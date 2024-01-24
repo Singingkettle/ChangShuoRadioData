@@ -1,0 +1,116 @@
+clc
+clear 
+close all
+
+% Add Modulation Classification with Deep Learning Tool in the environment
+addpath('C:\Users\97147\Documents\MATLAB\Examples\R2021b\deeplearning_shared\ModulationClassificationWithDeepLearningExample');
+
+rng(123)
+
+dataDirectory = './data';
+
+
+function generate_data_with_snr(snr)
+    SNR = snr;
+    maxOffset = 5;
+    sps = 32;               % Samples per symbol, must be an even number
+    spf = 4096;             % Samples per frame
+    symbolsPerFrame = spf / sps;
+    fs = 200e3;             % Sample rate
+    fc = [902e6 100e6];     % Center frequencies
+    sb = 3*fs/sps;          % Signal bandwidth
+    num_bands = floor((fs-sb)/sb/2)*2+1;
+    
+    numFramesPerModType = 10000;
+    modulationTypes = categorical(["BPSK", "QPSK", "8PSK", "16QAM", "64QAM"]);
+    channel = helperModClassTestChannel(...
+      'SampleRate', fs, ...
+      'SNR', SNR, ...
+      'PathDelays', [0 1.8 3.4] / fs, ...
+      'AveragePathGains', [0 -2 -10], ...
+      'KFactor', 4, ...
+      'MaximumDopplerShift', 4, ...
+      'MaximumClockOffset', 5, ...
+      'CenterFrequency', 902e6);
+    
+    
+    numModulationTypes = length(modulationTypes);
+    tic
+    transDelay = 50;
+    
+    i = 0;
+    two_set = zeros(numModulationTypes*(numModulationTypes-1)/2, 2);
+    for modType1 = 1:numModulationTypes-1
+        for modType2 = modType1+1:numModulationTypes
+            i = i+1;
+            two_set(i, 1) = modType1;
+            two_set(i, 2) = modType2;
+        end
+    end
+    
+    x = zeros(size(two_set, 1)*numFramesPerModType, spf);
+    for index = 1:size(two_set, 1)
+        elapsedTime = seconds(toc);
+        elapsedTime.Format = 'hh:mm:ss';
+        fprintf('%s - Generating %s %s frames of %d dB\n', ...
+          elapsedTime, modulationTypes(two_set(index, 1), SNR), ...
+          modulationTypes(two_set(index, 2)));
+        
+        label1 = modulationTypes(two_set(index, 1));
+        label2 = modulationTypes(two_set(index, 2));
+        numSymbols = (numFramesPerModType / sps);
+        dataSrc1 = helperModClassGetSource( ...
+            modulationTypes(two_set(index, 1)), sps, 2*spf, fs);
+        modulator1 = helperModClassGetModulator( ...
+            modulationTypes(two_set(index, 1)), sps, fs);
+        
+        dataSrc2 = helperModClassGetSource( ...
+            modulationTypes(two_set(index, 2)), sps, 2*spf, fs);
+        modulator2 = helperModClassGetModulator( ...
+            modulationTypes(two_set(index, 2)), sps, fs);
+    
+        % Digital modulation types use a center frequency of 902 MHz
+        channel.CenterFrequency = 902e6;
+       
+        for p=1:numFramesPerModType
+            % Set band index in random and move baseban signal to the speicifed
+            % sub-band
+            bands = (randperm(num_bands)-(num_bands+1)/2).*sb;
+            exp1 = expWave(bands(1), fs, spf);
+            exp2 = expWave(bands(2), fs, spf);
+            band1 = exp1();
+            band2 = exp2();
+            % Generate random data
+            x1 = dataSrc1();
+            x2 = dataSrc2();
+            
+            % Modulate
+            y1 = modulator1(x1);
+            y2 = modulator2(x2);
+            
+            % Add carrier
+            y3 = y1.*band1;
+            y4 = y2.*band2;
+            y = y3 + y4;
+    
+            % Pass through independent channels
+            rxSamples = channel(y);
+            rxSamples(end) = 0;
+            % Remove transients from the beginning, trim to size, and normalize
+            frame = helperModClassFrameGenerator(rxSamples, spf, spf, ...
+                transDelay, sps);
+            
+        end
+    end
+
+end
+
+function y = expWave(fc, fs, spf)
+    sine = dsp.SineWave("Frequency",fc,"SampleRate",fs, ...
+        "ComplexOutput",false, "SamplesPerFrame",2*spf);
+    cosine = dsp.SineWave("Frequency",fc,"SampleRate",fs, ...
+        "ComplexOutput",false, "SamplesPerFrame",2*spf, ...
+        "PhaseOffset", pi/2);
+    
+    y = complex(cosine(), sine());
+end
