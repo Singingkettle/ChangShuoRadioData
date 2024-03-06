@@ -1,0 +1,5 @@
+# Donot change the template config file, please copy it and write 
+# your own file.
+
+filePrefix: '../data'
+modulatorType: ['BPSK', 'QPSK']
