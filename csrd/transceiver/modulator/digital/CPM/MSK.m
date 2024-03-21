@@ -1,6 +1,5 @@
 classdef MSK < BaseModulator
-    
-   
+
     methods
 
         function modulator = getModulator(obj)
@@ -12,17 +11,16 @@ classdef MSK < BaseModulator
             obj.isDigital = true;
         end
 
-        
         function bw = bandWidth(obj, x)
 
             bw = obw(x, obj.sampleRate);
-            
+
         end
 
-        function  y = passBand(obj, x)
+        function y = passBand(obj, x)
             y = real(x .* obj.carrierWave);
         end
-        
+
     end
-    
+
 end

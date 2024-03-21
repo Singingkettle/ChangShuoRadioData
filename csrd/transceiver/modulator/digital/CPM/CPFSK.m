@@ -1,8 +1,8 @@
 classdef CPFSK < BaseModulator
-% https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
-% MSK 和 GMSK 是CPFSK的特例，所以在构造数据集的时候不考虑更高阶，
-% https://blog.csdn.net/Insomnia_X/article/details/126333301
-% TODO: Support CPFSK in high order > 2
+    % https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
+    % MSK 和 GMSK 是CPFSK的特例，所以在构造数据集的时候不考虑更高阶，
+    % https://blog.csdn.net/Insomnia_X/article/details/126333301
+    % TODO: Support CPFSK in high order > 2
     methods
 
         function modulator = getModulator(obj)
@@ -11,7 +11,7 @@ classdef CPFSK < BaseModulator
                 obj.samplePerSymbol);
 
             obj.isDigital = true;
-            
+
         end
 
         function bw = bandWidth(obj, x)

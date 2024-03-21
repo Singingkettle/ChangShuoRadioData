@@ -1,5 +1,5 @@
 classdef RandomSource < BaseSource
-    
+
     methods
 
         function obj = RandomSource(param)

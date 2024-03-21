@@ -21,33 +21,32 @@ close all
 %     FFTLength=numSC, ...
 %     CyclicPrefixLength=cpLen);
 % errorRate = comm.ErrorRate(ResetInputPort=true);
-% 
+%
 % dataIn = randi([0,1],frameSize);              % Generate binary data
 % qpskTx = pskmod(dataIn,M,InputType="bit");    % Apply QPSK modulation
 % txSig = ofdmMod(qpskTx);
-% 
+%
 % h1 = designMultirateFIR(5,1, 1000);
 % txsig1 = resample(double(txSig),5,1,h1);
-% 
+%
 % h2 = designMultirateFIR(1,5, 1000);
 % txsig2 = resample(double(txsig1),1,5,h2);
-% 
-% 
+%
+%
 % sum(abs(txsig2-txSig))
-% 
-% 
-% qpskRx = ofdmDemod(txSig);                      
-% dataOut = pskdemod(qpskRx,M,OutputType="bit");  
-% errorStats = errorRate(dataIn,dataOut,0); 
-% 
-% 
-% qpskRx1 = ofdmDemod(txsig2);                      
-% dataOut1 = pskdemod(qpskRx1,M,OutputType="bit");  
-% errorStats1 = errorRate(dataIn,dataOut1,0); 
-% 
-% 
+%
+%
+% qpskRx = ofdmDemod(txSig);
+% dataOut = pskdemod(qpskRx,M,OutputType="bit");
+% errorStats = errorRate(dataIn,dataOut,0);
+%
+%
+% qpskRx1 = ofdmDemod(txsig2);
+% dataOut1 = pskdemod(qpskRx1,M,OutputType="bit");
+% errorStats1 = errorRate(dataIn,dataOut1,0);
+%
+%
 % sum(abs(dataOut1-dataOut))
-
 
 clc
 clear
@@ -68,7 +67,17 @@ memoryLessNonlinearityConfig.IIP3 = 30;
 
 modulatorConfig.mode = 'QPSK';
 modulatorConfig.order = 4;
-modulatorConfig.ofdm. = 4;
+modulatorConfig.ofdm.fftLength = 128;
+modulatorConfig.ofdm.numGuardBandCarriers = [6; 5];
+modulatorConfig.ofdm.insertDCNull = false;
+modulatorConfig.ofdm.pilotInputPort = true;
+modulatorConfig.ofdm.pilotCarrierIndices = [12; 26; 40; 54];
+modulatorConfig.ofdm.cyclicPrefixLength = 16;
+modulatorConfig.ofdm.windowing = false;
+modulatorConfig.ofdm.windowLength = 1;
+modulatorConfig.ofdm.oversamplingFactor = 1;
+modulatorConfig.ofdm.numSymbols = 1;
+modulatorConfig.ofdm.numTransmitAntennnas = 1;
 
 param.iqImbalanceConfig = iqImbalanceConfig;
 param.phaseNoiseConfig = phaseNoiseConfig;
@@ -81,7 +90,7 @@ param.samplePerSymbol = 8;
 
 source = RandomSource(param);
 
-modualtor = PSK(param);
+modualtor = OFDM(param);
 
 x = source();
 y = modualtor(x);

@@ -1,10 +1,13 @@
 classdef OFDM < BaseModulator
     % https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
     % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html
+    % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m
     properties
         sampler
         firstStageModulator
         secondStageModulator
+        numDatas
+        numSymbols
     end
 
     methods
@@ -36,33 +39,47 @@ classdef OFDM < BaseModulator
 
         function secondStageModulator = getSecondStageModulator(obj)
             p = obj.modulatorConfig.ofdm;
+
             secondStageModulator = comm.OFDMModulator( ...
                 FFTLength = p.fftLength, ...
                 NumGuardBandCarriers = p.numGuardBandCarriers, ...
-                InsertDCNull = p.InsertDCNull, ...
-                PilotInputPort = p.pilotInputPort, ...
-                PilotCarrierIndices = p.pilotCarrierIndices, ...
+                InsertDCNull = p.insertDCNull, ...
                 CyclicPrefixLength = p.cyclicPrefixLength, ...
-                Windowing = p.windowing, ...
-                WindowLength = p.windowLength, ...
                 OversamplingFactor = p.oversamplingFactor, ...
-                NumSymbols = p.numSymbols, ...
                 NumTransmitAntennas = p.numTransmitAntennnas);
+
+            if p.pilotInputPort
+                secondStageModulator.PilotInputPort = p.pilotInputPort;
+                secondStageModulator.PilotCarrierIndices = p.pilotCarrierIndices;
+            end
+
+            if p.windowing
+                secondStageModulator.Windowing = true;
+                secondStageModulator.WindowLength = p.windowLength;
+            end
+
+            ofdmInfo = info(secondStageModulator);
+            ns = ceil(obj.samplePerFrame / ofdmInfo.DataInputSize(1));
+            secondStageModulator.NumSymbols = ns;
+            obj.numSymbols = ns;
+            obj.numDatas = ofdmInfo.DataInputSize;
         end
 
         function modulator = getModulator(obj)
-           obj.sampler = obj.getSampler;
-           obj.firstStageModulator = obj.getFirstStageModulator;
-           obj.secondStageModulator = obj.getSecondStageModulator;
+            obj.sampler = obj.getSampler;
+            obj.firstStageModulator = obj.getFirstStageModulator;
+            obj.secondStageModulator = obj.getSecondStageModulator;
 
-           modulator = @(x)baseOFDMModulator(x, ...
-               obj.firstStageModulator, ...
-               obj.secondStageModulator, ...
-               obj.sampler);
+            modulator = @(x)baseOFDMModulator(x, ...
+                obj.numDatas, ...
+                obj.numSymbols, ...
+                obj.firstStageModulator, ...
+                obj.secondStageModulator, ...
+                obj.sampler);
+            obj.isDigital = true;
 
         end
-        
-        
+
         function bw = bandWidth(obj, x)
 
             bw = obw(x, obj.sampleRate);
@@ -77,11 +94,12 @@ classdef OFDM < BaseModulator
 
 end
 
+function y = baseOFDMModulator(x, ns, nd, m1, m2, s)
 
-function y = baseOFDMModulator(x, m1, m2, s)
-
-x = m1(x);
-x = m2(x);
-y = s(x);
+    x = [x; randsample(x, ns * nd - length(x))];
+    x = m1(x);
+    x = reshape(x, [nd, ns, 1]);
+    x = m2(x);
+    y = s(x);
 
 end

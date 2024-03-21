@@ -1,9 +1,11 @@
 classdef QAM < BaseModulator
-    
-   properties (Dependent=false)
-        filterCoeffs 
+
+    properties (Dependent = false)
+        filterCoeffs
     end
+
     methods
+
         function filterCoeffs = get.filterCoeffs(obj)
 
             filterCoeffs = rcosdesign(obj.modulatorConfig.beta, ...
@@ -22,27 +24,25 @@ classdef QAM < BaseModulator
 
         end
 
-        
         function bw = bandWidth(obj, x)
 
             bw = obw(x, obj.sampleRate);
-            
+
         end
 
-        function  y = passBand(obj, x)
+        function y = passBand(obj, x)
             y = real(x .* obj.carrierWave);
         end
-        
-    end
-    
-end
 
+    end
+
+end
 
 function y = basQAMModulator(x, order, sps, filterCoeffs)
 
-y = qammod(x, order, 'UnitAveragePower', true);
+    y = qammod(x, order, 'UnitAveragePower', true);
 
-% Pulse shape
-y = filter(filterCoeffs, 1, upsample(y, sps));
+    % Pulse shape
+    y = filter(filterCoeffs, 1, upsample(y, sps));
 
-end 
+end
