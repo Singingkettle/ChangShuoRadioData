@@ -49,9 +49,13 @@ classdef BaseModulator < matlab.System
             phaseNoise = comm.PhaseNoise( ...
                 Level = obj.phaseNoiseConfig.Level, ...
                 FrequencyOffset = obj.phaseNoiseConfig.FrequencyOffset, ...
-                SampleRate = obj.sampleRate, ...
-                RandomStream = obj.phaseNoiseConfig.RandomStream, ...
-                Seed = obj.phaseNoiseConfig.Seed);
+                SampleRate = obj.sampleRate);
+
+            if strcmp(obj.phaseNoiseConfig.RandomStream, 'mt19936ar with seed')
+                phaseNoise.RandomStream = "mt19937ar with seed";
+                phaseNoise.Seed = obj.phaseNoiseConfig.Seed;
+            end
+
         end
 
         function samplePerFrame = getSamplePerFrame(obj)

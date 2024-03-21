@@ -59,10 +59,10 @@ classdef OFDM < BaseModulator
             end
 
             ofdmInfo = info(secondStageModulator);
-            ns = ceil(obj.samplePerFrame / ofdmInfo.DataInputSize(1));
+            ns = ceil(obj.samplePerFrame / obj.samplePerSymbol / ofdmInfo.DataInputSize(1));
             secondStageModulator.NumSymbols = ns;
             obj.numSymbols = ns;
-            obj.numDatas = ofdmInfo.DataInputSize;
+            obj.numDatas = ofdmInfo.DataInputSize(1);
         end
 
         function modulator = getModulator(obj)
@@ -98,7 +98,7 @@ function y = baseOFDMModulator(x, ns, nd, m1, m2, s)
 
     x = [x; randsample(x, ns * nd - length(x))];
     x = m1(x);
-    x = reshape(x, [nd, ns, 1]);
+    x = reshape(x, [ns, nd, 1]);
     x = m2(x);
     y = s(x);
 

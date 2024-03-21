@@ -2,6 +2,8 @@ clear
 clc
 close all
 
+% 关于如何设置OFDM有效参数范围的参考https://www.mathworks.com/help/comm/ug/ofdm-transmitter-and-receiver.html
+
 % rng(0)
 % M = 4;                 % Modulation alphabet
 % k = log2(M);           % Bits/symbol
@@ -64,13 +66,17 @@ memoryLessNonlinearityConfig.Method = 'Cubic polynomial';
 memoryLessNonlinearityConfig.LinearGain = 10;
 memoryLessNonlinearityConfig.TOISpecification = 'IIP3';
 memoryLessNonlinearityConfig.IIP3 = 30;
+memoryLessNonlinearityConfig.AMPMConversion = 10;
+memoryLessNonlinearityConfig.PowerLowerLimit = 10;
+memoryLessNonlinearityConfig.PowerUpperLimit = inf;
+memoryLessNonlinearityConfig.ReferenceImpedance = 1;
 
 modulatorConfig.mode = 'QPSK';
 modulatorConfig.order = 4;
 modulatorConfig.ofdm.fftLength = 128;
 modulatorConfig.ofdm.numGuardBandCarriers = [6; 5];
 modulatorConfig.ofdm.insertDCNull = false;
-modulatorConfig.ofdm.pilotInputPort = true;
+modulatorConfig.ofdm.pilotInputPort = false;
 modulatorConfig.ofdm.pilotCarrierIndices = [12; 26; 40; 54];
 modulatorConfig.ofdm.cyclicPrefixLength = 16;
 modulatorConfig.ofdm.windowing = false;
