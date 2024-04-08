@@ -1,33 +1,17 @@
-classdef SSBAM < BaseModulator
+classdef SSBAM < DSBSCAM
 
-    methods
+    methods (Access = protected)
 
-        function modulator = getModulator(obj)
+        function y = baseModulator(obj, x)
 
-            if strcmp(obj.modulatorConfig.mode, 'upper')
-                modulator = @(x)ssbmod(x, obj.carrierFrequency, ...
-                    obj.sampleRate, obj.modulatorConfig.initPhase, 'upper');
+            x = lowpass(x, 30e3, obj.SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
+
+            if strcmp(obj.ModulatorConfig.mode, 'upper')
+                y = complex(x, imag(hilbert(x)));
             else
-                modulator = @(x)ssbmod(x, obj.carrierFrequency, ...
-                    obj.sampleRate, obj.modulatorConfig.initPhase);
+                y = complex(x, -imag(hilbert(x)));
             end
 
-            obj.isDigital = false;
-
-        end
-
-        function bw = bandWidth(obj, x)
-
-            if strcmp(obj.modulatorConfig.mode, 'upper')
-                bw = obw(x, obj.sampleRate, [obj.carrierFrequency, obj.sampleRate / 2]);
-            else
-                bw = obw(x, obj.sampleRate, [0, obj.carrierFrequency]);
-            end
-
-        end
-
-        function y = passBand(obj, x)
-            y = x;
         end
 
     end

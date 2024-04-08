@@ -1,10 +1,25 @@
-classdef DSBSCAM < DSBAM
+classdef DSBSCAM < BaseModulator
+
+    methods (Access = protected)
+
+        function y = baseModulator(obj, x)
+
+            x = lowpass(x, 30e3, obj.SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
+            y = x;
+
+        end
+
+    end
 
     methods
 
-        function modulator = getModulator(obj)
-            modulator = @(x)obj.placeHolder(x);
-            obj.isDigital = false;
+        function modulatorHandle = genModulatorHandle(obj)
+
+            modulatorHandle = @(x)obj.baseModulator(x);
+            obj.IsDigital = false;
+            % donot consider multi-tx in analog modulation
+            obj.NumTransmitAntennnas = 1;
+
         end
 
     end

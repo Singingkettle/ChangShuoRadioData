@@ -1,24 +1,14 @@
-classdef MSK < BaseModulator
+classdef MSK < FSK
 
     methods
 
-        function modulator = getModulator(obj)
-            modulator = @(x)mskmod(x, ...
-                obj.samplePerSymbol, ...
-                obj.modulatorConfig.dataEncode, ...
-                obj.modulatorConfig.initPhase);
-
+        function modulatorHandle = genModulator(obj)
+            modulatorHandle = @(x)mskmod(x, ...
+                obj.SamplePerSymbol, ...
+                obj.ModulatorConfig.DataEncode, ...
+                obj.ModulatorConfig.InitPhase);
+            obj.NumTransmitAntennnas = 1;
             obj.isDigital = true;
-        end
-
-        function bw = bandWidth(obj, x)
-
-            bw = obw(x, obj.sampleRate);
-
-        end
-
-        function y = passBand(obj, x)
-            y = real(x .* obj.carrierWave);
         end
 
     end

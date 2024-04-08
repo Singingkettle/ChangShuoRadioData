@@ -1,27 +1,23 @@
 classdef FSK < BaseModulator
 
+    properties
+
+        SamplePerSymbol (1, 1) {mustBePositive, mustBeReal} = 2
+
+    end
+
     methods
 
-        function modulator = getModulator(obj)
-            modulator = @(x)fskmod(x, ...
-                obj.modulatorConfig.order, ...
-                obj.sampleRate / obj.samplePerSymbol / 2, ...
-                obj.samplePerSymbol, ...
-                obj.sampleRate, ...
+        function modulatorHandle = genModulator(obj)
+            modulatorHandle = @(x)fskmod(x, ...
+                obj.ModulatorConfig.order, ...
+                obj.SampleRate / obj.SamplePerSymbol / 2, ...
+                obj.SamplePerSymbol, ...
+                obj.SampleRate, ...
                 'discont', ...
-                obj.modulatorConfig.symbolOrder);
-
-            obj.isDigital = true;
-        end
-
-        function bw = bandWidth(obj, x)
-
-            bw = (obj.modulatorConfig.order - 1) * obj.sampleRate / obj.samplePerSymbol / 2;
-
-        end
-
-        function y = passBand(obj, x)
-            y = real(x .* obj.carrierWave);
+                obj.ModulatorConfig.SymbolOrder);
+            obj.NumTransmitAntennnas = 1;
+            obj.IsDigital = true;
         end
 
     end

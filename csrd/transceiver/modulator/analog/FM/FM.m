@@ -2,27 +2,13 @@ classdef FM < BaseModulator
 
     methods
 
-        function modulator = getModulator(obj)
-            % modulator = comm.FMModulator( ...
-            %     %AudioSampleRate = obj.sampleRate, ...
-            %     SampleRate = obj.sampleRate, ...
-            %     FrequencyDeviation = obj.modulatorConfig.frequencyDeviation);
-            modulator = comm.FMModulator( ...
-                SampleRate = obj.sampleRate, ...
-                FrequencyDeviation = obj.modulatorConfig.frequencyDeviation);
-        end
+        function modulatorHandle = genModulatorHandle(obj)
 
-        function bw = bandWidth(obj, x)
-
-            bw1 = obw(real(x), obj.sampleRate) * 2;
-            bw2 = obw(imag(x), obj.sampleRate) * 2;
-            bw = max([bw1, bw2]);
-
-        end
-
-        function y = passBand(obj, x)
-
-            y = x .* obj.carrierWave + conj(x) .* conj(obj.carrierWave);
+            modulatorHandle = comm.FMModulator( ...
+                SampleRate = obj.SampleRate, ...
+                FrequencyDeviation = obj.ModulatorConfig.frequencyDeviation);
+            obj.IsDigital = false;
+            obj.NumTransmitAntennnas = 1; % donot consider multi-tx in analog modulation
 
         end
 

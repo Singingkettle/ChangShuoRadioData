@@ -1,53 +1,22 @@
-classdef PSK < BaseModulator
+classdef PSK < APSK
+    % 关于ostbc 与PRC的关系https://publik.tuwien.ac.at/files/pub-et_8438.pdf
+    methods (Access = protected)
 
-    properties (Dependent = false)
-        filterCoeffs
-    end
+        function y = baseModulator(obj, x)
 
-    methods
+            if differential
+                x = dpskmod(x, obj.ModulatorConfig.order);
+            else
+                x = pskmod(x, obj.ModulatorConfig.order);
+            end
 
-        function filterCoeffs = get.filterCoeffs(obj)
+            x = obj.ostbc(x);
 
-            filterCoeffs = rcosdesign(obj.modulatorConfig.beta, ...
-                obj.modulatorConfig.span, ...
-                obj.samplePerSymbol);
+            % Pulse shape
+            y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
 
-        end
-
-        function modulator = getModulator(obj)
-            modulator = @(x)basPSKModulator(x, ...
-                obj.modulatorConfig.order, ...
-                obj.samplePerSymbol, ...
-                obj.filterCoeffs, ...
-                obj.modulatorConfig.differential);
-
-            obj.isDigital = true;
-
-        end
-
-        function bw = bandWidth(obj, x)
-
-            bw = obw(x, obj.sampleRate);
-
-        end
-
-        function y = passBand(obj, x)
-            y = real(x .* obj.carrierWave);
         end
 
     end
-
-end
-
-function y = basPSKModulator(x, order, sps, filterCoeffs, differential)
-
-    if differential
-        y = dpskmod(x, order);
-    else
-        y = pskmod(x, order);
-    end
-
-    % Pulse shape
-    y = filter(filterCoeffs, 1, upsample(y, sps));
 
 end

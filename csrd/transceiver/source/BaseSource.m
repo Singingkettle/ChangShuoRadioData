@@ -1,22 +1,28 @@
 classdef BaseSource < matlab.System
 
     properties
-        % Below two properties are only used in the digital system
-        order
-        samplePerSymbol
-        timeDuration
-        sampleRate
+        TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
+        SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
     end
 
-    properties (Dependent)
-        samplePerFrame
+    properties (Access = protected)
+        SamplePerFrame
     end
 
     methods
 
-        function samplePerFrame = get.samplePerFrame(obj)
-            samplePerFrame = obj.timeDuration * obj.sampleRate;
-            samplePerFrame = round(samplePerFrame);
+        function obj = BaseSource(varargin)
+
+            setProperties(obj, nargin, varargin{:});
+
+        end
+
+    end
+
+    methods (Access = protected)
+
+        function setupImpl(obj)
+            obj.SamplePerFrame = round(obj.SampleRate * obj.TimeDuration);
         end
 
     end

@@ -1,25 +1,27 @@
 classdef OFDM < BaseModulator
     % https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
-    % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html
-    % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m
+    % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html  关于如何实现对OFDM信号采样的仿真，本质上是一个转换
+    % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
+    % https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html 基于这个例子确定OFDM-MIMO的整体流程
     properties
         sampler
         firstStageModulator
+        ostbc
         secondStageModulator
         numDatas
-        numSymbols
     end
 
     methods
 
         function sampler = getSampler(obj)
+
             L = obj.samplePerSymbol;
             M = 1;
-
             TW = 0.001;
             AStop = 70;
             h = designMultirateFIR(L, M, TW, AStop);
             sampler = @(x)resample(x, L, M, h);
+
         end
 
         function firstStageModulator = getFirstStageModulator(obj)
@@ -59,20 +61,33 @@ classdef OFDM < BaseModulator
             end
 
             ofdmInfo = info(secondStageModulator);
-            ns = ceil(obj.samplePerFrame / obj.samplePerSymbol / ofdmInfo.DataInputSize(1));
-            secondStageModulator.NumSymbols = ns;
-            obj.numSymbols = ns;
             obj.numDatas = ofdmInfo.DataInputSize(1);
         end
 
         function modulator = getModulator(obj)
+
+            if obj.numTransmitAntennnas > 1
+
+                if obj.numTransmitAntennnas == 2
+                    obj.ostbc = comm.OSTBCEncoder( ...
+                        NumTransmitAntennas = obj.numTransmitAntennnas);
+                else
+                    obj.ostbc = comm.OSTBCEncoder( ...
+                        NumTransmitAntennas = obj.numTransmitAntennnas, ...
+                        SymbolRate = obj.modulatorConfig.ostbcSymbolRate);
+                end
+
+            else
+                obj.ostbc = @(x)obj.placeHolder(x);
+            end
+
             obj.sampler = obj.getSampler;
             obj.firstStageModulator = obj.getFirstStageModulator;
             obj.secondStageModulator = obj.getSecondStageModulator;
 
             modulator = @(x)baseOFDMModulator(x, ...
                 obj.numDatas, ...
-                obj.numSymbols, ...
+                obj.numTransmitAntennnas, ...
                 obj.firstStageModulator, ...
                 obj.secondStageModulator, ...
                 obj.sampler);
@@ -94,11 +109,15 @@ classdef OFDM < BaseModulator
 
 end
 
-function y = baseOFDMModulator(x, ns, nd, m1, m2, s)
+function y = baseOFDMModulator(x, nd, nt, m1, m2, s)
 
-    x = [x; randsample(x, ns * nd - length(x))];
     x = m1(x);
-    x = reshape(x, [ns, nd, 1]);
+    x = ostbc(x);
+    ns = fix(size(x, 1) / nd);
+    x = x(1:ns * nd, :);
+    x = reshape(x, [ns, nd, nt]);
+
+    m2.NumSymbols = ns;
     x = m2(x);
     y = s(x);
 

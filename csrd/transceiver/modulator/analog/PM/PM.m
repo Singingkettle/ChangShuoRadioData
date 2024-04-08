@@ -1,21 +1,28 @@
-classdef PM < FM
+classdef PM < BaseModulator
 
-    methods
+    methods (Access = private)
 
-        function modulator = getModulator(obj)
+        function y = baseModulator(obj, x)
 
-            modulator = @(x)basePMModulator(x, ...
-                obj.modulatorConfig.phaseDev, ...
-                obj.modulatorConfig.initPhase);
+            y = complex(cos(obj.ModulatorConfig.phaseDev * x + ...
+                obj.ModulatorConfig.initPhase), ...
+                sin(obj.ModulatorConfig.phaseDev * x + ...
+                obj.ModulatorConfig.initPhase)) / 2;
 
         end
 
     end
 
-end
+    methods
 
-function y = basePMModulator(x, ini_phase)
+        function modulatorHandle = genModulatorHandle(obj)
 
-    y = complex(cos(phasedev * x + ini_phase), sin(phasedev * x + ini_phase)) / 2;
+            modulatorHandle = @(x)obj.baseModulator(x);
+            obj.IsDigital = false;
+            obj.NumTransmitAntennnas = 1; % donot consider multi-tx in analog modulation
+
+        end
+
+    end
 
 end

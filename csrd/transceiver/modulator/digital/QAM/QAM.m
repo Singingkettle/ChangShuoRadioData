@@ -1,48 +1,18 @@
-classdef QAM < BaseModulator
+classdef QAM < APSK
 
-    properties (Dependent = false)
-        filterCoeffs
-    end
+    methods (Access = protected)
 
-    methods
+        function y = baseModulator(obj, x)
+            % Modulate
+            x = qammod(x, obj.ModulatorConfig.order, ...
+                UnitAveragePower = true);
+            x = obj.ostbc(x);
 
-        function filterCoeffs = get.filterCoeffs(obj)
+            % Pulse shape
+            y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
 
-            filterCoeffs = rcosdesign(obj.modulatorConfig.beta, ...
-                obj.modulatorConfig.span, ...
-                obj.samplePerSymbol);
-
-        end
-
-        function modulator = getModulator(obj)
-            modulator = @(x)basQAMModulator(x, ...
-                obj.modulatorConfig.order, ...
-                obj.samplePerSymbol, ...
-                obj.filterCoeffs);
-
-            obj.isDigital = true;
-
-        end
-
-        function bw = bandWidth(obj, x)
-
-            bw = obw(x, obj.sampleRate);
-
-        end
-
-        function y = passBand(obj, x)
-            y = real(x .* obj.carrierWave);
         end
 
     end
-
-end
-
-function y = basQAMModulator(x, order, sps, filterCoeffs)
-
-    y = qammod(x, order, 'UnitAveragePower', true);
-
-    % Pulse shape
-    y = filter(filterCoeffs, 1, upsample(y, sps));
 
 end

@@ -1,28 +1,14 @@
-classdef DSBAM < BaseModulator
+classdef DSBAM < DSBSCAM
 
-    methods
+    methods (Access = protected)
 
-        function modulator = getModulator(obj)
-            modulator = @(x)baseAMModulator(x);
-            obj.isDigital = false;
-        end
+        function y = baseModulator(obj, x)
 
-        function bw = bandWidth(obj, x)
-            bw = obw(x - min(abs(x)), obj.sampleRate) * 2;
-        end
+            x = lowpass(x, 30e3, obj.SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
+            y = x + obj.ModulatorConfig.carramp;
 
-        function y = passBand(obj, x)
-            t = (0:1 / obj.sampleRate:((size(x, 1) - 1) / obj.sampleRate))';
-            t = t(:, ones(1, size(x, 2)));
-            y = x .* cos(2 * pi * obj.carrierFrequency * t + obj.modulatorConfig.initPhase);
         end
 
     end
-
-end
-
-function y = baseAMModulator(x)
-
-    y = x + min(abs(x));
 
 end

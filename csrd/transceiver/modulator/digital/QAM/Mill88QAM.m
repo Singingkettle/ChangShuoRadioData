@@ -1,12 +1,11 @@
-classdef ASK < APSK
+classdef Mill88QAM < APSK
 
     methods (Access = protected)
 
         function y = baseModulator(obj, x)
-
-            amp = 1 / sqrt(mean(abs(pammod(0:obj.ModulationOrder - 1, obj.ModulationOrder)) .^ 2));
             % Modulate
-            x = amp * pammod(x, obj.ModulationOrder);
+            x = mil188qammod(x, obj.ModulatorConfig.order, ...
+                UnitAveragePower = true);
             x = obj.ostbc(x);
 
             % Pulse shape

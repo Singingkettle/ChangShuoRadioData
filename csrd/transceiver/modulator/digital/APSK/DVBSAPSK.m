@@ -1,12 +1,14 @@
-classdef ASK < APSK
+classdef DVBSAPSK < APSK
 
     methods (Access = protected)
 
         function y = baseModulator(obj, x)
 
-            amp = 1 / sqrt(mean(abs(pammod(0:obj.ModulationOrder - 1, obj.ModulationOrder)) .^ 2));
             % Modulate
-            x = amp * pammod(x, obj.ModulationOrder);
+            x = dvbsapskmod(x, obj.ModulationOrder, ...
+                obj.ModulatorConfig.stdSuffix, ...
+                obj.ModulatorConfig.codeIDF, ...
+                UnitAveragePower = true);
             x = obj.ostbc(x);
 
             % Pulse shape

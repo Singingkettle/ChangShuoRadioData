@@ -1,0 +1,19 @@
+classdef Rayleigh < BaseChannel
+
+    methods
+
+        function channel = getChannel(obj)
+
+            channel = comm.RayleighChannel( ...
+                SampleRate = obj.channelConfig.sampleRate, ...
+                PathDelays = obj.channelConfig.pathDelays, ...
+                AveragePathGains = obj.channelConfig.averagePathGains, ...
+                NormalizePathGains = obj.channelConfig.normalizePathGains, ...
+                MaximumDopplerShift = obj.channelConfig.maximumDopplerShift, ...
+                DopplerSpectrum = obj.channelConfig.dopplerSpectrum);
+
+        end
+
+    end
+
+end

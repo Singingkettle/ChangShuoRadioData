@@ -1,43 +1,30 @@
-classdef CPFSK < BaseModulator
+classdef CPFSK < GFSK
     % https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
     % MSK 和 GMSK 是CPFSK的特例，所以在构造数据集的时候不考虑更高阶，
     % https://blog.csdn.net/Insomnia_X/article/details/126333301
     % TODO: Support CPFSK in high order > 2
+
     methods
 
-        function modulator = getModulator(obj)
+        function modulatorHandle = genModulator(obj)
 
-            modulator = @(x)baseCPFSKMdulator(x, obj.modulatorConfig, ...
-                obj.samplePerSymbol);
+            if obj.ModulatorConfig.order <= 2
+                error("Value of Modulation order must be large than 2.");
+            end
 
-            obj.isDigital = true;
+            obj.meanM = mean(0:obj.ModulatorConfig.order - 1);
+            obj.pureModulator = comm.CPFSKModulator( ...
+                ModulationOrder = obj.ModulatorConfig.order, ...
+                ModulationIndex = obj.modulatorConfig.ModulationIndex, ...
+                InitialPhaseOffset = obj.modulatorConfig.initialPhaseOffset, ...
+                SamplesPerSymbol = obj.SamplePerSymbol);
 
-        end
-
-        function bw = bandWidth(obj, x)
-
-            bw = obw(x, obj.sampleRate);
-
-        end
-
-        function y = passBand(obj, x)
-
-            y = real(x .* obj.carrierWave);
+            modulatorHandle = @(x)baseMdulator(x);
+            obj.NumTransmitAntennnas = 1;
+            obj.IsDigital = true;
 
         end
 
     end
-
-end
-
-function y = baseCPFSKMdulator(x, modulatorConfig, sps)
-
-    modulator = comm.CPFSKModulator( ...
-        ModulationOrder = modulatorConfig.order, ...
-        ModulationIndex = modulatorConfig.modulationIndex, ...
-        InitialPhaseOffset = modulatorConfig.initialPhaseOffset, ...
-        SamplesPerSymbol = sps);
-    meanM = mean(0:modulatorConfig.order - 1);
-    y = modulator(2 * (x - meanM));
 
 end

@@ -3,42 +3,46 @@ classdef GFSK < BaseModulator
     % MSK 和 GMSK 是CPFSK的特例，所以在构造数据集的时候不考虑更高阶，
     % https://blog.csdn.net/Insomnia_X/article/details/126333301
     % TODO: Support CPFSK in high order > 2
-    methods
 
-        function modulator = getModulator(obj)
+    properties
 
-            modulator = @(x)baseGFSKMdulator(x, obj.modulatorConfig, ...
-                obj.samplePerSymbol);
+        meanM
+        pureModulator
 
-            obj.isDigital = true;
+    end
 
-        end
+    methods (Access = protected)
 
-        function bw = bandWidth(obj, x)
+        function y = baseMdulator(obj, x)
 
-            bw = obw(x, obj.sampleRate);
-
-        end
-
-        function y = passBand(obj, x)
-
-            y = real(x .* obj.carrierWave);
+            y = obj.pureModulator(2 * (x - obj.meanM));
 
         end
 
     end
 
-end
+    methods
 
-function y = baseGFSKMdulator(x, modulatorConfig, sps)
+        function modulatorHandle = genModulator(obj)
 
-    modulator = comm.CPMModulator( ...
-        ModulationOrder = modulatorConfig.order, ...
-        FrequencyPulse = "Gaussian", ...
-        ModulationIndex = 1, ...
-        BandwidthTimeProduct = modulatorConfig.bandwidthTimeProduct, ...
-        SamplesPerSymbol = sps);
-    meanM = mean(0:modulatorConfig.order - 1);
-    y = modulator(2 * (x - meanM));
+            if obj.ModulatorConfig.order <= 2
+                error("Value of Modulation order must be large than 2.");
+            end
+
+            obj.meanM = mean(0:obj.ModulatorConfig.order - 1);
+            obj.pureModulator = comm.CPMModulator( ...
+                ModulationOrder = obj.ModulatorConfig.order, ...
+                FrequencyPulse = "Gaussian", ...
+                ModulationIndex = 1, ...
+                BandwidthTimeProduct = obj.ModulatorConfig.BandwidthTimeProduct, ...
+                SamplesPerSymbol = obj.SamplePerSymbol);
+
+            modulatorHandle = @(x)baseMdulator(x);
+            obj.NumTransmitAntennnas = 1;
+            obj.IsDigital = true;
+
+        end
+
+    end
 
 end
