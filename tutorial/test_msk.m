@@ -2,35 +2,25 @@ clc
 clear
 close all
 
-iqImbalanceConfig.A = 0;
-iqImbalanceConfig.P = 0;
+% 单天线场景
+SampleRate = 200e3;
+TimeDuration = 1;
+ModulationOrder = 2;
+SamplePerSymbol = 8;
 
-phaseNoiseConfig.Level = -50;
-phaseNoiseConfig.FrequencyOffset = 20;
-phaseNoiseConfig.RandomStream = 'Global stream';
-phaseNoiseConfig.Seed = 2137;
+ModulatorConfig.DataEncode = 'diff';
+ModulatorConfig.InitPhase = 0;
 
-memoryLessNonlinearityConfig.Method = 'Cubic polynomial';
-memoryLessNonlinearityConfig.LinearGain = 10;
-memoryLessNonlinearityConfig.TOISpecification = 'IIP3';
-memoryLessNonlinearityConfig.IIP3 = 30;
+source = RandomSource(SampleRate=SampleRate, ...
+    TimeDuration=TimeDuration, ...
+    ModulationOrder=ModulationOrder, ...
+    SamplePerSymbol=SamplePerSymbol);
 
-modulatorConfig.order = 2;
-modulatorConfig.dataEncode = 'diff';
-modulatorConfig.initPhase = 0;
-
-param.iqImbalanceConfig = iqImbalanceConfig;
-param.phaseNoiseConfig = phaseNoiseConfig;
-param.memoryLessNonlinearityConfig = memoryLessNonlinearityConfig;
-param.carrierFrequency = 60000;
-param.timeDuration = 1;
-param.sampleRate = 200e3;
-param.modulatorConfig = modulatorConfig;
-param.samplePerSymbol = 8;
-
-source = RandomSource(param);
-
-modualtor = MSK(param);
+modualtor = MSK(SampleRate=SampleRate, ...
+    TimeDuration=TimeDuration, ...
+    ModulationOrder=ModulationOrder, ...
+    SamplePerSymbol=SamplePerSymbol, ...
+    ModulatorConfig=ModulatorConfig);
 
 x = source();
 y = modualtor(x);

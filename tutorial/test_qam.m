@@ -1,3 +1,27 @@
-M = 16;
-x = (0:M - 1)';
-y = qammod(x, M);
+clc
+clear
+close all
+
+% 单天线场景
+SampleRate = 200e3;
+TimeDuration = 1;
+ModulationOrder = 4;
+SamplePerSymbol = 8;
+
+ModulatorConfig.SymbolOrder = 'gray';
+ModulatorConfig.beta = 0.35;
+ModulatorConfig.span = 4;
+
+source = RandomSource(SampleRate=SampleRate, ...
+    TimeDuration=TimeDuration, ...
+    ModulationOrder=ModulationOrder, ...
+    SamplePerSymbol=SamplePerSymbol);
+
+modualtor = QAM(SampleRate=SampleRate, ...
+    TimeDuration=TimeDuration, ...
+    ModulationOrder=ModulationOrder, ...
+    SamplePerSymbol=SamplePerSymbol, ...
+    ModulatorConfig=ModulatorConfig);
+
+x = source();
+y = modualtor(x);

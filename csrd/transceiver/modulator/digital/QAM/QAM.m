@@ -4,7 +4,7 @@ classdef QAM < APSK
 
         function y = baseModulator(obj, x)
             % Modulate
-            x = qammod(x, obj.ModulatorConfig.order, ...
+            x = qammod(x, obj.ModulationOrder, obj.ModulatorConfig.SymbolOrder, ...
                 UnitAveragePower = true);
             x = obj.ostbc(x);
 

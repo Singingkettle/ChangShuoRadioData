@@ -4,7 +4,7 @@ classdef Mill88QAM < APSK
 
         function y = baseModulator(obj, x)
             % Modulate
-            x = mil188qammod(x, obj.ModulatorConfig.order, ...
+            x = mil188qammod(x, obj.ModulationOrder, ...
                 UnitAveragePower = true);
             x = obj.ostbc(x);
 

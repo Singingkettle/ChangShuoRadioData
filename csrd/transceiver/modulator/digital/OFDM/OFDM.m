@@ -3,19 +3,59 @@ classdef OFDM < BaseModulator
     % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html  关于如何实现对OFDM信号采样的仿真，本质上是一个转换
     % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
     % https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html 基于这个例子确定OFDM-MIMO的整体流程
+
+    properties (Nontunable)
+        SamplePerSymbol (1, 1) {mustBeReal, mustBePositive} = 4
+    end
+
     properties
-        sampler
+
         firstStageModulator
         ostbc
         secondStageModulator
-        numDatas
+        sampler
+        NumDataSubcarriers
+        NumSymbols
     end
 
-    methods
+    methods (Access = protected)
 
-        function sampler = getSampler(obj)
+        function y = baseModulator(obj, x)
 
-            L = obj.samplePerSymbol;
+            x = obj.firstStageModulator(x);
+            x = obj.ostbc(x);
+            obj.NumSymbols = fix(size(x, 1) / obj.NumDataSubcarriers);
+            x = x(1:obj.NumSymbols * obj.NumDataSubcarriers, :);
+            x = reshape(x, [obj.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennnas]);
+
+            obj.secondStageModulator.NumSymbols = obj.NumSymbols;
+            x = obj.secondStageModulator(x);
+            y = obj.sampler(x);
+
+        end
+
+        function ostbc = genOSTBC(obj)
+
+            if obj.NumTransmitAntennnas > 1
+
+                if obj.NumTransmitAntennnas == 2
+                    ostbc = comm.OSTBCEncoder( ...
+                        NumTransmitAntennas = obj.NumTransmitAntennnas);
+                else
+                    ostbc = comm.OSTBCEncoder( ...
+                        NumTransmitAntennas = obj.NumTransmitAntennnas, ...
+                        SymbolRate = obj.ModulatorConfig.ostbcSymbolRate);
+                end
+
+            else
+                ostbc = @(x)obj.placeHolder(x);
+            end
+
+        end
+
+        function sampler = genSampler(obj)
+
+            L = obj.SamplePerSymbol;
             M = 1;
             TW = 0.001;
             AStop = 70;
@@ -24,14 +64,16 @@ classdef OFDM < BaseModulator
 
         end
 
-        function firstStageModulator = getFirstStageModulator(obj)
+        function firstStageModulator = genFirstStageModulator(obj)
 
-            if contains(lower(obj.modulatorConfig.mode), 'psk')
+            if contains(lower(obj.ModulatorConfig.base.mode), 'psk')
                 firstStageModulator = @(x)pskmod(x, ...
-                    obj.modulatorConfig.order);
+                    obj.ModulationOrder, ...
+                    obj.ModulatorConfig.base.PhaseOffset, ...
+                    obj.ModulatorConfig.base.SymbolOrder);
             elseif contains(lower(mode), 'qam')
                 firstStageModulator = @(x)qammod(x, ...
-                    obj.modulatorConfig.order, ...
+                    obj.ModulationOrder, ...
                     'UnitAveragePower', true);
             else
                 error('Not implemented %s modulator in OFDM', mode);
@@ -39,86 +81,47 @@ classdef OFDM < BaseModulator
 
         end
 
-        function secondStageModulator = getSecondStageModulator(obj)
-            p = obj.modulatorConfig.ofdm;
+        function secondStageModulator = genSecondStageModulator(obj)
+            p = obj.ModulatorConfig.ofdm;
 
             secondStageModulator = comm.OFDMModulator( ...
-                FFTLength = p.fftLength, ...
-                NumGuardBandCarriers = p.numGuardBandCarriers, ...
-                InsertDCNull = p.insertDCNull, ...
-                CyclicPrefixLength = p.cyclicPrefixLength, ...
-                OversamplingFactor = p.oversamplingFactor, ...
-                NumTransmitAntennas = p.numTransmitAntennnas);
+                FFTLength = p.FFTLength, ...
+                NumGuardBandCarriers = p.NumGuardBandCarriers, ...
+                InsertDCNull = p.InsertDCNull, ...
+                CyclicPrefixLength = p.CyclicPrefixLength, ...
+                OversamplingFactor = p.OversamplingFactor, ...
+                NumTransmitAntennas = obj.NumTransmitAntennnas);
 
-            if p.pilotInputPort
-                secondStageModulator.PilotInputPort = p.pilotInputPort;
-                secondStageModulator.PilotCarrierIndices = p.pilotCarrierIndices;
+            if p.PilotInputPort
+                secondStageModulator.PilotInputPort = p.PilotInputPort;
+                secondStageModulator.PilotCarrierIndices = p.PilotCarrierIndices;
             end
 
-            if p.windowing
+            if p.Windowing
                 secondStageModulator.Windowing = true;
-                secondStageModulator.WindowLength = p.windowLength;
+                secondStageModulator.WindowLength = p.WindowLength;
             end
 
             ofdmInfo = info(secondStageModulator);
-            obj.numDatas = ofdmInfo.DataInputSize(1);
-        end
-
-        function modulator = getModulator(obj)
-
-            if obj.numTransmitAntennnas > 1
-
-                if obj.numTransmitAntennnas == 2
-                    obj.ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.numTransmitAntennnas);
-                else
-                    obj.ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.numTransmitAntennnas, ...
-                        SymbolRate = obj.modulatorConfig.ostbcSymbolRate);
-                end
-
-            else
-                obj.ostbc = @(x)obj.placeHolder(x);
-            end
-
-            obj.sampler = obj.getSampler;
-            obj.firstStageModulator = obj.getFirstStageModulator;
-            obj.secondStageModulator = obj.getSecondStageModulator;
-
-            modulator = @(x)baseOFDMModulator(x, ...
-                obj.numDatas, ...
-                obj.numTransmitAntennnas, ...
-                obj.firstStageModulator, ...
-                obj.secondStageModulator, ...
-                obj.sampler);
-            obj.isDigital = true;
-
-        end
-
-        function bw = bandWidth(obj, x)
-
-            bw = obw(x, obj.sampleRate);
-
-        end
-
-        function y = passBand(obj, x)
-            y = real(x .* obj.carrierWave);
+            obj.NumDataSubcarriers = ofdmInfo.DataInputSize(1);
         end
 
     end
 
-end
+    methods
 
-function y = baseOFDMModulator(x, nd, nt, m1, m2, s)
+        function modulatorHandle = genModulatorHandle(obj)
 
-    x = m1(x);
-    x = ostbc(x);
-    ns = fix(size(x, 1) / nd);
-    x = x(1:ns * nd, :);
-    x = reshape(x, [ns, nd, nt]);
+            obj.ostbc = obj.genOSTBC;
+            obj.sampler = obj.genSampler;
+            obj.firstStageModulator = obj.genFirstStageModulator;
+            obj.secondStageModulator = obj.genSecondStageModulator;
 
-    m2.NumSymbols = ns;
-    x = m2(x);
-    y = s(x);
+            modulatorHandle = @(x)obj.baseModulator(x);
+            obj.IsDigital = true;
+
+        end
+
+    end
 
 end

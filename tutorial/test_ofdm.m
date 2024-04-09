@@ -54,49 +54,35 @@ clc
 clear
 close all
 
-iqImbalanceConfig.A = 0;
-iqImbalanceConfig.P = 0;
+SampleRate = 200e3;
+TimeDuration = 1;
+ModulationOrder = 4;
+SamplePerSymbol = 8;
+NumTransmitAntennnas = 1;
 
-phaseNoiseConfig.Level = -50;
-phaseNoiseConfig.FrequencyOffset = 20;
-phaseNoiseConfig.RandomStream = 'Global stream';
-phaseNoiseConfig.Seed = 2137;
+ModulatorConfig.base.mode = 'QPSK';
+ModulatorConfig.base.PhaseOffset = pi/8;
+ModulatorConfig.base.SymbolOrder = 'gray';
+ModulatorConfig.ofdm.FFTLength = 128;
+ModulatorConfig.ofdm.NumGuardBandCarriers = [6; 5];
+ModulatorConfig.ofdm.InsertDCNull = false;
+ModulatorConfig.ofdm.PilotInputPort = false;
+ModulatorConfig.ofdm.PilotCarrierIndices = [12; 26; 40; 54];
+ModulatorConfig.ofdm.CyclicPrefixLength = 16;
+ModulatorConfig.ofdm.Windowing = false;
+ModulatorConfig.ofdm.WindowLength = 1;
+ModulatorConfig.ofdm.OversamplingFactor = 1;
 
-memoryLessNonlinearityConfig.Method = 'Cubic polynomial';
-memoryLessNonlinearityConfig.LinearGain = 10;
-memoryLessNonlinearityConfig.TOISpecification = 'IIP3';
-memoryLessNonlinearityConfig.IIP3 = 30;
-memoryLessNonlinearityConfig.AMPMConversion = 10;
-memoryLessNonlinearityConfig.PowerLowerLimit = 10;
-memoryLessNonlinearityConfig.PowerUpperLimit = inf;
-memoryLessNonlinearityConfig.ReferenceImpedance = 1;
+source = RandomSource(SampleRate = SampleRate, ...
+    TimeDuration = TimeDuration, ...
+    ModulationOrder = ModulationOrder, ...
+    SamplePerSymbol = SamplePerSymbol);
 
-modulatorConfig.mode = 'QPSK';
-modulatorConfig.order = 4;
-modulatorConfig.ofdm.fftLength = 128;
-modulatorConfig.ofdm.numGuardBandCarriers = [6; 5];
-modulatorConfig.ofdm.insertDCNull = false;
-modulatorConfig.ofdm.pilotInputPort = false;
-modulatorConfig.ofdm.pilotCarrierIndices = [12; 26; 40; 54];
-modulatorConfig.ofdm.cyclicPrefixLength = 16;
-modulatorConfig.ofdm.windowing = false;
-modulatorConfig.ofdm.windowLength = 1;
-modulatorConfig.ofdm.oversamplingFactor = 1;
-modulatorConfig.ofdm.numSymbols = 1;
-modulatorConfig.ofdm.numTransmitAntennnas = 1;
-
-param.iqImbalanceConfig = iqImbalanceConfig;
-param.phaseNoiseConfig = phaseNoiseConfig;
-param.memoryLessNonlinearityConfig = memoryLessNonlinearityConfig;
-param.carrierFrequency = 60000;
-param.timeDuration = 1;
-param.sampleRate = 200e3;
-param.modulatorConfig = modulatorConfig;
-param.samplePerSymbol = 8;
-
-source = RandomSource(param);
-
-modualtor = OFDM(param);
+modualtor = OFDM(SampleRate = SampleRate, ...
+    TimeDuration = TimeDuration, ...
+    ModulationOrder = ModulationOrder, ...
+    SamplePerSymbol = SamplePerSymbol, ...
+    ModulatorConfig = ModulatorConfig);
 
 x = source();
 y = modualtor(x);

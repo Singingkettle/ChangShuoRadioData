@@ -4,10 +4,10 @@ classdef PSK < APSK
 
         function y = baseModulator(obj, x)
 
-            if differential
-                x = dpskmod(x, obj.ModulatorConfig.order);
+            if obj.ModulatorConfig.Differential
+                x = dpskmod(x, obj.ModulationOrder, obj.ModulatorConfig.PhaseOffset, obj.ModulatorConfig.SymbolOrder);
             else
-                x = pskmod(x, obj.ModulatorConfig.order);
+                x = pskmod(x, obj.ModulationOrder, obj.ModulatorConfig.PhaseOffset, obj.ModulatorConfig.SymbolOrder);
             end
 
             x = obj.ostbc(x);

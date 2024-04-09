@@ -8,7 +8,7 @@ TimeDuration = 1;
 ModulationOrder = [4 8 20];
 SamplePerSymbol = 2;
 
-ModulatorConfig.ModulationOrder = ModulationOrder;
+
 ModulatorConfig.Radii = [0.3 0.7 1.2];
 ModulatorConfig.PhaseOffset = [0 0 0];
 ModulatorConfig.beta = 0.35;
@@ -34,7 +34,7 @@ ModulationOrder = [4 8 20];
 SamplePerSymbol = 2;
 NumTransmitAntennnas = 2;
 
-ModulatorConfig.ModulationOrder = ModulationOrder;
+
 ModulatorConfig.Radii = [0.3 0.7 1.2];
 ModulatorConfig.PhaseOffset = [0 0 0];
 ModulatorConfig.beta = 0.35;
