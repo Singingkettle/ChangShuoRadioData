@@ -2,7 +2,6 @@ classdef RandomSource < BaseSource
 
     properties
         ModulationOrder {mustBePositive, mustBeReal} = 2
-        SamplePerSymbol (1, 1) {mustBePositive, mustBeReal} = 2
     end
 
     methods
@@ -17,7 +16,7 @@ classdef RandomSource < BaseSource
 
     methods (Access = protected)
 
-        function y = stepImpl(obj)
+        function out = stepImpl(obj)
 
             if isscalar(obj.ModulationOrder)
                 y = randi([0, obj.ModulationOrder - 1], ...
@@ -26,6 +25,12 @@ classdef RandomSource < BaseSource
                 y = randi([0, sum(obj.ModulationOrder) - 1], ...
                     round(obj.SamplePerFrame / obj.SamplePerSymbol), 1);
             end
+            
+            out.data = y;
+            out.TimeDuration = obj.TimeDuration;
+            out.SampleRate = obj.SampleRate;
+            out.SamplePerFrame = length(y);
+            out.SamplePerSymbol = 1;
 
         end
 

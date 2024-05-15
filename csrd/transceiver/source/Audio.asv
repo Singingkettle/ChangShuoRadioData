@@ -1,0 +1,26 @@
+classdef Audio < BaseSource
+
+    methods (Access = protected)
+
+        function y = stepImpl(obj)
+            % Implement algorithm. Calculate y as a function of input u and
+            % discrete states.
+            SamplePerFrame = obj.SamplePerFrame * 1
+            audioSrc = dsp.AudioFileReader('audio_mix_441.wav', ...
+                'SamplesPerFrame', obj.SamplePerFrame, 'PlayCount', inf);
+            audioRC = dsp.SampleRateConverter('Bandwidth', 30e3, ...
+                'InputSampleRate', audioSrc.SampleRate, ...
+                'OutputSampleRate', obj.SampleRate);
+            [~, decimFactor] = getRateChangeFactors(audioRC);
+            audioSrc.SamplesPerFrame = ceil(obj.SamplePerFrame / ...
+                obj.SampleRate * audioSrc.SampleRate / ...
+                decimFactor) * decimFactor;
+
+            x = audioRC(audioSrc());
+            partID = randi(999)+1;
+            y = x((partID-1)*obj.SamplePerFrame+1:partID*obj.SamplePerFrame, 1);
+        end
+
+    end
+
+end
