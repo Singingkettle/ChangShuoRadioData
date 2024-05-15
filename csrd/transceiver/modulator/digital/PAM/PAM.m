@@ -13,8 +13,8 @@ classdef PAM < BaseModulator
     end
 
     methods (Access = protected)
- 
-        function y = baseModulator(obj, x)
+
+        function [y, bw] = baseModulator(obj, x)
 
             amp = 1 / sqrt(mean(abs(pammod(0:obj.ModulationOrder - 1, obj.ModulationOrder)) .^ 2));
             % Modulate
@@ -22,6 +22,10 @@ classdef PAM < BaseModulator
 
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
+            bw = obw(y, obj.SampleRate, [], 99.99999);
+            if obj.NumTransmitAntennnas > 1
+                bw = max(bw);
+            end
 
         end
 
@@ -38,12 +42,12 @@ classdef PAM < BaseModulator
         end
 
         function modulator = genModulatorHandle(obj)
-
+            
+            obj.IsDigital = true;
+            obj.NumTransmitAntennnas = 1;
             obj.filterCoeffs = obj.genFilterCoeffs;
             modulator = @(x)obj.baseModulator(x);
-            obj.NumTransmitAntennnas = 1;
-            obj.IsDigital = true;
-
+            
         end
 
     end

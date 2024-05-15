@@ -1,15 +1,11 @@
-classdef OFDM < BaseModulator
-    % https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
-    % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html  关于如何实现对OFDM信号采样的仿真，本质上是一个转换
-    % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
-    % https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html 基于这个例子确定OFDM-MIMO的整体流程
-    % https://www.mathworks.com/help/comm/ug/ofdm-transmitter-and-receiver.html
-    % 这个链接里面详细介绍了如何定义OFDM调制信号的采样率以及带宽
+classdef SCFDMA < BaseModulator
+    % This class is based on https://www.mathworks.com/help/comm/ug/scfdma-vs-ofdm.html
 
     properties (Nontunable)
         Subcarrierspacing (1, 1) {mustBeReal, mustBePositive} = 30e3
         % Transmit parameters
         NumTransmitAntennnas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennnas, [1, 2, 3, 4])} = 1
+        SubcarrierMappingInterval (1, 1) {mustBeReal, mustBePositive} = 1
     end
 
     properties
@@ -31,10 +27,18 @@ classdef OFDM < BaseModulator
             obj.NumSymbols = fix(size(x, 1) / obj.NumDataSubcarriers);
             x = x(1:obj.NumSymbols * obj.NumDataSubcarriers, :);
             x = reshape(x, [obj.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennnas]);
+            x = cat(1, x, ...
+                zeros(obj.ModulatorConfig.ofdm.FFTLength - ...
+                obj.NumDataSubcarriers, obj.NumSymbols, ...
+                obj.NumTransmitAntennnas));
+            x = fft(x(1:obj.NumDataSubcarriers, :), obj.NumDataSubcarriers);
+            x_ = zeros(obj.ModulatorConfig.ofdm.FFTLength, obj.NumSymbols);
+            x_ (1:obj.SubcarrierMappingInterval:obj.NumDataSubcarriers * obj.SubcarrierMappingInterval, :) = x;
 
-            obj.secondStageModulator.NumSymbols = obj.NumSymbols;
-            y = obj.secondStageModulator(x);
+            x = obj.secondStageModulator(x_);
+            y = obj.sampler(x);
             
+            obj.UsedSubCarr = obj.NumDataSubcarriers;
             bw = obj.Subcarrierspacing * obj.UsedSubCarr;
             obj.TimeDuration = size(y, 1) / obj.SampleRate;
 
@@ -59,6 +63,17 @@ classdef OFDM < BaseModulator
 
         end
 
+        function sampler = genSampler(obj)
+
+            L = obj.SamplePerSymbol;
+            M = 1;
+            TW = 0.001;
+            AStop = 70;
+            h = designMultirateFIR(L, M, TW, AStop);
+            sampler = @(x)resample(x, L, M, h);
+
+        end
+
         function firstStageModulator = genFirstStageModulator(obj)
 
             if contains(lower(obj.ModulatorConfig.base.mode), 'psk')
@@ -79,37 +94,12 @@ classdef OFDM < BaseModulator
         function secondStageModulator = genSecondStageModulator(obj)
             p = obj.ModulatorConfig.ofdm;
 
-            secondStageModulator = comm.OFDMModulator( ...
-                FFTLength = p.FFTLength, ...
-                NumGuardBandCarriers = p.NumGuardBandCarriers, ...
-                InsertDCNull = p.InsertDCNull, ...
-                CyclicPrefixLength = p.CyclicPrefixLength, ...
-                OversamplingFactor = p.OversamplingFactor, ...
-                NumTransmitAntennas = obj.NumTransmitAntennnas);
-            % TODO: Support insert pilot
-            % if p.PilotInputPort
-            %     secondStageModulator.PilotInputPort = p.PilotInputPort;
-            %     secondStageModulator.PilotCarrierIndices = p.PilotCarrierIndices;
-            % end
-
-            if p.Windowing
-                secondStageModulator.Windowing = true;
-                secondStageModulator.WindowLength = p.WindowLength;
-            end
-            
-            % Without pilot, the UsedSubCarr is equal NumDataSubcarriers
-            obj.UsedSubCarr = p.FFTLength - sum(secondStageModulator.NumGuardBandCarriers);
-            if p.InsertDCNull
-                obj.UsedSubCarr = obj.UsedSubCarr - 1;
-            end
-            
-            obj.NumDataSubcarriers = obj.UsedSubCarr;
-            % TODO: Support insert pilot
-            % if p.PilotInputPort
-            %     obj.NumDataSubcarriers = obj.NumDataSubcarriers - sum(p.PilotCarrierIndices);
-            % end
-
+            secondStageModulator = @(x)ofdmmod(x, ...
+                p.FFTLength, ...
+                p.CyclicPrefixLength, ...
+                OversamplingFactor = p.OversamplingFactor);
             obj.SampleRate = obj.Subcarrierspacing * p.FFTLength;
+            
         end
 
     end
@@ -117,14 +107,15 @@ classdef OFDM < BaseModulator
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
-            
-            obj.IsDigital = true;
+
             obj.ostbc = obj.genOSTBC;
             obj.sampler = obj.genSampler;
             obj.firstStageModulator = obj.genFirstStageModulator;
             obj.secondStageModulator = obj.genSecondStageModulator;
+
             modulatorHandle = @(x)obj.baseModulator(x);
-            
+            obj.IsDigital = true;
+
         end
 
     end

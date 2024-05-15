@@ -15,14 +15,18 @@ classdef APSK < BaseModulator
 
     methods (Access = protected)
 
-        function y = baseModulator(obj, x)
+        function [y, bw] = baseModulator(obj, x)
 
             x = apskmod(x, obj.ModulationOrder, obj.ModulatorConfig.Radii, obj.ModulatorConfig.PhaseOffset);
             x = obj.ostbc(x);
 
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-
+            
+            bw = obw(y, obj.SampleRate, [], 99.99999);
+            if obj.NumTransmitAntennnas > 1
+                bw = max(bw);
+            end
         end
 
     end
@@ -57,13 +61,11 @@ classdef APSK < BaseModulator
         end
 
         function modulatorHandle = genModulatorHandle(obj)
-
+            
+            obj.IsDigital = true;
             obj.filterCoeffs = obj.genFilterCoeffs;
             obj.ostbc = obj.genOSTBC;
-
             modulatorHandle = @(x)obj.baseModulator(x);
-
-            obj.IsDigital = true;
 
         end
 

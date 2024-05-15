@@ -2,10 +2,10 @@ classdef DSBAM < DSBSCAM
 
     methods (Access = protected)
 
-        function y = baseModulator(obj, x)
-
-            x = lowpass(x, 30e3, obj.SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
+        function [y, bw] = baseModulator(obj, x)
+            
             y = x + obj.ModulatorConfig.carramp;
+            bw = obw(x, obj.SampleRate)*2;
 
         end
 

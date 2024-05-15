@@ -3,7 +3,7 @@ classdef BaseModulator < matlab.System
 
     properties
 
-        ModulationOrder {mustBePositive, mustBeReal} = 2
+        ModulationOrder {mustBePositive, mustBeReal} = 1
 
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
@@ -17,10 +17,6 @@ classdef BaseModulator < matlab.System
         % Digital Sign
         IsDigital (1, 1) logical = true
 
-    end
-
-    properties (Access = protected)
-        SamplePerFrame
     end
 
     properties (Access = private)
@@ -53,22 +49,40 @@ classdef BaseModulator < matlab.System
         % Validate the inputs to the object
         function validateInputsImpl(~, x)
 
-            if ~isnumeric(x)
-                error("Input must be numeric");
+            if ~isstruct(x)
+                error("Input must be struct");
             end
 
         end
 
         function setupImpl(obj)
-            obj.SamplePerFrame = round(obj.SampleRate * obj.TimeDuration);
             obj.modulator = obj.genModulatorHandle;
-
         end
 
-        function y = stepImpl(obj, x)
+        function out = stepImpl(obj, x)
 
-            y = obj.modulator(x);
+            [y, bw] = obj.modulator(x.data);
+            % filter the high frequnecy component, and the max(bw) stands 
+            % for only saving the max bw in the multiTX scene.
+            y = lowpass(y, bw/2, obj.SampleRate, ...
+                ImpulseResponse = "fir", ...
+                Steepness = 0.99999, StopbandAttenuation=200);
+            
+            out.data = y;
+            out.BandWidth = bw;
+            out.SamplePerSymbol = x.SamplePerSymbol;
+            out.ModulationOrder = obj.ModulationOrder;
+            out.IsDigital = obj.IsDigital;
+            out.NumTransmitAntennnas = obj.NumTransmitAntennnas;
+            out.ModulatorConfig = obj.ModulatorConfig;
+            out.ModulationOrder = obj.ModulationOrder;
 
+            % The obj.TimeDuration and obj.SampleRate are redefined in
+            % OFDM, SCDMA and OTFS
+            out.TimeDuration = obj.TimeDuration;
+            out.SampleRate = obj.SampleRate;
+            out.SamplePerFrame = size(y, 1);
+            
         end
 
     end

@@ -2,13 +2,14 @@ classdef PM < BaseModulator
 
     methods (Access = private)
 
-        function y = baseModulator(obj, x)
+        function [y, bw] = baseModulator(obj, x)
 
             y = complex(cos(obj.ModulatorConfig.phaseDev * x + ...
                 obj.ModulatorConfig.initPhase), ...
                 sin(obj.ModulatorConfig.phaseDev * x + ...
                 obj.ModulatorConfig.initPhase)) / 2;
-
+            bw = obw(y, obj.SampleRate, [], 99.99999);
+            
         end
 
     end
@@ -16,11 +17,12 @@ classdef PM < BaseModulator
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
-
-            modulatorHandle = @(x)obj.baseModulator(x);
+            
             obj.IsDigital = false;
-            obj.NumTransmitAntennnas = 1; % donot consider multi-tx in analog modulation
-
+            % donot consider multi-tx in analog modulation
+            obj.NumTransmitAntennnas = 1; 
+            modulatorHandle = @(x)obj.baseModulator(x);
+            
         end
 
     end

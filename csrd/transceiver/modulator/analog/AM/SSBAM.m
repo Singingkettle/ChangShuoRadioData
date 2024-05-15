@@ -2,15 +2,15 @@ classdef SSBAM < DSBSCAM
 
     methods (Access = protected)
 
-        function y = baseModulator(obj, x)
-
-            x = lowpass(x, 30e3, obj.SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
+        function [y, bw] = baseModulator(obj, x)
 
             if strcmp(obj.ModulatorConfig.mode, 'upper')
                 y = complex(x, imag(hilbert(x)));
             else
                 y = complex(x, -imag(hilbert(x)));
             end
+            
+            bw = obw(y, obj.SampleRate);
 
         end
 

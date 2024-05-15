@@ -2,7 +2,7 @@ classdef DVBSAPSK < APSK
 
     methods (Access = protected)
 
-        function y = baseModulator(obj, x)
+        function [y, bw] = baseModulator(obj, x)
 
             % Modulate
             x = dvbsapskmod(x, obj.ModulationOrder, ...
@@ -13,7 +13,11 @@ classdef DVBSAPSK < APSK
 
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-
+            
+            bw = obw(y, obj.SampleRate, [], 99.99999);
+            if obj.NumTransmitAntennnas > 1
+                bw = max(bw);
+            end
         end
 
     end
