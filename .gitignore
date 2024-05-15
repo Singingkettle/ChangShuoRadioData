@@ -110,6 +110,7 @@ data/
 data
 .vscode
 .idea
+ref/
 .DS_Store
 
 # custom
