@@ -25,9 +25,10 @@ classdef VSBAM < DSBSCAM
     methods (Access = protected)
 
         function [y, bw] = baseModulator(obj, x)
-
-            x = lowpass(x, 30e3, obj.SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
-
+            SamplePerFrame = length(x);
+            f = (-SamplePerFrame / 2:SamplePerFrame / 2 - 1) * (obj.SampleRate / SamplePerFrame);
+            f = f';
+            obj.hf = arrayfun(@(x)obj.basefiler(x), f);
             if strcmp(obj.ModulatorConfig.mode, 'upper')
                 imagP = fftshift(fft(x)) .* (flipud(obj.hf) - obj.hf);
             else
@@ -37,7 +38,7 @@ classdef VSBAM < DSBSCAM
             imagP = imag(ifft(ifftshift(imagP)));
             y = complex(x, imagP);
             
-            bw = obw(y, obj.SampleRate, [], 99.99999);
+            bw = obw(x, obj.SampleRate)*2;
         end
 
     end
@@ -49,10 +50,6 @@ classdef VSBAM < DSBSCAM
             obj.IsDigital = false;
             % donot consider multi-tx in analog modulation
             obj.NumTransmitAntennnas = 1;
-            SamplePerFrame = round(obj.SampleRate * obj.TimeDuration);
-            f = (-SamplePerFrame / 2:SamplePerFrame / 2 - 1) * (obj.SampleRate / SamplePerFrame);
-            f = f';
-            obj.hf = arrayfun(@(x)obj.basefiler(x), f);
             modulatorHandle = @(x)obj.baseModulator(x);
 
         end

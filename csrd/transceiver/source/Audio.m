@@ -18,9 +18,9 @@ classdef Audio < BaseSource
                 decimFactor) * decimFactor;
 
             x = audioRC(audioSrc());
-            % partID = randi(num_part);
-            % y = x((partID-1)*obj.SamplePerFrame+1:partID*obj.SamplePerFrame, 1);
-            y = x;
+            partID = randi(num_part);
+            y = x((partID-1)*obj.SamplePerFrame+1:partID*obj.SamplePerFrame, 1);
+
             y = lowpass(y, 15e3, obj.SampleRate, ...
                 ImpulseResponse = "fir", Steepness = 0.99999, ...
                 StopbandAttenuation=200);

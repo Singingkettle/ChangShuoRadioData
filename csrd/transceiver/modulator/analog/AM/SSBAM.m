@@ -9,8 +9,7 @@ classdef SSBAM < DSBSCAM
             else
                 y = complex(x, -imag(hilbert(x)));
             end
-            
-            bw = obw(y, obj.SampleRate);
+            bw = obw(x, obj.SampleRate)*2;
 
         end
 
