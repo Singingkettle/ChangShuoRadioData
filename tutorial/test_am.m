@@ -3,12 +3,12 @@ clear
 close all
 
 %% 
-TimeDuration = 0.1;
-SampleRate = 200e3;
+TimeDuration = 1;
+SampleRate = 50e3;
 NumTransmitAntennnas = 1;
-MasterClockRate = 600e3;
+MasterClockRate = 100e3;
 
-CarrierFrequency = 200e3;
+CarrierFrequency = 30e3;
 IqImbalanceConfig.A = 3;
 IqImbalanceConfig.P = 10;
 PhaseNoiseConfig.Level = -50;
@@ -38,8 +38,8 @@ ricChannel = Rician(CarrierFrequency=CarrierFrequency, ...
     SampleRate=SampleRate, PathDelays=0, ...
     AveragePathGains=0, MaximumDopplerShift=0);
 
-rxRF = RRFSimulator(StartTime=0, TimeDuration=2, SampleRate=SampleRate, ...
-    NumReceiveAntennas=1, CenterFrequency=200e3, Bandwidth=20e3, ...
+rxRF = RRFSimulator(StartTime=0, TimeDuration=5, SampleRate=SampleRate, ...
+    NumReceiveAntennas=1, CenterFrequency=30e3, Bandwidth=20e3, ...
     MasterClockRate=MasterClockRate, ...
     MemoryLessNonlinearityConfig=MemoryLessNonlinearityConfig, ...
     ThermalNoiseConfig=ThermalNoiseConfig, ...
@@ -53,16 +53,20 @@ x = source();
 %% Test DSBAM
 ModulatorConfig.carramp = 1;
 ModulatorConfig.initPhase = 0;
-baseBandSignal = DSBAM(ModulatorConfig = ModulatorConfig, NumTransmitAntennnas = NumTransmitAntennnas);
+baseBandSignal = DSBAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennnas = NumTransmitAntennnas, ...
+    SampleRate=SampleRate);
 x1= baseBandSignal(x);
 x1 = txRF(x1);
 x1 = rayChannel(x1);
 
 %% Test DSSCBAM
 ModulatorConfig.initPhase = 0;
-baseBandSignal = DSBSCAM(ModulatorConfig = ModulatorConfig, NumTransmitAntennnas = NumTransmitAntennnas);
+baseBandSignal = DSBSCAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennnas = NumTransmitAntennnas, ...
+    SampleRate=SampleRate);
 x2 = baseBandSignal(x);
-txRF.StartTime = 0.4;
+txRF.StartTime = 1.3;
 x2 = txRF(x2);
 x2 = ricChannel(x2);
 
@@ -70,10 +74,12 @@ x2 = ricChannel(x2);
 ModulatorConfig.fa = 3000;
 ModulatorConfig.mode = 'upper';
 ModulatorConfig.initPhase = 0;
-baseBandSignal = SSBAM(ModulatorConfig = ModulatorConfig, NumTransmitAntennnas = NumTransmitAntennnas);
+baseBandSignal = SSBAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennnas = NumTransmitAntennnas, ...
+    SampleRate=SampleRate);
 
 x3 = baseBandSignal(x);
-txRF.StartTime = 0.6;
+txRF.StartTime = 2.4;
 
 % demod SSB and verify
 % upConv = dsp.DigitalUpConverter(... 
@@ -113,9 +119,11 @@ x3 = ricChannel(x3);
 ModulatorConfig.fa = 3000;
 ModulatorConfig.mode = 'upper';
 ModulatorConfig.initPhase = 0;
-baseBandSignal = VSBAM(ModulatorConfig = ModulatorConfig, NumTransmitAntennnas = NumTransmitAntennnas);
+baseBandSignal = VSBAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennnas = NumTransmitAntennnas, ...
+    SampleRate=SampleRate);
 x4 = baseBandSignal(x);
-txRF.StartTime = 1;
+txRF.StartTime = 3.5;
 x4 = txRF(x4);
 x4 = ricChannel(x4);
 % scope = spectrumAnalyzer(SampleRate=x4.SampleRate,AveragingMethod="exponential",RBWSource="auto",SpectrumUnits="dBW");
@@ -152,7 +160,6 @@ x4 = ricChannel(x4);
 % scope2(c);
 % 
 % 
-
 
 %% 
 y = rxRF({x1, x2, x3, x4});

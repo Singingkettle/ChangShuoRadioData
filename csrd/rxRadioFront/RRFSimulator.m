@@ -171,7 +171,7 @@ classdef RRFSimulator < matlab.System
             obj.LowerPowerAmplifier = obj.genLowerPowerAmplifier;
             obj.FrequencyShifter = obj.genFrequencyShifter;
             obj.SampleShifter = obj.genSampleShifter;
-            obj.ThermalNoise = obj.ThermalNoise;
+            obj.ThermalNoise = obj.genThermalNoise;
             obj.PhaseNoise = obj.genPhaseNoise;
             obj.IQImbalance = obj.genIqImbalance;
             obj.AGC = obj.genAGC;
@@ -215,7 +215,8 @@ classdef RRFSimulator < matlab.System
             mbc = comm.MultibandCombiner( ...
                     InputSampleRate=obj.MasterClockRate, ...
                     FrequencyOffsets=0, ...
-                    OutputSampleRateSource="Auto");
+                    OutputSampleRateSource='Property', ...
+                    OutputSampleRate=obj.MasterClockRate);
             x = mbc(datas);
             % lightSpeed = physconst('light');
             % waveLength = lightSpeed/(obj.CarrierFrequency);
@@ -225,9 +226,9 @@ classdef RRFSimulator < matlab.System
             x = obj.LowerPowerAmplifier(x);
             DDC = dsp.DigitalDownConverter(...
                   DecimationFactor=obj.InterpDecim,...
-                  SampleRate = obj.SampleRate,...
+                  SampleRate = obj.MasterClockRate,...
                   Bandwidth  = obj.Bandwidth,...
-                  StopbandAttenuation = 100,...
+                  StopbandAttenuation = 60,...
                   PassbandRipple = 0.1,...
                   CenterFrequency = obj.CenterFrequency);
             x = DDC(x);
@@ -240,7 +241,6 @@ classdef RRFSimulator < matlab.System
             x = obj.IQImbalance(x);
             x = obj.AGC(x);
             
-
             out.data = x;
             out.StartTime = obj.StartTime;
             out.TimeDuration = obj.TimeDuration;
@@ -260,8 +260,8 @@ classdef RRFSimulator < matlab.System
 
             out.tx = cell(length(in), 1);
             for i=1:length(in)
-                item = rmfield(in(i, 1), 'data');
-                out.tx(i, 1) = item;
+                item = rmfield(in{i}, 'data');
+                out.tx{i} = item;
             end
 
         end
