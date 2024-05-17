@@ -20,8 +20,11 @@ classdef Audio < BaseSource
             x = audioRC(audioSrc());
             partID = randi(num_part);
             y = x((partID-1)*obj.SamplePerFrame+1:partID*obj.SamplePerFrame, 1);
-
-            y = lowpass(y, 15e3, obj.SampleRate, ...
+            
+            bw = obw(y, obj.SampleRate);
+            % 这里这么做的原因是，保证信号的带宽为KHz的倍数
+            bw = ceil(bw/1000)*1000;
+            y = lowpass(y, bw/2, obj.SampleRate, ...
                 ImpulseResponse = "fir", Steepness = 0.99999, ...
                 StopbandAttenuation=200);
 

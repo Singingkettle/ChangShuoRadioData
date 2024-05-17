@@ -64,6 +64,9 @@ classdef BaseModulator < matlab.System
             [y, bw] = obj.modulator(x.data);
             % filter the high frequnecy component, and the max(bw) stands 
             % for only saving the max bw in the multiTX scene.
+
+            % 这里这么做的原因是，保证信号的带宽为KHz的倍数
+            bw = ceil(bw/1000)*1000;
             y = lowpass(y, bw/2, obj.SampleRate, ...
                 ImpulseResponse = "fir", ...
                 Steepness = 0.99999, StopbandAttenuation=200);
