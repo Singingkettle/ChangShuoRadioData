@@ -1,13 +1,13 @@
 classdef OQPSK < APSK
     
-     properties
-
+    properties
+        
         pureModulator
         
-     end
+    end
     
-     methods (Access = protected)
-
+    methods (Access = protected)
+        
         function [y, bw] = baseModulator(obj, x)
             y = obj.pureModulator(x);
             bw = obw(y, obj.SampleRate, [], 99.99999);
@@ -15,11 +15,11 @@ classdef OQPSK < APSK
                 bw = max(bw);
             end
         end
-
-     end
-
+        
+    end
+    
     methods
-
+        
         function modulatorHandle = genModulatorHandle(obj)
             obj.IsDigital = true;
             obj.filterCoeffs = obj.genFilterCoeffs;
@@ -37,7 +37,7 @@ classdef OQPSK < APSK
             modulatorHandle = @(x)obj.baseModulator(x);
             
         end
-
+        
     end
-
+    
 end

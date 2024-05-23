@@ -55,7 +55,7 @@ rxRF = RRFSimulator(StartTime=0, TimeDuration=2, SampleRate=SampleRate, ...
     MasterClockRate=MasterClockRate, ...
     MemoryLessNonlinearityConfig=MemoryLessNonlinearityConfig, ...
     ThermalNoiseConfig=ThermalNoiseConfig, ...
-    PhaseNoiseConfig=PhaseNoiseConfig, ... 
+    PhaseNoiseConfig=PhaseNoiseConfig, ...
     AGCConfig=AGCConfig, ...
     IqImbalanceConfig=IqImbalanceConfig);
 
@@ -76,23 +76,23 @@ y1 = rxRF({x1});
 % TimeDuration = 1;
 % ModulationOrder = 8;
 % SamplePerSymbol = 32;
-% 
-% 
+%
+%
 % ModulatorConfig.BandwidthTimeProduct = 0.35;
 % source = RandomSource(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulationOrder=ModulationOrder, ...
 %     SamplePerSymbol=SamplePerSymbol);
-% 
+%
 % modualtor = GFSK(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulationOrder=ModulationOrder, ...
 %     SamplePerSymbol=SamplePerSymbol, ...
 %     ModulatorConfig=ModulatorConfig);
-% 
+%
 % x = source();
 % y = modualtor(x);
-% 
+%
 % % Simple test for filter
 % M = 2; % Modulation order
 % gfskMod = comm.CPMModulator( ...
@@ -108,8 +108,8 @@ y1 = rxRF({x1});
 %     'ModulationIndex',1, ...
 %     'BitOutput',false);
 % spf = 10000;        % Symobls per frame
-% 
-% 
+%
+%
 % data = randi([0 M-1],spf,1);
 % const = (-(M-1):2:(M-1))';
 % data = const((data(:)+1));
@@ -122,6 +122,6 @@ y1 = rxRF({x1});
 %     ReceiveDelay=delay);
 % isequal(data(1:end-delay),receivedData(delay+1:end))
 % errorStats = errorRate(data,receivedData);
-% 
+%
 % receivedData1 = gfskDemod(y);
 % errorStats1 = errorRate(data,receivedData1);

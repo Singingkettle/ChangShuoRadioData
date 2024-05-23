@@ -3,7 +3,7 @@ classdef MSK < FSK
     methods
         
         function modulatorHandle = genModulatorHandle(obj)
-
+            
             obj.IsDigital = true;
             obj.NumTransmitAntennnas = 1;
             obj.pureModulator = @(x)mskmod(x, ...
@@ -13,7 +13,7 @@ classdef MSK < FSK
             modulatorHandle = @(x)obj.baseModulator(x);
             
         end
-
+        
     end
-
+    
 end

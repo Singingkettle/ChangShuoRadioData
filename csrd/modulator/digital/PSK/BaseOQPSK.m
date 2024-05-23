@@ -98,11 +98,11 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   fprintf('Bit error rate: %f\n', ber);
     %
     %   See also comm.OQPSKDemodulator, comm.OQPSKModulator.
-
+    
     % Copyright 2009-2023 The MathWorks, Inc.
-
+    
     %#codegen
-
+    
     properties (Nontunable)
         %BitInput Bit input
         % Specify whether the input is bits or integers. The default is false.
@@ -111,7 +111,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         % this property is set to true, the input must be a binary vector of even
         % length.
         BitInput (1, 1) logical = false;
-
+        
         %OutputDataType Data type of output
         %   Specify the output data type as one of 'double' | 'single'. The
         %   default is 'double'.
@@ -119,11 +119,11 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         NumTransmitAntennas = 1;
         ostbc
     end
-
+    
     methods
         % Constructor
         function obj = BaseOQPSK(varargin)
-
+            
             if nargin == 1 && isa(varargin{1}, 'comm.OQPSKDemodulator')
                 demod = varargin{1};
                 obj.PhaseOffset = demod.PhaseOffset;
@@ -132,7 +132,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
                 obj.PulseShape = demod.PulseShape;
                 obj.SamplesPerSymbol = demod.SamplesPerSymbol;
                 obj.NumTransmitAntennas = demod.NumTransmitAntennas;
-
+                
                 if ~strcmp(demod.OutputDataType, 'uint8')
                     % double or single
                     obj.OutputDataType = demod.OutputDataType;
@@ -140,23 +140,23 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
                     % most efficient implementation
                     obj.OutputDataType = 'single';
                 end
-
+                
                 if strcmp(demod.PulseShape, 'Custom')
                     obj.FilterNumerator = demod.FilterNumerator;
-
+                    
                 elseif any(strcmp(demod.PulseShape, {'Normal raised cosine', 'Root raised cosine'}))
                     obj.RolloffFactor = demod.RolloffFactor;
                     obj.FilterSpanInSymbols = demod.FilterSpanInSymbols;
                 end
-
+                
             else
                 setProperties(obj, nargin, varargin{:}, 'PhaseOffset');
             end
-
+            
         end
-
+        
         function set.OutputDataType(obj, value)
-
+            
             if strcmpi(value, 'Custom')
                 coder.internal.warning('comm:system:OQPSKModulator:InvalidOutType', 'double', value);
                 obj.OutputDataType = 'double';
@@ -164,131 +164,131 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
                 value = validatestring(value, {'double', 'single'}, 'set.OutputDataType');
                 obj.OutputDataType = value;
             end
-
+            
         end
-
+        
     end
-
+    
     methods (Access = protected)
-
+        
         function validateInputsImpl(~, x)
             coder.internal.errorIf(isfi(x), ...
-            'comm:system:OQPSKDemodulator:FiInput');
-
+                'comm:system:OQPSKDemodulator:FiInput');
+            
             coder.internal.errorIf(size(x, 2) > 1, ...
-            'dspshared:system:multChanNotSupport');
+                'dspshared:system:multChanNotSupport');
         end
-
+        
         function resetImpl(obj)
-
+            
             if coder.internal.is_defined(obj.pFilter)
                 reset(obj.pFilter);
             end
-
+            
             obj.pPrevHalfSymbol = zeros(obj.SamplesPerSymbol / 2, obj.NumTransmitAntennas, obj.OutputDataType);
         end
-
+        
         function setupImpl(obj)
             obj.pPrevHalfSymbol = zeros(obj.SamplesPerSymbol / 2, obj.NumTransmitAntennas, obj.OutputDataType);
-
+            
             % pMapping does input to phases mapping
             if strcmp(obj.SymbolMapping, 'Binary')
                 obj.pMapping = [0 1 2 3];
             elseif ~strcmp(obj.SymbolMapping, 'Gray') % Custom
                 % Offline, one step execution of find indices location
-
+                
                 % find [b a; c d] to phases mapping.
                 obj.pMapping = zeros(1, 4);
-
+                
                 for idx = 1:4
-
+                    
                     for symbol = 0:3
-
+                        
                         if obj.SymbolMapping(idx) == symbol
                             obj.pMapping(symbol + 1) = idx;
                         end
-
+                        
                     end
-
+                    
                 end
-
+                
                 % else private property not used for Gray
             end
-
+            
             prepareFilter(obj);
         end
-
+        
         function prepareFilter(obj)
             sps = obj.SamplesPerSymbol;
-
+            
             switch obj.PulseShape
-
+                
                 case 'Half sine'
                     halfSinePulse = sin(0:pi / sps:pi);
                     obj.pFilter = dsp.FIRInterpolator('Numerator', halfSinePulse, ...
                         'InterpolationFactor', sps);
-
+                    
                 case 'Normal raised cosine'
                     obj.pFilter = comm.RaisedCosineTransmitFilter('Shape', 'Normal', ...
                         'RolloffFactor', obj.RolloffFactor, 'FilterSpanInSymbols', obj.FilterSpanInSymbols, ...
                         'OutputSamplesPerSymbol', sps, 'Gain', sqrt(sps / 2));
-
+                    
                 case 'Root raised cosine'
                     obj.pFilter = comm.RaisedCosineTransmitFilter('Shape', 'Square root', ...
                         'RolloffFactor', obj.RolloffFactor, 'FilterSpanInSymbols', obj.FilterSpanInSymbols, ...
                         'OutputSamplesPerSymbol', sps, 'Gain', sqrt(sps / 2));
-
+                    
                 case 'Rectangular'
                     obj.pFilter = dsp.FIRInterpolator('Numerator', ones(1, sps) / sps, ...
                         'InterpolationFactor', sps);
-
+                    
                 otherwise % Custom
                     obj.pFilter = dsp.FIRInterpolator('Numerator', obj.FilterNumerator, ...
                         'InterpolationFactor', sps);
             end
-
+            
         end
-
+        
         function oqpskWaveform = stepImpl(obj, in)
-
+            
             coder.internal.errorIf(obj.BitInput && mod(length(in), 2), ...
                 'comm:system:bitInVecInWrongLen', length(in), 2);
-
+            
             if strcmp(obj.OutputDataType, 'double')
                 input = double(in);
             else
                 input = single(in);
             end
-
+            
             if isempty(in)
                 oqpskWaveform = complex(zeros(size(input), 'like', input));
                 return;
             end
-
+            
             if ~obj.BitInput % INTEGER INPUT
-
+                
                 coder.internal.errorIf(any(input > 3) || any(input < 0) || any(floor(input) ~= input) || ~isreal(input), ...
-                'comm:system:OQPSKModulator:InvalidInput');
-
+                    'comm:system:OQPSKModulator:InvalidInput');
+                
                 if strcmp(obj.SymbolMapping, 'Gray')
                     bits = int2bit(input, 2);
                 else
                     phases = obj.pMapping(1 + input)';
                 end
-
+                
             else % BIT INPUT
-
+                
                 coder.internal.errorIf(any(input > 1) || any(input < 0) || any(floor(input) ~= input) || ~isreal(input), ...
-                'comm:system:OQPSKModulator:InvalidInput');
-
+                    'comm:system:OQPSKModulator:InvalidInput');
+                
                 if strcmp(obj.SymbolMapping, 'Gray')
                     bits = input;
                 else
                     phases = obj.pMapping(1 + bit2int(input, 2))';
                 end
-
+                
             end
-
+            
             % O-QPSK modulation (part 1)
             % split two 2 parallel streams, also map [0, 1] to [-1, 1]
             if strcmp(obj.SymbolMapping, 'Gray')
@@ -299,70 +299,70 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
                 symbols = bits * 2 - 1;
                 re = -symbols(2:2:end);
                 im = -symbols(1:2:end);
-
+                
             else % Binary or custom symbol mapping
-
+                
                 if strcmp(obj.SymbolMapping, 'Binary')
                     rotated = exp(1i * pi / 2 * phases + 1i * pi / 4);
                 else % Custom
                     rotated = exp(1i * pi / 2 * (phases - 1) + 1i * pi / 4);
                 end
-
+                
                 % unit amplitude:
                 re = sign(real(rotated));
                 im = sign(imag(rotated));
             end
-
+            
             % Support MIMO
             x = obj.ostbc(complex(re, im));
             re = real(x);
             im = imag(x);
-
+            
             % Filtering
             filtered = obj.pFilter([re im]);
             filteredRe = filtered(:, 1:obj.NumTransmitAntennas);
             filteredIm = filtered(:, obj.NumTransmitAntennas + 1:2 * obj.NumTransmitAntennas);
-
+            
             % O-QPSK modulation (part 2)
             % delay Q component:
             filteredAligned = [obj.pPrevHalfSymbol; filteredIm(1:end - obj.SamplesPerSymbol / 2, :)];
             obj.pPrevHalfSymbol = filteredIm(end - obj.SamplesPerSymbol / 2 + 1:end, :);
             oqpskWaveform = complex(filteredRe, filteredAligned);
-
+            
             oqpskWaveform = oqpskWaveform * exp(1i * obj.PhaseOffset);
         end
-
+        
         function flag = isInputSizeMutableImpl(~, ~)
             flag = true;
         end
-
+        
     end
-
+    
     methods (Static, Hidden)
-
+        
         function a = getAlternateBlock
             a = 'commdigbbndpm3/OQPSK Modulator Baseband';
         end
-
+        
     end
-
+    
     methods (Static, Hidden, Access = protected)
-
+        
         function groups = getPropertyGroupsImpl()
-
+            
             modulationSection = matlab.system.display.Section( ...
                 'PropertyList', {'PhaseOffset', 'SymbolMapping', 'BitInput'});
-
+            
             modulationGroup = matlab.system.display.SectionGroup( ...
                 'Title', getString(message('comm:system:OQPSKModulator:ModulationTitle')), ...
                 'Sections', modulationSection);
             modulationGroup.IncludeInShortDisplay = true;
-
+            
             [filteringGroup, outTypeGroup] = getPropertyGroupsImpl@comm.internal.OQPSKBase;
-
+            
             groups = [modulationGroup filteringGroup outTypeGroup];
         end
-
+        
     end
-
+    
 end

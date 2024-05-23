@@ -1,29 +1,29 @@
 classdef FSK < BaseModulator
-
+    
     properties
-
+        
         SamplePerSymbol (1, 1) {mustBePositive, mustBeReal} = 2
-
+        
     end
     
     properties
-
+        
         pureModulator
         
     end
-
+    
     methods (Access = protected)
-
+        
         function [y, bw] = baseModulator(obj, x)
             y = obj.pureModulator(x);
             bw = obw(y, obj.SampleRate);
         end
     end
-
+    
     methods
-
+        
         function modulatorHandle = genModulatorHandle(obj)
-
+            
             obj.IsDigital = true;
             obj.NumTransmitAntennnas = 1;
             obj.pureModulator = @(x)fskmod(x, ...
@@ -35,7 +35,7 @@ classdef FSK < BaseModulator
                 obj.ModulatorConfig.SymbolOrder);
             modulatorHandle = @(x)obj.baseModulator(x);
         end
-
+        
     end
-
+    
 end

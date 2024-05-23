@@ -1,7 +1,7 @@
 classdef GMSK < FSK
-
+    
     methods
-
+        
         function modulatorHandle = genModulatorHandle(obj)
             
             obj.IsDigital = true;
@@ -16,7 +16,7 @@ classdef GMSK < FSK
             modulatorHandle = @(x)obj.baseModulator(x);
             
         end
-
+        
     end
-
+    
 end

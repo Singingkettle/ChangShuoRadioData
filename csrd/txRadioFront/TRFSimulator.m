@@ -7,13 +7,13 @@ classdef TRFSimulator < matlab.System
     % https://kb.ettus.com/UHD
     % https://zhuanlan.zhihu.com/p/24217098
     % =====================================================================
-    % 关于发射机的模拟，里面的射频损失主要是依据论文："ORACLE: Optimized Radio 
+    % 关于发射机的模拟，里面的射频损失主要是依据论文："ORACLE: Optimized Radio
     % clAssification through Convolutional neuraL nEtworks"和USRP官网给出的
     % 关于硬件示意图：https://kb.ettus.com/UHD
     % 其中，DUC的两个关键参数作用：https://blog.csdn.net/u010565765/article/details/54925659/
     % DUC的取值主要参考这个链接：https://www.mathworks.com/matlabcentral/answers/772293-passband-ripple-and-stopband-attenuation
     % =====================================================================
-
+    
     properties
         
         % 信号发送的开始时间，这个值必须>=0,
@@ -22,22 +22,23 @@ classdef TRFSimulator < matlab.System
         AntennaEfficiency (1, 1) {mustBePositive, mustBeReal} = 0.5
         TransmitAntennaDiameter  (1, 1) {mustBePositive, mustBeReal} = 0.4
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
-        % Master clock rate, specified as a scalar in Hz. The master clock 
+        OutputPower (1, 1) {mustBeReal} = -100 % dBm
+        % Master clock rate, specified as a scalar in Hz. The master clock
         % rate is the A/D and D/A clock rate. The valid range of values for
         % this property depends on the radio platform that is connected.
         % This value depends on the ettus usrp devices.
         % Please refer:
         % https://www.mathworks.com/help/comm/usrpradio/ug/sdrutransmitter.html
-
+        
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
         DCOffset {mustBeReal} = -50;
         
         IqImbalanceConfig struct
         PhaseNoiseConfig struct
         MemoryLessNonlinearityConfig struct
-
+        
     end
-
+    
     properties (Access = protected)
         
         IQImbalance
@@ -45,18 +46,18 @@ classdef TRFSimulator < matlab.System
         MemoryLessNonlinearity
         DUC
     end
-
+    
     methods (Access = protected)
-
+        
         function IQImbalance = genIqImbalance(obj)
-
+            
             % https://www.mathworks.com/help/comm/ref/iqimbal.html
             IQImbalance = @(x)iqimbal(x, ...
                 obj.IqImbalanceConfig.A, ...
                 obj.IqImbalanceConfig.P);
-
+            
         end
-
+        
         function PhaseNoise = genPhaseNoise(obj)
             % https://www.mathworks.com/help/comm/ref/comm.phasenoise-system-object.html
             PhaseNoise = comm.PhaseNoise( ...
@@ -71,16 +72,16 @@ classdef TRFSimulator < matlab.System
                 end
             end
         end
-
+        
         function MemoryLessNonlinearity = genMemoryLessNonlinearity(obj)
-
+            
             if strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Cubic polynomial')
                 MemoryLessNonlinearity = comm.MemorylessNonlinearity( ...
                     Method = 'Cubic polynomial', ...
                     LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
                     TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification, ...
                     IIP3 = obj.MemoryLessNonlinearityConfig.IIP3);
-
+                
                 if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
                     MemoryLessNonlinearity.OIP3 = obj.MemoryLessNonlinearityConfig.OIP3;
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IP1dB')
@@ -92,7 +93,7 @@ classdef TRFSimulator < matlab.System
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OPsat')
                     MemoryLessNonlinearity.OPsat = obj.MemoryLessNonlinearityConfig.OPsat;
                 end
-
+                
                 MemoryLessNonlinearity.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
                 MemoryLessNonlinearity.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
                 MemoryLessNonlinearity.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
@@ -104,7 +105,7 @@ classdef TRFSimulator < matlab.System
                 MemoryLessNonlinearity.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
                 MemoryLessNonlinearity.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
                 MemoryLessNonlinearity.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
-
+                
             elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Saleh model') || strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Ghorbani model')
                 MemoryLessNonlinearity = comm.MemorylessNonlinearity( ...
                     Method = obj.MemoryLessNonlinearityConfig.Method, ...
@@ -128,21 +129,21 @@ classdef TRFSimulator < matlab.System
             
             MemoryLessNonlinearity.ReferenceImpedance = obj.MemoryLessNonlinearityConfig.ReferenceImpedance;
         end
-
-       function setupImpl(obj)
-
+        
+        function setupImpl(obj)
+            
             obj.IQImbalance = obj.genIqImbalance;
             obj.PhaseNoise = obj.genPhaseNoise;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
-
+            
         end
         
         function y = DUCH(obj, x)
-                 y = obj.DUC(x);
+            y = obj.DUC(x);
         end
-
+        
         function out = stepImpl(obj, x)
-
+            
             y = obj.IQImbalance(x.data);
             y = y + 10 ^ (obj.DCOffset / 10);
             release(obj.PhaseNoise);
@@ -155,13 +156,13 @@ classdef TRFSimulator < matlab.System
             txAntGain = sqrt(obj.AntennaEfficiency)*pi*obj.TransmitAntennaDiameter/waveLength;
             InterpDecim = fix(obj.MasterClockRate / x.SampleRate);
             obj.MasterClockRate = InterpDecim * x.SampleRate;
-            obj.DUC = dsp.DigitalUpConverter(... 
-                     InterpolationFactor = InterpDecim,...
-                     SampleRate = x.SampleRate,...
-                     Bandwidth = x.BandWidth,...
-                     StopbandAttenuation = 60,...
-                     PassbandRipple = 0.1,...
-                     CenterFrequency = obj.CarrierFrequency);
+            obj.DUC = dsp.DigitalUpConverter(...
+                InterpolationFactor = InterpDecim,...
+                SampleRate = x.SampleRate,...
+                Bandwidth = x.BandWidth,...
+                StopbandAttenuation = 60,...
+                PassbandRipple = 0.1,...
+                CenterFrequency = obj.CarrierFrequency);
             if x.NumTransmitAntennnas > 1
                 cy = num2cell(y, 1);
                 y = cellfun(@obj.DUCH, cy, 'UniformOutput',false);
@@ -178,7 +179,9 @@ classdef TRFSimulator < matlab.System
                 Steepness = 0.99, ...
                 StopbandAttenuation=200);
             % y = txAntGain*y;
-
+            % 关于输出功率的控制参考的是：https://www.mathworks.com/help/comm/ref/comm.thermalnoise-system-object.html
+            y = (10^((obj.OutputPower-30)/20)) * y;
+            
             out = x;
             out.data = y;
             out.AntennaEfficiency = obj.AntennaEfficiency;
@@ -194,17 +197,17 @@ classdef TRFSimulator < matlab.System
             out.CarrierFrequency = obj.CarrierFrequency;
             out.StartTime = obj.StartTime;
         end
-
+        
     end
-
-    methods 
-
+    
+    methods
+        
         function obj = TRFSimulator(varargin)
-
+            
             setProperties(obj, nargin, varargin{:});
-
+            
         end
-
+        
     end
-
+    
 end

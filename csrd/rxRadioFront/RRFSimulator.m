@@ -1,5 +1,5 @@
 classdef RRFSimulator < matlab.System
-
+    
     properties
         StartTime (1, 1) {mustBeGreaterThanOrEqual(StartTime, 0), mustBeReal} = 0
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
@@ -12,7 +12,7 @@ classdef RRFSimulator < matlab.System
         % 可参考matlab的调制识别例子
         SampleRateOffset (1, 1) {mustBeReal} = 0
         Bandwidth {mustBePositive, mustBeReal, mustBeInteger} = 20e3;
-
+        
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
         DCOffset {mustBeReal} = -50;
         
@@ -23,7 +23,7 @@ classdef RRFSimulator < matlab.System
         IqImbalanceConfig struct
         
     end
-
+    
     properties (Access = protected)
         SamplePerFrame
         FrequencyOffset
@@ -36,29 +36,29 @@ classdef RRFSimulator < matlab.System
         AGC
         SNR
         SampleShifter
-
+        
     end
-
+    
     methods (Access = private)
         
         function IQImbalance = genIqImbalance(obj)
-
+            
             % https://www.mathworks.com/help/comm/ref/iqimbal.html
             IQImbalance = @(x)iqimbal(x, ...
                 obj.IqImbalanceConfig.A, ...
                 obj.IqImbalanceConfig.P);
-
+            
         end
-
+        
         function LowerNoiseAmplifier = genLowerPowerAmplifier(obj)
-
+            
             if strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Cubic polynomial')
                 LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
                     Method = 'Cubic polynomial', ...
                     LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
                     TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification, ...
                     IIP3 = obj.MemoryLessNonlinearityConfig.IIP3);
-
+                
                 if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
                     LowerNoiseAmplifier.OIP3 = obj.MemoryLessNonlinearityConfig.OIP3;
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IP1dB')
@@ -70,7 +70,7 @@ classdef RRFSimulator < matlab.System
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OPsat')
                     LowerNoiseAmplifier.OPsat = obj.MemoryLessNonlinearityConfig.OPsat;
                 end
-
+                
                 LowerNoiseAmplifier.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
                 LowerNoiseAmplifier.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
                 LowerNoiseAmplifier.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
@@ -82,7 +82,7 @@ classdef RRFSimulator < matlab.System
                 LowerNoiseAmplifier.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
                 LowerNoiseAmplifier.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
                 LowerNoiseAmplifier.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
-
+                
             elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Saleh model') || strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Ghorbani model')
                 LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
                     Method = obj.MemoryLessNonlinearityConfig.Method, ...
@@ -103,31 +103,31 @@ classdef RRFSimulator < matlab.System
                     Method = 'Look table', ...
                     Table = obj.MemoryLessNonlinearityConfig.Table);
             end
-
+            
             LowerNoiseAmplifier.ReferenceImpedance = obj.MemoryLessNonlinearityConfig.ReferenceImpedance;
         end
         
         
-
+        
         function FrequencyShifter = genFrequencyShifter(obj)
             FrequencyShifter = comm.PhaseFrequencyOffset(...
                 SampleRate=obj.SampleRate);
             obj.FrequencyShifter.FrequencyOffset = -obj.SampleRateOffset*1e-6*obj.CenterFrequency;
         end
-
+        
         function ThermalNoise = genThermalNoise(obj)
             ThermalNoise = comm.ThermalNoise( ...
                 SampleRate = obj.SampleRate, ...
                 NoiseTemperature = obj.ThermalNoiseConfig.NoiseTemperature);
         end
-
+        
         function PhaseNoise = genPhaseNoise(obj)
             % https://www.mathworks.com/help/comm/ref/comm.phasenoise-system-object.html
             PhaseNoise = comm.PhaseNoise( ...
                 Level = obj.PhaseNoiseConfig.Level, ...
                 FrequencyOffset = obj.PhaseNoiseConfig.FrequencyOffset, ...
                 SampleRate = obj.SampleRate);
-
+            
             if isfield(obj.PhaseNoiseConfig, 'RandomStream')
                 if strcmp(obj.PhaseNoiseConfig.RandomStream, ...
                         'mt19936ar with seed')
@@ -135,36 +135,36 @@ classdef RRFSimulator < matlab.System
                     PhaseNoise.Seed = obj.PhaseNoiseConfig.Seed;
                 end
             end
-
+            
         end
-
+        
         
         function AGC = genAGC(obj)
             AGC = comm.AGC(...
                 AveragingLength = obj.AGCConfig.AveragingLength, ...
                 MaxPowerGain = obj.AGCConfig.MaxPowerGain);
-
+            
         end
-
+        
         function SampleShifter = genSampleShifter(obj)
             SampleShifter = comm.SampleRateOffset(...
                 Offset=obj.SampleRateOffset);
         end
-
+        
     end
     
     methods
-
+        
         function obj = RRFSimulator(varargin)
-        
+            
             setProperties(obj, nargin, varargin{:});
-        
+            
         end
-
+        
     end
-
+    
     methods (Access=protected)
-
+        
         function setupImpl(obj)
             
             obj.SamplePerFrame = round(obj.SampleRate * obj.TimeDuration);
@@ -176,11 +176,11 @@ classdef RRFSimulator < matlab.System
             obj.IQImbalance = obj.genIqImbalance;
             obj.AGC = obj.genAGC;
             
-
+            
         end
-
+        
         function out = stepImpl(obj, in)
-
+            
             obj.InterpDecim = fix(obj.MasterClockRate / obj.SampleRate);
             obj.MasterClockRate = obj.InterpDecim * obj.SampleRate;
             
@@ -199,13 +199,20 @@ classdef RRFSimulator < matlab.System
                         OutputSampleRate=obj.MasterClockRate, ...
                         StopbandAttenuation=180);
                     x = src(rx.data);
+                    x = bandpass(x, ...
+                        [rx.CarrierFrequency - rx.BandWidth/2, ...
+                        rx.CarrierFrequency + rx.BandWidth/2], ...
+                        obj.MasterClockRate, ...
+                        ImpulseResponse = "fir", ...
+                        Steepness = 0.99, ...
+                        StopbandAttenuation=200);
                     startIdx = fix(obj.MasterClockRate * rx.StartTime)+1;
                     xgrid(startIdx:length(x)+startIdx-1, :) = x;
                     datas(i, :, :) = xgrid;
                 end
             else
                 xgrid = zeros(obj.MasterClockRate * obj.TimeDuration, ...
-                        obj.NumReceiveAntennas);
+                    obj.NumReceiveAntennas);
                 if ~iscell(in)
                     in = {in};
                 end
@@ -217,46 +224,46 @@ classdef RRFSimulator < matlab.System
                     StopbandAttenuation=180);
                 x = src(rx.data);
                 x = bandpass(x, ...
-                            [rx.CarrierFrequency - rx.BandWidth/2, ...
-                            rx.CarrierFrequency + rx.BandWidth/2], ...
-                            obj.MasterClockRate, ...
-                            ImpulseResponse = "fir", ...
-                            Steepness = 0.99, ...
-                            StopbandAttenuation=200);
+                    [rx.CarrierFrequency - rx.BandWidth/2, ...
+                    rx.CarrierFrequency + rx.BandWidth/2], ...
+                    obj.MasterClockRate, ...
+                    ImpulseResponse = "fir", ...
+                    Steepness = 0.99, ...
+                    StopbandAttenuation=200);
                 startIdx = fix(obj.MasterClockRate * rx.StartTime)+1;
                 xgrid(startIdx:length(x)+startIdx-1, :) = x;
                 datas(1, :, :) = xgrid;
             end
             
             mbc = comm.MultibandCombiner( ...
-                    InputSampleRate=obj.MasterClockRate, ...
-                    FrequencyOffsets=0, ...
-                    OutputSampleRateSource='Property', ...
-                    OutputSampleRate=obj.MasterClockRate);
+                InputSampleRate=obj.MasterClockRate, ...
+                FrequencyOffsets=0, ...
+                OutputSampleRateSource='Property', ...
+                OutputSampleRate=obj.MasterClockRate);
             datas = permute(datas, [2 1 3]);
             y = cell(1, obj.NumReceiveAntennas);
             SNRs = zeros(length(in), obj.NumReceiveAntennas);
             for rxI=1:obj.NumReceiveAntennas
                 x = mbc(datas(:, :, rxI));
-    
+                
                 % lightSpeed = physconst('light');
                 % waveLength = lightSpeed/(obj.CarrierFrequency);
                 % rxAntGain = sqrt(obj.AntennaEfficiency)*pi*obj.ReceiveAntennaDiameter/waveLength;
                 % x = rxAntGain*x;
-    
+                
                 x = obj.LowerPowerAmplifier(x);
                 DDC = dsp.DigitalDownConverter(...
-                      DecimationFactor=obj.InterpDecim,...
-                      SampleRate = obj.MasterClockRate,...
-                      Bandwidth  = obj.Bandwidth,...
-                      StopbandAttenuation = 60,...
-                      PassbandRipple = 0.1,...
-                      CenterFrequency = obj.CenterFrequency);
+                    DecimationFactor=obj.InterpDecim,...
+                    SampleRate = obj.MasterClockRate,...
+                    Bandwidth  = obj.Bandwidth,...
+                    StopbandAttenuation = 60,...
+                    PassbandRipple = 0.1,...
+                    CenterFrequency = obj.CenterFrequency);
                 x = DDC(x);
                 x = obj.FrequencyShifter(x);
                 x = obj.SampleShifter(x);
                 xAwgn = obj.ThermalNoise(x);
-
+                
                 % Estimate Eb/No
                 for i=1:length(in)
                     SNRs(i, rxI) = 10*log10(var(in{i}.data(:, rxI))./var(xAwgn-x));
@@ -268,7 +275,7 @@ classdef RRFSimulator < matlab.System
                 y{rxI} = x;
             end
             y = cell2mat(y);
-
+            
             out.data = y;
             out.StartTime = obj.StartTime;
             out.TimeDuration = obj.TimeDuration;
@@ -285,15 +292,15 @@ classdef RRFSimulator < matlab.System
             out.ThermalNoiseConfig = obj.ThermalNoiseConfig;
             out.AGCConfig = obj.AGCConfig;
             out.SNRs = SNRs;
-
+            
             out.tx = cell(length(in), 1);
             for i=1:length(in)
                 item = rmfield(in{i}, 'data');
                 out.tx{i} = item;
             end
-
+            
         end
-
+        
     end
-
+    
 end

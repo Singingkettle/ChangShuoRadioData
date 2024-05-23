@@ -1,7 +1,7 @@
 classdef Audio < BaseSource
-
+    
     methods (Access = protected)
-
+        
         function out = stepImpl(obj)
             % Implement algorithm. Calculate y as a function of input u and
             % discrete states.
@@ -16,7 +16,7 @@ classdef Audio < BaseSource
             audioSrc.SamplesPerFrame = ceil(SamplePerFrame / ...
                 obj.SampleRate * audioSrc.SampleRate / ...
                 decimFactor) * decimFactor;
-
+            
             x = audioRC(audioSrc());
             partID = randi(num_part);
             y = x((partID-1)*obj.SamplePerFrame+1:partID*obj.SamplePerFrame, 1);
@@ -27,14 +27,14 @@ classdef Audio < BaseSource
             y = lowpass(y, bw/2, obj.SampleRate, ...
                 ImpulseResponse = "fir", Steepness = 0.99999, ...
                 StopbandAttenuation=200);
-
+            
             out.data = y;
             out.TimeDuration = obj.TimeDuration;
             out.SampleRate = obj.SampleRate;
             out.SamplePerFrame = length(y);
             out.SamplePerSymbol = 1;
         end
-
+        
     end
-
+    
 end

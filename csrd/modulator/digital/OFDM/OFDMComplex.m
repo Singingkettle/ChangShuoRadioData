@@ -4,45 +4,45 @@ classdef OFDM < BaseModulator
     % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
     % https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html  基于这个例子确定OFDM-MIMO的整体流程
     % https://www.mathworks.com/help/comm/ug/ofdm-transmitter-and-receiver.html
-
-
+    
+    
     properties (Nontunable)
-
+        
         % Transmit parameters
         NumTransmitAntennnas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennnas, [1, 2, 3, 4])} = 1
         
         % Index corresponding to desired bandwidth
         BandWidthIndex (1, 1) {mustBeReal, mustBePositive} = 1
-
+        
         % Code rate index corresponding to desired rate
         codeRateIndex (1, 1) {mustBeReal, mustBePositive} = 1
-
-        % 
+        
+        %
         ModulatorType = 'psk'
         ModulatorOrder (1, 1) {mustBeReal, mustBePositive} = 1
-
+        
     end
     
     properties (Access = protected)
-
+        
         sysParam
         txParam
         txObj
-
+        
     end
-
-
+    
+    
     methods (Access = protected)
         
         function [sysParam, txParam] = setParameters(obj)
             sysParam = struct();
-
+            
             % Set transmit-specific parameter structure
             txParam = struct();
             txParam.numTx           = obj.NumTransmitAntennnas;
             txParam.modType         = obj.ModulatorType;
-            txParam.modOrder        = obj.ModulatorOrder;    
-            txParam.codeRateIndex   = obj.CodeRateIndex;     
+            txParam.modOrder        = obj.ModulatorOrder;
+            txParam.codeRateIndex   = obj.CodeRateIndex;
             
             sysParam.initState = [1 0 1 1 1 0 1]; % Scrambler/descrambler polynomials
             sysParam.scrMask   = [0 0 0 1 0 0 1];
@@ -74,7 +74,7 @@ classdef OFDM < BaseModulator
             sysParam.usedSubCarr    = BWParam.numSubCarr;  % number of active subcarriers
             sysParam.BW             = BWParam.BW;          % total allocated bandwidth
             sysParam.scs            = BWParam.scs;         % subcarrier spacing (Hz)
-            sysParam.pilotSpacing   = BWParam.pilotSpacing; 
+            sysParam.pilotSpacing   = BWParam.pilotSpacing;
             codeRate                = codeParam.codeRate;       % Coding rate
             sysParam.tracebackDepth = codeParam.tracebackDepth; % Traceback depth
             
@@ -101,7 +101,7 @@ classdef OFDM < BaseModulator
             if floor(numIntrlvRows) ~= numIntrlvRows
                 error('Number of header interleaver rows must divide into number of header subcarriers evenly.');
             end
-               
+            
         end
         
         function txObj = txInit(obj)
@@ -131,16 +131,16 @@ classdef OFDM < BaseModulator
             
             % Plot frequency response
             if obj.sysParam.enableScopes
-               [h,w] = freqz(txFilterCoef,1,1024,obj.sysParam.scs*obj.sysParam.FFTLen);
-               figure;
-               plot(w,20*log10(abs(h)));
-               grid on;
-               title('Tx Filter Frequency Response');
-               xlabel('Frequency (Hz)');
-               ylabel('Magnitude (dB)');
+                [h,w] = freqz(txFilterCoef,1,1024,obj.sysParam.scs*obj.sysParam.FFTLen);
+                figure;
+                plot(w,20*log10(abs(h)));
+                grid on;
+                title('Tx Filter Frequency Response');
+                xlabel('Frequency (Hz)');
+                ylabel('Magnitude (dB)');
             end
         end
-
+        
         function y = baseModulator(obj, x)
             obj.sysParam.numSymPerFrame = round(length(x)/obj.sysParam.usedSubCarr/obj.NumTransmitAntennnas);
             numDataOFDMSymbols = obj.sysParam.numSymPerFrame - ...
@@ -159,7 +159,7 @@ classdef OFDM < BaseModulator
             obj.sysParam.trBlkPadSize = (uncodedPayloadSize - codedPayloadSize)*obj.NumTransmitAntennnas;
             obj.sysParam.trBlkSize = ((codedPayloadSize * codeRate) - obj.sysParam.CRCLen - ...
                 (obj.sysParam.dataConvK-1))*obj.NumTransmitAntennnas;
-
+            
             
             ssIdx = obj.sysParam.ssIdx;         % sync symbol index
             rsIdx = obj.sysParam.rsIdx;         % reference symbol index
@@ -178,7 +178,7 @@ classdef OFDM < BaseModulator
             % Derive actual parameters from inputs
             [modType,bitsPerModSym,puncVec,~] = ...
                 getParameters(obj.txParam.modOrder,obj.txParam.codeRateIndex);
-
+            
             %% Synchronization signal generation
             syncSignal = OFDMSyncSignal();
             syncSignalInd = (numSubCar/2) - 31 + (1:62);
@@ -231,7 +231,7 @@ classdef OFDM < BaseModulator
                     modTypeIndexBits = dec2bin(5,nbitsModTypeIndex) == '1';
             end
             reserveBits = zeros(1,14-nbitsFFTLenIndex-nbitsCodeRateIndex-nbitsModTypeIndex); % Reserve bits for future use
-
+            
             % Form header bits
             headerBits = [FFTLenIndexBits, modTypeIndexBits, codeRateIndexBits, reserveBits];
             diagnostics.headerBits = headerBits.';
@@ -240,8 +240,8 @@ classdef OFDM < BaseModulator
             headerCRCOut = reshape(crcGenerate(headerBits',obj.txObj.crcHeaderGen),1,[]);
             
             % Perform convolutional coding
-            headerConvK = obj.sysParam.headerConvK; 
-            headerConvCode = obj.sysParam.headerConvCode; 
+            headerConvK = obj.sysParam.headerConvK;
+            headerConvCode = obj.sysParam.headerConvCode;
             headerConvOut = convenc([headerCRCOut, zeros(1,headerConvK-1)], ...
                 poly2trellis(headerConvK,headerConvCode)); % Terminated Mode
             
@@ -311,7 +311,7 @@ classdef OFDM < BaseModulator
             for i = 1:numDataOFDMSymbols
                 % Interleave each symbol
                 intrlvOut = OFDMInterleave(dataEnc(:,i),obj.sysParam.dataIntrlvNColumns);
-                    % Modulate the symbol
+                % Modulate the symbol
                 modData(:,i) = qammod(intrlvOut,obj.txParam.modOrder,...
                     UnitAveragePower=true,InputType="bit");
             end
@@ -323,7 +323,7 @@ classdef OFDM < BaseModulator
             % Load data and pilots on the grid
             grid(pilotInd,(headerIdx+1:numSymPerFrame)) = pilot;
             grid(modDataInd,(headerIdx+1:numSymPerFrame)) = modData;
-                
+            
             %% OFDM modulation
             dcIdx = (fftLen/2)+1;
             
@@ -350,22 +350,22 @@ classdef OFDM < BaseModulator
             
             % Collect diagnostic information
             diagnostics.ofdmModOut = txWaveform.';
-
+            
         end
-    
+        
     end
     methods
-
+        
         function modulatorHandle = genModulatorHandle(obj)
             
             [obj.txParam, obj.sysParam] = obj.setParameters;
             obj.txObj = obj.txInit;
             obj.IsDigital = true;
-
+            
         end
-
+        
     end
-
+    
 end
 
 
@@ -449,7 +449,7 @@ function firCoeff = OFDMFrontEndFilter(sysParam)
 BW = sysParam.BW;                  % Bandwidth (in Hz) of OFDM signal
 fs = sysParam.scs*sysParam.FFTLen; % Sample rate of OFDM signal
 
-%% FIR Filtering 
+%% FIR Filtering
 % Equiripple Lowpass filter designed using the |firpm| function.
 % All frequency values are in Hz.
 Fpass = BW/2;               % Passband frequency
@@ -480,7 +480,7 @@ function syncSignal = OFDMSyncSignal()
 %   seqeunce) as long as the sequence is of length 62 to fit the OFDM
 %   simulation.
 %
-%   syncSignal = helperOFDMSyncSignal() 
+%   syncSignal = helperOFDMSyncSignal()
 %   syncSignal - frequency-domain sync signal
 
 

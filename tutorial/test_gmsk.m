@@ -1,19 +1,19 @@
 clc
 clear
 close all
-% 
+%
 % %%
 % TimeDuration = 0.1;
 % SampleRate = 200e3;
 % MasterClockRate = 600e3;
 % ModulationOrder = 2;
 % SamplePerSymbol = 8;
-% 
+%
 % ModulatorConfig.BandwidthTimeProduct = 0.3;
 % ModulatorConfig.PulseLength = 4;
 % ModulatorConfig.SymbolPrehistory = 1;
 % ModulatorConfig.InitialPhaseOffset = 0;
-% 
+%
 % CarrierFrequency = 200e3;
 % IqImbalanceConfig.A = 3;
 % IqImbalanceConfig.P = 10;
@@ -28,16 +28,16 @@ close all
 % ThermalNoiseConfig.NoiseTemperature = 290;
 % AGCConfig.AveragingLength = 256 * 4;
 % AGCConfig.MaxPowerGain = 400;
-% 
+%
 % source = RandomSource(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulationOrder=ModulationOrder, ...
 %     SamplePerSymbol=SamplePerSymbol);
-% 
+%
 % x = source();
-% 
+%
 % %% 单天线场景
-% 
+%
 % txRF = TRFSimulator(StartTime=0.2, ...
 %     SampleRate = SampleRate, ...
 %     CarrierFrequency=CarrierFrequency, ...
@@ -48,32 +48,32 @@ close all
 % rayChannel = Rayleigh(CarrierFrequency=CarrierFrequency, ...
 %     SampleRate=SampleRate, PathDelays=0, ...
 %     AveragePathGains=0, MaximumDopplerShift=0);
-% 
+%
 % ricChannel = Rician(CarrierFrequency=CarrierFrequency, ...
 %     SampleRate=SampleRate, PathDelays=0, ...
 %     AveragePathGains=0, MaximumDopplerShift=0);
-% 
+%
 % rxRF = RRFSimulator(StartTime=0, TimeDuration=2, SampleRate=SampleRate, ...
 %     NumReceiveAntennas=1, CenterFrequency=200e3, Bandwidth=20e3, ...
 %     MasterClockRate=MasterClockRate, ...
 %     MemoryLessNonlinearityConfig=MemoryLessNonlinearityConfig, ...
 %     ThermalNoiseConfig=ThermalNoiseConfig, ...
-%     PhaseNoiseConfig=PhaseNoiseConfig, ... 
+%     PhaseNoiseConfig=PhaseNoiseConfig, ...
 %     AGCConfig=AGCConfig, ...
 %     IqImbalanceConfig=IqImbalanceConfig);
-% 
+%
 % baseBandSignal = GMSK(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulationOrder=ModulationOrder, ...
 %     SamplePerSymbol=SamplePerSymbol, ...
 %     ModulatorConfig=ModulatorConfig);
-% 
+%
 % x1= baseBandSignal(x);
 % x1 = txRF(x1);
 % x1 = rayChannel(x1);
 % y1 = rxRF({x1});
 
-%% 
+%%
 
 gmskmodulator = comm.GMSKModulator( ...
     BitInput=true, ...
@@ -90,8 +90,8 @@ modSignal = gmskmodulator(data);
 bw = obw(modSignal, 200e3, [], 99);
 bw = ceil(bw/1000)*1000;
 a = lowpass(modSignal, bw/2, 200e3, ...
-                ImpulseResponse = "fir", ...
-                Steepness = 0.99999, StopbandAttenuation=200);
+    ImpulseResponse = "fir", ...
+    Steepness = 0.99999, StopbandAttenuation=200);
 receivedData = gmskdemodulator(modSignal);
 receivedData1 = gmskdemodulator(a);
 errorStats = errorRate(data, receivedData);

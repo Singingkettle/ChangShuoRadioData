@@ -1,5 +1,5 @@
 classdef Rician < BaseChannel
-
+    
     properties (Nontunable)
         %PathDelays Discrete path delays (s)
         %   Specify the delays of the discrete paths in seconds as a double
@@ -28,11 +28,11 @@ classdef Rician < BaseChannel
         %   MaximumDopplerShift must be smaller than SampleRate/10 for each
         %   path. The default is 0.
         MaximumDopplerShift = 0
-
+        
     end
-
+    
     methods (Access=protected)
-
+        
         function setupImpl(obj)
             obj.MultipathChannel = comm.RicianChannel( ...
                 SampleRate = obj.SampleRate, ...
@@ -41,7 +41,7 @@ classdef Rician < BaseChannel
                 KFactor = obj.KFactor, ...
                 MaximumDopplerShift = obj.MaximumDopplerShift);
         end
-
+        
         function out = addMultipathFading(obj, in)
             %addMultipathFading Add Rician multipath fading
             %   Y=addMultipathFading(CH,X) adds Rician multipath fading effects
@@ -49,12 +49,13 @@ classdef Rician < BaseChannel
             %   MaximumDopplerShift settings. Channel path gains are regenerated
             %   for each frame, which provides independent path gain values for
             %   each frame.
-
+            
             % Pass input through the new channel
             out = obj.MultipathChannel(in);
         end
         
         function out = stepImpl(obj, x)
+            x.data = x.data/10^(obj.PathLoss/20);
             % Add channel impairments
             release(obj.MultipathChannel);
             obj.MultipathChannel.SampleRate = x.SampleRate;
@@ -70,22 +71,22 @@ classdef Rician < BaseChannel
             out.KFactor = obj.KFactor;
             out.MaximumDopplerShift = obj.MaximumDopplerShift;
             out.mode = 'SISO';
-          
+            
         end
-
+        
         function resetImpl(obj)
             reset(obj.MultipathChannel);
         end
-
+        
         function s = infoImpl(obj)
-
+            
             if isempty(obj.MultipathChannel)
                 setupImpl(obj);
             end
-
+            
             % Get channel delay from fading channel object delay
             mpInfo = info(obj.MultipathChannel);
-
+            
             s = struct( ...
                 'mode', obj.mode, ...
                 'FadingDistribution', 'Rician', ...
@@ -93,7 +94,7 @@ classdef Rician < BaseChannel
                 'NumReceiveAntennas', obj.NumReceiveAntennas, ...
                 'ChannelDelay', mpInfo.ChannelFilterDelay);
         end
-
+        
     end
-
+    
 end

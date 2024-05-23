@@ -1,5 +1,5 @@
 classdef MIMO < BaseChannel
-
+    
     properties (Nontunable)
         FadingDistribution = 'Rayleigh'
         %PathDelays Discrete path delays (s)
@@ -29,13 +29,13 @@ classdef MIMO < BaseChannel
         %   MaximumDopplerShift must be smaller than SampleRate/10 for each
         %   path. The default is 0.
         MaximumDopplerShift = 0
-
+        
     end
-
+    
     methods (Access=protected)
-
+        
         function setupImpl(obj)
-
+            
             if strcmp(obj.FadingDistribution, 'Rayleigh')
                 obj.MultipathChannel = comm.MIMOChannel( ...
                     SampleRate = obj.SampleRate, ...
@@ -58,17 +58,17 @@ classdef MIMO < BaseChannel
                     NumTransmitAntennas = obj.NumTransmitAntennas, ...
                     NumReceiveAntennas = obj.NumReceiveAntennas);
             end
-
+            
         end
-
+        
         function out = stepImpl(obj, x)
             % Add channel impairments
-
+            
             release(obj.MultipathChannel);
             obj.MultipathChannel.SampleRate = x.SampleRate;
             y = addMultipathFading(obj, x.data);
             % y = obj.PathLoss(y);
-
+            
             out = x;
             out.data = y;
             out.PathDelays = obj.PathDelays;
@@ -80,9 +80,9 @@ classdef MIMO < BaseChannel
             end
             out.MaximumDopplerShift = obj.MaximumDopplerShift;
             out.mode = obj.mode;
-
+            
         end
-
+        
         function out = addMultipathFading(obj, in)
             %addMultipathFading Add Rician multipath fading
             %   Y=addMultipathFading(CH,X) adds Rician multipath fading effects
@@ -90,30 +90,30 @@ classdef MIMO < BaseChannel
             %   MaximumDopplerShift settings. Channel path gains are regenerated
             %   for each frame, which provides independent path gain values for
             %   each frame.
-
+            
             % Get new path gains
             reset(obj.MultipathChannel)
             % Pass input through the new channel
             out = obj.MultipathChannel(in);
         end
-
+        
         function resetImpl(obj)
             reset(obj.MultipathChannel);
         end
-
+        
         function s = infoImpl(obj)
-
+            
             if isempty(obj.MultipathChannel)
                 setupImpl(obj);
             end
-
+            
             s = struct( ...
                 'mode', obj.mode, ...
                 'FadingDistribution', obj.FadingDistribution, ...
                 'NumTransmitAntennas', obj.NumTransmitAntennas, ...
                 'NumReceiveAntennas', obj.NumReceiveAntennas);
         end
-
+        
     end
-
+    
 end
