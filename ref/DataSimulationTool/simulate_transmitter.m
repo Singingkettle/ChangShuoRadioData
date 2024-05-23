@@ -14,8 +14,8 @@ if lf < hf
     y = modulator(x);
     
     bw = obw(y, sr);
-    % 1.5 is the protect gap to prevent the spectrum interference
-    protect_gap = 1.5;
+    % 2 is the protect gap to prevent the spectrum interference
+    protect_gap = 2;
     
     per_point_bw = sr/spf;
 
@@ -28,9 +28,11 @@ if lf < hf
         fc = round(fc/per_point_bw)*per_point_bw;
         fcd = fc - lf - bw*protect_gap/2;
         c = expWave(fc, sr, spf);
-        y = lowpass(y, bw*1.2/2, sr, ImpulseResponse="fir", Steepness=0.99);
+        y = lowpass(y, bw/2, sr, ImpulseResponse="fir", ...
+            Steepness=0.99, StopbandAttenuation=200);
 
         frame = y.*c;
+        frame = frame(1:spf/10);
         % make sure the input signal is normalized to unity power
         frame = frame ./ sqrt(mean(abs(frame).^2));
     

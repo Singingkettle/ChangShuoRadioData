@@ -22,13 +22,10 @@ classdef GFSK < BaseModulator
 
     methods (Access = protected)
 
-        function [y, bw] = baseMdulator(obj, x)
+        function [y, bw] = baseModulator(obj, x)
 
             y = obj.pureModulator(obj.const(x(:) + 1));
-            bw = obw(y, obj.SampleRate, [], 99.99999);
-            if obj.NumTransmitAntennnas > 1
-                bw = max(bw);
-            end
+            bw = obw(y, obj.SampleRate);
         end
 
     end
@@ -40,7 +37,8 @@ classdef GFSK < BaseModulator
             % if obj.ModulationOrder <= 2
             %     error("Value of Modulation order must be large than 2.");
             % end
-
+            obj.NumTransmitAntennnas = 1;
+            obj.IsDigital = true;
             obj.const = (- (obj.ModulationOrder - 1):2:(obj.ModulationOrder - 1))';
             obj.pureModulator = comm.CPMModulator( ...
                 ModulationOrder = obj.ModulationOrder, ...
@@ -49,9 +47,7 @@ classdef GFSK < BaseModulator
                 BandwidthTimeProduct = obj.ModulatorConfig.BandwidthTimeProduct, ...
                 SamplesPerSymbol = obj.SamplePerSymbol);
 
-            modulatorHandle = @(x)obj.baseMdulator(x);
-            obj.NumTransmitAntennnas = 1;
-            obj.IsDigital = true;
+            modulatorHandle = @(x)obj.baseModulator(x);
 
         end
 

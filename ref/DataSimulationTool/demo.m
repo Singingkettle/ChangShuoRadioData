@@ -3,7 +3,7 @@ clear
 close all
 % Generate train data
 spses = [10, 12, 15];        % Set of samples per symbol
-spf = 1200;                  % Samples per frame
+spf = 120000;                  % Samples per frame
 sr = 900e6;                  % Sample rate
 
 % Modulation set

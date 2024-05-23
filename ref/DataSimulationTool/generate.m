@@ -3,7 +3,7 @@ clear
 close all
 % Generate train data
 spses = [10, 12, 15];        % Set of samples per symbol
-spf = 1200;                  % Samples per frame
+spf = 12000;                  % Samples per frame
 sr = 150e3;                  % Sample rate
 
 % Modulation set
@@ -34,6 +34,10 @@ frequency_shifter = comm.PhaseFrequencyOffset('SampleRate', sr);
 for i=1:1000
     fprintf('Generate data of number %05d.\n', i);
     y = simulate_transmitter(-sr/2, sr/2, sr, spf, spses, modulationTypes);
+    % a = 0;
+    % for version=1:length(y)
+    %     a = a + y{version}.data;
+    % end
     y = pass_channels(y, channels, frequency_shifter);
     for version=1:length(y)
         is_ok = save_item(y{version}, version, i, spf);
@@ -47,7 +51,7 @@ function y = pass_channels(x, channels, frequency_shifter)
 % car_speed = 12;
 
 speeds = 0:2:12;
-snrs = 12:2:30;
+snrs = -8:2:30;
 
 % Res
 y = {};
@@ -69,7 +73,7 @@ y = {new};
 % =========================================================================
 c = channels.rician;
 for i=1:length(speeds)
-    for k=5:5
+    for k=1:10
         new = {};
         c.KFactor = k;
         for sub_signal_index=1:length(x)
@@ -113,7 +117,9 @@ for i=1:length(snrs)
     dB = snrs(i);
     for sub_signal_index=1:length(x)
         new_sub = x{sub_signal_index};
-        new_sub.data = awgn(new_sub.data, dB);
+        if sub_signal_index == 1
+            new_sub.data = awgn(new_sub.data, dB);
+        end
         new_sub.channel = sprintf('awgn-%ddB', dB);
         new_sub.snr = sprintf('%ddB', dB);
         new = [new, new_sub];
@@ -165,7 +171,9 @@ for sub_signal_index=1:length(x)
     data = c(new_sub.data);
     data = add_clock_offset(data, 5, new_sub.sample_rate, ...
         frequency_shifter, abs(new_sub.center_frequency));
-    new_sub.data = awgn(data, dB);
+    if sub_signal_index == 1
+        new_sub.data = awgn(new_sub.data, dB);
+    end
     new = [new, new_sub];
     release(c);
 end
@@ -200,7 +208,9 @@ for i=1:length(snrs)
         data = c(new_sub.data);
         data = add_clock_offset(data, 5, new_sub.sample_rate, ...
             frequency_shifter, abs(new_sub.center_frequency));
-        new_sub.data = awgn(data, dB);
+        if sub_signal_index == 1
+            new_sub.data = awgn(data, dB);
+        end
         new = [new, new_sub];
         release(c);
     end
@@ -213,7 +223,7 @@ end
 
 function is_ok = save_item(y, version, item_index, spf)
 
-signal_data = zeros(length(y), 2, spf);
+signal_data = zeros(length(y), 2, spf/10);
 signal_info.center_frequency = zeros(length(y), 1);
 signal_info.bandwidth = zeros(length(y), 1);
 signal_info.snr = strings(length(y), 1);
@@ -222,10 +232,12 @@ signal_info.channel = strings(length(y), 1);
 signal_info.sample_rate = zeros(length(y), 1);
 signal_info.sample_num = zeros(length(y), 1);
 signal_info.sample_per_symbol = zeros(length(y), 1);
+a = 0;
 for j=1:length(y)
     y{j}.data(isnan(y{j}.data)) = 0;
     signal_data(j, 1, :) = real(y{j}.data);
     signal_data(j, 2, :) = imag(y{j}.data);
+    a = a + y{j}.data;
     signal_info.center_frequency(j, 1) = y{j}.center_frequency;
     signal_info.bandwidth(j, 1) = y{j}.bandwidth;
     signal_info.snr(j, 1) = y{j}.snr;
@@ -238,18 +250,18 @@ end
 signal_info.file_name = sprintf('%06d.mat', item_index);
 s = jsonencode(signal_info, 'PrettyPrint', true);
 
-if ~exist(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d', version), 'dir')
-    mkdir(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d', version));
-    mkdir(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d/anno', version));
-    mkdir(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d/sequence_data', version));
-    mkdir(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d/sequence_data/iq', version));
+if ~exist(sprintf('./data/ChangShuo/v%d', version), 'dir')
+    mkdir(sprintf('./data/ChangShuo/v%d', version));
+    mkdir(sprintf('./data/ChangShuo/v%d/anno', version));
+    mkdir(sprintf('./data/ChangShuo/v%d/sequence_data', version));
+    mkdir(sprintf('./data/ChangShuo/v%d/sequence_data/iq', version));
 end
 
-fid = fopen(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d/anno/%06d.json', version, item_index),'w');
+fid = fopen(sprintf('./data/ChangShuo/v%d/anno/%06d.json', version, item_index),'w');
 fprintf(fid, s); 
 fclose(fid);
 
-save(sprintf('D:/Projects/ChangShuoRadioRecognition/data/ChangShuo/v%d/sequence_data/iq/%06d.mat', version, item_index),  'signal_data');
+save(sprintf('./data/ChangShuo/v%d/sequence_data/iq/%06d.mat', version, item_index),  'signal_data');
 
 is_ok = 1;
 

@@ -43,7 +43,7 @@ classdef TRFSimulator < matlab.System
         IQImbalance
         PhaseNoise
         MemoryLessNonlinearity
-
+        DUC
     end
 
     methods (Access = protected)
@@ -136,6 +136,10 @@ classdef TRFSimulator < matlab.System
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
 
         end
+        
+        function y = DUCH(obj, x)
+                 y = obj.DUC(x);
+        end
 
         function out = stepImpl(obj, x)
 
@@ -150,14 +154,29 @@ classdef TRFSimulator < matlab.System
             waveLength = lightSpeed/(obj.CarrierFrequency);
             txAntGain = sqrt(obj.AntennaEfficiency)*pi*obj.TransmitAntennaDiameter/waveLength;
             InterpDecim = fix(obj.MasterClockRate / x.SampleRate);
-            DUC = dsp.DigitalUpConverter(... 
+            obj.MasterClockRate = InterpDecim * x.SampleRate;
+            obj.DUC = dsp.DigitalUpConverter(... 
                      InterpolationFactor = InterpDecim,...
                      SampleRate = x.SampleRate,...
                      Bandwidth = x.BandWidth,...
                      StopbandAttenuation = 60,...
                      PassbandRipple = 0.1,...
                      CenterFrequency = obj.CarrierFrequency);
-            y = DUC(y);
+            if x.NumTransmitAntennnas > 1
+                cy = num2cell(y, 1);
+                y = cellfun(@obj.DUCH, cy, 'UniformOutput',false);
+                y = cell2mat(y);
+            else
+                y = obj.DUC(y);
+            end
+            
+            y = bandpass(y, ...
+                [obj.CarrierFrequency - x.BandWidth/2, ...
+                obj.CarrierFrequency + x.BandWidth/2], ...
+                obj.MasterClockRate, ...
+                ImpulseResponse = "fir", ...
+                Steepness = 0.99, ...
+                StopbandAttenuation=200);
             % y = txAntGain*y;
 
             out = x;

@@ -2,10 +2,6 @@ classdef MIMO < BaseChannel
 
     properties (Nontunable)
         FadingDistribution = 'Rayleigh'
-        %SampleRate Sample rate (Hz)
-        %   Specify the sample rate of the input signal in Hz as a double
-        %   precision, real, positive scalar. The default is 1 Hz.
-        SampleRate = 1
         %PathDelays Discrete path delays (s)
         %   Specify the delays of the discrete paths in seconds as a double
         %   precision, real, scalar or row vector. When PathDelays is a scalar,
@@ -36,11 +32,7 @@ classdef MIMO < BaseChannel
 
     end
 
-    properties (Access = private)
-        MultipathChannel
-    end
-
-    methods
+    methods (Access=protected)
 
         function setupImpl(obj)
 
@@ -50,6 +42,7 @@ classdef MIMO < BaseChannel
                     PathDelays = obj.PathDelays, ...
                     AveragePathGains = obj.AveragePathGains, ...
                     MaximumDopplerShift = obj.MaximumDopplerShift, ...
+                    SpatialCorrelationSpecification='None', ...
                     FadingDistribution = 'Rayleigh', ...
                     NumTransmitAntennas = obj.NumTransmitAntennas, ...
                     NumReceiveAntennas = obj.NumReceiveAntennas);
@@ -60,6 +53,7 @@ classdef MIMO < BaseChannel
                     AveragePathGains = obj.AveragePathGains, ...
                     KFactor = obj.KFactor, ...
                     MaximumDopplerShift = obj.MaximumDopplerShift, ...
+                    SpatialCorrelationSpecification='None', ...
                     FadingDistribution = 'Rician', ...
                     NumTransmitAntennas = obj.NumTransmitAntennas, ...
                     NumReceiveAntennas = obj.NumReceiveAntennas);

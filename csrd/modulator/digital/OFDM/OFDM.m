@@ -8,8 +8,6 @@ classdef OFDM < BaseModulator
 
     properties (Nontunable)
         Subcarrierspacing (1, 1) {mustBeReal, mustBePositive} = 30e3
-        % Transmit parameters
-        NumTransmitAntennnas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennnas, [1, 2, 3, 4])} = 1
     end
 
     properties
@@ -120,7 +118,6 @@ classdef OFDM < BaseModulator
             
             obj.IsDigital = true;
             obj.ostbc = obj.genOSTBC;
-            obj.sampler = obj.genSampler;
             obj.firstStageModulator = obj.genFirstStageModulator;
             obj.secondStageModulator = obj.genSecondStageModulator;
             modulatorHandle = @(x)obj.baseModulator(x);

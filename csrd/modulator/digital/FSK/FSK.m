@@ -16,10 +16,7 @@ classdef FSK < BaseModulator
 
         function [y, bw] = baseModulator(obj, x)
             y = obj.pureModulator(x);
-            bw = obw(y, obj.SampleRate, [], 99.99999);
-            if obj.NumTransmitAntennnas > 1
-                bw = max(bw);
-            end
+            bw = obw(y, obj.SampleRate);
         end
     end
 
@@ -29,14 +26,14 @@ classdef FSK < BaseModulator
 
             obj.IsDigital = true;
             obj.NumTransmitAntennnas = 1;
-            modulatorHandle = @(x)fskmod(x, ...
+            obj.pureModulator = @(x)fskmod(x, ...
                 obj.ModulationOrder, ...
                 obj.SampleRate / obj.SamplePerSymbol / 2, ...
                 obj.SamplePerSymbol, ...
                 obj.SampleRate, ...
                 'discont', ...
                 obj.ModulatorConfig.SymbolOrder);
-            
+            modulatorHandle = @(x)obj.baseModulator(x);
         end
 
     end

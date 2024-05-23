@@ -2,4 +2,4 @@
 # your own file.
 
 filePrefix: '../data'
-modulatorType: ['BPSK', 'QPSK']
+modulatorType: [ 'BPSK', 'QPSK' ]

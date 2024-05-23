@@ -1,4 +1,4 @@
-% 
+%
 M = 64;      % Modulation order for 16QAM
 nfft  = 1024; % Number of data carriers
 numSubCar = 500;
@@ -178,7 +178,7 @@ if ~isempty(prmStr.PilotIndices) && ~isempty(prmStr.Pilots)
             prmStr.Pilots(:,1:numSym,1:numTx,1:numBatchObs);
     else
         fullGrid(prmStr.PilotIndices,1:numSym,1:numTx,1:numBatchObs) = ...
-        repmat(prmStr.Pilots(:,1:numSym,1:numTx),[1,1,1,numBatchObs]);
+            repmat(prmStr.Pilots(:,1:numSym,1:numTx),[1,1,1,numBatchObs]);
     end
 end
 
@@ -193,201 +193,201 @@ end
 function [prmStr,pDataIdx] = setup(x,nfft,cplen,varargin)
 % Parse inputs and set up parameters
 
-    % Validate data input
-    validateattributes(x, {'double','single'}, ...
-        {'nonempty','finite'}, '', 'X');
+% Validate data input
+validateattributes(x, {'double','single'}, ...
+    {'nonempty','finite'}, '', 'X');
 
-    [numST,numSym,numTx,numBatchObs] = size(x,1:4);
+[numST,numSym,numTx,numBatchObs] = size(x,1:4);
 
-    fullSz = size(x);
+fullSz = size(x);
 
-    % Validate input size
-    coder.internal.errorIf( ~(numel(size(x))<=4 || all(fullSz(5:end)==1)), ...
-        'comm:OFDM:InvalidXInputSize',numST,numSym,numTx,numBatchObs);
+% Validate input size
+coder.internal.errorIf( ~(numel(size(x))<=4 || all(fullSz(5:end)==1)), ...
+    'comm:OFDM:InvalidXInputSize',numST,numSym,numTx,numBatchObs);
 
-    % Formatted dlarrays are unsupported
-    coder.internal.errorIf( isa(x, 'dlarray') && ~isempty(dims(x)), ...
-        'comm:OFDM:InvalidDlarrayFormat');
+% Formatted dlarrays are unsupported
+coder.internal.errorIf( isa(x, 'dlarray') && ~isempty(dims(x)), ...
+    'comm:OFDM:InvalidDlarrayFormat');
 
-    % Check nfft - scalar, positive integer > 8.
-    validateattributes(nfft, {'numeric'}, ...
-        {'real','scalar','integer','nonempty','finite','>=',8}, ...
-        '', 'NFFT');
+% Check nfft - scalar, positive integer > 8.
+validateattributes(nfft, {'numeric'}, ...
+    {'real','scalar','integer','nonempty','finite','>=',8}, ...
+    '', 'NFFT');
 
-    % Check cplen - scalar in range [0 nfft], or vector of length numSym
-    validateattributes(cplen, {'numeric'}, ...
-        {'real','row','integer','nonnegative','nonempty','finite'}, ...
-        '', 'CPLEN');
-    if isscalar(cplen)
-        coder.internal.errorIf( cplen>nfft, ...
-            'comm:OFDM:InvalidCyclicPrefixfcn');
-    else
-        coder.internal.errorIf( (length(cplen) ~= numSym) , ...
-            'comm:OFDM:InvalidCyclicPrefixVectorfcn');
-    end
+% Check cplen - scalar in range [0 nfft], or vector of length numSym
+validateattributes(cplen, {'numeric'}, ...
+    {'real','row','integer','nonnegative','nonempty','finite'}, ...
+    '', 'CPLEN');
+if isscalar(cplen)
+    coder.internal.errorIf( cplen>nfft, ...
+        'comm:OFDM:InvalidCyclicPrefixfcn');
+else
+    coder.internal.errorIf( (length(cplen) ~= numSym) , ...
+        'comm:OFDM:InvalidCyclicPrefixVectorfcn');
+end
 
-    % Parse optional parameters and name-value arguments
-    % Avoid using inputParser for faster processing
-    hasNVPair = false;
-    if isempty(varargin)      % ofdmmod(x,nfft,cplen)
-
-        NullIndices   = [];
+% Parse optional parameters and name-value arguments
+% Avoid using inputParser for faster processing
+hasNVPair = false;
+if isempty(varargin)      % ofdmmod(x,nfft,cplen)
+    
+    NullIndices   = [];
+    hasPilots     = false;
+    PilotIndices  = [];
+    Pilots        = [];
+    OversamplingFactor = 1;
+    
+elseif length(varargin)==1
+    % ofdmmod(x,nfft,cplen,nullIdx) OR
+    % ofdmmod(x,nfft,cplen,'OversamplingFactor') without argument error
+    
+    if isnumeric(varargin{1})
+        NullIndices   = varargin{1};
         hasPilots     = false;
         PilotIndices  = [];
         Pilots        = [];
         OversamplingFactor = 1;
-
-    elseif length(varargin)==1
-        % ofdmmod(x,nfft,cplen,nullIdx) OR
-        % ofdmmod(x,nfft,cplen,'OversamplingFactor') without argument error
-
-        if isnumeric(varargin{1})
-            NullIndices   = varargin{1};
-            hasPilots     = false;
-            PilotIndices  = [];
-            Pilots        = [];
-            OversamplingFactor = 1;
-        else
-            coder.internal.errorIf(true, 'comm:OFDM:InvalidOversamplingFactorSyntax');
-        end
-
-    elseif length(varargin)==2
-
-        % ofdmmod(x,nfft,cplen,'OversamplingFactor',OversamplingFactor) OR
-        % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx) without PILOTS argument error
-        % ofdmmod(x,nfft,cplen,nullIdx,'OversamplingFactor') without argument error
-
-        if ~isnumeric(varargin{1})
-            NullIndices   = [];
-            hasPilots     = false;
-            PilotIndices  = [];
-            Pilots        = [];
-            hasNVPair = true;
-            nvInd = 1;
-        else
-            if isnumeric(varargin{2})
-                coder.internal.errorIf(true, 'comm:OFDM:InvalidPilotSyntax');
-            else
-                coder.internal.errorIf(true, 'comm:OFDM:InvalidOversamplingFactorSyntax');
-            end
-        end
-
-    elseif length(varargin)==3
-
-        % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots) OR
-        % ofdmmod(x,nfft,cplen,nullIdx,'OversamplingFactor',OversamplingFactor)
-
+    else
+        coder.internal.errorIf(true, 'comm:OFDM:InvalidOversamplingFactorSyntax');
+    end
+    
+elseif length(varargin)==2
+    
+    % ofdmmod(x,nfft,cplen,'OversamplingFactor',OversamplingFactor) OR
+    % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx) without PILOTS argument error
+    % ofdmmod(x,nfft,cplen,nullIdx,'OversamplingFactor') without argument error
+    
+    if ~isnumeric(varargin{1})
+        NullIndices   = [];
+        hasPilots     = false;
+        PilotIndices  = [];
+        Pilots        = [];
+        hasNVPair = true;
+        nvInd = 1;
+    else
         if isnumeric(varargin{2})
-            % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots)
-            NullIndices  = varargin{1};
-            hasPilots    = true;
-            PilotIndices = varargin{2};
-            Pilots       = varargin{3};
-            OversamplingFactor = 1;
-            coder.internal.errorIf( ~strcmp(underlyingType(x),underlyingType(Pilots)) , ...
-                'comm:OFDM:InvalidInputTypes');
-        else
-            % ofdmmod(x,nfft,cplen,nullIdx,'OversamplingFactor',OversamplingFactor)
-            NullIndices  = varargin{1};
-            hasPilots    = false;
-            PilotIndices = [];
-            Pilots       = [];
-            hasNVPair = true;
-            nvInd = 2;
-        end
-
-    elseif length(varargin)==4
-
-        % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,'OversamplingFactor',OversamplingFactor) without PILOTS argument error
-        % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots,'OversamplingFactor') without argument error
-
-        if ~isnumeric(varargin{3})
             coder.internal.errorIf(true, 'comm:OFDM:InvalidPilotSyntax');
         else
             coder.internal.errorIf(true, 'comm:OFDM:InvalidOversamplingFactorSyntax');
         end
-
-    elseif length(varargin)==5 % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots,'OversamplingFactor',OversamplingFactor)
+    end
+    
+elseif length(varargin)==3
+    
+    % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots) OR
+    % ofdmmod(x,nfft,cplen,nullIdx,'OversamplingFactor',OversamplingFactor)
+    
+    if isnumeric(varargin{2})
+        % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots)
         NullIndices  = varargin{1};
         hasPilots    = true;
         PilotIndices = varargin{2};
         Pilots       = varargin{3};
-        hasNVPair = true;
-        nvInd = 4;
-    end
-
-    % Parse Name-Value pair
-    if hasNVPair
-        defaults = struct('OversamplingFactor', 1);
-        res = comm.internal.utilities.nvParser(defaults, varargin{nvInd:end});
-        OversamplingFactor = res.OversamplingFactor;
-
-        % Check validity of oversampling factor
-        validateattributes(OversamplingFactor, {'numeric'}, ...
-            {'real','scalar','nonempty','finite','>=',1}, ...
-            '', 'OversamplingFactor');
-        OversamplingFactor = double(OversamplingFactor);
-    end
-
-    % Populate prmStr as a sticky struct for codegen performance
-    prmStr = coder.internal.constantPreservingStruct( ...
-        'FFTLength',nfft, ...
-        'CyclicPrefixLength',cplen, ...
-        'NumSymbols',numSym, ...
-        'NumTransmitAntennas',numTx, ...
-        'NumBatchObs',numBatchObs, ...
-        'NullIndices',NullIndices, ...
-        'hasPilots', hasPilots, ...
-        'PilotIndices', PilotIndices, ...
-        'Pilots', Pilots, ...
-        'OversamplingFactor',OversamplingFactor);
-
-    if hasNVPair
-         comm.internal.ofdm.validatePrms('OversamplingFactor',prmStr);
-    end
-
-    % Throw error if pilot indices are specified but pilot values are empty
-    if ~isempty(prmStr.PilotIndices) && isempty(prmStr.Pilots)
-        coder.internal.errorIf(true, 'comm:OFDM:InvalidPilotSyntax');
-    end
-    
-    % Check for proper input type if PilotIndices and Pilots are not empty
-    if ~isempty(prmStr.PilotIndices) && ~isempty(prmStr.Pilots)
-        hasPilots = true;
-        coder.internal.errorIf( ~strcmp(underlyingType(x),underlyingType(prmStr.Pilots)) , ...
+        OversamplingFactor = 1;
+        coder.internal.errorIf( ~strcmp(underlyingType(x),underlyingType(Pilots)) , ...
             'comm:OFDM:InvalidInputTypes');
     else
-        hasPilots = false;
-    end
-
-    % Calculate the DataIndices
-    if ~isempty(prmStr.NullIndices)
-        checkNulls(prmStr,numST,hasPilots);
-
-        dataIdx = zeros(nfft-length(prmStr.NullIndices),1);
-        dataIdx(:) = double(setdiff((1:nfft)',prmStr.NullIndices));
-    else % no nulls
-        if hasPilots
-            numPilots = length(prmStr.PilotIndices); % may not have been specified
-            coder.internal.errorIf( (numST+numPilots) ~= prmStr.FFTLength, ...
-                'comm:OFDM:InvalidPacking');
-        else
-            coder.internal.errorIf( numST ~= prmStr.FFTLength, ...
-                'comm:OFDM:InvalidBasicInputSize');
-        end
-
-        dataIdx = double((1:nfft)');
+        % ofdmmod(x,nfft,cplen,nullIdx,'OversamplingFactor',OversamplingFactor)
+        NullIndices  = varargin{1};
+        hasPilots    = false;
+        PilotIndices = [];
+        Pilots       = [];
+        hasNVPair = true;
+        nvInd = 2;
     end
     
-    if hasPilots
-        checkPilots(prmStr,numSym,numTx,numBatchObs);
-
-        pDataIdx = coder.nullcopy(zeros(nfft-length(prmStr.NullIndices) ...
-            -length(prmStr.PilotIndices),1));
-        pDataIdx(:) = double(setdiff(dataIdx,prmStr.PilotIndices));
+elseif length(varargin)==4
+    
+    % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,'OversamplingFactor',OversamplingFactor) without PILOTS argument error
+    % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots,'OversamplingFactor') without argument error
+    
+    if ~isnumeric(varargin{3})
+        coder.internal.errorIf(true, 'comm:OFDM:InvalidPilotSyntax');
     else
-        pDataIdx = dataIdx;
+        coder.internal.errorIf(true, 'comm:OFDM:InvalidOversamplingFactorSyntax');
     end
+    
+elseif length(varargin)==5 % ofdmmod(x,nfft,cplen,nullIdx,pilotIdx,pilots,'OversamplingFactor',OversamplingFactor)
+    NullIndices  = varargin{1};
+    hasPilots    = true;
+    PilotIndices = varargin{2};
+    Pilots       = varargin{3};
+    hasNVPair = true;
+    nvInd = 4;
+end
+
+% Parse Name-Value pair
+if hasNVPair
+    defaults = struct('OversamplingFactor', 1);
+    res = comm.internal.utilities.nvParser(defaults, varargin{nvInd:end});
+    OversamplingFactor = res.OversamplingFactor;
+    
+    % Check validity of oversampling factor
+    validateattributes(OversamplingFactor, {'numeric'}, ...
+        {'real','scalar','nonempty','finite','>=',1}, ...
+        '', 'OversamplingFactor');
+    OversamplingFactor = double(OversamplingFactor);
+end
+
+% Populate prmStr as a sticky struct for codegen performance
+prmStr = coder.internal.constantPreservingStruct( ...
+    'FFTLength',nfft, ...
+    'CyclicPrefixLength',cplen, ...
+    'NumSymbols',numSym, ...
+    'NumTransmitAntennas',numTx, ...
+    'NumBatchObs',numBatchObs, ...
+    'NullIndices',NullIndices, ...
+    'hasPilots', hasPilots, ...
+    'PilotIndices', PilotIndices, ...
+    'Pilots', Pilots, ...
+    'OversamplingFactor',OversamplingFactor);
+
+if hasNVPair
+    comm.internal.ofdm.validatePrms('OversamplingFactor',prmStr);
+end
+
+% Throw error if pilot indices are specified but pilot values are empty
+if ~isempty(prmStr.PilotIndices) && isempty(prmStr.Pilots)
+    coder.internal.errorIf(true, 'comm:OFDM:InvalidPilotSyntax');
+end
+
+% Check for proper input type if PilotIndices and Pilots are not empty
+if ~isempty(prmStr.PilotIndices) && ~isempty(prmStr.Pilots)
+    hasPilots = true;
+    coder.internal.errorIf( ~strcmp(underlyingType(x),underlyingType(prmStr.Pilots)) , ...
+        'comm:OFDM:InvalidInputTypes');
+else
+    hasPilots = false;
+end
+
+% Calculate the DataIndices
+if ~isempty(prmStr.NullIndices)
+    checkNulls(prmStr,numST,hasPilots);
+    
+    dataIdx = zeros(nfft-length(prmStr.NullIndices),1);
+    dataIdx(:) = double(setdiff((1:nfft)',prmStr.NullIndices));
+else % no nulls
+    if hasPilots
+        numPilots = length(prmStr.PilotIndices); % may not have been specified
+        coder.internal.errorIf( (numST+numPilots) ~= prmStr.FFTLength, ...
+            'comm:OFDM:InvalidPacking');
+    else
+        coder.internal.errorIf( numST ~= prmStr.FFTLength, ...
+            'comm:OFDM:InvalidBasicInputSize');
+    end
+    
+    dataIdx = double((1:nfft)');
+end
+
+if hasPilots
+    checkPilots(prmStr,numSym,numTx,numBatchObs);
+    
+    pDataIdx = coder.nullcopy(zeros(nfft-length(prmStr.NullIndices) ...
+        -length(prmStr.PilotIndices),1));
+    pDataIdx(:) = double(setdiff(dataIdx,prmStr.PilotIndices));
+else
+    pDataIdx = dataIdx;
+end
 
 end
 
@@ -395,17 +395,17 @@ function checkNulls(prmStr,numST,hasPilots)
 %   Check for:
 %       NullIdx: unique, column, range [1:nfft]
 
-    comm.internal.ofdm.validatePrms('NullIdx',prmStr);
+comm.internal.ofdm.validatePrms('NullIdx',prmStr);
 
-    numNulls = length(prmStr.NullIndices);
-    if hasPilots
-        numPilots = length(prmStr.PilotIndices); % may not have been specified
-    else
-        numPilots = 0;
-    end
-    
-    coder.internal.errorIf( (numST+numNulls+numPilots) ~= prmStr.FFTLength, ...
-        'comm:OFDM:InvalidPacking');
+numNulls = length(prmStr.NullIndices);
+if hasPilots
+    numPilots = length(prmStr.PilotIndices); % may not have been specified
+else
+    numPilots = 0;
+end
+
+coder.internal.errorIf( (numST+numNulls+numPilots) ~= prmStr.FFTLength, ...
+    'comm:OFDM:InvalidPacking');
 
 end
 
@@ -416,22 +416,22 @@ function checkPilots(prmStr,numSym,numTx,numBatchObs)
 %       Pilots: double, 2d or 3D of size [np-by-Nsym-by-Nt] or
 %               4D of size [np-by-Nsym-by-Nt-by-Nb]
 
-    comm.internal.ofdm.validatePrms('PilotIdx',prmStr);
+comm.internal.ofdm.validatePrms('PilotIdx',prmStr);
 
-    % Formatted dlarrays are unsupported
-    coder.internal.errorIf(isa(prmStr.Pilots, 'dlarray') && ~isempty(dims(prmStr.Pilots)), ...
-        'comm:OFDM:InvalidDlarrayFormat');
-    
-    numPilots = length(prmStr.PilotIndices);
-    
-    [np,pSym,pNt,pNb] = size(prmStr.Pilots);
-    if numBatchObs == 1
-        coder.internal.errorIf( (np~=numPilots || pSym~=numSym || pNt~=numTx || pNb~=1), ...
-            'comm:OFDM:InvalidNumPilots', numPilots, numSym, numTx);
-    else
-        coder.internal.errorIf( (np~=numPilots || pSym~=numSym || pNt~=numTx || (pNb~=1 && pNb~=numBatchObs)), ...
-            'comm:OFDM:InvalidNumPilots4D', numPilots, numSym, numTx, numBatchObs);
-    end        
+% Formatted dlarrays are unsupported
+coder.internal.errorIf(isa(prmStr.Pilots, 'dlarray') && ~isempty(dims(prmStr.Pilots)), ...
+    'comm:OFDM:InvalidDlarrayFormat');
+
+numPilots = length(prmStr.PilotIndices);
+
+[np,pSym,pNt,pNb] = size(prmStr.Pilots);
+if numBatchObs == 1
+    coder.internal.errorIf( (np~=numPilots || pSym~=numSym || pNt~=numTx || pNb~=1), ...
+        'comm:OFDM:InvalidNumPilots', numPilots, numSym, numTx);
+else
+    coder.internal.errorIf( (np~=numPilots || pSym~=numSym || pNt~=numTx || (pNb~=1 && pNb~=numBatchObs)), ...
+        'comm:OFDM:InvalidNumPilots4D', numPilots, numSym, numTx, numBatchObs);
+end
 
 end
 

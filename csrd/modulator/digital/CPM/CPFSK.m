@@ -21,7 +21,7 @@ classdef CPFSK < GFSK
                 InitialPhaseOffset = obj.ModulatorConfig.InitialPhaseOffset, ...
                 SamplesPerSymbol = obj.SamplePerSymbol);
 
-            modulatorHandle = @(x)obj.baseMdulator(x);
+            modulatorHandle = @(x)obj.baseModulator(x);
             
 
         end

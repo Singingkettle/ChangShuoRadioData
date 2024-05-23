@@ -6,7 +6,7 @@ classdef FM < BaseModulator
 
             intY = cast(0, class(x)) + cumsum(x)/obj.SampleRate;
             y = exp(1i*2*pi*obj.ModulatorConfig.FrequencyDeviation*intY);
-            bw = obw(y, obj.SampleRate, [], 99.99999);
+            bw = obw(y, obj.SampleRate);
         end
 
     end
