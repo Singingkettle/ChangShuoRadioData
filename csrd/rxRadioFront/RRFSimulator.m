@@ -3,6 +3,7 @@ classdef RRFSimulator < matlab.System
     properties
         StartTime (1, 1) {mustBeGreaterThanOrEqual(StartTime, 0), mustBeReal} = 0
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
+        % The SampleRate is the bandwidth of receiver.
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e6
         NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1
         CenterFrequency (1, 1) {mustBePositive, mustBeReal, mustBeInteger} = 20e3
@@ -15,6 +16,8 @@ classdef RRFSimulator < matlab.System
         
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
         DCOffset {mustBeReal} = -50;
+
+        Position
         
         MemoryLessNonlinearityConfig struct
         ThermalNoiseConfig struct
@@ -25,6 +28,7 @@ classdef RRFSimulator < matlab.System
     end
     
     properties (Access = protected)
+        
         SamplePerFrame
         FrequencyOffset
         InterpDecim

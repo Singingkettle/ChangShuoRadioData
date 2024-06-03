@@ -42,18 +42,6 @@ classdef Rician < BaseChannel
                 MaximumDopplerShift = obj.MaximumDopplerShift);
         end
         
-        function out = addMultipathFading(obj, in)
-            %addMultipathFading Add Rician multipath fading
-            %   Y=addMultipathFading(CH,X) adds Rician multipath fading effects
-            %   to input, X, based on PathDelays, AveragePathGains, KFactor, and
-            %   MaximumDopplerShift settings. Channel path gains are regenerated
-            %   for each frame, which provides independent path gain values for
-            %   each frame.
-            
-            % Pass input through the new channel
-            out = obj.MultipathChannel(in);
-        end
-        
         function out = stepImpl(obj, x)
             x.data = x.data/10^(obj.PathLoss/20);
             % Add channel impairments
@@ -72,10 +60,6 @@ classdef Rician < BaseChannel
             out.MaximumDopplerShift = obj.MaximumDopplerShift;
             out.mode = 'SISO';
             
-        end
-        
-        function resetImpl(obj)
-            reset(obj.MultipathChannel);
         end
         
         function s = infoImpl(obj)

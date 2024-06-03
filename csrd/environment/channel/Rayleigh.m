@@ -41,7 +41,9 @@ classdef Rayleigh < BaseChannel
             %   MaximumDopplerShift settings. Channel path gains are regenerated
             %   for each frame, which provides independent path gain values for
             %   each frame.
-            
+
+            % Get new path gains
+            reset(obj.MultipathChannel)
             % Pass input through the new channel
             out = obj.MultipathChannel(in);
         end
@@ -52,7 +54,6 @@ classdef Rayleigh < BaseChannel
             release(obj.MultipathChannel);
             obj.MultipathChannel.SampleRate = x.SampleRate;
             y = obj.addMultipathFading(x.data);
-            % y = obj.PathLoss(y);
             
             out = x;
             out.data = y;
@@ -63,11 +64,6 @@ classdef Rayleigh < BaseChannel
             out.MaximumDopplerShift = obj.MaximumDopplerShift;
             out.mode = 'SISO';
             
-        end
-        
-        
-        function resetImpl(obj)
-            reset(obj.MultipathChannel);
         end
         
         function s = infoImpl(obj)

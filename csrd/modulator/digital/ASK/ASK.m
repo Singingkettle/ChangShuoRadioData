@@ -1,5 +1,5 @@
 classdef ASK < APSK
-    % FILEPATH: /e:/Projects/ChangShuoRadioData/csrd/modulator/digital/ASK/ASK.m
+    % FILEPATH: ChangShuoRadioData/csrd/modulator/digital/ASK/ASK.m
     %
     % ASK class is a subclass of APSK class and represents an Amplitude Shift Keying (ASK) modulator.
     %
@@ -29,7 +29,7 @@ classdef ASK < APSK
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-            
+
             bw = obw(y, obj.SampleRate)*2;
             if obj.NumTransmitAntennnas > 1
                 bw = max(bw);

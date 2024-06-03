@@ -34,7 +34,7 @@ z0 = apskdemod(modSig,M,radii);
 txSig = txfilter(modSig);
 bw = obw(txSig, SampleRate);
 bw = fix(bw/1000)*1000;
-y = lowpass(txSig, bw/2, SampleRate, ImpulseResponse="fir", Steepness=0.99);
+y = lowpass(txSig, SampleRate/sps, SampleRate, ImpulseResponse="fir", Steepness=0.99);
 
 rxSig = rxfilter(txSig);
 rxSig1 = rxfilter(y);

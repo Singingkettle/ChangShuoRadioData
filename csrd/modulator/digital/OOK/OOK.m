@@ -6,10 +6,12 @@ classdef OOK < APSK
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-            bw = obw(y, obj.SampleRate, [], 99.99999);
+
+            bw = obw(y, obj.SampleRate)*2;
             if obj.NumTransmitAntennnas > 1
                 bw = max(bw);
             end
+            
         end
         
     end

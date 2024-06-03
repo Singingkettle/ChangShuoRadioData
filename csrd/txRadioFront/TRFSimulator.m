@@ -29,10 +29,11 @@ classdef TRFSimulator < matlab.System
         % This value depends on the ettus usrp devices.
         % Please refer:
         % https://www.mathworks.com/help/comm/usrpradio/ug/sdrutransmitter.html
-        
+
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
         DCOffset {mustBeReal} = -50;
         
+        TxSiteConfig = false; 
         IqImbalanceConfig struct
         PhaseNoiseConfig struct
         MemoryLessNonlinearityConfig struct
@@ -63,7 +64,7 @@ classdef TRFSimulator < matlab.System
             PhaseNoise = comm.PhaseNoise( ...
                 Level = obj.PhaseNoiseConfig.Level, ...
                 FrequencyOffset = obj.PhaseNoiseConfig.FrequencyOffset, ...
-                SampleRate = obj.SampleRate);
+                SampleRate = obj.MasterClockRate);
             if isfield(obj.PhaseNoiseConfig, 'RandomStream')
                 if strcmp(obj.PhaseNoiseConfig.RandomStream, ...
                         'mt19936ar with seed')
@@ -151,9 +152,6 @@ classdef TRFSimulator < matlab.System
             y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
             
-            lightSpeed = physconst('light');
-            waveLength = lightSpeed/(obj.CarrierFrequency);
-            txAntGain = sqrt(obj.AntennaEfficiency)*pi*obj.TransmitAntennaDiameter/waveLength;
             InterpDecim = fix(obj.MasterClockRate / x.SampleRate);
             obj.MasterClockRate = InterpDecim * x.SampleRate;
             obj.DUC = dsp.DigitalUpConverter(...
@@ -178,14 +176,14 @@ classdef TRFSimulator < matlab.System
                 ImpulseResponse = "fir", ...
                 Steepness = 0.99, ...
                 StopbandAttenuation=200);
+            
             % y = txAntGain*y;
-            % 关于输出功率的控制参考的是：https://www.mathworks.com/help/comm/ref/comm.thermalnoise-system-object.html
+            % To control the output power, we refer：
+            % https://www.mathworks.com/help/comm/ref/comm.thermalnoise-system-object.html
             y = (10^((obj.OutputPower-30)/20)) * y;
             
             out = x;
             out.data = y;
-            out.AntennaEfficiency = obj.AntennaEfficiency;
-            out.TransmitAntennaDiameter = obj.TransmitAntennaDiameter;
             out.DCOffset = obj.DCOffset;
             out.IqImbalanceConfig = obj.IqImbalanceConfig;
             out.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;

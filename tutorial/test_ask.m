@@ -3,44 +3,44 @@ clear
 close all
 
 %%
-rolloff = 0.35;
-span= 4;
-sps = 4;
-
-SampleRate = 200e3;
-
-txfilter = comm.RaisedCosineTransmitFilter( ...
-    RolloffFactor=rolloff, ...
-    FilterSpanInSymbols=span, ...
-    OutputSamplesPerSymbol=sps);
-
-rxfilter = comm.RaisedCosineReceiveFilter( ...
-    RolloffFactor=rolloff, ...
-    FilterSpanInSymbols=span, ...
-    InputSamplesPerSymbol=sps, ...
-    DecimationFactor=sps);
-
-
-modOrder = 8;
-bps = log2(modOrder);
-filtDelay = span;
-errorRate = comm.ErrorRate(ReceiveDelay=filtDelay);
-errorRate1 = comm.ErrorRate(ReceiveDelay=filtDelay);
-
-x = randi([0 modOrder-1],1000,1);
-modSig = apskmod(x,M,radii);
-z0 = apskdemod(modSig,M,radii);
-txSig = txfilter(modSig);
-bw = obw(txSig, SampleRate);
-bw = fix(bw/1000)*1000;
-y = lowpass(txSig, bw/2, SampleRate, ImpulseResponse="fir", Steepness=0.99);
-
-rxSig = rxfilter(txSig);
-rxSig1 = rxfilter(y);
-z = apskdemod(rxSig,M,radii);
-z1 = apskdemod(rxSig1,M,radii);
-errStat = errorRate(x,z);
-errStat1 = errorRate1(x,z1);
+% rolloff = 0.35;
+% span= 4;
+% sps = 4;
+% 
+% SampleRate = 200e3;
+% 
+% txfilter = comm.RaisedCosineTransmitFilter( ...
+%     RolloffFactor=rolloff, ...
+%     FilterSpanInSymbols=span, ...
+%     OutputSamplesPerSymbol=sps);
+% 
+% rxfilter = comm.RaisedCosineReceiveFilter( ...
+%     RolloffFactor=rolloff, ...
+%     FilterSpanInSymbols=span, ...
+%     InputSamplesPerSymbol=sps, ...
+%     DecimationFactor=sps);
+% 
+% 
+% modOrder = 8;
+% bps = log2(modOrder);
+% filtDelay = span;
+% errorRate = comm.ErrorRate(ReceiveDelay=filtDelay);
+% errorRate1 = comm.ErrorRate(ReceiveDelay=filtDelay);
+% 
+% x = randi([0 modOrder-1],1000,1);
+% modSig = apskmod(x,M,radii);
+% z0 = apskdemod(modSig,M,radii);
+% txSig = txfilter(modSig);
+% bw = obw(txSig, SampleRate);
+% bw = fix(bw/1000)*1000;
+% y = lowpass(txSig, bw/2, SampleRate, ImpulseResponse="fir", Steepness=0.99);
+% 
+% rxSig = rxfilter(txSig);
+% rxSig1 = rxfilter(y);
+% z = apskdemod(rxSig,M,radii);
+% z1 = apskdemod(rxSig1,M,radii);
+% errStat = errorRate(x,z);
+% errStat1 = errorRate1(x,z1);
 
 %%
 TimeDuration = 0.1;

@@ -62,12 +62,11 @@ classdef MIMO < BaseChannel
         end
         
         function out = stepImpl(obj, x)
+            x.data = x.data/10^(obj.PathLoss/20);
             % Add channel impairments
-            
             release(obj.MultipathChannel);
             obj.MultipathChannel.SampleRate = x.SampleRate;
             y = addMultipathFading(obj, x.data);
-            % y = obj.PathLoss(y);
             
             out = x;
             out.data = y;
@@ -81,24 +80,6 @@ classdef MIMO < BaseChannel
             out.MaximumDopplerShift = obj.MaximumDopplerShift;
             out.mode = obj.mode;
             
-        end
-        
-        function out = addMultipathFading(obj, in)
-            %addMultipathFading Add Rician multipath fading
-            %   Y=addMultipathFading(CH,X) adds Rician multipath fading effects
-            %   to input, X, based on PathDelays, AveragePathGains, KFactor, and
-            %   MaximumDopplerShift settings. Channel path gains are regenerated
-            %   for each frame, which provides independent path gain values for
-            %   each frame.
-            
-            % Get new path gains
-            reset(obj.MultipathChannel)
-            % Pass input through the new channel
-            out = obj.MultipathChannel(in);
-        end
-        
-        function resetImpl(obj)
-            reset(obj.MultipathChannel);
         end
         
         function s = infoImpl(obj)

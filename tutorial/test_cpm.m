@@ -1,8 +1,8 @@
 %
 fprintf("====================================================================\n")
 data = randi([0 1], 8, 1);
-mod1 = @(x)fskmod(x, 2, 2, 8, 32);
-mod2 = comm.CPFSKModulator(BitInput = true, ModulationOrder = 2);
+mod1 = @(x)fskmod(x, 2, 2, 16, 64);
+mod2 = comm.CPFSKModulator(BitInput = true, ModulationOrder = 2, SamplesPerSymbol=16);
 
 y1 = mod1(data);
 y2 = mod2(data);

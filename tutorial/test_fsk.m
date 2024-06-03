@@ -6,8 +6,8 @@ close all
 TimeDuration = 0.1;
 SampleRate = 200e3;
 MasterClockRate = 600e3;
-ModulationOrder = 2;
-SamplePerSymbol = 8;
+ModulationOrder = 8;
+SamplePerSymbol = 4;
 
 ModulatorConfig.SymbolOrder = 'bin';
 

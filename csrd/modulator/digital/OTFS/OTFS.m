@@ -3,8 +3,6 @@ classdef OTFS < BaseModulator
     
     properties (Nontunable)
         Subcarrierspacing (1, 1) {mustBeReal, mustBePositive} = 30e3
-        % Transmit parameters
-        NumTransmitAntennnas = 1
         % DelayLength
         DelayLength (1, 1) {mustBeReal, mustBePositive} = 1024
     end
@@ -26,14 +24,45 @@ classdef OTFS < BaseModulator
             x = obj.ostbc(x);
             obj.NumSymbols = fix(size(x, 1) / obj.DelayLength);
             x = x(1:obj.NumSymbols * obj.DelayLength, :);
-            x = reshape(x, [obj.DelayLength, obj.NumSymbols]);
-            
+            x = reshape(x, [obj.DelayLength, obj.NumSymbols, obj.NumTransmitAntennnas]);
             y = obj.secondStageModulator(x);
-            bw = obj.DelayLength * obj.Subcarrierspacing;
+            M = length(y)/obj.NumSymbols;
+
             obj.TimeDuration = size(y, 1) / obj.SampleRate;
-            
+
+            bw = obw(y, obj.SampleRate, [], 98.5);
+            bw = max(bw);
+            scale_val = 2;
+            src = dsp.SampleRateConverter( ...
+                            Bandwidth=bw, ...
+                            InputSampleRate=obj.SampleRate, ...
+                            OutputSampleRate=obj.SampleRate*scale_val, ...
+                            StopbandAttenuation=50);
+            y1 = src(y);
+            [delay, ~, ~] = outputDelay(src, Fc=0);
+            y1 = circshift(y1, -fix(delay*(obj.SampleRate*scale_val)));
+            % Delete the dealy part, the 3 is hand value to ensure the
+            % delay part has been removed completely.
+            y = y1(1:end-M*scale_val*3, :);
+            % src = dsp.FIRRateConverter(2,1);
+            % [SRCoutMag,SRCFreq] = freqzmr(src);
+            % plot(SRCFreq/1e3,db(SRCoutMag)); 
+            % 
+
+            % [delay,FsOut] = outputDelay(src,FsIn=obj.SampleRate);
+            % tx = (0:length(y)-1)./obj.SampleRate;
+            % ty = (0:length(y1)-1)./(FsOut);
+            % ty = ty-delay;
+            % y = y1(ty>=0&ty<=tx(end));
+            % ty = ty(ty>=0&ty<=tx(end));
+            % signalAnalyzer(y, 'SampleRate', obj.SampleRate, 'StartTime', 0);
+            % signalAnalyzer(y1, 'SampleRate', obj.SampleRate*scale_val, 'StartTime', -delay);
+            % signalAnalyzer(y2, 'SampleRate', obj.SampleRate*scale_val, 'StartTime', ty(1));
+            bw = obj.DelayLength * obj.Subcarrierspacing;
+            obj.SampleRate = obj.SampleRate*scale_val;
         end
         
+     
         function ostbc = genOSTBC(obj)
             
             if obj.NumTransmitAntennnas > 1

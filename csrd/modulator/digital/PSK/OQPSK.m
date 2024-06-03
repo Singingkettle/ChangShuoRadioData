@@ -10,10 +10,12 @@ classdef OQPSK < APSK
         
         function [y, bw] = baseModulator(obj, x)
             y = obj.pureModulator(x);
-            bw = obw(y, obj.SampleRate, [], 99.99999);
+
+            bw = obw(y, obj.SampleRate);
             if obj.NumTransmitAntennnas > 1
                 bw = max(bw);
             end
+            
         end
         
     end

@@ -1,5 +1,5 @@
 classdef DVBSAPSK < APSK
-    % 关于DVBSAPSK的调制器参数取值，请参考
+    % For the modulator parameters of DVBSAPSK, please refer:
     % https://www.mathworks.com/help/comm/ref/dvbsapskmod.html#mw_c8c83d0e-4cb9-4aa7-bf44-92d4e39be3c9
     
     methods (Access = protected)
@@ -15,11 +15,12 @@ classdef DVBSAPSK < APSK
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-            
+
             bw = obw(y, obj.SampleRate);
             if obj.NumTransmitAntennnas > 1
                 bw = max(bw);
             end
+            
         end
         
     end
