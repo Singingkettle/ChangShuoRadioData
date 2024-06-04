@@ -16,3 +16,12 @@ v0.0.1 was released in 23/01/2024, which was located in ref/DataSimulationTool
 you can run generate.m to simulate wireless data, and
 use [ChangShuoRadioRecognition](https://github.com/Singingkettle/ChangShuoRadioRecognition) to do a joint DL model for
 radio detection and modulation classification
+
+# Notes
+
+These notes are mainly about how to simulate a real wireless communication system.
+
+1. How to convert a baseband to a passband signal
+```
+https://www.mathworks.com/help/comm/ug/passband-modulation.html
+```

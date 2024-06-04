@@ -138,46 +138,42 @@ classdef TRFSimulator < matlab.System
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
             
         end
-        
-        function y = DUCH(obj, x)
-            y = obj.DUC(x);
-        end
-        
+
         function out = stepImpl(obj, x)
-            
-            y = obj.IQImbalance(x.data);
-            y = y + 10 ^ (obj.DCOffset / 10);
-            release(obj.PhaseNoise);
-            obj.PhaseNoise.SampleRate = x.SampleRate;
-            y = obj.PhaseNoise(y);
-            y = obj.MemoryLessNonlinearity(y);
-            
+            % Change the input signal sample rate as txrf's master clock
+            % rate
             InterpDecim = fix(obj.MasterClockRate / x.SampleRate);
             obj.MasterClockRate = InterpDecim * x.SampleRate;
-            obj.DUC = dsp.DigitalUpConverter(...
-                InterpolationFactor = InterpDecim,...
-                SampleRate = x.SampleRate,...
-                Bandwidth = x.BandWidth,...
-                StopbandAttenuation = 60,...
-                PassbandRipple = 0.1,...
-                CenterFrequency = obj.CarrierFrequency);
-            if x.NumTransmitAntennnas > 1
-                cy = num2cell(y, 1);
-                y = cellfun(@obj.DUCH, cy, 'UniformOutput',false);
-                y = cell2mat(y);
-            else
-                y = obj.DUC(y);
-            end
-            
-            y = bandpass(y, ...
-                [obj.CarrierFrequency - x.BandWidth/2, ...
-                obj.CarrierFrequency + x.BandWidth/2], ...
-                obj.MasterClockRate, ...
-                ImpulseResponse = "fir", ...
-                Steepness = 0.99, ...
+            src = dsp.SampleRateConverter( ...
+                    Bandwidth=x.BandWidth, ...
+                    InputSampleRate=x.SampleRate, ...
+                    OutputSampleRate=obj.MasterClockRate, ...
+                    StopbandAttenuation=180);
+            y = src(x.data);
+            % Then pass the rated signal through a low pass filter, to 
+            % supress the compenents of high frequency 
+            y = lowpass(y, x.BandWidth/2, obj.MasterClockRate, ...
+                ImpulseResponse = "fir", Steepness = 0.99, ...
                 StopbandAttenuation=200);
+
+            % After that, add impairments 
+            y = obj.IQImbalance(y);
+            y = y + 10 ^ (obj.DCOffset / 10);
+            % release(obj.PhaseNoise);
+            % obj.PhaseNoise.SampleRate = obj.MasterClockRate;
+            % y = obj.PhaseNoise(y);
+            y = obj.MemoryLessNonlinearity(y);
+            % Transform the baseband to passband 
+            UpConverter = dsp.SineWave( ...
+                Amplitude=1, ...
+                Frequency=obj.CarrierFrequency, ...
+                PhaseOffset=0, ...
+                ComplexOutput=true, ...
+                SampleRate=obj.MasterClockRate, ...
+                SamplesPerFrame=size(y, 1));
+            y = y.*UpConverter();
+            y = real(y);
             
-            % y = txAntGain*y;
             % To control the output power, we refer：
             % https://www.mathworks.com/help/comm/ref/comm.thermalnoise-system-object.html
             y = (10^((obj.OutputPower-30)/20)) * y;
@@ -189,7 +185,7 @@ classdef TRFSimulator < matlab.System
             out.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;
             out.PhaseNoiseConfig = obj.PhaseNoiseConfig;
             out.SDRInterpDecim = InterpDecim;
-            out.SampleRate = x.SampleRate * InterpDecim;
+            out.SampleRate = obj.MasterClockRate;
             out.SamplePerFrame = size(y, 1);
             out.TimeDuration = out.SamplePerFrame / out.SampleRate;
             out.CarrierFrequency = obj.CarrierFrequency;

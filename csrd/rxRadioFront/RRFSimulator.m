@@ -6,7 +6,7 @@ classdef RRFSimulator < matlab.System
         % The SampleRate is the bandwidth of receiver.
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e6
         NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1
-        CenterFrequency (1, 1) {mustBePositive, mustBeReal, mustBeInteger} = 20e3
+        CarrierFrequency (1, 1) {mustBePositive, mustBeReal, mustBeInteger} = 20e3
         AntennaEfficiency (1, 1) {mustBePositive, mustBeReal} = 0.5
         ReceiveAntennaDiameter  (1, 1) {mustBePositive, mustBeReal} = 0.4
         % 关于SampleRateOffset的取值影响晶振频率也影响采样偏移
@@ -116,7 +116,7 @@ classdef RRFSimulator < matlab.System
         function FrequencyShifter = genFrequencyShifter(obj)
             FrequencyShifter = comm.PhaseFrequencyOffset(...
                 SampleRate=obj.SampleRate);
-            obj.FrequencyShifter.FrequencyOffset = -obj.SampleRateOffset*1e-6*obj.CenterFrequency;
+            obj.FrequencyShifter.FrequencyOffset = -obj.SampleRateOffset*1e-6*obj.CarrierFrequency;
         end
         
         function ThermalNoise = genThermalNoise(obj)
@@ -203,13 +203,6 @@ classdef RRFSimulator < matlab.System
                         OutputSampleRate=obj.MasterClockRate, ...
                         StopbandAttenuation=180);
                     x = src(rx.data);
-                    x = bandpass(x, ...
-                        [rx.CarrierFrequency - rx.BandWidth/2, ...
-                        rx.CarrierFrequency + rx.BandWidth/2], ...
-                        obj.MasterClockRate, ...
-                        ImpulseResponse = "fir", ...
-                        Steepness = 0.99, ...
-                        StopbandAttenuation=200);
                     startIdx = fix(obj.MasterClockRate * rx.StartTime)+1;
                     xgrid(startIdx:length(x)+startIdx-1, :) = x;
                     datas(i, :, :) = xgrid;
@@ -227,13 +220,6 @@ classdef RRFSimulator < matlab.System
                     OutputSampleRate=obj.MasterClockRate, ...
                     StopbandAttenuation=180);
                 x = src(rx.data);
-                x = bandpass(x, ...
-                    [rx.CarrierFrequency - rx.BandWidth/2, ...
-                    rx.CarrierFrequency + rx.BandWidth/2], ...
-                    obj.MasterClockRate, ...
-                    ImpulseResponse = "fir", ...
-                    Steepness = 0.99, ...
-                    StopbandAttenuation=200);
                 startIdx = fix(obj.MasterClockRate * rx.StartTime)+1;
                 xgrid(startIdx:length(x)+startIdx-1, :) = x;
                 datas(1, :, :) = xgrid;
@@ -247,23 +233,22 @@ classdef RRFSimulator < matlab.System
             datas = permute(datas, [2 1 3]);
             y = cell(1, obj.NumReceiveAntennas);
             SNRs = zeros(length(in), obj.NumReceiveAntennas);
+
+            DownConverter = dsp.SineWave( ...
+                Amplitude=1, ...
+                Frequency=obj.CarrierFrequency, ...
+                PhaseOffset=0, ...
+                ComplexOutput=true, ...
+                SampleRate=obj.MasterClockRate, ...
+                SamplesPerFrame=size(datas, 1));
+
             for rxI=1:obj.NumReceiveAntennas
                 x = mbc(datas(:, :, rxI));
-                
-                % lightSpeed = physconst('light');
-                % waveLength = lightSpeed/(obj.CarrierFrequency);
-                % rxAntGain = sqrt(obj.AntennaEfficiency)*pi*obj.ReceiveAntennaDiameter/waveLength;
-                % x = rxAntGain*x;
-                
+                x = x.*conj(DownConverter());
+                x = lowpass(x, obj.Bandwidth/2, obj.MasterClockRate, ...
+                    ImpulseResponse = "fir", Steepness = 0.99, ...
+                    StopbandAttenuation=200);
                 x = obj.LowerPowerAmplifier(x);
-                DDC = dsp.DigitalDownConverter(...
-                    DecimationFactor=obj.InterpDecim,...
-                    SampleRate = obj.MasterClockRate,...
-                    Bandwidth  = obj.Bandwidth,...
-                    StopbandAttenuation = 60,...
-                    PassbandRipple = 0.1,...
-                    CenterFrequency = obj.CenterFrequency);
-                x = DDC(x);
                 x = obj.FrequencyShifter(x);
                 x = obj.SampleShifter(x);
                 xAwgn = obj.ThermalNoise(x);
@@ -272,7 +257,7 @@ classdef RRFSimulator < matlab.System
                 for i=1:length(in)
                     SNRs(i, rxI) = 10*log10(var(in{i}.data(:, rxI))./var(xAwgn-x));
                 end
-                x = obj.PhaseNoise(xAwgn);
+                % x = obj.PhaseNoise(xAwgn);
                 x = x + 10 ^ (obj.DCOffset / 10);
                 x = obj.IQImbalance(x);
                 x = obj.AGC(x);
@@ -286,7 +271,7 @@ classdef RRFSimulator < matlab.System
             out.MasterClockRate = obj.MasterClockRate;
             out.SampleRate = obj.SampleRate;
             out.NumReceiveAntennas = obj.NumReceiveAntennas;
-            out.CenterFrequency = obj.CenterFrequency;
+            out.CarrierFrequency = obj.CarrierFrequency;
             out.SampleRateOffset = obj.SampleRateOffset;
             out.Bandwidth = obj.Bandwidth;
             out.DCOffset = obj.DCOffset;
