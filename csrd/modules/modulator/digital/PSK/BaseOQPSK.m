@@ -76,7 +76,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   % visualize 50 pulses of the OQPSK waveform
     %   eyediagram(waveform, 2*sps)
     %
-    %   % Example #3: End-to-end communication system, including OQPSK transmitter & receiver
+    %   % Example #3: End-to-end modules system, including OQPSK transmitter & receiver
     %
     %   % Transmitter:
     %   sps = 12;
