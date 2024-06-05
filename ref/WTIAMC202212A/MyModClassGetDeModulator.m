@@ -1,32 +1,32 @@
-function modulator = MyModClassGetDeModulator(modType, sps, fs)
+function modulator = MyModClassGetDeModulation(modType, sps, fs)
 
 switch modType
   case "BPSK"
-    modulator = @(x)bpskDeModulator(x,sps);
+    modulator = @(x)bpskDeModulation(x,sps);
   case "QPSK"
-    modulator = @(x)qpskDeModulator(x,sps);
+    modulator = @(x)qpskDeModulation(x,sps);
   case "8PSK"
-    modulator = @(x)psk8DeModulator(x,sps);
+    modulator = @(x)psk8DeModulation(x,sps);
   case "16QAM"
-    modulator = @(x)qam16DeModulator(x,sps);
+    modulator = @(x)qam16DeModulation(x,sps);
   case "64QAM"
-    modulator = @(x)qam64DeModulator(x,sps);
+    modulator = @(x)qam64DeModulation(x,sps);
   case "GFSK"
-    modulator = @(x)gfskModulator(x,sps);
+    modulator = @(x)gfskModulation(x,sps);
   case "CPFSK"
-    modulator = @(x)cpfskModulator(x,sps);
+    modulator = @(x)cpfskModulation(x,sps);
   case "PAM4"
-    modulator = @(x)pam4Modulator(x,sps);
+    modulator = @(x)pam4Modulation(x,sps);
   case "B-FM"
-    modulator = @(x)bfmModulator(x, fs);
+    modulator = @(x)bfmModulation(x, fs);
   case "DSB-AM"
-    modulator = @(x)dsbamModulator(x, fs);
+    modulator = @(x)dsbamModulation(x, fs);
   case "SSB-AM"
-    modulator = @(x)ssbamModulator(x, fs);
+    modulator = @(x)ssbamModulation(x, fs);
 end
 end
 
-function y = bpskDeModulator(x,sps)
+function y = bpskDeModulation(x,sps)
 rxfilter = comm.RaisedCosineReceiveFilter( ...
     RolloffFactor=0.35, ...
     FilterSpanInSymbols=4, ...
@@ -37,7 +37,7 @@ x = rxfilter(x);
 y = pskdemod(x,2);
 end
 
-function y = qpskDeModulator(x,sps)
+function y = qpskDeModulation(x,sps)
 rxfilter = comm.RaisedCosineReceiveFilter( ...
     RolloffFactor=0.35, ...
     FilterSpanInSymbols=4, ...
@@ -48,7 +48,7 @@ x = rxfilter(x);
 y = pskdemod(x,4,pi/4);
 end
 
-function y = psk8DeModulator(x,sps)
+function y = psk8DeModulation(x,sps)
 rxfilter = comm.RaisedCosineReceiveFilter( ...
     RolloffFactor=0.35, ...
     FilterSpanInSymbols=4, ...
@@ -59,7 +59,7 @@ x = rxfilter(x);
 y = pskdemod(x,8);
 end
 
-function y = qam16DeModulator(x,sps)
+function y = qam16DeModulation(x,sps)
 rxfilter = comm.RaisedCosineReceiveFilter( ...
     RolloffFactor=0.35, ...
     FilterSpanInSymbols=4, ...
@@ -70,7 +70,7 @@ x = rxfilter(x);
 y = qamdemod(x,16,'UnitAveragePower',true);
 end
 
-function y = qam64DeModulator(x,sps)
+function y = qam64DeModulation(x,sps)
 rxfilter = comm.RaisedCosineReceiveFilter( ...
     RolloffFactor=0.35, ...
     FilterSpanInSymbols=4, ...
@@ -81,9 +81,9 @@ x = rxfilter(x);
 y = qamdemod(x,64,'UnitAveragePower',true);
 end
 
-function y = pam4Modulator(x,sps)
-%pam4Modulator PAM4 modulator with pulse shaping
-%   Y = pam4Modulator(X,SPS) PAM4 modulates the input X, and returns the
+function y = pam4Modulation(x,sps)
+%pam4Modulation PAM4 modulator with pulse shaping
+%   Y = pam4Modulation(X,SPS) PAM4 modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 3]. The root-raised cosine filter has a
 %   roll-off factor of 0.35 and spans four symbols. The output signal
@@ -100,16 +100,16 @@ syms = amp * pammod(x,4);
 y = txfilter(syms);
 end
 
-function y = gfskModulator(x,sps)
-%gfskModulator GFSK modulator
-%   Y = gfskModulator(X,SPS) GFSK modulates the input X and returns the
+function y = gfskModulation(x,sps)
+%gfskModulation GFSK modulator
+%   Y = gfskModulation(X,SPS) GFSK modulates the input X and returns the
 %   signal Y. X must be a column vector of values in the set [0 1]. The
 %   BT product is 0.35 and the modulation index is 1. The output signal
 %   Y has unit power.
 
 
 M = 2;
-mod = comm.CPMModulator(...
+mod = comm.CPMModulation(...
 'ModulationOrder', M, ...
 'FrequencyPulse', 'Gaussian', ...
 'BandwidthTimeProduct', 0.35, ...
@@ -120,14 +120,14 @@ meanM = mean(0:M-1);
 y = mod(2*(x-meanM));
 end
 
-function y = cpfskModulator(x,sps)
-%cpfskModulator CPFSK modulator
-%   Y = cpfskModulator(X,SPS) CPFSK modulates the input X and returns
+function y = cpfskModulation(x,sps)
+%cpfskModulation CPFSK modulator
+%   Y = cpfskModulation(X,SPS) CPFSK modulates the input X and returns
 %   the signal Y. X must be a column vector of values in the set [0 1].
 %   the modulation index is 0.5. The output signal Y has unit power.
 
 M = 2;
-mod = comm.CPFSKModulator(...
+mod = comm.CPFSKModulation(...
 'ModulationOrder', M, ...
 'ModulationIndex', 0.5, ...
 'SamplesPerSymbol', sps);
@@ -136,32 +136,32 @@ meanM = mean(0:M-1);
 y = mod(2*(x-meanM));
 end
 
-function y = bfmModulator(x,fs)
-%bfmModulator Broadcast FM modulator
-%   Y = bfmModulator(X,FS) broadcast FM modulates the input X and returns
+function y = bfmModulation(x,fs)
+%bfmModulation Broadcast FM modulator
+%   Y = bfmModulation(X,FS) broadcast FM modulates the input X and returns
 %   the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The frequency deviation is 75 kHz
 %   and the pre-emphasis filter time constant is 75 microseconds.
 
 
-mod = comm.FMBroadcastModulator(...
+mod = comm.FMBroadcastModulation(...
 'AudioSampleRate', fs, ...
 'SampleRate', fs);
 y = mod(x);
 end
 
-function y = dsbamModulator(x,fs)
-%dsbamModulator Double sideband AM modulator
-%   Y = dsbamModulator(X,FS) double sideband AM modulates the input X and
+function y = dsbamModulation(x,fs)
+%dsbamModulation Double sideband AM modulator
+%   Y = dsbamModulation(X,FS) double sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.
 
 y = ammod(x,50e3,fs);
 end
 
-function y = ssbamModulator(x,fs)
-%ssbamModulator Single sideband AM modulator
-%   Y = ssbamModulator(X,FS) single sideband AM modulates the input X and
+function y = ssbamModulation(x,fs)
+%ssbamModulation Single sideband AM modulator
+%   Y = ssbamModulation(X,FS) single sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.
 

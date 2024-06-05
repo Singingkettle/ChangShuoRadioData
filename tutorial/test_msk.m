@@ -9,8 +9,8 @@ MasterClockRate = 600e3;
 ModulationOrder = 2;
 SamplePerSymbol = 8;
 
-ModulatorConfig.DataEncode = 'diff';
-ModulatorConfig.InitPhase = 0;
+ModulationConfig.DataEncode = 'diff';
+ModulationConfig.InitPhase = 0;
 
 CarrierFrequency = 200e3;
 IqImbalanceConfig.A = 3;
@@ -64,7 +64,7 @@ baseBandSignal = MSK(SampleRate=SampleRate, ...
     TimeDuration=TimeDuration, ...
     ModulationOrder=ModulationOrder, ...
     SamplePerSymbol=SamplePerSymbol, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x1= baseBandSignal(x);
 x1 = txRF(x1);

@@ -14,7 +14,7 @@ There are mainly three kinds of Classes to control the generation process. Their
 
 ![relationship](./img/relationship.svg)
 
-The whole generation pipeline is defined in the ModulatorClass file, for example **BPSKModulator.m**.:
+The whole generation pipeline is defined in the ModulationClass file, for example **BPSKModulation.m**.:
 
 ```matlab
     methods(Access = protected)
@@ -85,7 +85,7 @@ cd {PROJECT_FOLDER}/ModulationDataSimulator/tool
 bash multi.sh 
 ```
 
-## Add New Modulator
+## Add New Modulation
 
 You can add new modulator very simple. There are two steps:
 
@@ -129,16 +129,16 @@ You can add new modulator very simple. There are two steps:
       end
       ```
 
-2. Add new **modulator** class in the folder "engine/module/Classes/Modulator".
+2. Add new **modulator** class in the folder "engine/module/Classes/Modulation".
 
     * Make sure the new modulator belongs to PSK or other types. If it cannot be classified, you should make new folder:
 
       ```bash
       mkdir NEW_FOLDER
       ```
-    * Write new class script "NEWModulator.m", for example:
+    * Write new class script "NEWModulation.m", for example:
       ```matlab
-      classdef BPSKModulator<baseModulator
+      classdef BPSKModulation<baseModulation
           %BPSKMODULATOR 此处显示有关此类的摘要
           %   此处显示详细说明
           
@@ -156,7 +156,7 @@ You can add new modulator very simple. There are two steps:
           end
           
           methods
-              function obj = BPSKModulator(modulatorParam)
+              function obj = BPSKModulation(modulatorParam)
                   %BPSKMODULATOR 构造此类的实例
                   %   此处显示详细说明
                   

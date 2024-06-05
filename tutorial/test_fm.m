@@ -52,9 +52,9 @@ source = Audio(SampleRate = SampleRate, TimeDuration = TimeDuration);
 x = source();
 
 %% Test FM
-ModulatorConfig.FrequencyDeviation = 75e3;
-ModulatorConfig.InitPhase = pi / 4;
-baseBandSignal = FM(ModulatorConfig = ModulatorConfig, ...
+ModulationConfig.FrequencyDeviation = 75e3;
+ModulationConfig.InitPhase = pi / 4;
+baseBandSignal = FM(ModulationConfig = ModulationConfig, ...
     NumTransmitAntennnas = NumTransmitAntennnas, ...
     SampleRate=SampleRate);
 
@@ -86,7 +86,7 @@ c = dwnConv(b);
 scope2 = spectrumAnalyzer(SampleRate=x1.SampleRate,AveragingMethod="exponential",RBWSource="auto",SpectrumUnits="dBW");
 scope2(c);
 
-fmDeMod = comm.FMDemodulator("SampleRate", x1.SampleRate, "FrequencyDeviation", ModulatorConfig.FrequencyDeviation);
+fmDeMod = comm.FMDemodulator("SampleRate", x1.SampleRate, "FrequencyDeviation", ModulationConfig.FrequencyDeviation);
 
 d = lowpass(c, 60e3, x1.SampleRate, ...
     ImpulseResponse = "fir", ...

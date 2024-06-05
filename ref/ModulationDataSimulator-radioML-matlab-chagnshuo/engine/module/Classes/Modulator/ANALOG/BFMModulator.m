@@ -1,6 +1,6 @@
-classdef BFMModulator<baseModulator
-    %BPSKMODULATOR ´Ë´¦ÏÔÊ¾ÓÐ¹Ø´ËÀàµÄÕªÒª
-    %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+classdef BFMModulation<baseModulation
+    %BPSKMODULATOR ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½Ð¹Ø´ï¿½ï¿½ï¿½ï¿½ÕªÒª
+    %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
     
     properties
         modulatorType = 'BFM'
@@ -8,15 +8,15 @@ classdef BFMModulator<baseModulator
     end
     
     methods
-        function obj = BFMModulator(modulatorParam)
-            %BPSKMODULATOR ¹¹Ôì´ËÀàµÄÊµÀý
-            %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+        function obj = BFMModulation(modulatorParam)
+            %BPSKMODULATOR ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
+            %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
             
-            % ¹¹ÔìÊý¾ÝÉú³ÉÆ÷¾ä±ú
+            % ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             obj.sourceHandle = ...
                 Source.create(modulatorParam.sourceParam);
             
-            % ¹¹ÔìÐÅµÀ¾ä±ú
+            % ï¿½ï¿½ï¿½ï¿½ï¿½Åµï¿½ï¿½ï¿½ï¿½
             obj.channelHandle = ...
                 Channel.create(modulatorParam.channelParam);
             
@@ -43,7 +43,7 @@ classdef BFMModulator<baseModulator
                 x = obj.sourceHandle();
 
                 % Modulate
-                mod = comm.FMBroadcastModulator(...
+                mod = comm.FMBroadcastModulation(...
                     'AudioSampleRate', obj.sampleRate, ...
                     'SampleRate', obj.sampleRate);
                 y = mod(x);

@@ -4,9 +4,9 @@ function helpInfo
     classFactory = containers.Map;
     % Get the current root directory path
     currentDirectory = fileparts(mfilename('fullpath'));
-    modulatorList = dir(fullfile(currentDirectory, '../Classes/Modulator'));
+    modulatorList = dir(fullfile(currentDirectory, '../Classes/Modulation'));
     
-    numModulatorClass = 0;
+    numModulationClass = 0;
     for folderIndex=3:length(modulatorList)
         folderPath = fullfile(modulatorList(folderIndex).folder, modulatorList(folderIndex).name);
         classFolderName = modulatorList(folderIndex).name;
@@ -26,12 +26,12 @@ function helpInfo
                         error('You have defined duplicated modulator classes, whose name is %s.\n' , modulatorClassName, ...
                               'And it''s not illegal. Please correct the code.');
                     end
-                    if(strcmp(modulatorClassName, 'baseModulator'))
+                    if(strcmp(modulatorClassName, 'baseModulation'))
                         continue;
                     end
                     modulatorClassNameCells{end+1} = modulatorClassName;
                     classFactory(modulatorClassName) = 0;
-                    numModulatorClass = numModulatorClass + 1;
+                    numModulationClass = numModulationClass + 1;
                 end
             end
             classFactoryInfo(classFolderName) = modulatorClassNameCells;
@@ -52,7 +52,7 @@ function helpInfo
         end
         fprintf('\n\n');
     end
-    fprintf('The number of registered modulatorClass are %d.\n', numModulatorClass);
+    fprintf('The number of registered modulatorClass are %d.\n', numModulationClass);
 end
     
         

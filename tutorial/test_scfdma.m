@@ -12,12 +12,12 @@ Subcarrierspacing = 10e3;
 NumDataSubcarriers = 24;
 SubcarrierMappingInterval = 3;
 
-ModulatorConfig.base.mode = 'QPSK';
-ModulatorConfig.base.PhaseOffset = pi/8;
-ModulatorConfig.base.SymbolOrder = 'gray';
-ModulatorConfig.scfdma.FFTLength = 128;
-ModulatorConfig.scfdma.CyclicPrefixLength = 16;
-ModulatorConfig.scfdma.OversamplingFactor = 1;
+ModulationConfig.base.mode = 'QPSK';
+ModulationConfig.base.PhaseOffset = pi/8;
+ModulationConfig.base.SymbolOrder = 'gray';
+ModulationConfig.scfdma.FFTLength = 128;
+ModulationConfig.scfdma.CyclicPrefixLength = 16;
+ModulationConfig.scfdma.OversamplingFactor = 1;
 
 CarrierFrequency = 5e6;
 IqImbalanceConfig.A = 3;
@@ -74,7 +74,7 @@ baseBandSignal = SCFDMA(SampleRate=SampleRate, ...
     NumDataSubcarriers=NumDataSubcarriers, ...
     SubcarrierMappingInterval = SubcarrierMappingInterval, ...
     ModulationOrder=ModulationOrder, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x1= baseBandSignal(x);
 x1 = txRF(x1);
@@ -113,7 +113,7 @@ baseBandSignal = SCFDMA(SampleRate=SampleRate, ...
     ModulationOrder=ModulationOrder, ...
     NumDataSubcarriers=NumDataSubcarriers, ...
     NumTransmitAntennnas=NumTransmitAntennnas, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x2 = baseBandSignal(x);
 x2 = txRF(x2);
@@ -150,7 +150,7 @@ baseBandSignal = SCFDMA(SampleRate=SampleRate, ...
     ModulationOrder=ModulationOrder, ...
     NumDataSubcarriers=NumDataSubcarriers, ...
     NumTransmitAntennnas=NumTransmitAntennnas, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x3 = baseBandSignal(x);
 x3 = txRF(x3);
@@ -187,7 +187,7 @@ baseBandSignal = SCFDMA(SampleRate=SampleRate, ...
     ModulationOrder=ModulationOrder, ...
     NumDataSubcarriers=NumDataSubcarriers, ...
     NumTransmitAntennnas=NumTransmitAntennnas, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x4 = baseBandSignal(x);
 x4 = txRF(x4);

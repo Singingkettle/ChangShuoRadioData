@@ -17,7 +17,7 @@ close all
 % sr = numDC * sps;
 %
 % frameSize = [k*numDC NumSymbols];
-% ofdmMod = comm.OFDMModulator( ...
+% ofdmMod = comm.OFDMModulation( ...
 %     FFTLength=numSC, ...
 %     CyclicPrefixLength=cpLen, ...
 %     Windowing=true, ...
@@ -73,18 +73,18 @@ MasterClockRate = 20e6;
 SamplePerSymbol = 1;
 Subcarrierspacing = 10e3;
 
-ModulatorConfig.base.mode = 'QPSK';
-ModulatorConfig.base.PhaseOffset = pi/8;
-ModulatorConfig.base.SymbolOrder = 'gray';
-ModulatorConfig.ofdm.FFTLength = 128;
-ModulatorConfig.ofdm.NumGuardBandCarriers = [6; 5];
-ModulatorConfig.ofdm.InsertDCNull = false;
-ModulatorConfig.ofdm.PilotInputPort = false;
-ModulatorConfig.ofdm.PilotCarrierIndices = [12; 26; 40; 54];
-ModulatorConfig.ofdm.CyclicPrefixLength = 16;
-ModulatorConfig.ofdm.Windowing = false;
-ModulatorConfig.ofdm.WindowLength = 1;
-ModulatorConfig.ofdm.OversamplingFactor = 1;
+ModulationConfig.base.mode = 'psk';
+ModulationConfig.base.PhaseOffset = pi/8;
+ModulationConfig.base.SymbolOrder = 'gray';
+ModulationConfig.ofdm.FFTLength = 128;
+ModulationConfig.ofdm.NumGuardBandCarriers = [6; 5];
+ModulationConfig.ofdm.InsertDCNull = false;
+ModulationConfig.ofdm.PilotInputPort = false;
+ModulationConfig.ofdm.PilotCarrierIndices = [12; 26; 40; 54];
+ModulationConfig.ofdm.CyclicPrefixLength = 16;
+ModulationConfig.ofdm.Windowing = false;
+ModulationConfig.ofdm.WindowLength = 1;
+ModulationConfig.ofdm.OversamplingFactor = 1;
 
 CarrierFrequency = 5e6;
 IqImbalanceConfig.A = 3;
@@ -139,7 +139,7 @@ baseBandSignal = OFDM(SampleRate=SampleRate, ...
     TimeDuration=TimeDuration, ...
     Subcarrierspacing = Subcarrierspacing, ...
     ModulationOrder=ModulationOrder, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x1= baseBandSignal(x);
 x1 = txRF(x1);
@@ -177,7 +177,7 @@ baseBandSignal = OFDM(SampleRate=SampleRate, ...
     Subcarrierspacing = Subcarrierspacing, ...
     ModulationOrder=ModulationOrder, ...
     NumTransmitAntennnas=NumTransmitAntennnas, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x2 = baseBandSignal(x);
 x2 = txRF(x2);
@@ -213,7 +213,7 @@ baseBandSignal = OFDM(SampleRate=SampleRate, ...
     Subcarrierspacing = Subcarrierspacing, ...
     ModulationOrder=ModulationOrder, ...
     NumTransmitAntennnas=NumTransmitAntennnas, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x3 = baseBandSignal(x);
 x3 = txRF(x3);
@@ -249,7 +249,7 @@ baseBandSignal = OFDM(SampleRate=SampleRate, ...
     Subcarrierspacing = Subcarrierspacing, ...
     ModulationOrder=ModulationOrder, ...
     NumTransmitAntennnas=NumTransmitAntennnas, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x4 = baseBandSignal(x);
 x4 = txRF(x4);

@@ -19,7 +19,7 @@ function generateAll(configFile)
     
     
     for workerIndex = 1:length(paramCells)
-        d = Modulator.create(paramCells{workerIndex});
+        d = Modulation.create(paramCells{workerIndex});
         d();
     end
 end

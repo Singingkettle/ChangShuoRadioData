@@ -3,7 +3,7 @@ fs = 200e3;                  % Sample rate
 
 
 src = helperModClassGetSource('BPSK', 16, 2*spf, fs);
-modulator = MyModClassGetModulator('BPSK', 16, fs);
+modulator = MyModClassGetModulation('BPSK', 16, fs);
 
 x = src();
 y = modulator(x);
@@ -47,7 +47,7 @@ channel_rayleigh = MyModClassTestChannel(...
                         'KFactor', 4, ...
                         'MaximumDopplerShift', 4, ...
                         'MaximumClockOffset', 5, ...
-                        'CenterFrequency', fc);
+                        'CarrierFrequency', fc);
 
 [y5, bw2,flo2,fhi2] = channel_rayleigh(y2);
 fc2_l = expWave(flo2, fs, spf);

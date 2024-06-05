@@ -59,7 +59,7 @@ function [H, delays, full_output]=scm(scmpar,linkpar,antpar,initvalues)
 %
 %   See also SCMPARSET, LINKPARSET, ANTPARSET
 
-%   Authors: Jari Salo (HUT), Giovanni Del Galdo (TUI), Pekka Kyösti (EBIT), 
+%   Authors: Jari Salo (HUT), Giovanni Del Galdo (TUI), Pekka Kyï¿½sti (EBIT), 
 %   Daniela Laselva (EBIT), Marko Milojevic (TUI), Christian Schneider (TUI)
 %   $Revision: 0.34$  $Date: Dec 12, 2004$
 
@@ -83,7 +83,7 @@ SampleDensity=scmpar.SampleDensity;
 NumTimeSamples=scmpar.NumTimeSamples;
 N=scmpar.NumPaths;
 M=scmpar.NumSubPathsPerPath;
-CenterFrequency=scmpar.CenterFrequency;
+CarrierFrequency=scmpar.CarrierFrequency;
 ScmOptions=scmpar.ScmOptions;
 DelaySamplingInterval=scmpar.DelaySamplingInterval;
 PathLossModel=scmpar.PathLossModel;

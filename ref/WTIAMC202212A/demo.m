@@ -69,7 +69,7 @@ for i=1:length(modulationTypes)
     for j=1:length(spses)
         errorRate = comm.ErrorRate(ReceiveDelay=4);
         src = helperModClassGetSource(modulationTypes(i), spses(j), 2*spf, fs);
-        modulator = MyModClassGetModulator(modulationTypes(i), spses(j), fs);
+        modulator = MyModClassGetModulation(modulationTypes(i), spses(j), fs);
         x = src();
         y = modulator(x);
         bw = obw(y, fs);
@@ -79,7 +79,7 @@ for i=1:length(modulationTypes)
         right = floor(length(y) - bw/fs*length(y)/2 - 1);
         tmp(left:right) = 0;
         tmp = ifft(tmp);
-        demodulator = MyModClassGetDeModulator(modulationTypes(i), spses(j), fs);
+        demodulator = MyModClassGetDeModulation(modulationTypes(i), spses(j), fs);
         x_ = demodulator(y);
 
         errStat = errorRate(x,x_);

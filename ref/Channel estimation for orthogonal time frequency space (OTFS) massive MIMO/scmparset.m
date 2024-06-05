@@ -14,7 +14,7 @@ function scmpar=scmparset(varargin)
 %   BsUrbanMacroAs          - BS angle spread for urban macro in degrees [ {eight} | fifteen ]
 %   NumPaths                - number of paths [ {6} ]
 %   NumSubPathsPerPath      - number of subpaths per path [ {20} ] (cannot be changed)
-%   CenterFrequency         - carrier frequency in Herz [ {2e9} ]
+%   CarrierFrequency         - carrier frequency in Herz [ {2e9} ]
 %   ScmOptions              - SCM optional features [ {none} | polarized | los | urban_canyon ]
 %   DelaySamplingInterval   - delay sampling grid [ {1.6276e-008} ]
 %   XpdIndependentPower     - power normalization with polarization [ yes | {no} ] 
@@ -30,7 +30,7 @@ function scmpar=scmparset(varargin)
 %     The values of NumBsElements and NumMsElements are used only if a single
 %     scalar is given as the antenna field pattern in ANTPAR (see ANTPARSET).
 %   - For successful Doppler analysis, one should select SampleDensity > 1.
-%     The time sample interval is calculated from CenterFrequency and
+%     The time sample interval is calculated from CarrierFrequency and
 %     MsVelocity (see LINKPARSET) according to wavelength/(2*MsVelocity*SampleDensity).
 %     The calculated time sample interval for each link is included in the optional 
 %     output argument (delta_t) of SCM. 
@@ -43,7 +43,7 @@ function scmpar=scmparset(varargin)
 %     [1]. Subpath AoD/AoAs are always taken from [1, Table 5.2].
 %   - Number of subpaths is fixed to 20. This is because the AoD/AoAs for
 %     subpaths in SCM have fixed angle spread given in [1, Table 5.2].
-%   - CenterFrequency affects path loss and time sampling interval.
+%   - CarrierFrequency affects path loss and time sampling interval.
 %   - DelaySamplingInterval determines the sampling grid in delay domain.
 %     All path delays are rounded to the nearest grid point. It can also 
 %     be set to zero. Default value is 1/(16*3.84e6) seconds [1]. 
@@ -77,7 +77,7 @@ function scmpar=scmparset(varargin)
 %
 %   See also SCM, LINKPARSET, ANTPARSET.
 
-%   Authors: Jari Salo (HUT), Pekka Kyösti (EBIT), Daniela Laselva (EBIT), 
+%   Authors: Jari Salo (HUT), Pekka Kyï¿½sti (EBIT), Daniela Laselva (EBIT), 
 %   Giovanni Del Galdo (TUI), Marko Milojevic (TUI), Christian Schneider (TUI)
 %   $Revision: 0.41 $  $Date: Jan 14, 2005$
 
@@ -98,7 +98,7 @@ scmpar=struct(  'NumBsElements',2,...
                 'BsUrbanMacroAS','eight',...            % choices: 'eight' and 'fifteen'. 
                 'NumPaths',6,...
                 'NumSubPathsPerPath',20,...             % only value supported is 20.
-                'CenterFrequency',2e9,...               % in Herz
+                'CarrierFrequency',2e9,...               % in Herz
                 'ScmOptions','none',...                 % 'none','polarized','los','urban_canyon'
                 'DelaySamplingInterval',1.6276e-008,... % default=1/(16*3.84e6), see [1]
                 'XpdIndependentPower','no',...          % with 'yes' normalizes matrix power with polarized arrays

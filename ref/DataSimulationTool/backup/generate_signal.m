@@ -16,7 +16,7 @@ if lf < hf
     channel.SNR = snr;
 
     src = helperModClassGetSource(modulationTypes(mid), spses(sid), spf, fs);
-    modulator = MyModClassGetModulator(modulationTypes(mid), spses(sid), fs);
+    modulator = MyModClassGetModulation(modulationTypes(mid), spses(sid), fs);
     
     x = src();
     y = modulator(x);
@@ -31,7 +31,7 @@ if lf < hf
         c = expWave(fc, fs, spf);
         y = lowpass(y, bw*1.2/2, fs, ImpulseResponse="fir", Steepness=0.99);
         
-        channel.CenterFrequency = fc;
+        channel.CarrierFrequency = fc;
         
         y = y.*c;
         frame = channel(y);

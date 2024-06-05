@@ -1,4 +1,4 @@
-function y = add_clock_offset(x, maxOffset, sr, frequency_shifter, CenterFrequency)
+function y = add_clock_offset(x, maxOffset, sr, frequency_shifter, CarrierFrequency)
 %   adds effects of clock offset. Clock offset
 %   has two effects on the received signal: 1) Frequency offset,
 %   which is determined by the clock offset (ppm) and the carrier
@@ -17,7 +17,7 @@ clockOffset = (rand() * 2*maxOffset) - maxOffset;
 C = 1 + clockOffset / 1e6;
 
 % (1)
-frequency_shifter.FrequencyOffset = -(C-1)*CenterFrequency;
+frequency_shifter.FrequencyOffset = -(C-1)*CarrierFrequency;
 x = frequency_shifter(x);
 
 % (2)

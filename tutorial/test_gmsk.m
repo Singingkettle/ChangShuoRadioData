@@ -9,10 +9,10 @@ MasterClockRate = 600e3;
 ModulationOrder = 2;
 SamplePerSymbol = 8;
 
-ModulatorConfig.BandwidthTimeProduct = 0.3;
-ModulatorConfig.PulseLength = 4;
-ModulatorConfig.SymbolPrehistory = 1;
-ModulatorConfig.InitialPhaseOffset = 0;
+ModulationConfig.BandwidthTimeProduct = 0.3;
+ModulationConfig.PulseLength = 4;
+ModulationConfig.SymbolPrehistory = 1;
+ModulationConfig.InitialPhaseOffset = 0;
 
 CarrierFrequency = 200e3;
 IqImbalanceConfig.A = 3;
@@ -66,7 +66,7 @@ baseBandSignal = GMSK(SampleRate=SampleRate, ...
     TimeDuration=TimeDuration, ...
     ModulationOrder=ModulationOrder, ...
     SamplePerSymbol=SamplePerSymbol, ...
-    ModulatorConfig=ModulatorConfig);
+    ModulationConfig=ModulationConfig);
 
 x1= baseBandSignal(x);
 x1 = txRF(x1);
@@ -75,7 +75,7 @@ y1 = rxRF({x1});
 
 %%
 
-gmskmodulator = comm.GMSKModulator( ...
+gmskmodulator = comm.GMSKModulation( ...
     BitInput=true, ...
     InitialPhaseOffset=pi/4);
 gmskdemodulator = comm.GMSKDemodulator( ...

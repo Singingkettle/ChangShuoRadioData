@@ -33,7 +33,7 @@ function generate(workerIndex, numWorkers, configFile)
 
     if workerIndex <= length(startIndexs) 
     	for workerIndex = startIndexs(workerIndex):endIndexs(workerIndex)
-            d = Modulator.create(paramCells{workerIndex});
+            d = Modulation.create(paramCells{workerIndex});
             d();
     	end
     end

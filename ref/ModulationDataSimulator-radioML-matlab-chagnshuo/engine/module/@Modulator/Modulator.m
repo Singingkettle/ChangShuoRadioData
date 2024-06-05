@@ -7,7 +7,7 @@
 % Copyright (c) 2020-present, WTI, BUPT.
 % =========================================================================
 
-classdef Modulator < handle
+classdef Modulation < handle
 
     methods(Static)
         helpInfo();

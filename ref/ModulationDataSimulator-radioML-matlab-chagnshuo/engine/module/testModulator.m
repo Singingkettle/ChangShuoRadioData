@@ -1,7 +1,7 @@
 %%
 % =========================================================================
 % Project: ModulationDataSimulator
-% Script: Class-> testModulator
+% Script: Class-> testModulation
 % Author: Shuo Chang
 % Email: changshuo@bupt.edu.cn
 % Date: 2020-05-21
@@ -13,8 +13,8 @@ clear;
 close all;
 restoredefaultpath;
 addpath('./Classes/Source/ANALOG/');
-addpath('./Classes/Modulator');
-addpath('./Classes/Modulator/ANALOG/');
+addpath('./Classes/Modulation');
+addpath('./Classes/Modulation/ANALOG/');
 addpath('./Classes/Channel/gaussianNoise/');
 
 sourceParam.modulatorType = 'VSB';
@@ -55,8 +55,8 @@ modulatorParam.offset = 50;
 modulatorParam.filePrefix = '';
 modulatorParam.repeatedNumber = 1;
 
-Modulator.helpInfo;
-d = Modulator.create(modulatorParam);
+Modulation.helpInfo;
+d = Modulation.create(modulatorParam);
 
 y = d();
 disp('Test Success!');

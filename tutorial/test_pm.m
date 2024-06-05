@@ -52,9 +52,9 @@ source = Audio(SampleRate = SampleRate, TimeDuration = TimeDuration);
 x = source();
 
 %% Test PM
-ModulatorConfig.PhaseDeviation = pi/2;
-ModulatorConfig.InitPhase = 0;
-baseBandSignal = PM(ModulatorConfig = ModulatorConfig, ...
+ModulationConfig.PhaseDeviation = pi/2;
+ModulationConfig.InitPhase = 0;
+baseBandSignal = PM(ModulationConfig = ModulationConfig, ...
     NumTransmitAntennnas = NumTransmitAntennnas, ...
     SampleRate=SampleRate);
 

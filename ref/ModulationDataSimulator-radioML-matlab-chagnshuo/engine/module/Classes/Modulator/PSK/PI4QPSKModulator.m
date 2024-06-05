@@ -1,6 +1,6 @@
-classdef PI4QPSKModulator<baseModulator
-    %BPSKMODULATOR ´Ë´¦ÏÔÊ¾ÓÐ¹Ø´ËÀàµÄÕªÒª
-    %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+classdef PI4QPSKModulation<baseModulation
+    %BPSKMODULATOR ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½Ð¹Ø´ï¿½ï¿½ï¿½ï¿½ÕªÒª
+    %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
     
     properties
         modulatorType = 'PI4QPSK'
@@ -8,19 +8,19 @@ classdef PI4QPSKModulator<baseModulator
     end
     
     methods
-        function obj = PI4QPSKModulator(modulatorParam)
-            %BPSKMODULATOR ¹¹Ôì´ËÀàµÄÊµÀý
-            %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+        function obj = PI4QPSKModulation(modulatorParam)
+            %BPSKMODULATOR ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
+            %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
             
-            % ¹¹ÔìÊý¾ÝÉú³ÉÆ÷¾ä±ú
+            % ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             obj.sourceHandle = ...
                 Source.create(modulatorParam.sourceParam);
             
-            % ¹¹ÔìÐÅµÀ¾ä±ú
+            % ï¿½ï¿½ï¿½ï¿½ï¿½Åµï¿½ï¿½ï¿½ï¿½
             obj.channelHandle = ...
                 Channel.create(modulatorParam.channelParam);
             
-            % Éú³ÉÆ½·½¸ùÉýÓàÐþ¹ö½µÂË²¨Æ÷µÄÏµÊýÖµ
+            % ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë²ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½Öµ
             obj.filterCoefficients = modulatorParam.filterCoefficients;
             
             %

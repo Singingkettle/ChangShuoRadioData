@@ -1,6 +1,6 @@
-classdef FSK16Modulator<baseModulator
-    %BPSKMODULATOR ´Ë´¦ÏÔÊ¾ÓÐ¹Ø´ËÀàµÄÕªÒª
-    %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+classdef FSK16Modulation<baseModulation
+    %BPSKMODULATOR ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½Ð¹Ø´ï¿½ï¿½ï¿½ï¿½ÕªÒª
+    %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
     
     properties
         modulatorType = 'FSK16'  
@@ -9,19 +9,19 @@ classdef FSK16Modulator<baseModulator
     end
     
     methods
-        function obj = FSK16Modulator(modulatorParam)
-            %BPSKMODULATOR ¹¹Ôì´ËÀàµÄÊµÀý
-            %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+        function obj = FSK16Modulation(modulatorParam)
+            %BPSKMODULATOR ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
+            %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
             
-            % ¹¹ÔìÊý¾ÝÉú³ÉÆ÷¾ä±ú
+            % ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             obj.sourceHandle = ...
                 Source.create(modulatorParam.sourceParam);
             
-            % ¹¹ÔìÐÅµÀ¾ä±ú
+            % ï¿½ï¿½ï¿½ï¿½ï¿½Åµï¿½ï¿½ï¿½ï¿½
             obj.channelHandle = ...
                 Channel.create(modulatorParam.channelParam);
             
-            % Éú³ÉÆ½·½¸ùÉýÓàÐþ¹ö½µÂË²¨Æ÷µÄÏµÊýÖµ
+            % ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë²ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½Öµ
             
             %
             obj.samplePerSymbol = modulatorParam.samplePerSymbol;
@@ -46,7 +46,7 @@ classdef FSK16Modulator<baseModulator
                 M = 16;
 
                 % Modulate
-                mod = comm.FSKModulator(...                    
+                mod = comm.FSKModulation(...
                     'ModulationOrder', M, ...
                     'FrequencySeparation', 0.5 * obj.symbolRate, ...
                     'SamplesPerSymbol', obj.samplePerSymbol, ...

@@ -1,6 +1,6 @@
-classdef baseModulator<matlab.System
-    %BASEMODULATOR ´Ë´¦ÏÔÊ¾ÓÐ¹Ø´ËÀàµÄÕªÒª
-    %   ´Ë´¦ÏÔÊ¾ÏêÏ¸ËµÃ÷
+classdef baseModulation<matlab.System
+    %BASEMODULATOR ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½Ð¹Ø´ï¿½ï¿½ï¿½ï¿½ÕªÒª
+    %   ï¿½Ë´ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½Ï¸Ëµï¿½ï¿½
     
     properties
         sourceHandle
@@ -43,7 +43,7 @@ classdef baseModulator<matlab.System
                 x_ = [real_x; imag_x]';
                 dlmwrite([filePrefix '.txt'], x_, '-append');
                 % Save as Image
-                % Õâ¿éÎÊÌâ»¹ÊÇºÜ¶à£¬²¢Ã»ÓÐÍ³Ò»µÄÒªÇó£¬ºóÐøÐèÒª×ö´óÁ¿µÄÊµÑé£¬À´½øÐÐËµÃ÷ÑéÖ¤
+                % ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â»¹ï¿½ÇºÜ¶à£¬ï¿½ï¿½Ã»ï¿½ï¿½Í³Ò»ï¿½ï¿½Òªï¿½ó£¬ºï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½é£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëµï¿½ï¿½ï¿½ï¿½Ö¤
                 % TODO
                 is_success = true;
             catch ME

@@ -71,17 +71,17 @@ antpar = antparset;   % parameter set for antennas
 scmpar.NumTimeSamples = Num_OFDM_symbol_per_TTI*OFDM_Parameter.Size_of_FFT*5/4;   % # of channel realizations per drop
 scmpar.NumBsElements = NumBSelement;   % # of BS antennas
 scmpar.NumMsElements =  1;   % # of MS antennas
-scmpar.CenterFrequency = 2.15e9;   % carrier frequency
-% scmpar.CenterFrequency = 28e9;   % carrier frequency
+scmpar.CarrierFrequency = 2.15e9;   % carrier frequency
+% scmpar.CarrierFrequency = 28e9;   % carrier frequency
 scmpar.UniformTimeSampling = 'yes';   % uniform channel sampling for all users
 scmpar.Scenario='urban_macro';
 %% Calculate the channel sampling density
 linkpar.MsVelocity=vel;
 M_Velocity = linkpar.MsVelocity;   % velocity of the highest mobile user
-scmpar.SampleDensity = round((2.99792458e8/scmpar.CenterFrequency/M_Velocity)/2/(OFDM_Parameter.Rate_Sampling));   % sampling density (interval) per drop
+scmpar.SampleDensity = round((2.99792458e8/scmpar.CarrierFrequency/M_Velocity)/2/(OFDM_Parameter.Rate_Sampling));   % sampling density (interval) per drop
 %% Pilot parameters
 % Num_Pilot_v = 12;  %%oven
-v_max = linkpar.MsVelocity*scmpar.CenterFrequency/3e8;
+v_max = linkpar.MsVelocity*scmpar.CarrierFrequency/3e8;
 Num_Pilot_v = Num_OFDM_symbol_per_TTI*6/8;
 % tao_max=1.2e-6;
 tao_max = 4.5e-6;

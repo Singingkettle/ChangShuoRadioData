@@ -48,7 +48,7 @@
 %   of the SCM_CORE, see SCM_MEX_CORE.
 
 %   Authors: Giovanni Del Galdo (TUI), Jussi Salmi (HUT), Marko Milojevic (TUI), 
-%   Christian Schneider (TUI), Jari Salo (HUT), Pekka Kyösti (EBIT), 
+%   Christian Schneider (TUI), Jari Salo (HUT), Pekka Kyï¿½sti (EBIT), 
 %   Daniela Laselva (EBIT)
 %   $Revision: 0.3 $  $Date: Jan 13, 2005$
 
@@ -126,7 +126,7 @@ function [H, delta_t, output_SubPathPhases, output_Phi_LOS] = scm_core (scmpar,l
 %
 % ______14-September-2004_____ (Jari)
 % 1- Modifications for intra-cluster delay spread (ANSI-C part only)
-% 2- Fixed delta_t so that SampleDensity means samples per ½ wavelength
+% 2- Fixed delta_t so that SampleDensity means samples per ï¿½ wavelength
 %
 %______21-Sep-2004_____ (Giovanni)
 % 1- adding the intra-cluster DS for all cases
@@ -205,7 +205,7 @@ end
 
 % Set internal parameters
 speed_of_light=2.99792458e8;
-wavelength=speed_of_light/scmpar.CenterFrequency;
+wavelength=speed_of_light/scmpar.CarrierFrequency;
 
 % dummy
 output_Phi_LOS       = zeros(K,1);

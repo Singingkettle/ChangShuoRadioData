@@ -13,7 +13,7 @@ if lf < hf
     channel.SNR = snr;
 
     src = helperModClassGetSource(modulationTypes(mid), spses(sid), 2*spf, fs);
-    modulator = MyModClassGetModulator(modulationTypes(mid), spses(sid), fs);
+    modulator = MyModClassGetModulation(modulationTypes(mid), spses(sid), fs);
     
     x = src();
     y = modulator(x);
@@ -55,10 +55,10 @@ if lf < hf
 
         if contains(char(modulationTypes(mid)), {'B-FM','DSB-AM','SSB-AM'})
           % Analog modulation types use a center frequency of 100 MHz
-          channel.CenterFrequency = 100e6;
+          channel.CarrierFrequency = 100e6;
         else
           % Digital modulation types use a center frequency of 902 MHz
-          channel.CenterFrequency = 902e6;
+          channel.CarrierFrequency = 902e6;
         end
         
         y = y.*c;

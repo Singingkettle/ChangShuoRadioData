@@ -26,16 +26,16 @@ function loss=pathloss(scmpar,linkpar)
 NumUsers=length(linkpar.MsBsDistance);
 MsBsDistance=linkpar.MsBsDistance;
 Scenario=scmpar.Scenario;
-CenterFrequency=scmpar.CenterFrequency;
+CarrierFrequency=scmpar.CarrierFrequency;
 Options=scmpar.ScmOptions;
 
 % print out a warning if center freqency is not within a tolerance
 tol=2e8;    % Hz
-if (abs(CenterFrequency - 2e9)>tol) 
-    CenterFrequency=2e9;
+if (abs(CarrierFrequency - 2e9)>tol)
+    CarrierFrequency=2e9;
     warning('MATLAB:CenterFrequencyChanged','Center frequency of 2GHz used for path loss computation.')
 else
-    CenterFrequency=2e9;
+    CarrierFrequency=2e9;
 end
 
 
@@ -43,7 +43,7 @@ switch lower(Scenario)
     
     case {'suburban_macro'}
         
-        switch (CenterFrequency)            % other frequencies may be added, if necessary
+        switch (CarrierFrequency)            % other frequencies may be added, if necessary
             
             case (2e9)                      % SCM suburban macro [1, Section 5.2 and Table 5.1]
                 if (min(MsBsDistance)<35)   
@@ -55,7 +55,7 @@ switch lower(Scenario)
         
     case {'urban_macro'}
         
-        switch (CenterFrequency)            % other frequencies may be added, if necessary
+        switch (CarrierFrequency)            % other frequencies may be added, if necessary
             
             case (2e9)                      % SCM urban_macro model [1, Section 5.2 and Table 5.1]
                 if (min(MsBsDistance)<35)
@@ -73,7 +73,7 @@ switch lower(Scenario)
             
             case {'none','polarized','urban_canyon'}
                 
-                switch (CenterFrequency)    % other frequencies may be added, if necessary
+                switch (CarrierFrequency)    % other frequencies may be added, if necessary
                     
                     case (2e9)              % SCM urban micro model [1, Section 5.2 and Table 5.1]
                         if (min(MsBsDistance)<20)
@@ -86,7 +86,7 @@ switch lower(Scenario)
                 
             case ('los')
                 
-                switch (CenterFrequency)    % other frequencies may be added, if necessary
+                switch (CarrierFrequency)    % other frequencies may be added, if necessary
                     
                     case (2e9)              % SCM urban micro model [1, Section 5.2 and Table 5.1]
                         if (min(MsBsDistance)<20)

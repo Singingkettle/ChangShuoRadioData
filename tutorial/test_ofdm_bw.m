@@ -10,7 +10,7 @@ dataIn = randi([0 M-1],numSubCar,nSym,nt);
 dcIdx = (nfft/2)+1;
 nullInd = [1:((nfft-numSubCar)/2) dcIdx ((nfft+numSubCar)/2)+1+1:nfft].';
 qamSig = qammod(dataIn,M,'UnitAveragePower',true);
-ofdmMod = comm.OFDMModulator( ...
+ofdmMod = comm.OFDMModulation( ...
     FFTLength=nfft, ...
     NumGuardBandCarriers=[((nfft-numSubCar)/2); 524-1-((nfft-numSubCar)/2)],...
     NumSymbols=nSym, ...
@@ -140,7 +140,7 @@ function y = otfsmod(x,nfft,cplen,varargin)
 %
 %     y3 = ofdmmod(dataIn,nfft,cplen,nullIdx,OversamplingFactor=osf);
 %
-%   See also ofdmdemod, comm.OFDMModulator.
+%   See also ofdmdemod, comm.OFDMModulation.
 
 %   Copyright 2017-2023 The MathWorks, Inc.
 

@@ -65,13 +65,13 @@ antpar = antparset;   % parameter set for antennas
 scmpar.NumTimeSamples = Num_OFDM_symbol_per_TTI*OFDM_Parameter.Size_of_FFT*5/4;   % # of channel realizations per drop
 scmpar.NumBsElements = 1;   % # of BS antennas
 scmpar.NumMsElements = 1;   % # of MS antennas
-scmpar.CenterFrequency = 2.15e9;   % carrier frequency
+scmpar.CarrierFrequency = 2.15e9;   % carrier frequency
 scmpar.UniformTimeSampling = 'yes';   % uniform channel sampling for all users
 
 %% Calculate the channel sampling density
 linkpar.MsVelocity=100;
 M_Velocity = linkpar.MsVelocity;   % velocity of the highest mobile user
-scmpar.SampleDensity = round((2.99792458e8/scmpar.CenterFrequency/M_Velocity)/2/(OFDM_Parameter.Rate_Sampling));   % sampling density (interval) per drop
+scmpar.SampleDensity = round((2.99792458e8/scmpar.CarrierFrequency/M_Velocity)/2/(OFDM_Parameter.Rate_Sampling));   % sampling density (interval) per drop
 
 
 SNR=0:5:30;

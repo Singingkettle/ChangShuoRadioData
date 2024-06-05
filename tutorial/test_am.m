@@ -51,9 +51,9 @@ source = Audio(SampleRate = SampleRate, TimeDuration = TimeDuration);
 x = source();
 
 %% Test DSBAM
-ModulatorConfig.carramp = 1;
-ModulatorConfig.initPhase = 0;
-baseBandSignal = DSBAM(ModulatorConfig = ModulatorConfig, ...
+ModulationConfig.carramp = 1;
+ModulationConfig.initPhase = 0;
+baseBandSignal = DSBAM(ModulationConfig = ModulationConfig, ...
     NumTransmitAntennnas = NumTransmitAntennnas, ...
     SampleRate=SampleRate);
 x1= baseBandSignal(x);
@@ -61,8 +61,8 @@ x1 = txRF(x1);
 x1 = rayChannel(x1);
 
 %% Test DSSCBAM
-ModulatorConfig.initPhase = 0;
-baseBandSignal = DSBSCAM(ModulatorConfig = ModulatorConfig, ...
+ModulationConfig.initPhase = 0;
+baseBandSignal = DSBSCAM(ModulationConfig = ModulationConfig, ...
     NumTransmitAntennnas = NumTransmitAntennnas, ...
     SampleRate=SampleRate);
 txRF.CarrierFrequency = 40e3;
@@ -72,10 +72,10 @@ x2 = txRF(x2);
 x2 = ricChannel(x2);
 
 %% Test SSBAM
-ModulatorConfig.fa = 3000;
-ModulatorConfig.mode = 'upper';
-ModulatorConfig.initPhase = 0;
-baseBandSignal = SSBAM(ModulatorConfig = ModulatorConfig, ...
+ModulationConfig.fa = 3000;
+ModulationConfig.mode = 'upper';
+ModulationConfig.initPhase = 0;
+baseBandSignal = SSBAM(ModulationConfig = ModulationConfig, ...
     NumTransmitAntennnas = NumTransmitAntennnas, ...
     SampleRate=SampleRate);
 txRF.CarrierFrequency = 60e3;
@@ -117,10 +117,10 @@ x3 = txRF(x3);
 x3 = ricChannel(x3);
 
 %% Test VSBAM
-ModulatorConfig.fa = 3000;
-ModulatorConfig.mode = 'upper';
-ModulatorConfig.initPhase = 0;
-baseBandSignal = VSBAM(ModulatorConfig = ModulatorConfig, ...
+ModulationConfig.fa = 3000;
+ModulationConfig.mode = 'upper';
+ModulationConfig.initPhase = 0;
+baseBandSignal = VSBAM(ModulationConfig = ModulationConfig, ...
     NumTransmitAntennnas = NumTransmitAntennnas, ...
     SampleRate=SampleRate);
 txRF.CarrierFrequency = 80e3;

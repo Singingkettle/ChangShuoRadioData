@@ -57,7 +57,7 @@ classdef MyModClassTestChannel < matlab.System
 %   helperModClassTestChannel properties:
 %   
 %   SNR                  - SNR (dB)
-%   CenterFrequency      - Center frequency (Hz)
+%   CarrierFrequency      - Center frequency (Hz)
 %   SampleRate           - Input signal sample rate (Hz)
 %   PathDelays           - Discrete path delay vector (s)
 %   AveragePathGains     - Average path gain vector (dB)
@@ -74,12 +74,12 @@ classdef MyModClassTestChannel < matlab.System
     %   Specify the SNR value in decibels. Set this property to a numeric,
     %   real scalar. The default is 20 dB. This property is tunable.
     SNR = 20
-    %CenterFrequency Center frequency (Hz)
+    %CarrierFrequency Center frequency (Hz)
     %   Specify the center frequency as a double precision nonnegative
     %   scalar. The default is 2.4 GHz. Center frequency value is used to
     %   calculate expected frequency offset in the received signal based on
     %   the maximum clock offset value. This property is tunable.
-    CenterFrequency = 2.4e9
+    CarrierFrequency = 2.4e9
   end
 
   properties (Nontunable)
@@ -225,7 +225,7 @@ classdef MyModClassTestChannel < matlab.System
       %   y = x .* exp(1i*2*pi*fOffset*t)
       
       obj.FrequencyShifter.FrequencyOffset = ...
-        -(obj.C-1)*obj.CenterFrequency;
+        -(obj.C-1)*obj.CarrierFrequency;
       out = obj.FrequencyShifter(in);
     end
     
@@ -266,7 +266,7 @@ classdef MyModClassTestChannel < matlab.System
       
       % Calculate maximum frequency offset
       maxClockOffset = obj.MaximumClockOffset;
-      maxFreqOffset = (maxClockOffset / 1e6) * obj.CenterFrequency;
+      maxFreqOffset = (maxClockOffset / 1e6) * obj.CarrierFrequency;
       
       % Calculate maximum timing offset
       maxClockOffset = obj.MaximumClockOffset;
