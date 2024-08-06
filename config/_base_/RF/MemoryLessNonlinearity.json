@@ -1,0 +1,45 @@
+{
+    "Methods": {
+        "Cubic polynomial": {
+            "LinearGain": [0, 10],
+            "TOISpecification": ["IIP3", "OIP3", "IP1dB", "OP1dB", "IPsat", "OPsat"],
+            "IIP3": [20, 40],
+            "OIP3": [20, 40],
+            "IP1dB": [20, 40],
+            "OP1dB": [20, 40],
+            "IPsat": [20, 40],
+            "OPsat": [20, 40],
+            "AMPMConversion": [10, 20],
+            "PowerLowerLimit": 10,
+            "PowerUpperLimit": 20
+        },
+        "Hyperbolic tangent": {
+            "LinearGain": [0, 10],
+            "IIP3": [20, 40],
+            "AMPMConversion": [10, 20],
+            "PowerLowerLimit": 10,
+            "PowerUpperLimit": 20
+        },
+        "Saleh model": {
+            "InputScaling": [-1, 1],
+            "AMPMConversion": [10, 20],
+            "PowerLowerLimit": 10,
+            "PowerUpperLimit": 20,
+            "OutputScaling": [-1, 1]
+        },
+        "Ghorbani model": {
+            "InputScaling": [-1, 1],
+            "AMPMConversion": [10, 20],
+            "PowerLowerLimit": 10,
+            "PowerUpperLimit": 20,
+            "OutputScaling": [-1, 1]
+        },
+        "Modified Rapp model": {
+            "LinearGain": [0, 10],
+            "Smoothness": [0.4, 0.6],
+            "PhaseGainRadian": [-0.45, 0],
+            "PhaseSmoothness": [3.2, 3.6],
+            "OutputSaturationLevel": [0.9, 1.1]
+        }
+    }
+}

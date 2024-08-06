@@ -20,16 +20,7 @@ classdef Simulation < matlab.System
         SampleRateRange (2, 1) {mustBePositive, mustBeReal} = [10; 30e3] % KHz
         SampleRateStep (1, 1) {mustBePositive, mustBeInteger} = 10 % KHz    
         TxMasterClockRateRange (2, 1) {mustBePositive, mustBeReal} = [1e6; 10e6]
-        MasterClockRateStep (1, 1) {mustBePositive, mustBeInteger} = 1e6 % KHz
-        TxOutputPowerRange (2, 1) {mustBeReal} = [-100, 0]
-        TxDCOffsetRange (2, 1) {mustBeReal} = [-60, -40]
-        TxIqImbalaceConfigARange (2, 1) {mustBeReal} = [0, 5]
-        TxIqImbalaceConfigBRange (2, 1) {mustBeReal} = [0, 5]
-        TxPhaseNoiseConfigLevel (2, 1) {mustBeReal} = [-100, -20]
-        TxPhaseNoiseConfigFrequencyOffset (2, 1) {mustBeReal} = [10, 200]
-        TxMemoryLessNonlinearityConfigMethodPool = ["Cubic polynomial", "Hyperbolic tangent", "Saleh model", "Ghorbani model", "Modified Rapp model", "Lookup table"]
         
-
         AnalogModulatorPool = ["DSBAM", "DSBSCAM", "SSBAM", "VSBAM", "FM", "PM"]
         DigitalModulatorPool = ["APSK", "DVBSAPSK", "ASK", "CPFSK", "GFSK", "GMSK", "MSK", "FSK", "OFDM", "OOK", "OTFS", "PSK", "OQPSK", "QAM", "Mill88QAM", "SCFDMA"]
         NumTransmitAntennasRange (2, 1) {mustBePositive, mustBeReal, mustBeLessThan(NumTransmitAntennasRange, 5)} = [1, 4]
@@ -44,8 +35,6 @@ classdef Simulation < matlab.System
     end
     
     properties (Access = private)
-        %
-        MemoryLessNonlinearityCfgFilePath = '../../config/_base_/RF/MemoryLessNonlinearity.json'
         % State
         ModulatorOrderPool
 
@@ -121,20 +110,12 @@ classdef Simulation < matlab.System
             x = cell(1, numFrames);
             for frameIndex=1:numFrames
                 x{frameIndex} = cell(1, randi([0, obj.NumMaxTx]));
-                % the same transimitter will be used to emit wireless signals using different modulation types
                 for itemIndex=1:length(x{frameIndex})
                     x{frameIndex}{itemIndex} = obj.Modulator();
                 end
                 
             end
-
-            x = obj.tiling(x, obj.IsOverlap, obj.FrequencyOverlapRadio, obj.FrequencyOverlapRadio);
-
-            for frameIndex=1:numFrames
-                for itemIndex=1:length(x{frameIndex})
-                    x{frameIndex}{itemIndex} = obj.transimitter(x{frameIndex}{itemIndex});
-                end
-            end
+            
         end
     end
 
@@ -189,36 +170,22 @@ classdef Simulation < matlab.System
             end
         end
 
-        function y = transimitter(obj, x)
-            StartTime = x.StartTime;
-            CarrierFrequency = x.CarrierFrequency;
-            SampleRate = x.SampleRate;
-            OutputPower = rand(1)*(obj.TxOutputPowerRange(2)-obj.TxOutputPowerRange(1))+obj.TxOutputPowerRange(1);
-            MasterClockRate = (randi((obj.TxMasterClockRateRange(2)-obj.TxMasterClockRateRange(1))/obj.MasterClockRateStep)*obj.MasterClockRateStep+obj.TxMasterClockRateRange(1)) * 1e6;
-            DCOffset = rand(1)*(obj.TxDCOffsetRange(2)-obj.TxDCOffsetRange(1))+obj.TxDCOffsetRange(1);
+        function y = tx(obj, x)
             
-            IqImbalanceConfig.A = rand(1)*(obj.TxIqImbalaceConfigARange(2)-obj.TxIqImbalaceConfigARange(1))+obj.TxIqImbalaceConfigARange(1);
-            IqImbalanceConfig.B = rand(1)*(obj.TxIqImbalaceConfigBRange(2)-obj.TxIqImbalaceConfigBRange(1))+obj.TxIqImbalaceConfigBRange(1);
-
-            PhaseNoiseConfig.Level = randi(obj.TxPhaseNoiseConfigLevel(2)-obj.TxPhaseNoiseConfigLevel(1))+obj.TxPhaseNoiseConfigLevel(1);
-            PhaseNoiseConfig.FrequencyOffset = randi(obj.TxPhaseNoiseConfigFrequencyOffset(2)-obj.TxPhaseNoiseConfigFrequencyOffset(1))+obj.TxPhaseNoiseConfigFrequencyOffset(1);
-            MemoryLessNonlinearityConfig = MemoryLessNonlinearityRandom(obj.MemoryLessNonlinearityCfgFilePath);
-            txRF = TRFSimulator(StartTime=StartTime, CarrierFrequency=CarrierFrequency, SampleRate=SampleRate, MasterClockRate=MasterClockRate, IqImbalanceConfig=IqImbalanceConfig, DCOffset=DCOffset, OutputPower=OutputPower, PhaseNoiseConfig=PhaseNoiseConfig, MemoryLessNonlinearityConfig=MemoryLessNonlinearityConfig);
-            y = txRF(x);
         end
     end
     
 end
 
 
-function tiling(xs, iso, f_radio, mf)
+function tiling(xs, iso, t, f, mf)
 
 num_tx = length(xs);
 
 % 打乱顺序
 tx_ids = randsample(1:num_tx, num_tx);
 
-base_frequency = 0.5*mf*(0.1*rand(1));
+base_frequency = mf*(0.2+0.3*rand(1));
 base_frequency = ceil(base_frequency/1000)*1000;
 current_start_time = 0;
 current_frequnecy_delta = 0;
@@ -257,14 +224,8 @@ for i=1:num_tx
         xs{tx_ids{i}}{j} = x;
 
     end
-
-    if iso
-        if rand(1) > 0.1
-            current_frequnecy_delta = current_band_width + current_frequnecy_delta;
-        else
-            current_frequnecy_delta = current_band_width + current_frequnecy_delta * f_radio;
-        end
-    end
+    
+    current_frequnecy_delta = current_band_width + current_frequnecy_delta;
 
     if (current_frequnecy_delta + base_frequency + 10e3) > mf/2
         new_row = true;
