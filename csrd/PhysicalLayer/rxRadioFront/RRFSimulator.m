@@ -12,9 +12,9 @@ classdef RRFSimulator < matlab.System
         % 关于SampleRateOffset的取值影响晶振频率也影响采样偏移
         % 可参考matlab的调制识别例子
         SampleRateOffset (1, 1) {mustBeReal} = 0
-        Bandwidth {mustBePositive, mustBeReal, mustBeInteger} = 20e3;
+        Bandwidth {mustBePositive, mustBeReal, mustBeInteger} = 20e3
         
-        MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
+        MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6
         DCOffset {mustBeReal} = -50;
 
         Position

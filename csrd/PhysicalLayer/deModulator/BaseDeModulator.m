@@ -1,18 +1,18 @@
-classdef BaseDeModulation < matlab.System
+classdef BaseDeModulator < matlab.System
     % https://www.mathworks.com/help/comm/ug/design-a-deep-neural-network-with-simulated-data-to-detect-wlan-router-impersonation.html
     
     properties
         
-        ModulationOrder {mustBePositive, mustBeReal} = 1
+        ModulatorOrder {mustBePositive, mustBeReal} = 1
         
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
         
         % Modulate parameters
-        ModulationConfig struct
+        ModulatorConfig struct
         
         % Transmit parameters
-        NumTransmitAntennnas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennnas, [1, 2, 3, 4])} = 1
+        NumTransmitAntennas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennas, [1, 2, 3, 4])} = 1
         
         % Digital Sign
         IsDigital (1, 1) logical = true
@@ -26,7 +26,7 @@ classdef BaseDeModulation < matlab.System
     
     methods
         
-        function obj = BaseModulation(varargin)
+        function obj = BaseModulator(varargin)
             
             setProperties(obj, nargin, varargin{:});
             
@@ -40,7 +40,7 @@ classdef BaseDeModulation < matlab.System
     
     methods (Abstract)
         % In the sub class, this method should be defined
-        modulatorHandle = genModulationHandle(obj)
+        modulatorHandle = genModulatorHandle(obj)
         
     end
     
@@ -56,7 +56,7 @@ classdef BaseDeModulation < matlab.System
         end
         
         function setupImpl(obj)
-            obj.modulator = obj.genModulationHandle;
+            obj.modulator = obj.genModulatorHandle;
         end
         
         function out = stepImpl(obj, x)
@@ -71,11 +71,11 @@ classdef BaseDeModulation < matlab.System
             out.data = y;
             out.BandWidth = bw;
             out.SamplePerSymbol = x.SamplePerSymbol;
-            out.ModulationOrder = obj.ModulationOrder;
+            out.ModulatorOrder = obj.ModulatorOrder;
             out.IsDigital = obj.IsDigital;
-            out.NumTransmitAntennnas = obj.NumTransmitAntennnas;
-            out.ModulationConfig = obj.ModulationConfig;
-            out.ModulationOrder = obj.ModulationOrder;
+            out.NumTransmitAntennas = obj.NumTransmitAntennas;
+            out.ModulatorConfig = obj.ModulatorConfig;
+            out.ModulatorOrder = obj.ModulatorOrder;
             
             % The obj.TimeDuration and obj.SampleRate are redefined in
             % OFDM, SCDMA and OTFS
