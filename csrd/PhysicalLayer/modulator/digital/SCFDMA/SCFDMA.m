@@ -7,43 +7,74 @@ classdef SCFDMA < OFDM
     
     methods (Access = protected)
         
-        function [y, bw] = baseModulation(obj, x)
+        function [y, bw] = baseModulator(obj, x)
             
-            x = obj.firstStageModulation(x);
+            x = obj.firstStageModulator(x);
             x = obj.ostbc(x);
-            obj.NumSymbols = fix(size(x, 1) / obj.NumDataSubcarriers);
-            x = x(1:obj.NumSymbols * obj.NumDataSubcarriers, :);
-            x = reshape(x, [obj.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennnas]);
-            x = fft(x, obj.NumDataSubcarriers);
-            x_ = zeros(obj.UsedSubCarr, obj.NumSymbols, obj.NumTransmitAntennnas);
-            x_ (1:obj.SubcarrierMappingInterval:obj.NumDataSubcarriers * obj.SubcarrierMappingInterval, :, :) = x;
+            obj.NumSymbols = fix(size(x, 1) / obj.ModulatorConfig.scfdma.NumDataSubcarriers);
+            x = x(1:obj.NumSymbols * obj.ModulatorConfig.scfdma.NumDataSubcarriers, :);
+            x = reshape(x, [obj.ModulatorConfig.scfdma.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennas]);
+            x = cat(1, x, zeros(obj.ModulatorConfig.scfdma.FFTLength-obj.ModulatorConfig.scfdma.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennas));
+            x = fft(x(1:obj.ModulatorConfig.scfdma.NumDataSubcarriers, :, :), obj.ModulatorConfig.scfdma.NumDataSubcarriers);
+            x_ = zeros(obj.ModulatorConfig.scfdma.FFTLength, obj.NumSymbols, obj.NumTransmitAntennas);
+
+            leftGuardBand = floor((obj.ModulatorConfig.scfdma.FFTLength-obj.ModulatorConfig.scfdma.NumDataSubcarriers)/2);
+            rightGuardBand = obj.ModulatorConfig.scfdma.FFTLength-obj.ModulatorConfig.scfdma.NumDataSubcarriers - leftGuardBand;
+            x_ (leftGuardBand+1:obj.ModulatorConfig.scfdma.SubcarrierMappingInterval:leftGuardBand+obj.ModulatorConfig.scfdma.NumDataSubcarriers * obj.ModulatorConfig.scfdma.SubcarrierMappingInterval, :, :) = x;
             
-            obj.secondStageModulation.NumSymbols = obj.NumSymbols;
-            y = obj.secondStageModulation(x_);
-            
-            bw = obj.Subcarrierspacing * obj.UsedSubCarr;
+            obj.secondStageModulator.NumSymbols = obj.NumSymbols;
+            y = obj.secondStageModulator(x_);
+            bw = zeros(1, 2);
+            bw(1) = -obj.ModulatorConfig.scfdma.Subcarrierspacing * (obj.ModulatorConfig.scfdma.FFTLength/2 - leftGuardBand);
+            bw(2) = obj.ModulatorConfig.scfdma.Subcarrierspacing * (obj.ModulatorConfig.scfdma.FFTLength/2 - rightGuardBand);
             obj.TimeDuration = size(y, 1) / obj.SampleRate;
             
         end
         
-        function secondStageModulation = genSecondStageModulation(obj)
-            p = obj.ModulationConfig.scfdma;
-            
-            NoUsedCarriers = p.FFTLength - ((obj.NumDataSubcarriers -1)*obj.SubcarrierMappingInterval + 1);
-            NumGuardBandCarriers = [floor(NoUsedCarriers/2); floor(NoUsedCarriers/2)];
-
-            secondStageModulation = comm.OFDMModulation( ...
+        function secondStageModulator = genSecondStageModulator(obj)
+            p = obj.ModulatorConfig.scfdma;
+            secondStageModulator = comm.OFDMModulator( ...
                 FFTLength = p.FFTLength, ...
-                NumGuardBandCarriers = NumGuardBandCarriers, ...
+                NumGuardBandCarriers = [0; 0], ...
                 CyclicPrefixLength = p.CyclicPrefixLength, ...
-                OversamplingFactor = p.OversamplingFactor, ...
-                NumTransmitAntennas = obj.NumTransmitAntennnas);
-            
-            % Without pilot, the UsedSubCarr is equal NumDataSubcarriers
-            obj.UsedSubCarr = p.FFTLength - sum(secondStageModulation.NumGuardBandCarriers);
-            obj.SampleRate = obj.Subcarrierspacing * p.FFTLength;
+                NumTransmitAntennas = obj.NumTransmitAntennas);
+
+            obj.UsedSubCarr = (obj.ModulatorConfig.scfdma.NumDataSubcarriers -1)*obj.ModulatorConfig.scfdma.SubcarrierMappingInterval + 1;
+            obj.SampleRate = obj.ModulatorConfig.scfdma.Subcarrierspacing * p.FFTLength;
         end
         
     end
     
+    methods
+        
+        function modulatorHandle = genModulatorHandle(obj)
+            
+            obj.IsDigital = true;
+            if obj.NumTransmitAntennas > 2
+                if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
+                    obj.ModulatorConfig.ostbcSymbolRate = randi([0, 1])*0.25+0.5;
+                end
+            end
+            obj.ostbc = obj.genOSTBC;
+            if ~isfield(obj.ModulatorConfig, 'base')
+                obj.ModulatorConfig.base.mode = randsample(["psk", "qam"], 1);
+                if strcmpi(obj.ModulatorConfig.base.mode, "psk")
+                    obj.ModulatorConfig.base.PhaseOffset = rand(1)*2*pi;
+                    obj.ModulatorConfig.base.SymbolOrder = randsample(["bin", "gray"], 1);
+                end
+                obj.ModulatorConfig.scfdma.FFTLength = randsample([128, 256, 512, 1024, 2048], 1);
+                obj.ModulatorConfig.scfdma.CyclicPrefixLength = randi([12, 32], 1);
+                obj.ModulatorConfig.scfdma.Subcarrierspacing = randsample([20, 40], 1)*1e3;
+                obj.ModulatorConfig.scfdma.SubcarrierMappingInterval = randi([1, 2], 1);
+                maxNumDataSubcarriers = fix((obj.ModulatorConfig.scfdma.FFTLength - 1)/obj.ModulatorConfig.scfdma.SubcarrierMappingInterval)+1;
+                % 48 is a number randomly selected
+                obj.ModulatorConfig.scfdma.NumDataSubcarriers = randi([48, maxNumDataSubcarriers], 1);
+            end
+            obj.firstStageModulator = obj.genFirstStageModulator;
+            obj.secondStageModulator = obj.genSecondStageModulator;
+            modulatorHandle = @(x)obj.baseModulator(x);
+        end
+        
+    end
+
 end

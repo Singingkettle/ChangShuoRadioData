@@ -2,9 +2,9 @@ classdef QAM < APSK
     
     methods (Access = protected)
         
-        function [y, bw] = baseModulation(obj, x)
+        function [y, bw] = baseModulator(obj, x)
             % Modulate
-            x = qammod(x, obj.ModulationOrder, obj.ModulationConfig.SymbolOrder, ...
+            x = qammod(x, obj.ModulatorOrder, obj.ModulatorConfig.SymbolOrder, ...
                 UnitAveragePower = true);
             x = obj.ostbc(x);
             
@@ -12,7 +12,7 @@ classdef QAM < APSK
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
 
             bw = obw(y, obj.SampleRate);
-            if obj.NumTransmitAntennnas > 1
+            if obj.NumTransmitAntennas > 1
                 bw = max(bw);
             end
             
@@ -20,4 +20,26 @@ classdef QAM < APSK
         
     end
     
+    methods
+
+        function modulatorHandle = genModulatorHandle(obj)
+            
+            if ~isfield(obj.ModulatorConfig, "beta")
+                obj.ModulatorConfig.SymbolOrder = randsample(["bin", "gray"], 1);
+                obj.ModulatorConfig.beta = rand(1);
+                obj.ModulatorConfig.span = randi([2, 8])*2;
+            end
+            if obj.NumTransmitAntennas > 2
+                if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
+                    obj.ModulatorConfig.ostbcSymbolRate = randi([0, 1])*0.25+0.5;
+                end
+            end
+            obj.IsDigital = true;
+            obj.filterCoeffs = obj.genFilterCoeffs;
+            obj.ostbc = obj.genOSTBC;
+            modulatorHandle = @(x)obj.baseModulator(x);
+            
+        end
+        
+    end
 end

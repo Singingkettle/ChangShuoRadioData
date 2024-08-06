@@ -1,4 +1,4 @@
-classdef PAM < BaseModulation
+classdef PAM < BaseModulator
     
     properties
         
@@ -14,17 +14,17 @@ classdef PAM < BaseModulation
     
     methods (Access = protected)
         
-        function [y, bw] = baseModulation(obj, x)
+        function [y, bw] = baseModulator(obj, x)
             
-            amp = 1 / sqrt(mean(abs(pammod(0:obj.ModulationOrder - 1, obj.ModulationOrder)) .^ 2));
+            amp = 1 / sqrt(mean(abs(pammod(0:obj.ModulatorOrder - 1, obj.ModulatorOrder)) .^ 2));
             % Modulate
-            x = amp * pammod(x, obj.ModulationOrder);
+            x = amp * pammod(x, obj.ModulatorOrder);
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
 
             bw = obw(y, obj.SampleRate)*2;
-            if obj.NumTransmitAntennnas > 1
+            if obj.NumTransmitAntennas > 1
                 bw = max(bw);
             end
             
@@ -36,18 +36,22 @@ classdef PAM < BaseModulation
         
         function filterCoeffs = genFilterCoeffs(obj)
             
-            filterCoeffs = rcosdesign(obj.ModulationConfig.beta, ...
-                obj.ModulationConfig.span, ...
+            filterCoeffs = rcosdesign(obj.ModulatorConfig.beta, ...
+                obj.ModulatorConfig.span, ...
                 obj.SamplePerSymbol);
             
         end
         
-        function modulator = genModulationHandle(obj)
+        function modulator = genModulatorHandle(obj)
             
             obj.IsDigital = true;
-            obj.NumTransmitAntennnas = 1;
+            obj.NumTransmitAntennas = 1;
+            if ~isfield(obj.ModulatorConfig, 'beta')
+                obj.ModulatorConfig.beta = rand(1);
+                obj.ModulatorConfig.span = randi([2, 8])*2;
+            end
             obj.filterCoeffs = obj.genFilterCoeffs;
-            modulator = @(x)obj.baseModulation(x);
+            modulator = @(x)obj.baseModulator(x);
             
         end
         

@@ -2,15 +2,19 @@ classdef MSK < FSK
     
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
+        function modulatorHandle = genModulatorHandle(obj)
             
             obj.IsDigital = true;
-            obj.NumTransmitAntennnas = 1;
-            obj.pureModulation = @(x)mskmod(x, ...
+            obj.NumTransmitAntennas = 1;
+            if ~isfield(obj.ModulatorConfig, 'DataEncode')
+                obj.ModulatorConfig.DataEncode = randsample(["diff", "nondiff"], 1);
+                obj.ModulatorConfig.InitPhase = rand(1)*2*pi;
+            end
+            obj.pureModulator = @(x)mskmod(x, ...
                 obj.SamplePerSymbol, ...
-                obj.ModulationConfig.DataEncode, ...
-                obj.ModulationConfig.InitPhase);
-            modulatorHandle = @(x)obj.baseModulation(x);
+                obj.ModulatorConfig.DataEncode, ...
+                obj.ModulatorConfig.InitPhase);
+            modulatorHandle = @(x)obj.baseModulator(x);
             
         end
         

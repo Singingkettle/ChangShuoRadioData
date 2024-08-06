@@ -1,4 +1,4 @@
-classdef OFDM < BaseModulation
+classdef OFDMComplex < BaseModulator
     % https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
     % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html  关于如何实现对OFDM信号采样的仿真，本质上是一个转换
     % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
@@ -9,7 +9,7 @@ classdef OFDM < BaseModulation
     properties (Nontunable)
         
         % Transmit parameters
-        NumTransmitAntennnas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennnas, [1, 2, 3, 4])} = 1
+        NumTransmitAntennas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennas, [1, 2, 3, 4])} = 1
         
         % Index corresponding to desired bandwidth
         BandWidthIndex (1, 1) {mustBeReal, mustBePositive} = 1
@@ -18,8 +18,8 @@ classdef OFDM < BaseModulation
         codeRateIndex (1, 1) {mustBeReal, mustBePositive} = 1
         
         %
-        ModulationType = 'psk'
-        ModulationOrder (1, 1) {mustBeReal, mustBePositive} = 1
+        ModulatorType = 'psk'
+        ModulatorOrder (1, 1) {mustBeReal, mustBePositive} = 1
         
     end
     
@@ -39,9 +39,9 @@ classdef OFDM < BaseModulation
             
             % Set transmit-specific parameter structure
             txParam = struct();
-            txParam.numTx           = obj.NumTransmitAntennnas;
-            txParam.modType         = obj.ModulationType;
-            txParam.modOrder        = obj.ModulationOrder;
+            txParam.numTx           = obj.NumTransmitAntennas;
+            txParam.modType         = obj.ModulatorType;
+            txParam.modOrder        = obj.ModulatorOrder;
             txParam.codeRateIndex   = obj.CodeRateIndex;
             
             sysParam.initState = [1 0 1 1 1 0 1]; % Scrambler/descrambler polynomials
@@ -141,8 +141,8 @@ classdef OFDM < BaseModulation
             end
         end
         
-        function y = baseModulation(obj, x)
-            obj.sysParam.numSymPerFrame = round(length(x)/obj.sysParam.usedSubCarr/obj.NumTransmitAntennnas);
+        function y = baseModulator(obj, x)
+            obj.sysParam.numSymPerFrame = round(length(x)/obj.sysParam.usedSubCarr/obj.NumTransmitAntennas);
             numDataOFDMSymbols = obj.sysParam.numSymPerFrame - ...
                 length(obj.sysParam.ssIdx)  - length(obj.sysParam.rsIdx) - ...
                 length(obj.sysParam.headerIdx);             % Number of data OFDM symbols
@@ -156,9 +156,9 @@ classdef OFDM < BaseModulation
             uncodedPayloadSize = (numSubCar-pilotsPerSym)*numDataOFDMSymbols*bitsPerModSym;
             codedPayloadSize = floor(uncodedPayloadSize / codeParam.codeRateK) * ...
                 codeParam.codeRateK;
-            obj.sysParam.trBlkPadSize = (uncodedPayloadSize - codedPayloadSize)*obj.NumTransmitAntennnas;
+            obj.sysParam.trBlkPadSize = (uncodedPayloadSize - codedPayloadSize)*obj.NumTransmitAntennas;
             obj.sysParam.trBlkSize = ((codedPayloadSize * codeRate) - obj.sysParam.CRCLen - ...
-                (obj.sysParam.dataConvK-1))*obj.NumTransmitAntennnas;
+                (obj.sysParam.dataConvK-1))*obj.NumTransmitAntennas;
             
             
             ssIdx = obj.sysParam.ssIdx;         % sync symbol index
@@ -173,7 +173,7 @@ classdef OFDM < BaseModulation
             numSymPerFrame = obj.sysParam.numSymPerFrame; % Number of OFDM symbols per frame
             
             % Initialize transmitter grid
-            grid = zeros(numSubCar,numSymPerFrame, obj.NumTransmitAntennnas);
+            grid = zeros(numSubCar,numSymPerFrame, obj.NumTransmitAntennas);
             
             % Derive actual parameters from inputs
             [modType,bitsPerModSym,puncVec,~] = ...
@@ -184,14 +184,14 @@ classdef OFDM < BaseModulation
             syncSignalInd = (numSubCar/2) - 31 + (1:62);
             
             % Load synchronization signal on the grid
-            grid(syncSignalInd,ssIdx, :) = repmat(syncSignal, [1, 1, obj.NumTransmitAntennnas]);
+            grid(syncSignalInd,ssIdx, :) = repmat(syncSignal, [1, 1, obj.NumTransmitAntennas]);
             
             %% Reference signal generation
             refSignal = OFDMRefSignal(numSubCar);
             refSignalInd = 1:length(refSignal);
             
             % Load reference signals on the grid
-            grid(refSignalInd,rsIdx(1), :) = repmat(refSignal, [1, 1, obj.NumTransmitAntennnas]);
+            grid(refSignalInd,rsIdx(1), :) = repmat(refSignal, [1, 1, obj.NumTransmitAntennas]);
             
             %% Header generation
             % Generate header bits
@@ -254,7 +254,7 @@ classdef OFDM < BaseModulation
             headerSymInd = (numSubCar/2)-36+(1:72);
             
             % Load header signal on the grid
-            grid(headerSymInd,headerIdx, :) = repmat(headerSym, [1, 1, obj.NumTransmitAntennnas]);
+            grid(headerSymInd,headerIdx, :) = repmat(headerSym, [1, 1, obj.NumTransmitAntennas]);
             
             %% Pilot generation
             % Number of data/pilots OFDM symbols per frame
@@ -356,7 +356,7 @@ classdef OFDM < BaseModulation
     end
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
+        function modulatorHandle = genModulatorHandle(obj)
             
             [obj.txParam, obj.sysParam] = obj.setParameters;
             obj.txObj = obj.txInit;

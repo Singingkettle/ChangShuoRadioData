@@ -6,22 +6,27 @@ classdef CPFSK < GFSK
     
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
+        function modulatorHandle = genModulatorHandle(obj)
             
-            if obj.ModulationOrder <= 2
-                error("Value of Modulation order must be large than 2.");
+            if obj.ModulatorOrder <= 2
+                error("Value of Modulator order must be large than 2.");
             end
-            obj.NumTransmitAntennnas = 1;
+            obj.NumTransmitAntennas = 1;
             obj.IsDigital = true;
             
-            obj.const = (- (obj.ModulationOrder - 1):2:(obj.ModulationOrder - 1))';
-            obj.pureModulation = comm.CPFSKModulation( ...
-                ModulationOrder = obj.ModulationOrder, ...
-                ModulationIndex = obj.ModulationConfig.ModulationIndex, ...
-                InitialPhaseOffset = obj.ModulationConfig.InitialPhaseOffset, ...
+            if ~isfield(obj.ModulatorConfig, 'ModulatorIndex')
+                obj.ModulatorConfig.ModulatorIndex = rand(1)*10;
+                obj.ModulatorConfig.InitialPhaseOffset = rand(1)*2*pi;
+            end
+
+            obj.const = (- (obj.ModulatorOrder - 1):2:(obj.ModulatorOrder - 1))';
+            obj.pureModulator = comm.CPFSKModulator( ...
+                ModulationOrder = obj.ModulatorOrder, ...
+                ModulationIndex = obj.ModulatorConfig.ModulatorIndex, ...
+                InitialPhaseOffset = obj.ModulatorConfig.InitialPhaseOffset, ...
                 SamplesPerSymbol = obj.SamplePerSymbol);
             
-            modulatorHandle = @(x)obj.baseModulation(x);
+            modulatorHandle = @(x)obj.baseModulator(x);
             
             
         end

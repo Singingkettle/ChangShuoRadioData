@@ -1,26 +1,20 @@
-classdef FSK < BaseModulation
-    
-    properties
-        
-        SamplePerSymbol (1, 1) {mustBePositive, mustBeReal} = 2
-        
-    end
+classdef FSK < BaseModulator
     
     properties (Access=private)
         freq_sep
     end
 
     properties
-        pureModulation
+        pureModulator
         
     end
     
     methods (Access = protected)
         
-        function [y, bw] = baseModulation(obj, x)
-            y = obj.pureModulation(x);
+        function [y, bw] = baseModulator(obj, x)
+            y = obj.pureModulator(x);
             if isprop(obj, 'freq_sep')
-                bw = obj.freq_sep * obj.ModulationOrder;
+                bw = obj.freq_sep * obj.ModulatorOrder;
             else
                 bw = obw(y, obj.SampleRate);
             end
@@ -30,21 +24,23 @@ classdef FSK < BaseModulation
     
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
+        function modulatorHandle = genModulatorHandle(obj)
             
             obj.IsDigital = true;
-            obj.NumTransmitAntennnas = 1;
-            max_freq_sep = obj.SampleRate / (obj.ModulationOrder - 1);
+            obj.NumTransmitAntennas = 1;
+            max_freq_sep = obj.SampleRate / (obj.ModulatorOrder - 1);
             obj.freq_sep = (rand(1)*0.1+0.4)*max_freq_sep;
-
-            obj.pureModulation = @(x)fskmod(x, ...
-                obj.ModulationOrder, ...
+            if ~isfield(obj.ModulatorConfig, 'SymbolOrder')
+                obj.ModulatorConfig.SymbolOrder = randsample(["bin", "gray"], 1);
+            end
+            obj.pureModulator = @(x)fskmod(x, ...
+                obj.ModulatorOrder, ...
                 obj.freq_sep, ...
                 obj.SamplePerSymbol, ...
                 obj.SampleRate, ...
                 'discont', ...
-                obj.ModulationConfig.SymbolOrder);
-            modulatorHandle = @(x)obj.baseModulation(x);
+                obj.ModulatorConfig.SymbolOrder);
+            modulatorHandle = @(x)obj.baseModulator(x);
         end
         
     end

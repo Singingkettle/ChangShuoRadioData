@@ -36,9 +36,7 @@ classdef DVBSAPSK < APSK
         function modulatorHandle = genModulatorHandle(obj)
             
             % About the valid values for DVABSAPSK the doc in matlab is not
-            % consistent with the official code, we use the official code 
-            % to define the config parameters' range. As a result, there 
-            % are bugs about codeIDF about doc link: https://www.mathworks.com/help/comm/ref/dvbsapskmod.html
+            % consistent with the official code, we use the code to 
             if ~isfield(obj.ModulatorConfig, "stdSuffix")
                 if obj.ModulatorOrder <= 16
                     obj.ModulatorConfig.stdSuffix = randsample(["s2", "s2x", "sh"], 1);
@@ -57,17 +55,17 @@ classdef DVBSAPSK < APSK
                         obj.ModulatorConfig.frameLength = "normal";
                     end
                 end
+                % 
+                % obj.ModulatorConfig.stdSuffix = "s2x";
+                % obj.ModulatorOrder = 64;
+                % obj.ModulatorConfig.frameLength = "short";
                 obj.ModulatorConfig.codeIDF = randomSelectCodeIDF(obj.ModulatorOrder, obj.ModulatorConfig.stdSuffix, obj.ModulatorConfig.frameLength);
                 
                 obj.ModulatorConfig.beta = rand(1);
                 % Product of SPS and SPAN must be even.
                 obj.ModulatorConfig.span = randi([2, 8])*2;
             end
-            if obj.NumTransmitAntennas > 2
-                if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
-                    obj.ModulatorConfig.ostbcSymbolRate = randi([0, 1])*0.25+0.5;
-                end
-            end
+            
             obj.IsDigital = true;
             obj.filterCoeffs = obj.genFilterCoeffs;
             obj.ostbc = obj.genOSTBC;

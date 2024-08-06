@@ -1,11 +1,9 @@
-classdef DSBSCAM < BaseModulation
+classdef DSBSCAM < BaseModulator
     
     methods (Access = protected)
         
-        function [y, bw] = baseModulation(obj, x)
-            if hasfield(obj.ModulationConfig, 'initPhase')
-                obj.ModulationConfig.initPhase = 0;
-            end
+        function [y, bw] = baseModulator(obj, x)
+
             y = x;
             bw = obw(y, obj.SampleRate)*2;
             
@@ -15,12 +13,15 @@ classdef DSBSCAM < BaseModulation
     
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
+        function modulatorHandle = genModulatorHandle(obj)
             
+            if ~isfield(obj.ModulatorConfig, 'initPhase')
+                obj.ModulatorConfig.initPhase = 0;
+            end
             obj.IsDigital = false;
             % donot consider multi-tx in analog modulation
-            obj.NumTransmitAntennnas = 1;
-            modulatorHandle = @(x)obj.baseModulation(x);
+            obj.NumTransmitAntennas = 1;
+            modulatorHandle = @(x)obj.baseModulator(x);
             
         end
         

@@ -1,13 +1,13 @@
-classdef PM < BaseModulation
+classdef PM < BaseModulator
     
     methods (Access = private)
         
-        function [y, bw] = baseModulation(obj, x)
+        function [y, bw] = baseModulator(obj, x)
             
-            y = complex(cos(obj.ModulationConfig.PhaseDeviation * x + ...
-                obj.ModulationConfig.InitPhase), ...
-                sin(obj.ModulationConfig.PhaseDeviation * x + ...
-                obj.ModulationConfig.InitPhase));
+            y = complex(cos(obj.ModulatorConfig.PhaseDeviation * x + ...
+                obj.ModulatorConfig.InitPhase), ...
+                sin(obj.ModulatorConfig.PhaseDeviation * x + ...
+                obj.ModulatorConfig.InitPhase));
             bw = obw(y, obj.SampleRate);
             
         end
@@ -16,12 +16,16 @@ classdef PM < BaseModulation
     
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
-            
+        function modulatorHandle = genModulatorHandle(obj)
+
+            if ~isfield(obj.ModulatorConfig, 'FrequencyDeviation')
+                obj.ModulatorConfig.PhaseDeviation = rand(1)*pi;
+                obj.ModulatorConfig.InitPhase = 0;
+            end
             obj.IsDigital = false;
             % donot consider multi-tx in analog modulation
-            obj.NumTransmitAntennnas = 1;
-            modulatorHandle = @(x)obj.baseModulation(x);
+            obj.NumTransmitAntennas = 1;
+            modulatorHandle = @(x)obj.baseModulator(x);
             
         end
         

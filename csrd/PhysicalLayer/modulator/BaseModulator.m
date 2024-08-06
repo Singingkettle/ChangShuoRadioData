@@ -1,26 +1,26 @@
-classdef BaseModulation < matlab.System
-    % BaseModulation - Base class for modulators
+classdef BaseModulator < matlab.System
+    % BaseModulator - Base class for modulators
     %
     %   This class serves as the base class for modulators in the ChangShuoRadioData project.
     %   It provides common properties and methods that are shared among different modulators.
     %
-    %   To create a specific modulator, you should create a subclass of BaseModulation and
-    %   implement the abstract method genModulationHandle.
+    %   To create a specific modulator, you should create a subclass of BaseModulator and
+    %   implement the abstract method genModulatorHandle.
     %
     %   Properties:
-    %       - ModulationOrder: The modulation order of the modulator (default: 1)
+    %       - ModulatorOrder: The modulation order of the modulator (default: 1)
     %       - TimeDuration: The time duration of the modulator in seconds (default: 1)
     %       - SampleRate: The sample rate of the modulator in Hz (default: 200e3)
-    %       - ModulationConfig: Configuration parameters for the modulator
-    %       - NumTransmitAntennnas: The number of transmit antennas (default: 1)
+    %       - ModulatorConfig: Configuration parameters for the modulator
+    %       - NumTransmitAntennas: The number of transmit antennas (default: 1)
     %       - IsDigital: Flag indicating whether the modulator is digital (default: true)
     %
     %   Methods:
-    %       - BaseModulation: Constructor method for the BaseModulation class
+    %       - BaseModulator: Constructor method for the BaseModulator class
     %       - placeHolder: A placeholder method used in single TransmitAntennna
     %
     %   Abstract Methods:
-    %       - genModulationHandle: Abstract method to generate the modulator handle
+    %       - genModulatorHandle: Abstract method to generate the modulator handle
     %
     %   Protected Methods:
     %       - validateInputsImpl: Validates the inputs to the object
@@ -30,26 +30,28 @@ classdef BaseModulation < matlab.System
     %   See also: matlab.System
     
     properties
-        ModulationOrder {mustBePositive, mustBeReal} = 1
+        ModulatorOrder {mustBePositive, mustBeReal} = 1
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
-        ModulationConfig struct
-        NumTransmitAntennnas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennnas, [1, 2, 3, 4])} = 1
-        
+        ModulatorConfig struct = struct()
+        NumTransmitAntennas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennas, [1, 2, 3, 4])} = 1
+        % For analog modulation, the SamplePerSymbol is just a placeholder
+        % var without use
+        SamplePerSymbol (1, 1) {mustBePositive, mustBeReal} = 1
     end
     
-    properties (Access = private)
+    properties (Access = protected)
         modulator % Modulate Handle
         IsDigital = true
     end
     
     methods
-        function obj = BaseModulation(varargin)
-            % BaseModulation - Constructor method for the BaseModulation class
+        function obj = BaseModulator(varargin)
+            % BaseModulator - Constructor method for the BaseModulator class
             %
-            %   obj = BaseModulation() creates a BaseModulation object with default property values.
+            %   obj = BaseModulator() creates a BaseModulator object with default property values.
             %
-            %   obj = BaseModulation(Name,Value) creates a BaseModulation object with the specified
+            %   obj = BaseModulator(Name,Value) creates a BaseModulator object with the specified
             %   property values.
             
             setProperties(obj, nargin, varargin{:});
@@ -65,12 +67,12 @@ classdef BaseModulation < matlab.System
     end
     
     methods (Abstract)
-        % genModulationHandle - Abstract method to generate the modulator handle
+        % genModulatorHandle - Abstract method to generate the modulator handle
         %
         %   This method should be implemented in the subclass to generate the modulator handle.
         %   The modulator handle is used for modulating the input data.
         %
-        %   modulatorHandle = genModulationHandle(obj)
+        modulatorHandle = genModulatorHandle(obj)
         
     end
     
@@ -95,7 +97,7 @@ classdef BaseModulation < matlab.System
             %
             %   setupImpl(obj)
             
-            obj.modulator = obj.genModulationHandle;
+            obj.modulator = obj.genModulatorHandle;
         end
         
         function out = stepImpl(obj, x)
@@ -109,17 +111,21 @@ classdef BaseModulation < matlab.System
             
             [y, bw] = obj.modulator(x.data);
             
-            if ~isfield(obj.ModulationConfig, 'base')
-                bw = ceil(bw/1000)*1000;
+            if isscalar(bw)
+                bw = [-bw/2, bw/2];
+            end
+            if ~isfield(obj.ModulatorConfig, 'base')
+                bw(1) = ceil(abs((bw(1)))/1000)*-1000;
+                bw(2) = ceil(abs((bw(2)))/1000)*1000;
             end
             
             out.data = y;
             out.BandWidth = bw;
             out.SamplePerSymbol = x.SamplePerSymbol;
-            out.ModulationOrder = obj.ModulationOrder;
+            out.ModulatorOrder = obj.ModulatorOrder;
             out.IsDigital = obj.IsDigital;
-            out.NumTransmitAntennnas = obj.NumTransmitAntennnas;
-            out.ModulationConfig = obj.ModulationConfig;
+            out.NumTransmitAntennas = obj.NumTransmitAntennas;
+            out.ModulatorConfig = obj.ModulatorConfig;
             
             % The obj.TimeDuration and obj.SampleRate are redefined in
             % OFDM, SCDMA and OTFS

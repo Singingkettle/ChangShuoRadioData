@@ -1,32 +1,25 @@
-classdef OTFS < BaseModulation
+classdef OTFS < BaseModulator
     % https://www.mathworks.com/help/comm/ug/otfs-modulation.html#d126e2615
-    
-    properties (Nontunable)
-        Subcarrierspacing (1, 1) {mustBeReal, mustBePositive} = 30e3
-        % DelayLength
-        DelayLength (1, 1) {mustBeReal, mustBePositive} = 1024
-    end
     
     properties
         
-        firstStageModulation
+        firstStageModulator
         ostbc
-        secondStageModulation
+        secondStageModulator
         NumSymbols
         
     end
     
     methods (Access = protected)
         
-        function [y, bw] = baseModulation(obj, x)
+        function [y, bw] = baseModulator(obj, x)
             
-            x = obj.firstStageModulation(x);
+            x = obj.firstStageModulator(x);
             x = obj.ostbc(x);
-            obj.NumSymbols = fix(size(x, 1) / obj.DelayLength);
-            x = x(1:obj.NumSymbols * obj.DelayLength, :);
-            x = reshape(x, [obj.DelayLength, obj.NumSymbols, obj.NumTransmitAntennnas]);
-            y = obj.secondStageModulation(x);
-            M = length(y)/obj.NumSymbols;
+            obj.NumSymbols = fix(size(x, 1) / obj.ModulatorConfig.otfs.DelayLength);
+            x = x(1:obj.NumSymbols * obj.ModulatorConfig.otfs.DelayLength, :);
+            x = reshape(x, [obj.ModulatorConfig.otfs.DelayLength, obj.NumSymbols, obj.NumTransmitAntennas]);
+            y = obj.secondStageModulator(x);
 
             obj.TimeDuration = size(y, 1) / obj.SampleRate;
 
@@ -43,7 +36,7 @@ classdef OTFS < BaseModulation
             y1 = circshift(y1, -fix(delay*(obj.SampleRate*scale_val)));
             % Delete the dealy part, the 3 is hand value to ensure the
             % delay part has been removed completely.
-            y = y1(1:end-M*scale_val*3, :);
+            y = y1(1:end-obj.ModulatorConfig.otfs.DelayLength*scale_val*3, :);
             % src = dsp.FIRRateConverter(2,1);
             % [SRCoutMag,SRCFreq] = freqzmr(src);
             % plot(SRCFreq/1e3,db(SRCoutMag)); 
@@ -58,22 +51,22 @@ classdef OTFS < BaseModulation
             % signalAnalyzer(y, 'SampleRate', obj.SampleRate, 'StartTime', 0);
             % signalAnalyzer(y1, 'SampleRate', obj.SampleRate*scale_val, 'StartTime', -delay);
             % signalAnalyzer(y2, 'SampleRate', obj.SampleRate*scale_val, 'StartTime', ty(1));
-            bw = obj.DelayLength * obj.Subcarrierspacing;
+            bw = obj.ModulatorConfig.otfs.DelayLength * obj.ModulatorConfig.otfs.Subcarrierspacing;
             obj.SampleRate = obj.SampleRate*scale_val;
         end
         
      
         function ostbc = genOSTBC(obj)
             
-            if obj.NumTransmitAntennnas > 1
+            if obj.NumTransmitAntennas > 1
                 
-                if obj.NumTransmitAntennnas == 2
+                if obj.NumTransmitAntennas == 2
                     ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennnas);
+                        NumTransmitAntennas = obj.NumTransmitAntennas);
                 else
                     ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennnas, ...
-                        SymbolRate = obj.ModulationConfig.ostbcSymbolRate);
+                        NumTransmitAntennas = obj.NumTransmitAntennas, ...
+                        SymbolRate = obj.ModulatorConfig.ostbcSymbolRate);
                 end
                 
             else
@@ -82,16 +75,16 @@ classdef OTFS < BaseModulation
             
         end
         
-        function firstStageModulation = genFirstStageModulation(obj)
+        function firstStageModulator = genFirstStageModulator(obj)
             
-            if contains(lower(obj.ModulationConfig.base.mode), 'psk')
-                firstStageModulation = @(x)pskmod(x, ...
-                    obj.ModulationOrder, ...
-                    obj.ModulationConfig.base.PhaseOffset, ...
-                    obj.ModulationConfig.base.SymbolOrder);
-            elseif contains(lower(mode), 'qam')
-                firstStageModulation = @(x)qammod(x, ...
-                    obj.ModulationOrder, ...
+            if contains(lower(obj.ModulatorConfig.base.mode), 'psk')
+                firstStageModulator = @(x)pskmod(x, ...
+                    obj.ModulatorOrder, ...
+                    obj.ModulatorConfig.base.PhaseOffset, ...
+                    obj.ModulatorConfig.base.SymbolOrder);
+            elseif contains(lower(obj.ModulatorConfig.base.mode), 'qam')
+                firstStageModulator = @(x)qammod(x, ...
+                    obj.ModulatorOrder, ...
                     'UnitAveragePower', true);
             else
                 error('Not implemented %s modulator in OFDM', mode);
@@ -99,25 +92,41 @@ classdef OTFS < BaseModulation
             
         end
         
-        function secondStageModulation = genSecondStageModulation(obj)
-            p = obj.ModulationConfig.otfs;
-            secondStageModulation = @(x)otfsmod(x, ...
-                obj.NumTransmitAntennnas, p.padLen, p.padType);
-            obj.SampleRate = obj.DelayLength * obj.Subcarrierspacing;
+        function secondStageModulator = genSecondStageModulator(obj)
+            p = obj.ModulatorConfig.otfs;
+            secondStageModulator = @(x)otfsmod(x, ...
+                obj.NumTransmitAntennas, p.padLen, p.padType);
+            obj.SampleRate = obj.ModulatorConfig.otfs.DelayLength * obj.ModulatorConfig.otfs.Subcarrierspacing;
         end
         
     end
     
     methods
         
-        function modulatorHandle = genModulationHandle(obj)
+        function modulatorHandle = genModulatorHandle(obj)
             
             obj.IsDigital = true;
+            if obj.NumTransmitAntennas > 2
+                if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
+                    obj.ModulatorConfig.ostbcSymbolRate = randi([0, 1])*0.25+0.5;
+                end
+            end
             obj.ostbc = obj.genOSTBC;
-            obj.firstStageModulation = obj.genFirstStageModulation;
-            obj.secondStageModulation = obj.genSecondStageModulation;
+            if ~isfield(obj.ModulatorConfig, "base")
+                obj.ModulatorConfig.base.mode = randsample(["psk", "qam"], 1);
+                if strcmpi(obj.ModulatorConfig.base.mode, "psk")
+                    obj.ModulatorConfig.base.PhaseOffset = rand(1)*2*pi;
+                    obj.ModulatorConfig.base.SymbolOrder = randsample(["bin", "gray"], 1);
+                end
+                obj.ModulatorConfig.otfs.padType = randsample(["CP", "ZP", "RZP", "RCP", "NONE"], 1);
+                obj.ModulatorConfig.otfs.padLen = randi([12, 32], 1);
+                obj.ModulatorConfig.otfs.DelayLength = randsample([128, 256, 512, 1024, 2048], 1);
+                obj.ModulatorConfig.otfs.Subcarrierspacing = randsample([20, 40], 1)*1e3;
+            end
+            obj.firstStageModulator = obj.genFirstStageModulator;
+            obj.secondStageModulator = obj.genSecondStageModulator;
             
-            modulatorHandle = @(x)obj.baseModulation(x);
+            modulatorHandle = @(x)obj.baseModulator(x);
             
         end
         

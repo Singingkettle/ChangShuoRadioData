@@ -1,20 +1,20 @@
 classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
-    %OQPSKModulation Joint OQPSK modulation and pulse filtering
-    %   MOD = comm.OQPSKModulation creates a modulator object, MOD, that
+    %OQPSKModulator Joint OQPSK modulation and pulse filtering
+    %   MOD = comm.OQPSKModulator creates a modulator object, MOD, that
     %   jointly: (i) modulates the input signal using the offset quadrature
     %   phase shift keying (OQPSK) method, and (ii) pulse shapes the waveform
     %   via filtering.
     %
-    %   MOD = comm.OQPSKModulation(DEMOD) creates an OQPSK modulator
+    %   MOD = comm.OQPSKModulator(DEMOD) creates an OQPSK modulator
     %   object, MOD, with symmetric configuration to the OQPSK demodulator
     %   object DEMOD.
     %
-    %   MOD = comm.OQPSKModulation(Name,Value) creates an OQPSK modulator
+    %   MOD = comm.OQPSKModulator(Name,Value) creates an OQPSK modulator
     %   object, MOD, with the specified property Name set to the specified
     %   Value. You can specify additional name-value pair arguments in any
     %   order as (Name1, Value1, ..., NameN, ValueN).
     %
-    %   MOD = comm.OQPSKModulation(PHASE,Name,Value) creates an OQPSK modulator
+    %   MOD = comm.OQPSKModulator(PHASE,Name,Value) creates an OQPSK modulator
     %   object, MOD, with the PhaseOffset property set to PHASE and other
     %   specified property Names set to the specified Values.
     %
@@ -29,16 +29,16 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   the step method. For example, y = step(obj, x) and y = obj(x) are
     %   equivalent.
     %
-    %   OQPSKModulation methods:
+    %   OQPSKModulator methods:
     %
     %   step          - Perform OQPSK modulation and filtering
     %   release       - Allow property value and input characteristics changes
-    %   clone         - Create OQPSKModulation object with same property values
+    %   clone         - Create OQPSKModulator object with same property values
     %   isLocked      - Locked status (logical)
-    %   reset         - Reset states of OQPSKModulation object
+    %   reset         - Reset states of OQPSKModulator object
     %   constellation - Ideal signal constellation
     %
-    %   OQPSKModulation properties:
+    %   OQPSKModulator properties:
     %
     %   PhaseOffset           - Phase of zeroth point of constellation
     %   BitInput              - Assume bit inputs
@@ -55,7 +55,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   bits = randi([0, 1], 800, 1);     % message signal in bits
     %   sps = 12;
     %   rate = 4e6;
-    %   modulator = comm.OQPSKModulation('BitInput', true, 'PulseShape', 'Half sine', ...
+    %   modulator = comm.OQPSKModulator('BitInput', true, 'PulseShape', 'Half sine', ...
     %                                   'SamplesPerSymbol', sps, 'SymbolMapping', [3 2 0 1]);
     %   waveform = modulator(bits);     % joint oqpsk modulation and filtering
     %   % visualize 10 pulses of the OQPSK waveform
@@ -70,7 +70,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   symbols = randi([0, 3], 800/2, 1);     % message signal in integers
     %   sps = 12;
     %   rate = 4e6;
-    %   modulator = comm.OQPSKModulation('PulseShape', 'Normal raised cosine', 'RolloffFactor', 0.8, ...
+    %   modulator = comm.OQPSKModulator('PulseShape', 'Normal raised cosine', 'RolloffFactor', 0.8, ...
     %                                   'SamplesPerSymbol', sps, 'SymbolMapping', [3 2 0 1]);
     %   waveform = modulator(symbols);     % joint oqpsk modulation and filtering
     %   % visualize 50 pulses of the OQPSK waveform
@@ -81,7 +81,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   % Transmitter:
     %   sps = 12;
     %   bits = randi([0, 1], 800, 1);     % message signal
-    %   modulator = comm.OQPSKModulation('BitInput', true, 'SamplesPerSymbol', sps, 'PulseShape', 'Root raised cosine');
+    %   modulator = comm.OQPSKModulator('BitInput', true, 'SamplesPerSymbol', sps, 'PulseShape', 'Root raised cosine');
     %   oqpskWaveform = modulator(bits);
     %
     %   % Channel:
@@ -97,7 +97,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %   [~, ber] = biterr(bits(1:end-delay), demodulated(delay+1:end));
     %   fprintf('Bit error rate: %f\n', ber);
     %
-    %   See also comm.OQPSKDemodulator, comm.OQPSKModulation.
+    %   See also comm.OQPSKDemodulator, comm.OQPSKModulator.
     
     % Copyright 2009-2023 The MathWorks, Inc.
     
@@ -158,7 +158,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         function set.OutputDataType(obj, value)
             
             if strcmpi(value, 'Custom')
-                coder.internal.warning('comm:system:OQPSKModulation:InvalidOutType', 'double', value);
+                coder.internal.warning('comm:system:OQPSKModulator:InvalidOutType', 'double', value);
                 obj.OutputDataType = 'double';
             else
                 value = validatestring(value, {'double', 'single'}, 'set.OutputDataType');
@@ -268,7 +268,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
             if ~obj.BitInput % INTEGER INPUT
                 
                 coder.internal.errorIf(any(input > 3) || any(input < 0) || any(floor(input) ~= input) || ~isreal(input), ...
-                    'comm:system:OQPSKModulation:InvalidInput');
+                    'comm:system:OQPSKModulator:InvalidInput');
                 
                 if strcmp(obj.SymbolMapping, 'Gray')
                     bits = int2bit(input, 2);
@@ -279,7 +279,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
             else % BIT INPUT
                 
                 coder.internal.errorIf(any(input > 1) || any(input < 0) || any(floor(input) ~= input) || ~isreal(input), ...
-                    'comm:system:OQPSKModulation:InvalidInput');
+                    'comm:system:OQPSKModulator:InvalidInput');
                 
                 if strcmp(obj.SymbolMapping, 'Gray')
                     bits = input;
@@ -341,7 +341,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     methods (Static, Hidden)
         
         function a = getAlternateBlock
-            a = 'commdigbbndpm3/OQPSK Modulation Baseband';
+            a = 'commdigbbndpm3/OQPSK Modulator Baseband';
         end
         
     end
@@ -354,7 +354,7 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
                 'PropertyList', {'PhaseOffset', 'SymbolMapping', 'BitInput'});
             
             modulationGroup = matlab.system.display.SectionGroup( ...
-                'Title', getString(message('comm:system:OQPSKModulation:ModulationTitle')), ...
+                'Title', getString(message('comm:system:OQPSKModulator:ModulatorTitle')), ...
                 'Sections', modulationSection);
             modulationGroup.IncludeInShortDisplay = true;
             
