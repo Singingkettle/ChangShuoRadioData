@@ -21,7 +21,13 @@ radio detection and modulation classification
 
 These notes are mainly about how to simulate a real wireless communication system.
 
-1. How to convert a baseband to a passband signal
+1. How to convert a baseband to a passband signal (Date: 2024/05/23)
 ```
 https://www.mathworks.com/help/comm/ug/passband-modulation.html
 ```
+
+2. Using a cache tools to avoid duplicate initialization about some method (such as, filters' coefficients), which are very time consuming (Date: 2024/06/04).
+
+3. Product of SPS and SPAN must be even.
+
+4.  About the valid values for DVABSAPSK the doc in matlab is not consistent with the official code, we use the official code to define the config parameters' range. As a result, there are bugs about codeIDF about doc link: https://www.mathworks.com/help/comm/ref/dvbsapskmod.html

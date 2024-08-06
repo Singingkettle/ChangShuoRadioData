@@ -5,7 +5,7 @@ close all
 %%
 TimeDuration = 1;
 SampleRate = 50e3;
-NumTransmitAntennnas = 1;
+NumTransmitAntennas = 1;
 MasterClockRate = 200e3;
 
 CarrierFrequency = 20e3;
@@ -51,19 +51,19 @@ source = Audio(SampleRate = SampleRate, TimeDuration = TimeDuration);
 x = source();
 
 %% Test DSBAM
-ModulationConfig.carramp = 1;
-ModulationConfig.initPhase = 0;
-baseBandSignal = DSBAM(ModulationConfig = ModulationConfig, ...
-    NumTransmitAntennnas = NumTransmitAntennnas, ...
+ModulatorConfig.carramp = 1;
+ModulatorConfig.initPhase = 0;
+baseBandSignal = DSBAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennas = NumTransmitAntennas, ...
     SampleRate=SampleRate);
 x1= baseBandSignal(x);
 x1 = txRF(x1);
 x1 = rayChannel(x1);
 
 %% Test DSSCBAM
-ModulationConfig.initPhase = 0;
-baseBandSignal = DSBSCAM(ModulationConfig = ModulationConfig, ...
-    NumTransmitAntennnas = NumTransmitAntennnas, ...
+ModulatorConfig.initPhase = 0;
+baseBandSignal = DSBSCAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennas = NumTransmitAntennas, ...
     SampleRate=SampleRate);
 txRF.CarrierFrequency = 40e3;
 x2 = baseBandSignal(x);
@@ -72,11 +72,11 @@ x2 = txRF(x2);
 x2 = ricChannel(x2);
 
 %% Test SSBAM
-ModulationConfig.fa = 3000;
-ModulationConfig.mode = 'upper';
-ModulationConfig.initPhase = 0;
-baseBandSignal = SSBAM(ModulationConfig = ModulationConfig, ...
-    NumTransmitAntennnas = NumTransmitAntennnas, ...
+ModulatorConfig.fa = 3000;
+ModulatorConfig.mode = 'upper';
+ModulatorConfig.initPhase = 0;
+baseBandSignal = SSBAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennas = NumTransmitAntennas, ...
     SampleRate=SampleRate);
 txRF.CarrierFrequency = 60e3;
 x3 = baseBandSignal(x);
@@ -117,11 +117,11 @@ x3 = txRF(x3);
 x3 = ricChannel(x3);
 
 %% Test VSBAM
-ModulationConfig.fa = 3000;
-ModulationConfig.mode = 'upper';
-ModulationConfig.initPhase = 0;
-baseBandSignal = VSBAM(ModulationConfig = ModulationConfig, ...
-    NumTransmitAntennnas = NumTransmitAntennnas, ...
+ModulatorConfig.fa = 3000;
+ModulatorConfig.mode = 'upper';
+ModulatorConfig.initPhase = 0;
+baseBandSignal = VSBAM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennas = NumTransmitAntennas, ...
     SampleRate=SampleRate);
 txRF.CarrierFrequency = 80e3;
 x4 = baseBandSignal(x);

@@ -6,10 +6,10 @@ close all
 TimeDuration = 0.1;
 SampleRate = 200e3;
 MasterClockRate = 600e3;
-ModulationOrder = 8;
+ModulatorOrder = 8;
 SamplePerSymbol = 4;
 
-ModulationConfig.SymbolOrder = 'bin';
+ModulatorConfig.SymbolOrder = 'bin';
 
 CarrierFrequency = 200e3;
 IqImbalanceConfig.A = 3;
@@ -28,7 +28,7 @@ AGCConfig.MaxPowerGain = 400;
 
 source = RandomSource(SampleRate=SampleRate, ...
     TimeDuration=TimeDuration, ...
-    ModulationOrder=ModulationOrder, ...
+    ModulatorOrder=ModulatorOrder, ...
     SamplePerSymbol=SamplePerSymbol);
 
 x = source();
@@ -61,9 +61,9 @@ rxRF = RRFSimulator(StartTime=0, TimeDuration=2, SampleRate=SampleRate, ...
 
 baseBandSignal = FSK(SampleRate=SampleRate, ...
     TimeDuration=TimeDuration, ...
-    ModulationOrder=ModulationOrder, ...
+    ModulatorOrder=ModulatorOrder, ...
     SamplePerSymbol=SamplePerSymbol, ...
-    ModulationConfig=ModulationConfig);
+    ModulatorConfig=ModulatorConfig);
 
 x1= baseBandSignal(x);
 x1 = txRF(x1);

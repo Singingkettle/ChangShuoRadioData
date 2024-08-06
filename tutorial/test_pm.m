@@ -5,7 +5,7 @@ close all
 %%
 TimeDuration = 1;
 SampleRate = 200e3;
-NumTransmitAntennnas = 1;
+NumTransmitAntennas = 1;
 MasterClockRate = 600e3;
 
 CarrierFrequency = 30e3;
@@ -52,10 +52,10 @@ source = Audio(SampleRate = SampleRate, TimeDuration = TimeDuration);
 x = source();
 
 %% Test PM
-ModulationConfig.PhaseDeviation = pi/2;
-ModulationConfig.InitPhase = 0;
-baseBandSignal = PM(ModulationConfig = ModulationConfig, ...
-    NumTransmitAntennnas = NumTransmitAntennnas, ...
+ModulatorConfig.PhaseDeviation = pi/2;
+ModulatorConfig.InitPhase = 0;
+baseBandSignal = PM(ModulatorConfig = ModulatorConfig, ...
+    NumTransmitAntennas = NumTransmitAntennas, ...
     SampleRate=SampleRate);
 
 x1= baseBandSignal(x);

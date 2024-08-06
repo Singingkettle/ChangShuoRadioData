@@ -2,7 +2,7 @@ clc
 clear
 close all
 
-M = 16;            % Modulation order
+M = 16;            % Modulator order
 k = log2(M);       % Bits per symbol
 numBits = k*7.5e4; % Bits to process
 sps = 4;           % Samples per symbol (oversampling factor)

@@ -1,5 +1,5 @@
 %
-M = 64;      % Modulation order for 16QAM
+M = 64;      % Modulator order for 16QAM
 nfft  = 1024; % Number of data carriers
 numSubCar = 500;
 cplen = 16;  % Cyclic prefix length
@@ -10,7 +10,7 @@ dataIn = randi([0 M-1],numSubCar,nSym,nt);
 dcIdx = (nfft/2)+1;
 nullInd = [1:((nfft-numSubCar)/2) dcIdx ((nfft+numSubCar)/2)+1+1:nfft].';
 qamSig = qammod(dataIn,M,'UnitAveragePower',true);
-ofdmMod = comm.OFDMModulation( ...
+ofdmMod = comm.OFDMModulator( ...
     FFTLength=nfft, ...
     NumGuardBandCarriers=[((nfft-numSubCar)/2); 524-1-((nfft-numSubCar)/2)],...
     NumSymbols=nSym, ...
@@ -140,7 +140,7 @@ function y = otfsmod(x,nfft,cplen,varargin)
 %
 %     y3 = ofdmmod(dataIn,nfft,cplen,nullIdx,OversamplingFactor=osf);
 %
-%   See also ofdmdemod, comm.OFDMModulation.
+%   See also ofdmdemod, comm.OFDMModulator.
 
 %   Copyright 2017-2023 The MathWorks, Inc.
 
