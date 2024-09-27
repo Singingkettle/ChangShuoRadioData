@@ -20,17 +20,15 @@ classdef OTFS < BaseModulator
             x = x(1:obj.NumSymbols * obj.ModulatorConfig.otfs.DelayLength, :);
             x = reshape(x, [obj.ModulatorConfig.otfs.DelayLength, obj.NumSymbols, obj.NumTransmitAntennas]);
             y = obj.secondStageModulator(x);
-
-            obj.TimeDuration = size(y, 1) / obj.SampleRate;
-
+            
             bw = obw(y, obj.SampleRate, [], 98.5);
             bw = max(bw);
             scale_val = 2;
             src = dsp.SampleRateConverter( ...
-                            Bandwidth=bw, ...
-                            InputSampleRate=obj.SampleRate, ...
-                            OutputSampleRate=obj.SampleRate*scale_val, ...
-                            StopbandAttenuation=50);
+                Bandwidth=bw, ...
+                InputSampleRate=obj.SampleRate, ...
+                OutputSampleRate=obj.SampleRate*scale_val, ...
+                StopbandAttenuation=50);
             y1 = src(y);
             [delay, ~, ~] = outputDelay(src, Fc=0);
             y1 = circshift(y1, -fix(delay*(obj.SampleRate*scale_val)));
@@ -39,9 +37,9 @@ classdef OTFS < BaseModulator
             y = y1(1:end-obj.ModulatorConfig.otfs.DelayLength*scale_val*3, :);
             % src = dsp.FIRRateConverter(2,1);
             % [SRCoutMag,SRCFreq] = freqzmr(src);
-            % plot(SRCFreq/1e3,db(SRCoutMag)); 
-            % 
-
+            % plot(SRCFreq/1e3,db(SRCoutMag));
+            %
+            
             % [delay,FsOut] = outputDelay(src,FsIn=obj.SampleRate);
             % tx = (0:length(y)-1)./obj.SampleRate;
             % ty = (0:length(y1)-1)./(FsOut);
@@ -55,25 +53,6 @@ classdef OTFS < BaseModulator
             obj.SampleRate = obj.SampleRate*scale_val;
         end
         
-     
-        function ostbc = genOSTBC(obj)
-            
-            if obj.NumTransmitAntennas > 1
-                
-                if obj.NumTransmitAntennas == 2
-                    ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennas);
-                else
-                    ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennas, ...
-                        SymbolRate = obj.ModulatorConfig.ostbcSymbolRate);
-                end
-                
-            else
-                ostbc = @(x)obj.placeHolder(x);
-            end
-            
-        end
         
         function firstStageModulator = genFirstStageModulator(obj)
             

@@ -4,8 +4,7 @@ classdef BaseDeModulator < matlab.System
     properties
         
         ModulatorOrder {mustBePositive, mustBeReal} = 1
-        
-        TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
+
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
         
         % Modulate parameters

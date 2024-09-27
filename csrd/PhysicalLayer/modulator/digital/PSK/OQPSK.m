@@ -10,7 +10,7 @@ classdef OQPSK < APSK
         
         function [y, bw] = baseModulator(obj, x)
             y = obj.pureModulator(x);
-
+            
             bw = obw(y, obj.SampleRate);
             if obj.NumTransmitAntennas > 1
                 bw = max(bw);
@@ -32,6 +32,7 @@ classdef OQPSK < APSK
             end
             obj.filterCoeffs = obj.genFilterCoeffs;
             obj.ostbc = obj.genOSTBC;
+            obj.SamplePerSymbol = obj.SamplePerSymbol - mod(obj.SamplePerSymbol, 2);
             obj.pureModulator = BaseOQPSK( ...
                 PhaseOffset = obj.ModulatorConfig.PhaseOffset, ...
                 SymbolMapping = obj.ModulatorConfig.SymbolMapping, ...

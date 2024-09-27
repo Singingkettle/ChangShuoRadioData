@@ -1,4 +1,4 @@
-classdef MSKModulation<baseModulation
+classdef MSKModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef MSKModulation<baseModulation
     end
     
     methods
-        function obj = MSKModulation(modulatorParam)
+        function obj = MSKModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -44,7 +44,7 @@ classdef MSKModulation<baseModulation
                 M = 2;
 
                 % Modulate
-                mod = comm.MSKModulation(...
+                mod = comm.MSKModulator(...
                     'BitInput', true,...
                     'InitialPhaseOffset', pi/4, ...
                     'SamplesPerSymbol', obj.samplePerSymbol);

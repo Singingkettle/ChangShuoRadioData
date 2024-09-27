@@ -3,7 +3,7 @@ classdef DSBSCAM < BaseModulator
     methods (Access = protected)
         
         function [y, bw] = baseModulator(obj, x)
-
+            
             y = x;
             bw = obw(y, obj.SampleRate)*2;
             

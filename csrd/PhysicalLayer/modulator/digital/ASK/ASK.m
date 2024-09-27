@@ -29,7 +29,7 @@ classdef ASK < APSK
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-
+            
             bw = obw(y, obj.SampleRate)*2;
             if obj.NumTransmitAntennas > 1
                 bw = max(bw);
@@ -40,7 +40,7 @@ classdef ASK < APSK
     end
     
     methods
-
+        
         function modulatorHandle = genModulatorHandle(obj)
             
             if ~isfield(obj.ModulatorConfig, 'beta')
@@ -58,7 +58,7 @@ classdef ASK < APSK
             modulatorHandle = @(x)obj.baseModulator(x);
             
         end
-
+        
     end
-
+    
 end

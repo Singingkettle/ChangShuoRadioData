@@ -17,7 +17,7 @@ classdef PM < BaseModulator
     methods
         
         function modulatorHandle = genModulatorHandle(obj)
-
+            
             if ~isfield(obj.ModulatorConfig, 'FrequencyDeviation')
                 obj.ModulatorConfig.PhaseDeviation = rand(1)*pi;
                 obj.ModulatorConfig.InitPhase = 0;

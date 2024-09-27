@@ -6,6 +6,7 @@ classdef TRFSimulator < matlab.System
     % 此外我们还参考了USRP的零中频设计架构实现发射器模拟
     % https://kb.ettus.com/UHD
     % https://zhuanlan.zhihu.com/p/24217098
+    % https://www.mathworks.com/help/simrf/ug/modeling-an-rf-mmwave-transmitter-with-hybrid-beamforming.html
     % =====================================================================
     % 关于发射机的模拟，里面的射频损失主要是依据论文："ORACLE: Optimized Radio
     % clAssification through Convolutional neuraL nEtworks"和USRP官网给出的
@@ -16,12 +17,8 @@ classdef TRFSimulator < matlab.System
     
     properties
         
-        % 信号发送的开始时间，这个值必须>=0,
-        StartTime (1, 1) {mustBeReal, mustBeGreaterThanOrEqual(StartTime, 0)} = 0
-        CarrierFrequency (1, 1) {mustBePositive, mustBeReal, mustBeInteger} = 200e3
         AntennaEfficiency (1, 1) {mustBePositive, mustBeReal} = 0.5
         TransmitAntennaDiameter  (1, 1) {mustBePositive, mustBeReal} = 0.4
-        SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
         OutputPower (1, 1) {mustBeReal} = -100 % dBm
         % Master clock rate, specified as a scalar in Hz. The master clock
         % rate is the A/D and D/A clock rate. The valid range of values for
@@ -29,11 +26,11 @@ classdef TRFSimulator < matlab.System
         % This value depends on the ettus usrp devices.
         % Please refer:
         % https://www.mathworks.com/help/comm/usrpradio/ug/sdrutransmitter.html
-
+        
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
         DCOffset {mustBeReal} = -50;
         
-        TxSiteConfig = false; 
+        TxSiteConfig = false;
         IqImbalanceConfig struct
         PhaseNoiseConfig struct
         MemoryLessNonlinearityConfig struct
@@ -80,10 +77,10 @@ classdef TRFSimulator < matlab.System
                 MemoryLessNonlinearity = comm.MemorylessNonlinearity( ...
                     Method = 'Cubic polynomial', ...
                     LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
-                    TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification, ...
-                    IIP3 = obj.MemoryLessNonlinearityConfig.IIP3);
-                
-                if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
+                    TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification);
+                if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IIP3')
+                    MemoryLessNonlinearity.OIP3 = obj.MemoryLessNonlinearityConfig.IIP3;
+                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
                     MemoryLessNonlinearity.OIP3 = obj.MemoryLessNonlinearityConfig.OIP3;
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IP1dB')
                     MemoryLessNonlinearity.IP1dB = obj.MemoryLessNonlinearityConfig.IP1dB;
@@ -120,6 +117,7 @@ classdef TRFSimulator < matlab.System
                     LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
                     Smoothness = obj.MemoryLessNonlinearityConfig.Smoothness, ...
                     PhaseGainRadian = obj.MemoryLessNonlinearityConfig.PhaseGainRadian, ...
+                    PhaseSaturation = obj.MemoryLessNonlinearityConfig.PhaseSaturation, ...
                     PhaseSmoothness = obj.MemoryLessNonlinearityConfig.PhaseSmoothness, ...
                     OutputSaturationLevel = obj.MemoryLessNonlinearityConfig.OutputSaturationLevel);
             elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Lookup table')
@@ -138,35 +136,42 @@ classdef TRFSimulator < matlab.System
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
             
         end
-
+        
         function out = stepImpl(obj, x)
             % Change the input signal sample rate as txrf's master clock
             % rate
             InterpDecim = fix(obj.MasterClockRate / x.SampleRate);
             obj.MasterClockRate = InterpDecim * x.SampleRate;
+            hbw = max(abs(x.BandWidth));
+            if strcmpi(x.ModulatorType, 'OFDM') || strcmpi(x.ModulatorType, 'SCFDMA') || strcmpi(x.ModulatorType, 'OTFS') || strcmpi(x.ModulatorType, 'CPFSK')
+                bw = fix(hbw/1000)*1000*2;
+            else
+                bw = 2 * hbw;
+            end
             src = dsp.SampleRateConverter( ...
-                    Bandwidth=max(abs(x.BandWidth))*2, ...
-                    InputSampleRate=x.SampleRate, ...
-                    OutputSampleRate=obj.MasterClockRate, ...
-                    StopbandAttenuation=180);
+                Bandwidth=bw, ...
+                InputSampleRate=x.SampleRate, ...
+                OutputSampleRate=obj.MasterClockRate, ...
+                StopbandAttenuation=100);
             y = src(x.data);
-            % Then pass the rated signal through a low pass filter, to 
-            % supress the compenents of high frequency 
+            % Then pass the rated signal through a low pass filter, to
+            % supress the compenents of high frequency
             y = lowpass(y, max(abs(x.BandWidth)), obj.MasterClockRate, ...
-                ImpulseResponse = "fir", Steepness = 0.99, ...
-                StopbandAttenuation=200);
-
-            % After that, add impairments 
+                ImpulseResponse = "fir", Steepness = 0.9, ...
+                StopbandAttenuation=100);
+            
+            % y = x.data;
+            % After that, add impairments
             y = obj.IQImbalance(y);
             y = y + 10 ^ (obj.DCOffset / 10);
             % release(obj.PhaseNoise);
             % obj.PhaseNoise.SampleRate = obj.MasterClockRate;
             % y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
-            % Transform the baseband to passband 
+            % Transform the baseband to passband
             UpConverter = dsp.SineWave( ...
                 Amplitude=1, ...
-                Frequency=obj.CarrierFrequency, ...
+                Frequency=x.CarrierFrequency, ...
                 PhaseOffset=0, ...
                 ComplexOutput=true, ...
                 SampleRate=obj.MasterClockRate, ...
@@ -188,8 +193,7 @@ classdef TRFSimulator < matlab.System
             out.SampleRate = obj.MasterClockRate;
             out.SamplePerFrame = size(y, 1);
             out.TimeDuration = out.SamplePerFrame / out.SampleRate;
-            out.CarrierFrequency = obj.CarrierFrequency;
-            out.StartTime = obj.StartTime;
+            out.CarrierFrequency = x.CarrierFrequency;
         end
         
     end

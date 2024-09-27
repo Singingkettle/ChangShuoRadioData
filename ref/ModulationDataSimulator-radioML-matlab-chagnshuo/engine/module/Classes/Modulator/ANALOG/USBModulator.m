@@ -1,4 +1,4 @@
-classdef USBModulation<baseModulation
+classdef USBModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef USBModulation<baseModulation
     end
     
     methods
-        function obj = USBModulation(modulatorParam)
+        function obj = USBModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

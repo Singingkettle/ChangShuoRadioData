@@ -1,4 +1,4 @@
-classdef CPFSK4Modulation<baseModulation
+classdef CPFSK4Modulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef CPFSK4Modulation<baseModulation
     end
     
     methods
-        function obj = CPFSK4Modulation(modulatorParam)
+        function obj = CPFSK4Modulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -45,9 +45,9 @@ classdef CPFSK4Modulation<baseModulation
 
                 % Modulate
                 M = 4;
-                mod = comm.CPFSKModulation(...
-                    'ModulationOrder', M, ...
-                    'ModulationIndex', 0.5, ...
+                mod = comm.CPFSKModulator(...
+                    'ModulatorOrder', M, ...
+                    'ModulatorIndex', 0.5, ...
                     'SamplesPerSymbol', obj.samplePerSymbol);
                 meanM = mean(0:M-1);
                 y = mod(2*(x-meanM));

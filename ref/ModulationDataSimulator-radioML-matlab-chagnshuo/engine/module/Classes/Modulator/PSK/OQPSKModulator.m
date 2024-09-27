@@ -1,4 +1,4 @@
-classdef OQPSKModulation<baseModulation
+classdef OQPSKModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -9,7 +9,7 @@ classdef OQPSKModulation<baseModulation
     end
     
     methods
-        function obj = OQPSKModulation(modulatorParam)
+        function obj = OQPSKModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -46,7 +46,7 @@ classdef OQPSKModulation<baseModulation
                 x = obj.sourceHandle();
 
                 % Modulate
-                mod = comm.OQPSKModulation(...
+                mod = comm.OQPSKModulator(...
                     'PulseShape', 'Root raised cosine', ...
                     'RolloffFactor', obj.rolloffFactor, ...
                     'SamplesPerSymbol', obj.samplePerSymbol, ...

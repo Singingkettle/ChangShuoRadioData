@@ -1,6 +1,6 @@
 % DSBAM is a class that extends DSBSCAM. It represents a Double Sideband Amplitude Modulator.
 classdef DSBAM < DSBSCAM
-   
+    
     methods (Access = protected)
         
         % baseModulator is a method that performs the base modulation.
@@ -17,7 +17,7 @@ classdef DSBAM < DSBSCAM
         end
         
     end
-
+    
     methods
         
         function modulatorHandle = genModulatorHandle(obj)

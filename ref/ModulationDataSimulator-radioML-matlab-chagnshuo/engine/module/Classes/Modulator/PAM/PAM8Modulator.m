@@ -1,4 +1,4 @@
-classdef PAM8Modulation<baseModulation
+classdef PAM8Modulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef PAM8Modulation<baseModulation
     end
     
     methods
-        function obj = PAM8Modulation(modulatorParam)
+        function obj = PAM8Modulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

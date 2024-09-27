@@ -5,7 +5,7 @@ function src = helperModClassGetSource(modType, sps, spf, fs)
 %    SPS, the number of samples per frame SPF, and the sampling frequency
 %    FS.
 %   
-%   See also ModulationClassificationWithDeepLearningExample.
+%   See also ModulatorClassificationWithDeepLearningExample.
 
 %   Copyright 2019 The MathWorks, Inc.
 

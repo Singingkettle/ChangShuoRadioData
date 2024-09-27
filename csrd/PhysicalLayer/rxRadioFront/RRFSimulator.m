@@ -2,7 +2,6 @@ classdef RRFSimulator < matlab.System
     
     properties
         StartTime (1, 1) {mustBeGreaterThanOrEqual(StartTime, 0), mustBeReal} = 0
-        TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
         % The SampleRate is the bandwidth of receiver.
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e6
         NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1
@@ -16,7 +15,7 @@ classdef RRFSimulator < matlab.System
         
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6
         DCOffset {mustBeReal} = -50;
-
+        
         Position
         
         MemoryLessNonlinearityConfig struct
@@ -233,7 +232,7 @@ classdef RRFSimulator < matlab.System
             datas = permute(datas, [2 1 3]);
             y = cell(1, obj.NumReceiveAntennas);
             SNRs = zeros(length(in), obj.NumReceiveAntennas);
-
+            
             DownConverter = dsp.SineWave( ...
                 Amplitude=1, ...
                 Frequency=obj.CarrierFrequency, ...
@@ -241,7 +240,7 @@ classdef RRFSimulator < matlab.System
                 ComplexOutput=true, ...
                 SampleRate=obj.MasterClockRate, ...
                 SamplesPerFrame=size(datas, 1));
-
+            
             for rxI=1:obj.NumReceiveAntennas
                 x = mbc(datas(:, :, rxI));
                 x = x.*conj(DownConverter());
@@ -267,7 +266,7 @@ classdef RRFSimulator < matlab.System
             
             out.data = y;
             out.StartTime = obj.StartTime;
-            out.TimeDuration = obj.TimeDuration;
+            out.TimeDuration = size(y, 1) / obj.SampleRate;
             out.MasterClockRate = obj.MasterClockRate;
             out.SampleRate = obj.SampleRate;
             out.NumReceiveAntennas = obj.NumReceiveAntennas;

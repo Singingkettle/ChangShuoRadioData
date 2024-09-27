@@ -14,7 +14,7 @@ function y = helperModClassFrameGenerator(x, windowLength, stepSize, offset, sps
 %   part enables the network to adapt to unknown delay values. Each frame
 %   is normalized to have unit energy.
 %
-%   See also ModulationClassificationWithDeepLearningExample.
+%   See also ModulatorClassificationWithDeepLearningExample.
 
 %   Copyright 2018 The MathWorks, Inc.
 

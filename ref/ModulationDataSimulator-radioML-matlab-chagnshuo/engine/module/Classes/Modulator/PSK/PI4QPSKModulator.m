@@ -1,4 +1,4 @@
-classdef PI4QPSKModulation<baseModulation
+classdef PI4QPSKModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef PI4QPSKModulation<baseModulation
     end
     
     methods
-        function obj = PI4QPSKModulation(modulatorParam)
+        function obj = PI4QPSKModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

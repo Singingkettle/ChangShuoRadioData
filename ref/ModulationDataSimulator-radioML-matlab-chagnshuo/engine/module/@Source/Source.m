@@ -1,5 +1,5 @@
 % =========================================================================
-% Project: ModulationDataSimulator
+% Project: ModulatorDataSimulator
 % Script: Class-> Factory
 % Author: Shuo Chang
 % Email: changshuo@bupt.edu.cn

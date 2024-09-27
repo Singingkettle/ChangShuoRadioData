@@ -1,4 +1,4 @@
-classdef GFSKModulation<baseModulation
+classdef GFSKModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -7,7 +7,7 @@ classdef GFSKModulation<baseModulation
     end
     
     methods
-        function obj = GFSKModulation(modulatorParam)
+        function obj = GFSKModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -43,11 +43,11 @@ classdef GFSKModulation<baseModulation
 
                 % Modulate                  
                 M = 2;
-                mod = comm.CPMModulation(...
-                  'ModulationOrder', M, ...
+                mod = comm.CPMModulator(...
+                  'ModulatorOrder', M, ...
                   'FrequencyPulse', 'Gaussian', ...
                   'BandwidthTimeProduct', 0.35, ...
-                  'ModulationIndex', 1, ...
+                  'ModulatorIndex', 1, ...
                   'SamplesPerSymbol', obj.samplePerSymbol);
                 meanM = mean(0:M-1);
                 y = mod(2*(x-meanM));

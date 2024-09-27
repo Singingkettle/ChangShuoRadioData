@@ -8,7 +8,6 @@ classdef SCFDMA < OFDM
     methods (Access = protected)
         
         function [y, bw] = baseModulator(obj, x)
-            
             x = obj.firstStageModulator(x);
             x = obj.ostbc(x);
             obj.NumSymbols = fix(size(x, 1) / obj.ModulatorConfig.scfdma.NumDataSubcarriers);
@@ -16,18 +15,20 @@ classdef SCFDMA < OFDM
             x = reshape(x, [obj.ModulatorConfig.scfdma.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennas]);
             x = cat(1, x, zeros(obj.ModulatorConfig.scfdma.FFTLength-obj.ModulatorConfig.scfdma.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennas));
             x = fft(x(1:obj.ModulatorConfig.scfdma.NumDataSubcarriers, :, :), obj.ModulatorConfig.scfdma.NumDataSubcarriers);
-            x_ = zeros(obj.ModulatorConfig.scfdma.FFTLength, obj.NumSymbols, obj.NumTransmitAntennas);
+            x_ = zeros(obj.ModulatorConfig.scfdma.FFTLength, obj.NumSymbols, obj.NumTransmitAntennas, 'like', x);
 
-            leftGuardBand = floor((obj.ModulatorConfig.scfdma.FFTLength-obj.ModulatorConfig.scfdma.NumDataSubcarriers)/2);
-            rightGuardBand = obj.ModulatorConfig.scfdma.FFTLength-obj.ModulatorConfig.scfdma.NumDataSubcarriers - leftGuardBand;
+            leftGuardBand = floor((obj.ModulatorConfig.scfdma.FFTLength-obj.NumDataSubcarriers)/2);
+            rightGuardBand = obj.ModulatorConfig.scfdma.FFTLength-obj.NumDataSubcarriers - leftGuardBand;
             x_ (leftGuardBand+1:obj.ModulatorConfig.scfdma.SubcarrierMappingInterval:leftGuardBand+obj.ModulatorConfig.scfdma.NumDataSubcarriers * obj.ModulatorConfig.scfdma.SubcarrierMappingInterval, :, :) = x;
             
+            if isLocked(obj.secondStageModulator)
+                release(obj.secondStageModulator);
+            end
             obj.secondStageModulator.NumSymbols = obj.NumSymbols;
             y = obj.secondStageModulator(x_);
             bw = zeros(1, 2);
             bw(1) = -obj.ModulatorConfig.scfdma.Subcarrierspacing * (obj.ModulatorConfig.scfdma.FFTLength/2 - leftGuardBand);
             bw(2) = obj.ModulatorConfig.scfdma.Subcarrierspacing * (obj.ModulatorConfig.scfdma.FFTLength/2 - rightGuardBand);
-            obj.TimeDuration = size(y, 1) / obj.SampleRate;
             
         end
         
@@ -38,8 +39,8 @@ classdef SCFDMA < OFDM
                 NumGuardBandCarriers = [0; 0], ...
                 CyclicPrefixLength = p.CyclicPrefixLength, ...
                 NumTransmitAntennas = obj.NumTransmitAntennas);
-
-            obj.UsedSubCarr = (obj.ModulatorConfig.scfdma.NumDataSubcarriers -1)*obj.ModulatorConfig.scfdma.SubcarrierMappingInterval + 1;
+            
+            obj.NumDataSubcarriers = (obj.ModulatorConfig.scfdma.NumDataSubcarriers -1)*obj.ModulatorConfig.scfdma.SubcarrierMappingInterval + 1;
             obj.SampleRate = obj.ModulatorConfig.scfdma.Subcarrierspacing * p.FFTLength;
         end
         
@@ -76,5 +77,5 @@ classdef SCFDMA < OFDM
         end
         
     end
-
+    
 end

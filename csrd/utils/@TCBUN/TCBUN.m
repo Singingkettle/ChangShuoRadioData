@@ -1,5 +1,5 @@
 classdef TCBUN
-    % Tools can be used now. 
+    % Tools can be used now.
     % 这个类的本质目标是管理一个针对各种模块（类）实例的一个预缓存
     % 因为有些类的实例，在初始化阶段会比较消耗时间，且该实例可能被重复使用，
     % 而我们信号仿真的主代码，会频繁进行重复的实例化过程，例如采样速率转换函数，
@@ -10,11 +10,11 @@ classdef TCBUN
     % 这个类的设计遵循单例设计模式，参考了这个链接：
     % https://www.mathworks.com/matlabcentral/fileexchange/24911-design-pattern-singleton-creational
     properties
-        tools 
+        tools
     end
     
     methods(Access = private)
-
+        
         function obj = TCBUN(varargin)
             obj.tools = dictionary(string.empty, string.empty);
         end
@@ -22,26 +22,26 @@ classdef TCBUN
     end
     
     methods(Static)
-      % Concrete implementation.  See Singleton superclass.
-      function obj = instance()
-         persistent uniqueInstance
-         if isempty(uniqueInstance)
-            obj = TCBUN();
-            uniqueInstance = obj;
-         else
-            obj = uniqueInstance;
-         end
-      end
-
+        % Concrete implementation.  See Singleton superclass.
+        function obj = instance()
+            persistent uniqueInstance
+            if isempty(uniqueInstance)
+                obj = TCBUN();
+                uniqueInstance = obj;
+            else
+                obj = uniqueInstance;
+            end
+        end
+        
     end
-
+    
     methods
-
+        
         addTool(obj, name, handle);
         removeTool(obj, name, handle);
         saveTools(obj);
         loadTools(obj);
-
+        
     end
-
+    
 end

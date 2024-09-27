@@ -3,4 +3,4 @@ clear
 close all
 
 sim = Simulation();
-sim(100);
+sim(1);

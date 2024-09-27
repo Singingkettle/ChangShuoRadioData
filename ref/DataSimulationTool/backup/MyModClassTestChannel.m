@@ -65,7 +65,7 @@ classdef MyModClassTestChannel < matlab.System
 %   MaximumDopplerShift  - Maximum Doppler shift (Hz)
 %   MaximumClockOffset   - Maximum clock offset (ppm)
 %   
-%   See also ModulationClassificationWithDeepLearningExample.
+%   See also ModulatorClassificationWithDeepLearningExample.
  
 %   Copyright 2018 The MathWorks, Inc.
 

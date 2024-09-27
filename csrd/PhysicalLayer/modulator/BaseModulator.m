@@ -9,7 +9,6 @@ classdef BaseModulator < matlab.System
     %
     %   Properties:
     %       - ModulatorOrder: The modulation order of the modulator (default: 1)
-    %       - TimeDuration: The time duration of the modulator in seconds (default: 1)
     %       - SampleRate: The sample rate of the modulator in Hz (default: 200e3)
     %       - ModulatorConfig: Configuration parameters for the modulator
     %       - NumTransmitAntennas: The number of transmit antennas (default: 1)
@@ -31,7 +30,6 @@ classdef BaseModulator < matlab.System
     
     properties
         ModulatorOrder {mustBePositive, mustBeReal} = 1
-        TimeDuration (1, 1) {mustBePositive, mustBeReal} = 1
         SampleRate (1, 1) {mustBePositive, mustBeReal} = 200e3
         ModulatorConfig struct = struct()
         NumTransmitAntennas (1, 1) {mustBePositive, mustBeInteger, mustBeMember(NumTransmitAntennas, [1, 2, 3, 4])} = 1
@@ -55,6 +53,25 @@ classdef BaseModulator < matlab.System
             %   property values.
             
             setProperties(obj, nargin, varargin{:});
+        end
+        
+        function ostbc = genOSTBC(obj)
+            
+            if obj.NumTransmitAntennas > 1
+                
+                if obj.NumTransmitAntennas == 2
+                    ostbc = comm.OSTBCEncoder( ...
+                        NumTransmitAntennas = obj.NumTransmitAntennas);
+                else
+                    ostbc = comm.OSTBCEncoder( ...
+                        NumTransmitAntennas = obj.NumTransmitAntennas, ...
+                        SymbolRate = obj.ModulatorConfig.ostbcSymbolRate);
+                end
+                ostbc = @(x)genOSTBCWithX(ostbc, x);
+            else
+                ostbc = @(x)obj.placeHolder(x);
+            end
+            
         end
         
         function y = placeHolder(obj, x)
@@ -96,7 +113,13 @@ classdef BaseModulator < matlab.System
             %   It initializes the modulator handle.
             %
             %   setupImpl(obj)
-            
+            if obj.NumTransmitAntennas > 2
+                if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
+                    obj.ModulatorConfig.ostbcSymbolRate = randi([0, 1])*0.25+0.5;
+                end
+            else
+                obj.ModulatorConfig.ostbcSymbolRate = 1;
+            end
             obj.modulator = obj.genModulatorHandle;
         end
         
@@ -115,26 +138,40 @@ classdef BaseModulator < matlab.System
                 bw = [-bw/2, bw/2];
             end
             if ~isfield(obj.ModulatorConfig, 'base')
-                bw(1) = ceil(abs((bw(1)))/1000)*-1000;
-                bw(2) = ceil(abs((bw(2)))/1000)*1000;
+                bw(1) = fix(bw(1));
+                bw(2) = fix(bw(2));
             end
             
             out.data = y;
             out.BandWidth = bw;
-            out.SamplePerSymbol = x.SamplePerSymbol;
+            if isfield(obj.ModulatorConfig, 'base')
+                out.SamplePerSymbol = 1;
+            else
+                out.SamplePerSymbol = x.SamplePerSymbol;
+            end
             out.ModulatorOrder = obj.ModulatorOrder;
             out.IsDigital = obj.IsDigital;
             out.NumTransmitAntennas = obj.NumTransmitAntennas;
             out.ModulatorConfig = obj.ModulatorConfig;
             
-            % The obj.TimeDuration and obj.SampleRate are redefined in
+            % The obj.SampleRate are redefined in
             % OFDM, SCDMA and OTFS
-            out.TimeDuration = obj.TimeDuration;
             out.SampleRate = obj.SampleRate;
+            out.TimeDuration = size(y, 1) / obj.SampleRate;
             out.SamplePerFrame = size(y, 1);
             
         end
         
     end
     
+end
+
+
+function y = genOSTBCWithX(ostbc, x)
+
+rr = floor(ostbc.SymbolRate * 8);
+valid_len = floor(size(x, 1) / rr);
+valid_len = valid_len * rr;
+y = ostbc(x(1:valid_len, :));
+
 end

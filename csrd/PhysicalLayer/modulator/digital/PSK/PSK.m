@@ -14,7 +14,7 @@ classdef PSK < APSK
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-
+            
             bw = obw(y, obj.SampleRate);
             if obj.NumTransmitAntennas > 1
                 bw = max(bw);
@@ -23,7 +23,7 @@ classdef PSK < APSK
         end
         
     end
-
+    
     methods
         function modulatorHandle = genModulatorHandle(obj)
             
@@ -46,6 +46,6 @@ classdef PSK < APSK
             
         end
     end
-
+    
     
 end

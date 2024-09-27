@@ -1,4 +1,4 @@
-classdef BFMModulation<baseModulation
+classdef BFMModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef BFMModulation<baseModulation
     end
     
     methods
-        function obj = BFMModulation(modulatorParam)
+        function obj = BFMModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -43,7 +43,7 @@ classdef BFMModulation<baseModulation
                 x = obj.sourceHandle();
 
                 % Modulate
-                mod = comm.FMBroadcastModulation(...
+                mod = comm.FMBroadcastModulator(...
                     'AudioSampleRate', obj.sampleRate, ...
                     'SampleRate', obj.sampleRate);
                 y = mod(x);

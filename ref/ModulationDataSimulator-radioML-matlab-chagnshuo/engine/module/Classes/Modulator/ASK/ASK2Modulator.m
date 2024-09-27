@@ -1,4 +1,4 @@
-classdef ASK2Modulation<baseModulation
+classdef ASK2Modulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef ASK2Modulation<baseModulation
     end
     
     methods
-        function obj = ASK2Modulation(modulatorParam)
+        function obj = ASK2Modulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

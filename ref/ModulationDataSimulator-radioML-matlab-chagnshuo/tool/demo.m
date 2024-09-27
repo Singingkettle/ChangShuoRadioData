@@ -1,6 +1,6 @@
 %%
 % =========================================================================
-% Project: ModulationDataSimulator
+% Project: ModulatorDataSimulator
 % Script: Class-> demo
 % Author: Shuo Chang
 % Email: changshuo@bupt.edu.cn

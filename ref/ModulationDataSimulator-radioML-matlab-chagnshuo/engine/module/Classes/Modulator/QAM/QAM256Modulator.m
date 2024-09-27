@@ -1,4 +1,4 @@
-classdef QAM256Modulation<baseModulation
+classdef QAM256Modulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef QAM256Modulation<baseModulation
     end
     
     methods
-        function obj = QAM256Modulation(modulatorParam)
+        function obj = QAM256Modulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

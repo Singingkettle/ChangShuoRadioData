@@ -11,11 +11,10 @@ classdef OFDM < BaseModulator
         ostbc
         secondStageModulator
         NumDataSubcarriers
-        NumSymbols
-        UsedSubCarr
         usePilot
         acrossSymbol
         pilotModulator
+        NumSymbols = 100
     end
     
     methods (Access = protected)
@@ -28,11 +27,21 @@ classdef OFDM < BaseModulator
             x = x(1:obj.NumSymbols * obj.NumDataSubcarriers, :);
             x = reshape(x, [obj.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennas]);
             
-            obj.secondStageModulator.NumSymbols = obj.NumSymbols;
-            if obj.acrossSymbol
-                obj.secondStageModulator.PilotCarrierIndices = obj.secondStageModulator.PilotCarrierIndices(:, 1:obj.NumSymbols, :);
+            % Ensure the object is released before changing non-tunable properties
+            if isLocked(obj.secondStageModulator)
+                release(obj.secondStageModulator);
             end
+            if obj.NumSymbols > obj.secondStageModulator.NumSymbols
+                x = x(:, 1:obj.secondStageModulator.NumSymbols, :);
+                obj.NumSymbols = obj.secondStageModulator.NumSymbols;
+            else
+                obj.secondStageModulator.NumSymbols = obj.NumSymbols;
+            end
+            
             if obj.usePilot
+                if obj.acrossSymbol
+                    obj.secondStageModulator.PilotCarrierIndices = obj.secondStageModulator.PilotCarrierIndices(:, 1:obj.NumSymbols, :);
+                end
                 px = randi([0, obj.ModulatorConfig.pilot.ModulatorOrder - 1], ...
                     size(obj.secondStageModulator.PilotCarrierIndices, 1), obj.NumSymbols, obj.NumTransmitAntennas);
                 px = obj.pilotModulator(px);
@@ -43,26 +52,6 @@ classdef OFDM < BaseModulator
             bw = obj.ModulatorConfig.ofdm.FFTLength / 2 - obj.ModulatorConfig.ofdm.NumGuardBandCarriers;
             bw(1) = bw(1)*-1;
             bw = bw.*obj.ModulatorConfig.ofdm.Subcarrierspacing;
-            obj.TimeDuration = size(y, 1) / obj.SampleRate;
-            
-        end
-        
-        function ostbc = genOSTBC(obj)
-            
-            if obj.NumTransmitAntennas > 1
-                
-                if obj.NumTransmitAntennas == 2
-                    ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennas);
-                else
-                    ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennas, ...
-                        SymbolRate = obj.ModulatorConfig.ostbcSymbolRate);
-                end
-                
-            else
-                ostbc = @(x)obj.placeHolder(x);
-            end
             
         end
         
@@ -82,7 +71,7 @@ classdef OFDM < BaseModulator
             end
             
         end
-
+        
         function pilotModulator = genPilotModulator(obj)
             
             if contains(lower(obj.ModulatorConfig.pilot.mode), "psk")
@@ -97,12 +86,12 @@ classdef OFDM < BaseModulator
                     pilotModulatorOrder, ...
                     'UnitAveragePower', true);
             else
-
+                
                 error('Not implemented %s modulator in OFDM', mode);
             end
             obj.ModulatorConfig.pilot.ModulatorOrder = pilotModulatorOrder;
         end
-
+        
         function secondStageModulator = genSecondStageModulator(obj)
             p = obj.ModulatorConfig.ofdm;
             
@@ -112,9 +101,10 @@ classdef OFDM < BaseModulator
                 InsertDCNull = p.InsertDCNull, ...
                 CyclicPrefixLength = p.CyclicPrefixLength, ...
                 NumTransmitAntennas = obj.NumTransmitAntennas, ...
-                NumSymbols=100000);
-
+                NumSymbols=obj.NumSymbols);
+            
             if isfield(p, 'PilotCarrierIndices')
+                secondStageModulator.PilotInputPort = true;
                 secondStageModulator.PilotCarrierIndices = p.PilotCarrierIndices;
             end
             if p.Windowing
@@ -123,15 +113,7 @@ classdef OFDM < BaseModulator
             end
             
             % Without pilot, the UsedSubCarr is equal NumDataSubcarriers
-            obj.UsedSubCarr = p.FFTLength - sum(secondStageModulator.NumGuardBandCarriers);
-            if p.InsertDCNull
-                obj.UsedSubCarr = obj.UsedSubCarr - 1;
-            end
-            
-            obj.NumDataSubcarriers = obj.UsedSubCarr;
-            if isfield(p, 'PilotCarrierIndices')
-                obj.NumDataSubcarriers = obj.NumDataSubcarriers - size(p.PilotCarrierIndices, 1);
-            end
+            obj.NumDataSubcarriers = info(secondStageModulator).DataInputSize(1);
             
             obj.SampleRate = obj.ModulatorConfig.ofdm.Subcarrierspacing * p.FFTLength;
         end
@@ -141,10 +123,10 @@ classdef OFDM < BaseModulator
     methods
         
         function modulatorHandle = genModulatorHandle(obj)
-            
+            obj.NumTransmitAntennas = 2;
             obj.IsDigital = true;
-            if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
-                if obj.NumTransmitAntennas > 2
+            if obj.NumTransmitAntennas > 2
+                if ~isfield(obj.ModulatorConfig, 'ostbcSymbolRate')
                     obj.ModulatorConfig.ostbcSymbolRate = randi([0, 1])*0.25+0.5;
                 end
             end
@@ -159,30 +141,50 @@ classdef OFDM < BaseModulator
                 obj.ModulatorConfig.ofdm.NumGuardBandCarriers = [0; 0];
                 obj.ModulatorConfig.ofdm.NumGuardBandCarriers(1) = randi([5, 12], 1);
                 obj.ModulatorConfig.ofdm.NumGuardBandCarriers(2) = randi([5, 12], 1);
-                obj.ModulatorConfig.ofdm.InsertDCNull = true;%randsample([true, false], 1);
+                obj.ModulatorConfig.ofdm.InsertDCNull = randsample([true, false], 1);
                 obj.ModulatorConfig.ofdm.CyclicPrefixLength = randi([12, 32], 1);
                 obj.ModulatorConfig.ofdm.Subcarrierspacing = randsample([20, 40], 1)*1e3;
-                obj.usePilot = true; %randsample([true, false], 1);
-                obj.acrossSymbol = randsample([true, false], 1);
+                obj.usePilot = randsample([true, false], 1);
                 if obj.usePilot
+                    obj.acrossSymbol = randsample([true, false], 1);
                     obj.ModulatorConfig.pilot.mode = randsample(["psk", "qam"], 1);
                     if strcmpi(obj.ModulatorConfig.pilot.mode, "psk")
                         obj.ModulatorConfig.pilot.PhaseOffset = rand(1)*2*pi;
                         obj.ModulatorConfig.pilot.SymbolOrder = randsample(["bin", "gray"], 1);
                     end
                     nPilot = randi([4, 32], 1);
-                    validRangeLeft = obj.ModulatorConfig.ofdm.NumGuardBandCarriers(1)+1:floor(obj.ModulatorConfig.ofdm.FFTLength/2); 
-                    validRangeRight = floor(obj.ModulatorConfig.ofdm.FFTLength/2)+2:obj.ModulatorConfig.ofdm.FFTLength-obj.ModulatorConfig.ofdm.NumGuardBandCarriers(2); 
+                    validRangeLeft = obj.ModulatorConfig.ofdm.NumGuardBandCarriers(1)+1:floor(obj.ModulatorConfig.ofdm.FFTLength/2);
+                    validRangeRight = floor(obj.ModulatorConfig.ofdm.FFTLength/2)+2:obj.ModulatorConfig.ofdm.FFTLength-obj.ModulatorConfig.ofdm.NumGuardBandCarriers(2);
                     validRange = cat(2, validRangeLeft, validRangeRight);
-
-                    repeatTimes = obj.NumTransmitAntennas;
-                    if obj.acrossSymbol
-                        repeatTimes = repeatTimes * 100000;
+                    if obj.NumTransmitAntennas > 1
+                        % 这块为了避免出bug，针对多天线场景，导频的设置，暂时不考虑
+                        % 每个符号的导频都不一致, 但是保证每个天线上的导频不一致
+                        % To minimize interference between transmissions
+                        % across more than one transmit antenna, the pilot
+                        % indices per symbol must be mutually distinct
+                        % across the antennas.
+                        if floor(length(validRange) / nPilot) < obj.NumTransmitAntennas
+                            obj.NumTransmitAntennas = floor(length(validRange) / nPilot);
+                        end
+                        validRange = shuffleArray(validRange);
+                        validRange = sort(validRange(1:nPilot*obj.NumTransmitAntennas));
+                        PilotCarrierIndices = reshape(validRange, nPilot, obj.NumTransmitAntennas);
+                        obj.acrossSymbol = false;
+                    else
+                        repeatTimes = 1;
+                        if obj.acrossSymbol
+                            repeatTimes = repeatTimes * obj.NumSymbols;
+                        end
+                        PilotCarrierIndices = zeros(repeatTimes, nPilot);
+                        valid_num = 0;
+                        while valid_num < repeatTimes
+                            p = sort(randsample(validRange, nPilot));
+                            valid_num = valid_num + 1;
+                            PilotCarrierIndices(valid_num, :) = p;
+                        end
+                        PilotCarrierIndices = PilotCarrierIndices';
                     end
-                    PilotCarrierIndices = zeros(nPilot, repeatTimes);
-                    for i=1:repeatTimes
-                        PilotCarrierIndices(:, i) = randsample(validRange, nPilot);
-                    end
+                    
                     obj.ModulatorConfig.ofdm.PilotCarrierIndices = reshape(PilotCarrierIndices, nPilot, [], obj.NumTransmitAntennas);
                 end
                 obj.ModulatorConfig.ofdm.Windowing = randsample([true, false], 1);
@@ -205,8 +207,6 @@ classdef OFDM < BaseModulator
             obj.secondStageModulator = obj.genSecondStageModulator;
             if obj.usePilot
                 obj.secondStageModulator.PilotInputPort = true;
-            end
-            if obj.usePilot
                 obj.pilotModulator = obj.genPilotModulator;
             end
             modulatorHandle = @(x)obj.baseModulator(x);
@@ -214,4 +214,13 @@ classdef OFDM < BaseModulator
         
     end
     
+end
+
+
+function shuffledArray = shuffleArray(array)
+% 生成随机排列的索引数组
+randomIndices = randperm(numel(array));
+
+% 使用随机索引对原数组进行重新排序
+shuffledArray = array(randomIndices);
 end

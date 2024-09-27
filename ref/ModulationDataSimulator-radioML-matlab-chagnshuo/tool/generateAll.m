@@ -1,6 +1,6 @@
 %%
 % =========================================================================
-% Project: ModulationDataSimulator
+% Project: ModulatorDataSimulator
 % Script: Class-> generate
 % Author: Shuo Chang
 % Email: changshuo@bupt.edu.cn
@@ -19,7 +19,7 @@ function generateAll(configFile)
     
     
     for workerIndex = 1:length(paramCells)
-        d = Modulation.create(paramCells{workerIndex});
+        d = Modulator.create(paramCells{workerIndex});
         d();
     end
 end

@@ -18,7 +18,7 @@ classdef CPFSK < GFSK
                 obj.ModulatorConfig.ModulatorIndex = rand(1)*10;
                 obj.ModulatorConfig.InitialPhaseOffset = rand(1)*2*pi;
             end
-
+            
             obj.const = (- (obj.ModulatorOrder - 1):2:(obj.ModulatorOrder - 1))';
             obj.pureModulator = comm.CPFSKModulator( ...
                 ModulationOrder = obj.ModulatorOrder, ...

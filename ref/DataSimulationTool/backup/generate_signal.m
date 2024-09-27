@@ -16,7 +16,7 @@ if lf < hf
     channel.SNR = snr;
 
     src = helperModClassGetSource(modulationTypes(mid), spses(sid), spf, fs);
-    modulator = MyModClassGetModulation(modulationTypes(mid), spses(sid), fs);
+    modulator = MyModClassGetModulator(modulationTypes(mid), spses(sid), fs);
     
     x = src();
     y = modulator(x);

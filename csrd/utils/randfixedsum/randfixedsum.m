@@ -41,9 +41,9 @@ function [x,v] = randfixedsum(n,m,s,a,b)
 
 % Check the arguments.
 if (m~=round(m))|(n~=round(n))|(m<0)|(n<1)
- error('n must be a whole number and m a non-negative integer.')
+    error('n must be a whole number and m a non-negative integer.')
 elseif (s<n*a)|(s>n*b)|(a>=b)
- error('Inequalities n*a <= s <= n*b and a < b must hold.')
+    error('Inequalities n*a <= s <= n*b and a < b must hold.')
 end
 
 % Rescale to a unit cube: 0 <= x(i) <= 1
@@ -59,12 +59,12 @@ w = zeros(n,n+1); w(1,2) = realmax; % Scale for full 'double' range
 t = zeros(n-1,n);
 tiny = 2^(-1074); % The smallest positive matlab 'double' no.
 for i = 2:n
- tmp1 = w(i-1,2:i+1).*s1(1:i)/i;
- tmp2 = w(i-1,1:i).*s2(n-i+1:n)/i;
- w(i,2:i+1) = tmp1 + tmp2;
- tmp3 = w(i,2:i+1) + tiny; % In case tmp1 & tmp2 are both 0,
- tmp4 = (s2(n-i+1:n) > s1(1:i)); % then t is 0 on left & 1 on right
- t(i-1,1:i) = (tmp2./tmp3).*tmp4 + (1-tmp1./tmp3).*(~tmp4);
+    tmp1 = w(i-1,2:i+1).*s1(1:i)/i;
+    tmp2 = w(i-1,1:i).*s2(n-i+1:n)/i;
+    w(i,2:i+1) = tmp1 + tmp2;
+    tmp3 = w(i,2:i+1) + tiny; % In case tmp1 & tmp2 are both 0,
+    tmp4 = (s2(n-i+1:n) > s1(1:i)); % then t is 0 on left & 1 on right
+    t(i-1,1:i) = (tmp2./tmp3).*tmp4 + (1-tmp1./tmp3).*(~tmp4);
 end
 
 % Derive the polytope volume v from the appropriate
@@ -80,12 +80,12 @@ s = repmat(s,1,m);
 j = repmat(k+1,1,m); % For indexing in the t table
 sm = zeros(1,m); pr = ones(1,m); % Start with sum zero & product 1
 for i = n-1:-1:1  % Work backwards in the t table
- e = (rt(n-i,:)<=t(i,j)); % Use rt to choose a transition
- sx = rs(n-i,:).^(1/i); % Use rs to compute next simplex coord.
- sm = sm + (1-sx).*pr.*s/(i+1); % Update sum
- pr = sx.*pr; % Update product
- x(n-i,:) = sm + pr.*e; % Calculate x using simplex coords.
- s = s - e; j = j - e; % Transition adjustment
+    e = (rt(n-i,:)<=t(i,j)); % Use rt to choose a transition
+    sx = rs(n-i,:).^(1/i); % Use rs to compute next simplex coord.
+    sm = sm + (1-sx).*pr.*s/(i+1); % Update sum
+    pr = sx.*pr; % Update product
+    x(n-i,:) = sm + pr.*e; % Calculate x using simplex coords.
+    s = s - e; j = j - e; % Transition adjustment
 end
 x(n,:) = sm + pr.*s; % Compute the last x
 

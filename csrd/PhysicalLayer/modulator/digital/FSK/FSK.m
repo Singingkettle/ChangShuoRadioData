@@ -3,7 +3,7 @@ classdef FSK < BaseModulator
     properties (Access=private)
         freq_sep
     end
-
+    
     properties
         pureModulator
         
@@ -18,7 +18,7 @@ classdef FSK < BaseModulator
             else
                 bw = obw(y, obj.SampleRate);
             end
-
+            
         end
     end
     

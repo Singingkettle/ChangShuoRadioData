@@ -51,8 +51,8 @@ classdef BaseChannel < matlab.System
             end
             
         end
-
-        function out = addMultipathFading(obj, in)
+        
+        function out = addMultipathFading(obj, in, startTime)
             %addMultipathFading Add Rician multipath fading
             %   Y=addMultipathFading(CH,X) adds Rician multipath fading effects
             %   to input, X, based on PathDelays, AveragePathGains, KFactor, and
@@ -63,7 +63,9 @@ classdef BaseChannel < matlab.System
             % Get new path gains
             reset(obj.MultipathChannel)
             % Pass input through the new channel
-            out = obj.MultipathChannel(in);
+            in = gpuArray(in);
+            out = obj.MultipathChannel(in, startTime);
+            out = gather(out);
         end
         
         function resetImpl(obj)

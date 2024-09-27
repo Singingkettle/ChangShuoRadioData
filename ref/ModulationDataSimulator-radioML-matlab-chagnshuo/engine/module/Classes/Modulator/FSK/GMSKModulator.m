@@ -1,4 +1,4 @@
-classdef GMSKModulation<baseModulation
+classdef GMSKModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef GMSKModulation<baseModulation
     end
     
     methods
-        function obj = GMSKModulation(modulatorParam)
+        function obj = GMSKModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -43,7 +43,7 @@ classdef GMSKModulation<baseModulation
                 x = obj.sourceHandle();
 
                 % Modulate
-                mod = comm.GMSKModulation(...
+                mod = comm.GMSKModulator(...
                     'BitInput', true,...
                     'SamplesPerSymbol', obj.samplePerSymbol);                
                 y = step(mod, x);

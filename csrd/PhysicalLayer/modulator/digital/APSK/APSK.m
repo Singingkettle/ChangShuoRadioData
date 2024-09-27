@@ -16,12 +16,11 @@ classdef APSK < BaseModulator
             
             % Pulse shape
             y = filter(obj.filterCoeffs, 1, upsample(x, obj.SamplePerSymbol));
-
+            
             bw = obw(y, obj.SampleRate);
             if obj.NumTransmitAntennas > 1
                 bw = max(bw);
             end
-            
         end
         
     end
@@ -33,25 +32,6 @@ classdef APSK < BaseModulator
             filterCoeffs = rcosdesign(obj.ModulatorConfig.beta, ...
                 obj.ModulatorConfig.span, ...
                 obj.SamplePerSymbol);
-            
-        end
-        
-        function ostbc = genOSTBC(obj)
-            
-            if obj.NumTransmitAntennas > 1
-                
-                if obj.NumTransmitAntennas == 2
-                    ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennas);
-                else
-                    ostbc = comm.OSTBCEncoder( ...
-                        NumTransmitAntennas = obj.NumTransmitAntennas, ...
-                        SymbolRate = obj.ModulatorConfig.ostbcSymbolRate);
-                end
-                
-            else
-                ostbc = @(x)obj.placeHolder(x);
-            end
             
         end
         

@@ -1,4 +1,4 @@
-classdef baseModulation<matlab.System
+classdef baseModulator<matlab.System
     %BASEMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     

@@ -3,7 +3,7 @@ fs = 200e3;                  % Sample rate
 
 
 src = helperModClassGetSource('BPSK', 16, 2*spf, fs);
-modulator = MyModClassGetModulation('BPSK', 16, fs);
+modulator = MyModClassGetModulator('BPSK', 16, fs);
 
 x = src();
 y = modulator(x);

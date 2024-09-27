@@ -1,4 +1,4 @@
-classdef DSBModulation<baseModulation
+classdef DSBModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef DSBModulation<baseModulation
     end
     
     methods
-        function obj = DSBModulation(modulatorParam)
+        function obj = DSBModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

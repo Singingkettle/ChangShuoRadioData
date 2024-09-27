@@ -62,14 +62,14 @@ spf = 4096;                  % Samples per frame
 fs = 200e3;                  % Sample rate
 modulationTypes = categorical(["BPSK", "QPSK", "8PSK", ...
   "16QAM", "64QAM"]);
-addpath('C:\Users\97147\Documents\MATLAB\Examples\R2023a\deeplearning_shared\ModulationClassificationWithDeepLearningExample');
+addpath('C:\Users\97147\Documents\MATLAB\Examples\R2023a\deeplearning_shared\ModulatorClassificationWithDeepLearningExample');
 
 
 for i=1:length(modulationTypes)
     for j=1:length(spses)
         errorRate = comm.ErrorRate(ReceiveDelay=4);
         src = helperModClassGetSource(modulationTypes(i), spses(j), 2*spf, fs);
-        modulator = MyModClassGetModulation(modulationTypes(i), spses(j), fs);
+        modulator = MyModClassGetModulator(modulationTypes(i), spses(j), fs);
         x = src();
         y = modulator(x);
         bw = obw(y, fs);
@@ -79,7 +79,7 @@ for i=1:length(modulationTypes)
         right = floor(length(y) - bw/fs*length(y)/2 - 1);
         tmp(left:right) = 0;
         tmp = ifft(tmp);
-        demodulator = MyModClassGetDeModulation(modulationTypes(i), spses(j), fs);
+        demodulator = MyModClassGetDeModulator(modulationTypes(i), spses(j), fs);
         x_ = demodulator(y);
 
         errStat = errorRate(x,x_);

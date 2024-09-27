@@ -1,5 +1,5 @@
 % =========================================================================
-% Project: ModulationDataSimulator
+% Project: ModulatorDataSimulator
 % Script: Class-> modulator.Factory
 % Author: Shuo Chang
 % Email: changshuo@bupt.edu.cn
@@ -7,7 +7,7 @@
 % Copyright (c) 2020-present, WTI, BUPT.
 % =========================================================================
 
-classdef Modulation < handle
+classdef Modulator < handle
 
     methods(Static)
         helpInfo();

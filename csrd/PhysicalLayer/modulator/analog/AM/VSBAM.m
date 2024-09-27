@@ -25,7 +25,7 @@ classdef VSBAM < DSBSCAM
     methods (Access = protected)
         
         function [y, bw] = baseModulator(obj, x)
-
+            
             SamplePerFrame = length(x);
             
             f = (-SamplePerFrame / 2:SamplePerFrame / 2 - 1) * (obj.SampleRate / SamplePerFrame);
@@ -42,7 +42,7 @@ classdef VSBAM < DSBSCAM
             
             imagP = imag(ifft(ifftshift(imagP)));
             y = complex(x, imagP);
-
+            
         end
         
     end
@@ -56,7 +56,7 @@ classdef VSBAM < DSBSCAM
                 % 15e3 is base on the Audio block's bandwidth (one side = two side /2)
                 obj.ModulatorConfig.fa = (rand(1)*0.01+0.01)*15e3;
             end
-
+            
             obj.IsDigital = false;
             % donot consider multi-tx in analog modulation
             obj.NumTransmitAntennas = 1;

@@ -2,8 +2,8 @@ clc
 clear 
 close all
 
-% Add Modulation Classification with Deep Learning Tool in the environment
-addpath('C:\Users\97147\Documents\MATLAB\Examples\R2022b\deeplearning_shared\ModulationClassificationWithDeepLearningExample');
+% Add Modulator Classification with Deep Learning Tool in the environment
+addpath('C:\Users\97147\Documents\MATLAB\Examples\R2022b\deeplearning_shared\ModulatorClassificationWithDeepLearningExample');
 
 load('D.mat');
 
@@ -58,15 +58,15 @@ channel = MyModClassTestChannel(...
   'MaximumClockOffset', 5, ...
   'CarrierFrequency', 902e6);
 
-numModulationTypes = length(modulationTypes);
+numModulatorTypes = length(modulationTypes);
 tic
 transDelay = 50;
 
 
 i = 0;
-two_set = zeros(numModulationTypes*(numModulationTypes+1)/2, 2);
-for modType1 = 1:numModulationTypes
-    for modType2 = modType1:numModulationTypes
+two_set = zeros(numModulatorTypes*(numModulatorTypes+1)/2, 2);
+for modType1 = 1:numModulatorTypes
+    for modType2 = modType1:numModulatorTypes
         i = i+1;
         two_set(i, 1) = modType1;
         two_set(i, 2) = modType2;
@@ -87,12 +87,12 @@ for index = 1:size(two_set, 1)
     label2 = modulationTypes_index(two_set(index, 2));
     dataSrc1 = helperModClassGetSource( ...
         modulationTypes(two_set(index, 1)), sps, spf, fs);
-    modulator1 = helperModClassGetModulation( ...
+    modulator1 = helperModClassGetModulator( ...
         modulationTypes(two_set(index, 1)), sps, fs);
     
     dataSrc2 = helperModClassGetSource( ...
         modulationTypes(two_set(index, 2)), sps, spf, fs);
-    modulator2 = helperModClassGetModulation( ...
+    modulator2 = helperModClassGetModulator( ...
         modulationTypes(two_set(index, 2)), sps, fs);
    
     for p=1:numFramesPerModType

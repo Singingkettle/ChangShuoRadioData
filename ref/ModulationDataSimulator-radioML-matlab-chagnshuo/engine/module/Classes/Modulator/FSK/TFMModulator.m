@@ -1,4 +1,4 @@
-classdef TFMModulation<baseModulation
+classdef TFMModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -7,7 +7,7 @@ classdef TFMModulation<baseModulation
     end
     
     methods
-        function obj = TFMModulation(modulatorParam)
+        function obj = TFMModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -43,10 +43,10 @@ classdef TFMModulation<baseModulation
 
                 % Modulate
                 M = 2;
-                mod = comm.CPMModulation(...
-                    'ModulationOrder', M, ...
+                mod = comm.CPMModulator(...
+                    'ModulatorOrder', M, ...
                     'FrequencyPulse', 'Tamed FM', ...
-                    'ModulationIndex', 1, ...
+                    'ModulatorIndex', 1, ...
                     'SamplesPerSymbol', obj.samplePerSymbol);
                 meanM = mean(0:M-1);
                 y = mod(2*(x-meanM));

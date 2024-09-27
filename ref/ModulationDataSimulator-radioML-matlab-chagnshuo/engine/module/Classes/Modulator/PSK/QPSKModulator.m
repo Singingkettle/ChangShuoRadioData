@@ -1,4 +1,4 @@
-classdef QPSKModulation<baseModulation
+classdef QPSKModulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef QPSKModulation<baseModulation
     end
     
     methods
-        function obj = QPSKModulation(modulatorParam)
+        function obj = QPSKModulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

@@ -1,4 +1,4 @@
-classdef PSK16Modulation<baseModulation
+classdef PSK16Modulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -8,7 +8,7 @@ classdef PSK16Modulation<baseModulation
     end
     
     methods
-        function obj = PSK16Modulation(modulatorParam)
+        function obj = PSK16Modulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             

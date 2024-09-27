@@ -1,8 +1,8 @@
 
 function simulate_signal(worker_id, num_worker)
 
-% Add Modulation Classification with Deep Learning Tool in the environment
-addpath('C:\Users\97147\Documents\MATLAB\Examples\R2022b\deeplearning_shared\ModulationClassificationWithDeepLearningExample');
+% Add Modulator Classification with Deep Learning Tool in the environment
+addpath('C:\Users\97147\Documents\MATLAB\Examples\R2022b\deeplearning_shared\ModulatorClassificationWithDeepLearningExample');
 
 rng(123+worker_id)
 

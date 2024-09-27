@@ -39,12 +39,12 @@
                           v:shadowOffsetY="-8.50394"/>
         <g id="shape1-1" v:mID="1" v:groupContext="shape" transform="translate(170.454,-170.454)">
 			<title>工作表.1</title>
-            <desc>Modulation</desc>
+            <desc>Modulator</desc>
             <v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
             <v:textRect cx="85.0394" cy="227.522" width="170.08" height="113.386"/>
             <rect x="0" y="170.829" width="170.079" height="113.386" class="st1"/>
             <text x="34.38" y="234.72" class="st2" v:langID="2052"><v:paragraph v:horizAlign="1"/>
-                <v:tabList/>Modulation</text>		</g>
+                <v:tabList/>Modulator</text>		</g>
         <g id="shape2-4" v:mID="2" v:groupContext="shape" transform="translate(0.375,-0.375)">
 			<title>工作表.2</title>
             <desc>Source</desc>

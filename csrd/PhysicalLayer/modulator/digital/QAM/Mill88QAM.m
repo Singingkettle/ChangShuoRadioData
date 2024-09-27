@@ -19,7 +19,7 @@ classdef Mill88QAM < APSK
     end
     
     methods
-
+        
         function modulatorHandle = genModulatorHandle(obj)
             
             if ~isfield(obj.ModulatorConfig, "beta")
@@ -38,6 +38,6 @@ classdef Mill88QAM < APSK
             
         end
         
-   end
-
+    end
+    
 end

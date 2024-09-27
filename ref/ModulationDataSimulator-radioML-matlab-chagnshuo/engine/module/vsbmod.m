@@ -8,7 +8,7 @@ function y = vsbmod(x, Fc, Fs)
 wcut = 0.05;    % normalized cutoff frequency for LPF
 P = 5;          % order of LPF
 %
-% Modulation (generation) of VSB signal
+% Modulator (generation) of VSB signal
 %
 [B,A] = butter(P,wcut);    % low-pass Butterworth filter of order P
                           % and normalized cutoff frequency wcut.

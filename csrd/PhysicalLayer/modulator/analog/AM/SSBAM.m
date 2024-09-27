@@ -3,7 +3,7 @@ classdef SSBAM < DSBSCAM
     methods (Access = protected)
         
         function [y, bw] = baseModulator(obj, x)
-
+            
             if strcmp(obj.ModulatorConfig.mode, 'upper')
                 y = complex(x, imag(hilbert(x)));
                 bw = [0, obw(x, obj.SampleRate)];
@@ -17,7 +17,7 @@ classdef SSBAM < DSBSCAM
     end
     
     methods
-    
+        
         function modulatorHandle = genModulatorHandle(obj)
             
             if ~isfield(obj.ModulatorConfig, 'mode')

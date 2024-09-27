@@ -1,4 +1,4 @@
-classdef FSK4Modulation<baseModulation
+classdef FSK4Modulator<baseModulator
     %BPSKMODULATOR �˴���ʾ�йش����ժҪ
     %   �˴���ʾ��ϸ˵��
     
@@ -9,7 +9,7 @@ classdef FSK4Modulation<baseModulation
     end
     
     methods
-        function obj = FSK4Modulation(modulatorParam)
+        function obj = FSK4Modulator(modulatorParam)
             %BPSKMODULATOR ��������ʵ��
             %   �˴���ʾ��ϸ˵��
             
@@ -47,8 +47,8 @@ classdef FSK4Modulation<baseModulation
                 M = 4;
 
                 % Modulate
-                mod = comm.FSKModulation(...
-                    'ModulationOrder', M, ...
+                mod = comm.FSKModulator(...
+                    'ModulatorOrder', M, ...
                     'FrequencySeparation', 0.5 * obj.symbolRate, ...
                     'SamplesPerSymbol', obj.samplePerSymbol, ...
                     'SymbolRate', obj.symbolRate);

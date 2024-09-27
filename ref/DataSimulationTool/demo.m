@@ -6,7 +6,7 @@ spses = [10, 12, 15];        % Set of samples per symbol
 spf = 120000;                  % Samples per frame
 sr = 900e6;                  % Sample rate
 
-% Modulation set
+% Modulator set
 modulationTypes = ["BPSK", "QPSK", "8PSK", "16QAM", "64QAM"];
 
 % Channel set

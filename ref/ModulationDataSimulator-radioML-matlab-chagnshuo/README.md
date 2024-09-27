@@ -1,4 +1,4 @@
-## Modulation Data Simulator
+## Modulator Data Simulator
 
 With the help of this project , You can simulate different kinds of data for modulation classification and RF.
 Surprisingly, you can start multi-process to generate data for speed consideration. Cheers.
@@ -14,7 +14,7 @@ There are mainly three kinds of Classes to control the generation process. Their
 
 ![relationship](./img/relationship.svg)
 
-The whole generation pipeline is defined in the ModulationClass file, for example **BPSKModulation.m**.:
+The whole generation pipeline is defined in the ModulatorClass file, for example **BPSKModulator.m**.:
 
 ```matlab
     methods(Access = protected)
@@ -59,7 +59,7 @@ is ok.
 Before you get start, you can glance the whole project by running the [demo.m](./tool/demo.m) script.
 
 ```bash
-cd {PROJECT_FOLDER}/ModulationDataSimulator/tool
+cd {PROJECT_FOLDER}/ModulatorDataSimulator/tool
 YOUR_MATLAB_INSTALL_FOLDER/bin/matlab -nosplash -r "run demo.m" 
 ```
 
@@ -72,7 +72,7 @@ column is real data. The second column is imag data.
 
 ```yaml
 # The parameter filePrefix sets the folder location, where the generated data should be saved. 
-filePrefix: 'D:\Projects\AMC\ModulationDataSimulator\data\'
+filePrefix: 'D:\Projects\AMC\ModulatorDataSimulator\data\'
 # The parameter modulatorType defines the different modulators.
 modulatorType: ['BPSK', 'QPSK']
 ```
@@ -80,12 +80,12 @@ modulatorType: ['BPSK', 'QPSK']
 2. Run the bash script to start generation:
 
 ```bash
-cd {PROJECT_FOLDER}/ModulationDataSimulator/tool
+cd {PROJECT_FOLDER}/ModulatorDataSimulator/tool
 # The config file path is defined in the first step.
 bash multi.sh 
 ```
 
-## Add New Modulation
+## Add New Modulator
 
 You can add new modulator very simple. There are two steps:
 
@@ -129,16 +129,16 @@ You can add new modulator very simple. There are two steps:
       end
       ```
 
-2. Add new **modulator** class in the folder "engine/module/Classes/Modulation".
+2. Add new **modulator** class in the folder "engine/module/Classes/Modulator".
 
     * Make sure the new modulator belongs to PSK or other types. If it cannot be classified, you should make new folder:
 
       ```bash
       mkdir NEW_FOLDER
       ```
-    * Write new class script "NEWModulation.m", for example:
+    * Write new class script "NEWModulator.m", for example:
       ```matlab
-      classdef BPSKModulation<baseModulation
+      classdef BPSKModulator<baseModulator
           %BPSKMODULATOR 此处显示有关此类的摘要
           %   此处显示详细说明
           
@@ -156,7 +156,7 @@ You can add new modulator very simple. There are two steps:
           end
           
           methods
-              function obj = BPSKModulation(modulatorParam)
+              function obj = BPSKModulator(modulatorParam)
                   %BPSKMODULATOR 构造此类的实例
                   %   此处显示详细说明
                   
