@@ -65,7 +65,7 @@ classdef SCFDMA < OFDM
                 end
                 obj.ModulatorConfig.scfdma.FFTLength = randsample([128, 256, 512, 1024, 2048], 1);
                 obj.ModulatorConfig.scfdma.CyclicPrefixLength = randi([12, 32], 1);
-                obj.ModulatorConfig.scfdma.Subcarrierspacing = randsample([20, 40], 1)*1e3;
+                obj.ModulatorConfig.scfdma.Subcarrierspacing = randsample([2, 4], 1)*1e2;
                 obj.ModulatorConfig.scfdma.SubcarrierMappingInterval = randi([1, 2], 1);
                 maxNumDataSubcarriers = fix((obj.ModulatorConfig.scfdma.FFTLength - 1)/obj.ModulatorConfig.scfdma.SubcarrierMappingInterval)+1;
                 % 48 is a number randomly selected

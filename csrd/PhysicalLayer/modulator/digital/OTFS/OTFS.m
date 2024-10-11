@@ -21,20 +21,20 @@ classdef OTFS < BaseModulator
             x = reshape(x, [obj.ModulatorConfig.otfs.DelayLength, obj.NumSymbols, obj.NumTransmitAntennas]);
             y = obj.secondStageModulator(x);
             
-            bw = obw(y, obj.SampleRate, [], 98.5);
-            bw = max(bw);
-            scale_val = 2;
-            src = dsp.SampleRateConverter( ...
-                Bandwidth=bw, ...
-                InputSampleRate=obj.SampleRate, ...
-                OutputSampleRate=obj.SampleRate*scale_val, ...
-                StopbandAttenuation=50);
-            y1 = src(y);
-            [delay, ~, ~] = outputDelay(src, Fc=0);
-            y1 = circshift(y1, -fix(delay*(obj.SampleRate*scale_val)));
-            % Delete the dealy part, the 3 is hand value to ensure the
-            % delay part has been removed completely.
-            y = y1(1:end-obj.ModulatorConfig.otfs.DelayLength*scale_val*3, :);
+            % bw = obw(y, obj.SampleRate, [], 98.5);
+            % bw = max(bw);
+            % scale_val = 1.5;
+            % src = dsp.SampleRateConverter( ...
+            %     Bandwidth=bw, ...
+            %     InputSampleRate=obj.SampleRate, ...
+            %     OutputSampleRate=obj.SampleRate*scale_val, ...
+            %     StopbandAttenuation=50);
+            % y1 = src(y);
+            % [delay, ~, ~] = outputDelay(src, Fc=0);
+            % y1 = circshift(y1, -fix(delay*(obj.SampleRate*scale_val)));
+            % % Delete the dealy part, the 3 is hand value to ensure the
+            % % delay part has been removed completely.
+            % y = y1(1:end-obj.ModulatorConfig.otfs.DelayLength*scale_val*3, :);
             % src = dsp.FIRRateConverter(2,1);
             % [SRCoutMag,SRCFreq] = freqzmr(src);
             % plot(SRCFreq/1e3,db(SRCoutMag));
@@ -49,8 +49,10 @@ classdef OTFS < BaseModulator
             % signalAnalyzer(y, 'SampleRate', obj.SampleRate, 'StartTime', 0);
             % signalAnalyzer(y1, 'SampleRate', obj.SampleRate*scale_val, 'StartTime', -delay);
             % signalAnalyzer(y2, 'SampleRate', obj.SampleRate*scale_val, 'StartTime', ty(1));
-            bw = obj.ModulatorConfig.otfs.DelayLength * obj.ModulatorConfig.otfs.Subcarrierspacing;
-            obj.SampleRate = obj.SampleRate*scale_val;
+            % 这里面计算带宽的数字8是一个经验值，只是为了保证进入发射机后，进行采样速率转换的时候不报警告信息
+            % 这个警告信息是由于带宽和采样速率太接近导致的
+            bw = (obj.ModulatorConfig.otfs.DelayLength-8) * obj.ModulatorConfig.otfs.Subcarrierspacing;
+            % obj.SampleRate = obj.SampleRate*scale_val;
         end
         
         
@@ -100,7 +102,7 @@ classdef OTFS < BaseModulator
                 obj.ModulatorConfig.otfs.padType = randsample(["CP", "ZP", "RZP", "RCP", "NONE"], 1);
                 obj.ModulatorConfig.otfs.padLen = randi([12, 32], 1);
                 obj.ModulatorConfig.otfs.DelayLength = randsample([128, 256, 512, 1024, 2048], 1);
-                obj.ModulatorConfig.otfs.Subcarrierspacing = randsample([20, 40], 1)*1e3;
+                obj.ModulatorConfig.otfs.Subcarrierspacing = randsample([2, 4], 1)*1e2;
             end
             obj.firstStageModulator = obj.genFirstStageModulator;
             obj.secondStageModulator = obj.genSecondStageModulator;

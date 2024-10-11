@@ -143,7 +143,7 @@ classdef OFDM < BaseModulator
                 obj.ModulatorConfig.ofdm.NumGuardBandCarriers(2) = randi([5, 12], 1);
                 obj.ModulatorConfig.ofdm.InsertDCNull = randsample([true, false], 1);
                 obj.ModulatorConfig.ofdm.CyclicPrefixLength = randi([12, 32], 1);
-                obj.ModulatorConfig.ofdm.Subcarrierspacing = randsample([20, 40], 1)*1e3;
+                obj.ModulatorConfig.ofdm.Subcarrierspacing = randsample([2, 4], 1)*1e2;
                 obj.usePilot = randsample([true, false], 1);
                 if obj.usePilot
                     obj.acrossSymbol = randsample([true, false], 1);

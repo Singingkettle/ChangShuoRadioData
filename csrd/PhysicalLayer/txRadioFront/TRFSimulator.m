@@ -19,7 +19,7 @@ classdef TRFSimulator < matlab.System
         
         AntennaEfficiency (1, 1) {mustBePositive, mustBeReal} = 0.5
         TransmitAntennaDiameter  (1, 1) {mustBePositive, mustBeReal} = 0.4
-        OutputPower (1, 1) {mustBeReal} = -100 % dBm
+        OutputPower (1, 1) {mustBeReal} = -10 % dBm
         % Master clock rate, specified as a scalar in Hz. The master clock
         % rate is the A/D and D/A clock rate. The valid range of values for
         % this property depends on the radio platform that is connected.
@@ -27,10 +27,10 @@ classdef TRFSimulator < matlab.System
         % Please refer:
         % https://www.mathworks.com/help/comm/usrpradio/ug/sdrutransmitter.html
         
-        MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6;
-        DCOffset {mustBeReal} = -50;
+        MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6
+        DCOffset {mustBeReal} = -50
         
-        TxSiteConfig = false;
+        TxSiteConfig = false
         IqImbalanceConfig struct
         PhaseNoiseConfig struct
         MemoryLessNonlinearityConfig struct
@@ -70,7 +70,7 @@ classdef TRFSimulator < matlab.System
                 end
             end
         end
-        
+
         function MemoryLessNonlinearity = genMemoryLessNonlinearity(obj)
             
             if strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Cubic polynomial')
@@ -152,14 +152,9 @@ classdef TRFSimulator < matlab.System
                 Bandwidth=bw, ...
                 InputSampleRate=x.SampleRate, ...
                 OutputSampleRate=obj.MasterClockRate, ...
-                StopbandAttenuation=100);
+                StopbandAttenuation=80);
             y = src(x.data);
-            % Then pass the rated signal through a low pass filter, to
-            % supress the compenents of high frequency
-            y = lowpass(y, max(abs(x.BandWidth)), obj.MasterClockRate, ...
-                ImpulseResponse = "fir", Steepness = 0.9, ...
-                StopbandAttenuation=100);
-            
+
             % y = x.data;
             % After that, add impairments
             y = obj.IQImbalance(y);
@@ -168,6 +163,13 @@ classdef TRFSimulator < matlab.System
             % obj.PhaseNoise.SampleRate = obj.MasterClockRate;
             % y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
+
+            % Then pass the rated signal through a low pass filter, to
+            % supress the compenents of high frequency
+            y = lowpass(y, max(abs(x.BandWidth)), obj.MasterClockRate, ...
+                ImpulseResponse = "fir", Steepness = 0.9, ...
+                StopbandAttenuation=100);
+
             % Transform the baseband to passband
             UpConverter = dsp.SineWave( ...
                 Amplitude=1, ...
@@ -181,7 +183,7 @@ classdef TRFSimulator < matlab.System
             
             % To control the output power, we refer：
             % https://www.mathworks.com/help/comm/ref/comm.thermalnoise-system-object.html
-            y = (10^((obj.OutputPower-30)/20)) * y;
+            % y = (10^((obj.OutputPower-30)/20)) * y;
             
             out = x;
             out.data = y;
@@ -194,6 +196,7 @@ classdef TRFSimulator < matlab.System
             out.SamplePerFrame = size(y, 1);
             out.TimeDuration = out.SamplePerFrame / out.SampleRate;
             out.CarrierFrequency = x.CarrierFrequency;
+            out.TxSiteConfig = obj.TxSiteConfig;
         end
         
     end

@@ -63,9 +63,7 @@ classdef BaseChannel < matlab.System
             % Get new path gains
             reset(obj.MultipathChannel)
             % Pass input through the new channel
-            in = gpuArray(in);
             out = obj.MultipathChannel(in, startTime);
-            out = gather(out);
         end
         
         function resetImpl(obj)
