@@ -10,7 +10,7 @@ classdef emitter_system < handle
         rolloff = 0.25;
         span = 10;
         sps = 8;
-        % modulator
+        % modulate
         ampImb = 3;
         phImb = 3;
         dcOffset = 5;
@@ -64,7 +64,7 @@ classdef emitter_system < handle
                 if isfield(txParams,'rolloff')
                     obj.rolloff = txParams.rolloff;
                 end
-                % modulator
+                % modulate
                 if isfield(txParams,'ampImb')
                     obj.ampImb = txParams.ampImb;
                 end

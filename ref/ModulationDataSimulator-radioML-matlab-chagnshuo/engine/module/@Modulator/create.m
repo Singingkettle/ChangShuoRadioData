@@ -1,5 +1,5 @@
 function modulatorHandle = create(modulatorParam)
-    % Return the modulator handle based the modulatorParam.
+    % Return the modulate handle based the modulatorParam.
 modulatorClassName = [modulatorParam.modulatorType 'Modulator'];
 classPointer = str2func(modulatorClassName);
 modulatorHandle = classPointer(modulatorParam);

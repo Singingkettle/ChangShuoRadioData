@@ -82,7 +82,7 @@ y = qamdemod(x,64,'UnitAveragePower',true);
 end
 
 function y = pam4Modulator(x,sps)
-%pam4Modulator PAM4 modulator with pulse shaping
+%pam4Modulator PAM4 modulate with pulse shaping
 %   Y = pam4Modulator(X,SPS) PAM4 modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 3]. The root-raised cosine filter has a
@@ -101,7 +101,7 @@ y = txfilter(syms);
 end
 
 function y = gfskModulator(x,sps)
-%gfskModulator GFSK modulator
+%gfskModulator GFSK modulate
 %   Y = gfskModulator(X,SPS) GFSK modulates the input X and returns the
 %   signal Y. X must be a column vector of values in the set [0 1]. The
 %   BT product is 0.35 and the modulation index is 1. The output signal
@@ -121,7 +121,7 @@ y = mod(2*(x-meanM));
 end
 
 function y = cpfskModulator(x,sps)
-%cpfskModulator CPFSK modulator
+%cpfskModulator CPFSK modulate
 %   Y = cpfskModulator(X,SPS) CPFSK modulates the input X and returns
 %   the signal Y. X must be a column vector of values in the set [0 1].
 %   the modulation index is 0.5. The output signal Y has unit power.
@@ -137,7 +137,7 @@ y = mod(2*(x-meanM));
 end
 
 function y = bfmModulator(x,fs)
-%bfmModulator Broadcast FM modulator
+%bfmModulator Broadcast FM modulate
 %   Y = bfmModulator(X,FS) broadcast FM modulates the input X and returns
 %   the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The frequency deviation is 75 kHz
@@ -151,7 +151,7 @@ y = mod(x);
 end
 
 function y = dsbamModulator(x,fs)
-%dsbamModulator Double sideband AM modulator
+%dsbamModulator Double sideband AM modulate
 %   Y = dsbamModulator(X,FS) double sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.
@@ -160,7 +160,7 @@ y = ammod(x,50e3,fs);
 end
 
 function y = ssbamModulator(x,fs)
-%ssbamModulator Single sideband AM modulator
+%ssbamModulator Single sideband AM modulate
 %   Y = ssbamModulator(X,FS) single sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.

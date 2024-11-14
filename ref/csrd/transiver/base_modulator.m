@@ -240,7 +240,7 @@ end
 
 
 function y = cpfskModulator(x,sps)
-%cpfskModulator CPFSK modulator
+%cpfskModulator CPFSK modulate
 %   Y = cpfskModulator(X,sps, filterCoeffs) CPFSK modulates the input X and returns
 %   the signal Y. X must be a column vector of values in the set [0 1].
 %   the modulation index is 0.5. The output signal Y has unit power.
@@ -257,20 +257,20 @@ y = mod(2*(x-meanM));
 end
 
 function y = fmModulator(x,fs)
-%fmModulator Broadcast FM modulator
+%fmModulator Broadcast FM modulate
 
 y = fmmod(x, 50e3, fs, 0);
 end
 
 function y = pmModulator(x,fs)
-%pmModulator Broadcast PM modulator
+%pmModulator Broadcast PM modulate
 
 y = pmmod(x, 50e3, fs, 0);
 end
 
 
 function y = dsbamModulator(x,fs, is_sc)
-%dsbamModulator Double sideband AM modulator
+%dsbamModulator Double sideband AM modulate
 %   Y = dsbamModulator(X,FS) double sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.
@@ -283,7 +283,7 @@ end
 end
 
 function y = vsbamModulator(x,fs)
-%vsbamModulator Double sideband AM modulator
+%vsbamModulator Double sideband AM modulate
 
 f = -fs/2:fs/(length(x)-1):fs/2;
 f = arrayfun(@(x) vsb_filer(x, 50e3, 30e3), f);
@@ -298,7 +298,7 @@ end
 
 
 function y = ssbamModulator(x,fs, is_upper, is_sc)
-%ssbamModulator Single sideband AM modulator
+%ssbamModulator Single sideband AM modulate
 %   Y = ssbamModulator(X,FS) single sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.

@@ -1,6 +1,6 @@
 % =========================================================================
 % Project: ModulatorDataSimulator
-% Script: Class-> modulator.Factory
+% Script: Class-> modulate.Factory
 % Author: Shuo Chang
 % Email: changshuo@bupt.edu.cn
 % Date: 2020-05-21

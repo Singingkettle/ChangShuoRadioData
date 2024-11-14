@@ -1,6 +1,6 @@
 function modulator = MyModClassGetModulator(modType, sps, fs)
 %helperModClassGetModulator Modulator function selector
-%   MOD = helperModClassGetModulator(TYPE,SPS,FS) returns the modulator
+%   MOD = helperModClassGetModulator(TYPE,SPS,FS) returns the modulate
 %   function handle MOD based on TYPE. SPS is the number of samples per
 %   symbol and FS is the sample rate.
 %   
@@ -35,7 +35,7 @@ end
 end
 
 function y = bpskModulator(x,sps)
-%bpskModulator BPSK modulator with pulse shaping
+%bpskModulator BPSK modulate with pulse shaping
 %   Y = bpskModulator(X,SPS) BPSK modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 1]. The root-raised cosine filter has a
@@ -53,7 +53,7 @@ y = txfilter(syms);
 end
 
 function y = qpskModulator(x,sps)
-%qpskModulator QPSK modulator with pulse shaping
+%qpskModulator QPSK modulate with pulse shaping
 %   Y = qpskModulator(X,SPS) QPSK modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 3]. The root-raised cosine filter has a
@@ -71,7 +71,7 @@ y = txfilter(syms);
 end
 
 function y = psk8Modulator(x,sps)
-%psk8Modulator 8-PSK modulator with pulse shaping
+%psk8Modulator 8-PSK modulate with pulse shaping
 %   Y = psk8Modulator(X,SPS) 8-PSK modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 7]. The root-raised cosine filter has a
@@ -90,7 +90,7 @@ y = txfilter(syms);
 end
 
 function y = qam16Modulator(x,sps)
-%qam16Modulator 16-QAM modulator with pulse shaping
+%qam16Modulator 16-QAM modulate with pulse shaping
 %   Y = qam16Modulator(X,SPS) 16-QAM modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 15]. The root-raised cosine filter has a
@@ -109,7 +109,7 @@ y = txfilter(syms);
 end
 
 function y = qam64Modulator(x,sps)
-%qam64Modulator 64-QAM modulator with pulse shaping
+%qam64Modulator 64-QAM modulate with pulse shaping
 %   Y = qam64Modulator(X,SPS) 64-QAM modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 63]. The root-raised cosine filter has a
@@ -127,7 +127,7 @@ y = txfilter(syms);
 end
 
 function y = pam4Modulator(x,sps)
-%pam4Modulator PAM4 modulator with pulse shaping
+%pam4Modulator PAM4 modulate with pulse shaping
 %   Y = pam4Modulator(X,SPS) PAM4 modulates the input X, and returns the
 %   root-raised cosine pulse shaped signal Y. X must be a column vector
 %   of values in the set [0 3]. The root-raised cosine filter has a
@@ -146,7 +146,7 @@ y = txfilter(syms);
 end
 
 function y = gfskModulator(x,sps)
-%gfskModulator GFSK modulator
+%gfskModulator GFSK modulate
 %   Y = gfskModulator(X,SPS) GFSK modulates the input X and returns the
 %   signal Y. X must be a column vector of values in the set [0 1]. The
 %   BT product is 0.35 and the modulation index is 1. The output signal
@@ -166,7 +166,7 @@ y = mod(2*(x-meanM));
 end
 
 function y = cpfskModulator(x,sps)
-%cpfskModulator CPFSK modulator
+%cpfskModulator CPFSK modulate
 %   Y = cpfskModulator(X,SPS) CPFSK modulates the input X and returns
 %   the signal Y. X must be a column vector of values in the set [0 1].
 %   the modulation index is 0.5. The output signal Y has unit power.
@@ -182,7 +182,7 @@ y = mod(2*(x-meanM));
 end
 
 function y = bfmModulator(x,fs)
-%bfmModulator Broadcast FM modulator
+%bfmModulator Broadcast FM modulate
 %   Y = bfmModulator(X,FS) broadcast FM modulates the input X and returns
 %   the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The frequency deviation is 75 kHz
@@ -196,7 +196,7 @@ y = mod(x);
 end
 
 function y = dsbamModulator(x,fs)
-%dsbamModulator Double sideband AM modulator
+%dsbamModulator Double sideband AM modulate
 %   Y = dsbamModulator(X,FS) double sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.
@@ -205,7 +205,7 @@ y = ammod(x,50e3,fs);
 end
 
 function y = ssbamModulator(x,fs)
-%ssbamModulator Single sideband AM modulator
+%ssbamModulator Single sideband AM modulate
 %   Y = ssbamModulator(X,FS) single sideband AM modulates the input X and
 %   returns the signal Y at the sample rate FS. X must be a column vector of
 %   audio samples at the sample rate FS. The IF frequency is 50 kHz.
