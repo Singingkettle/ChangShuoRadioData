@@ -14,8 +14,8 @@ Basically, a signal data recognition pipline is:
 
 v0.0.1 was released in 23/01/2024, which was located in ref/DataSimulationTool
 you can run generate.m to simulate wireless data, and
-use [ChangShuoRadioRecognition](https://github.com/Singingkettle/ChangShuoRadioRecognition) to do a joint DL model for
-radio detection and modulation classification
+can use [ChangShuoRadioRecognition](https://github.com/Singingkettle/ChangShuoRadioRecognition) to do a joint DL model for
+radio detection and modulation classification. This dataset is used in the TWC paper["Joint Signal Detection and Automatic Modulation Classification via Deep Learning"](https://arxiv.org/abs/2405.00736)
 
 # Notes
 
