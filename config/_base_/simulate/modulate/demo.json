@@ -1,0 +1,20 @@
+{
+  "analog": {
+    "AM": 1,
+    "FM": 1,
+    "PM": 1,
+    "SSBAM": 1,
+    "DSBAM": 1,
+    "DSBSCAM": 1,
+    "VSBAM": 1
+  },
+  "digital": {
+    "FSK": [
+      2,
+      4,
+      8,
+      16,
+      32
+    ]
+  }
+}

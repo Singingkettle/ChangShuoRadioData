@@ -1,0 +1,88 @@
+{
+    "runner": {
+        "handle": "runner",
+        "NumFrames": 1,
+        "Seed": 1234,
+        "LogLevel": "INFO",
+        "Data": {
+            "SaveFolder": "../results"
+        },
+        "Physical": {
+            "handle": "simulate.ChangShuo",
+            "NumMaxTx": 8,
+            "NumMaxRx": 8,
+            "NumMaxTransmitTimes": 4,
+            "NumTransmitAntennasRange": [
+                1,
+                4
+            ],
+            "NumReceiveAntennasRange": [
+                1,
+                4
+            ],
+            "ADRatio": 10,
+            "SymbolRateRange": [
+                30e3,
+                50e3
+            ],
+            "SymbolRateStep": 1e3,
+            "SamplePerSymbolRange": [
+                2,
+                8
+            ],
+            "MessageLengthRange": [
+                50000,
+                100000
+            ],
+            "TxMasterClockRateRange": [
+                100e4,
+                150e4
+            ],
+            "Message": {
+                "handle": "simulate.physical.Message",
+                "AudioFile": "../data/audio_mix_441.wav"
+            },
+            "Modulate": {
+                "handle": "simulate.physical.Modulate",
+                "Config": "../config/_base_/simulate/modulate/modulate.json"
+            },
+            "Behavior": {
+                "handle": "simulate.physical.behavior.Tiling",
+                "IsOverlap": true,
+                "FrequencyOverlapRadioRange": [
+                    0,
+                    0.15
+                ]
+            },
+            "Transmit": {
+                "handle": "simulate.physical.Transmit",
+                "Config": "../config/_base_/simulate/radiofront/transmit.json"
+            },
+            "Channel": {
+                "handle": "simulate.physical.Channel",
+                "MaxPaths": 3,
+                "MaxDistance": {
+                    "Ratio": 50,
+                    "Indoor": 10,
+                    "Outdoor": 10
+                },
+                "SpeedRange": [
+                    1.5,
+                    28
+                ],
+                "MaxKFactor": 9,
+                "Fading": {
+                    "Ratio": 50,
+                    "Distribution": [
+                        "Rayleigh",
+                        "Rician"
+                    ]
+                }
+            },
+            "Receive": {
+                "handle": "simulate.physical.Receive",
+                "Config": "../config/_base_/simulate/radiofront/receive.json"
+            }
+        }
+    }
+}
