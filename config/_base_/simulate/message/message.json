@@ -1,0 +1,8 @@
+{
+    "Audio": {
+        "handle": "blocks.physical.message.Audio"
+    },
+    "RandomBit": {
+        "handle": "blocks.physical.message.RandomBit"
+    }
+}

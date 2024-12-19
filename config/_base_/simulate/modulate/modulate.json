@@ -1,88 +1,145 @@
 {
   "analog": {
-    "AM": 1,
-    "FM": 1,
-    "PM": 1,
-    "SSBAM": 1,
-    "DSBAM": 1,
-    "DSBSCAM": 1,
-    "VSBAM": 1
+    "FM": {
+      "handle": "blocks.physical.modulate.analog.FM.FM",
+      "Order": 1
+    },
+    "PM": {
+      "handle": "blocks.physical.modulate.analog.PM.PM",
+      "Order": 1
+    },
+    "SSBAM": {
+      "handle": "blocks.physical.modulate.analog.AM.SSBAM",
+      "Order": 1
+    },
+    "DSBAM": {
+      "handle": "blocks.physical.modulate.analog.AM.DSBAM",
+      "Order": 1
+    },
+    "DSBSCAM": {
+      "handle": "blocks.physical.modulate.analog.AM.DSBSCAM",
+      "Order": 1
+    },
+    "VSBAM": {
+      "handle": "blocks.physical.modulate.analog.AM.VSBAM",
+      "Order": 1
+    }
   },
   "digital": {
-    "APSK": [
-      16,
-      32,
-      64,
-      128,
-      256
-    ],
-    "DVBSAPSK": [
-      16,
-      32,
-      64,
-      128,
-      256
-    ],
-    "ASK": [
-      4,
-      8,
-      16,
-      32,
-      64
-    ],
-    "CPFSK": [
-      4,
-      8,
-      16,
-      32,
-      64
-    ],
-    "GFSK": [
-      4,
-      8,
-      16,
-      32,
-      64
-    ],
-    "GMSK": 2,
-    "MSK": 2,
-    "FSK": [
-      2,
-      4,
-      8,
-      16,
-      32
-    ],
-    "OOK": 2,
-    "PSK": [
-      2,
-      4,
-      8,
-      16,
-      32,
-      64
-    ],
-    "OQPSK": 4,
-    "QAM": [
-      8,
-      16,
-      32,
-      64,
-      128,
-      256,
-      512,
-      1024,
-      2048,
-      4096
-    ],
-    "Mill88QAM": [
-      16,
-      32,
-      64,
-      256
-    ],
+    "APSK": {
+      "handle": "blocks.physical.modulate.digital.APSK.APSK",
+      "Order": [
+        16,
+        32,
+        64,
+        128,
+        256
+      ]
+    },
+    "DVBSAPSK": {
+      "handle": "blocks.physical.modulate.digital.DVBSAPSK",
+      "Order": [
+        16,
+        32,
+        64,
+        128,
+        256
+      ]
+    },
+    "ASK": {
+      "handle": "blocks.physical.modulate.digital.ASK.ASK",
+      "Order": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ]
+    },
+    "CPFSK": {
+      "handle": "blocks.physical.modulate.digital.CPM.CPFSK",
+      "Order": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ]
+    },
+    "GFSK": {
+      "handle": "blocks.physical.modulate.digital.CPM.GFSK",
+      "Order": [
+        4,
+        8,
+        16,
+        32,
+        64
+      ]
+    },
+    "GMSK": {
+      "handle": "blocks.physical.modulate.digital.CPM.GMSK",
+      "Order": 2
+    },
+    "MSK": {
+      "handle": "blocks.physical.modulate.digital.CPM.MSK",
+      "Order": 2
+    },
+    "FSK": {
+      "handle": "blocks.physical.modulate.digital.FSK.FSK",
+      "Order": [
+        2,
+        4,
+        8,
+        16,
+        32
+      ]
+    },
+    "OOK": {
+      "handle": "blocks.physical.modulate.digital.OOK.OOK",
+      "Order": 2
+    },
+    "PSK": {
+      "handle": "blocks.physical.modulate.digital.PSK.PSK",
+      "Order": [
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+      ]
+    },
+    "OQPSK": {
+      "handle": "blocks.physical.modulate.digital.PSK.OQPSK",
+      "Order": 4
+    },
+    "QAM": {
+      "handle": "blocks.physical.modulate.digital.QAM.QAM",
+      "Order": [
+        8,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ]
+    },
+    "Mill88QAM": {
+      "handle": "blocks.physical.modulate.digital.QAM.Mill88QAM",
+      "Order": [
+        16,
+        32,
+        64,
+        256
+      ]
+    },
     "OFDM": {
-      "PSK": [
+      "handle": "blocks.physical.modulate.digital.OFDM.OFDM",
+      "PSKOrder": [
         2,
         4,
         8,
@@ -90,7 +147,7 @@
         32,
         64
       ],
-      "QAM": [
+      "QAMOrder": [
         8,
         16,
         32,
@@ -104,7 +161,8 @@
       ]
     },
     "OTFS": {
-      "PSK": [
+      "handle": "blocks.physical.modulate.digital.OTFS.OTFS",
+      "PSKOrder": [
         2,
         4,
         8,
@@ -112,7 +170,7 @@
         32,
         64
       ],
-      "QAM": [
+      "QAMOrder": [
         8,
         16,
         32,
@@ -126,7 +184,8 @@
       ]
     },
     "SCFDMA": {
-      "PSK": [
+      "handle": "blocks.physical.modulate.digital.SCFDMA.SCFDMA",
+      "PSKOrder": [
         2,
         4,
         8,
@@ -134,7 +193,7 @@
         32,
         64
       ],
-      "QAM": [
+      "QAMOrder": [
         8,
         16,
         32,

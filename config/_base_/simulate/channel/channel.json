@@ -1,0 +1,39 @@
+{
+    "Simulate": {
+        "MIMO": {
+            "handle": "blocks.physical.environment.channel.MIMO",
+            "MaxPaths": 3,
+            "MaxDistance": {
+                "Ratio": 50,
+                "Indoor": 10,
+                "Outdoor": 10
+            },
+            "SpeedRange": [
+                1.5,
+                28
+            ],
+            "MaxKFactor": 9,
+            "Fading": {
+                "Ratio": 50,
+                "Distribution": [
+                    "Rayleigh",
+                    "Rician"
+                ]
+            },
+            "Comment": {
+                "MaxPaths": "Maximum number of multipath components",
+                "MaxDistance": {
+                    "Ratio": "Percentage chance of using indoor vs outdoor distance",
+                    "Indoor": "Maximum distance in meters for indoor scenarios",
+                    "Outdoor": "Maximum distance in kilometers for outdoor scenarios"
+                },
+                "SpeedRange": "Min and max speed of moving objects in m/s",
+                "MaxKFactor": "Maximum Rician K-factor for LOS paths",
+                "Fading": {
+                    "Ratio": "Probability of Rayleigh vs Rician fading",
+                    "Distribution": "Available fading distribution types"
+                }
+            }
+        }
+    }
+}

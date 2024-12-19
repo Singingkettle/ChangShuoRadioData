@@ -10,6 +10,12 @@ Basically, a signal data recognition pipline is:
 3. emitter type: friendly or not friendly, which one (like face recognition)
 4. emitter location: figure out the intrerested signal location
 
+# Install
+
+
+1. Install [Advanced Logger for MATLAB](https://www.mathworks.com/matlabcentral/fileexchange/87322-advanced-logger-for-matlab) to log.
+
+
 # What's new
 
 v0.0.1 was released in 23/01/2024, which was located in ref/DataSimulationTool

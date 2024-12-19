@@ -1,0 +1,13 @@
+{
+    "Wireless": {
+        "Tiling": {
+            "handle": "blocks.event.communication.wireless.Tiling",
+            "IsOverlap": true,
+            "OverlapRadio": 0.1,
+            "FrequencyOverlapRadioRange": [
+                0,
+                0.15
+            ]
+        }
+    }
+}
