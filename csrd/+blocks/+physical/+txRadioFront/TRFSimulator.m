@@ -26,6 +26,10 @@ classdef TRFSimulator < matlab.System
 
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6
         DCOffset {mustBeReal} = -50
+        TxPowerDb (1, 1) {mustBeReal} = 50 % Desired transmission power in dBm (default: 10 dBm)
+        CarrierFrequency (1, 1) {mustBeReal} = 2.4e9
+        BandWidth (1, 1) {mustBeReal} = 20e6
+        SampleRate (1, 1) {mustBeReal} = 20e6
 
         SiteConfig = false
         IqImbalanceConfig struct
@@ -39,11 +43,29 @@ classdef TRFSimulator < matlab.System
         IQImbalance
         PhaseNoise
         MemoryLessNonlinearity
+        InterpolationFactor
         DUC
 
     end
 
     methods (Access = protected)
+
+        function DUC = genDUC(obj)
+            obj.InterpolationFactor = ceil(obj.MasterClockRate / obj.SampleRate);
+            obj.InterpolationFactor = ceil(obj.InterpolationFactor / 2) * 2;
+            obj.MasterClockRate = obj.InterpolationFactor * obj.SampleRate;
+            bw = obj.BandWidth;
+            if bw <= 0
+                error("hello");
+            end
+            DUC = dsp.DigitalUpConverter( ...
+                InterpolationFactor = obj.InterpolationFactor, ...
+                SampleRate = obj.SampleRate, ...
+                Bandwidth = bw, ...
+                PassbandRipple = 0.1, ...
+                StopbandAttenuation = 50, ...
+                CenterFrequency = obj.CarrierFrequency);
+        end
 
         function IQImbalance = genIqImbalance(obj)
 
@@ -59,7 +81,7 @@ classdef TRFSimulator < matlab.System
             PhaseNoise = comm.PhaseNoise( ...
                 Level = obj.PhaseNoiseConfig.Level, ...
                 FrequencyOffset = obj.PhaseNoiseConfig.FrequencyOffset, ...
-                SampleRate = obj.MasterClockRate);
+                SampleRate = obj.SampleRate);
 
             if isfield(obj.PhaseNoiseConfig, 'RandomStream')
 
@@ -137,58 +159,41 @@ classdef TRFSimulator < matlab.System
             obj.IQImbalance = obj.genIqImbalance;
             obj.PhaseNoise = obj.genPhaseNoise;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
+            obj.DUC = obj.genDUC;
 
         end
 
         function y = DUCH(obj, x)
+
             y = obj.DUC(x);
         end
 
         function out = stepImpl(obj, x)
-            % Change the input signal sample rate as txrf's master clock
-            % rate
-            InterpolationFactor = ceil(obj.MasterClockRate / x.SampleRate);
-            obj.MasterClockRate = InterpolationFactor * x.SampleRate;
-            hbw = max(abs(x.BandWidth));
-
-            if strcmpi(x.ModulatorType, 'OFDM') || strcmpi(x.ModulatorType, 'SCFDMA') || strcmpi(x.ModulatorType, 'OTFS') || strcmpi(x.ModulatorType, 'CPFSK')
-                bw = fix(hbw / 1000) * 1000 * 2;
-            else
-                bw = 2 * hbw;
-            end
 
             % Add impairments
             y = obj.IQImbalance(x.data);
             y = y + 10 ^ (obj.DCOffset / 10);
-            release(obj.PhaseNoise);
-            obj.PhaseNoise.SampleRate = x.SampleRate;
             y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
 
             % Transform the baseband to passband
-            obj.DUC = dsp.DigitalUpConverter( ...
-                InterpolationFactor = InterpolationFactor, ...
-                SampleRate = x.SampleRate, ...
-                Bandwidth = sum(abs(bw)), ...
-                StopbandAttenuation = 60, ...
-                PassbandRipple = 0.2, ...
-                CenterFrequency = x.CarrierFrequency);
+            release(obj.DUC);
 
             if x.NumTransmitAntennas > 1
-                cy = num2cell(y, 1);
-                y = cellfun(@obj.DUCH, cy, 'UniformOutput', false);
-                y = cell2mat(y);
+                % Process multiple antennas in parallel using arrayfun
+                y = arrayfun(@(col) obj.DUC(y(:, col)), 1:x.NumTransmitAntennas, 'UniformOutput', false);
+                y = cat(2, y{:});
             else
                 y = obj.DUC(y);
             end
 
-            y = bandpass(y, ...
-                [x.CarrierFrequency + x.BandWidth(1), ...
-                 x.CarrierFrequency + x.BandWidth(2)], ...
-                obj.MasterClockRate, ...
-                ImpulseResponse = "fir", ...
-                Steepness = 0.9, ...
-                StopbandAttenuation = 60);
+            % Set the transmitter power for IQ signal
+            signalDuration = size(y, 1) / obj.MasterClockRate; % Signal duration in seconds
+            signalPower = sum(abs(y(:, 1)) .^ 2) / (size(y, 1)); % Average power per sample
+            % Convert dBm to linear power (Watts) and scale the signal
+            % 10^(dBm/10)/1000 converts dBm to Watts
+            scalingFactor = sqrt((10 ^ (obj.TxPowerDb / 10) / 1000) / (signalPower * signalDuration)) * sqrt(signalDuration);
+            y = y * scalingFactor;
 
             out = x;
             out.data = y;
@@ -196,12 +201,13 @@ classdef TRFSimulator < matlab.System
             out.IqImbalanceConfig = obj.IqImbalanceConfig;
             out.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;
             out.PhaseNoiseConfig = obj.PhaseNoiseConfig;
-            out.SDRInterpolationFactor = InterpolationFactor;
+            out.SDRInterpolationFactor = obj.InterpolationFactor;
             out.SampleRate = obj.MasterClockRate;
             out.SamplePerFrame = size(y, 1);
             out.TimeDuration = out.SamplePerFrame / out.SampleRate;
             out.CarrierFrequency = x.CarrierFrequency;
             out.TxSiteConfig = obj.SiteConfig;
+            out.SDRMode = "Zero-IF Receiver";
         end
 
     end

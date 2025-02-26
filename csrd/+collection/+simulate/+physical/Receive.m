@@ -1,22 +1,16 @@
 classdef Receive < matlab.System
 
     properties
-        % config for modulate
-        BandWidth {mustBePositive, mustBeReal, mustBeInteger} = 20e3;
-        CenterFrequency (1, 1) {mustBePositive, mustBeReal, mustBeInteger} = 20e3
-        SiteConfig
-        NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1
+        % config for receive
         Config {mustBeFile} = "../config/_base_/simulate/radiofront/receive.json"
+        RxInfos
 
     end
 
     properties (Access = private)
-        run
+        forward
         logger
         cfgs
-        ModulatorType
-        baseModulatorType
-        ModulatorOrder
     end
 
     methods
@@ -31,29 +25,63 @@ classdef Receive < matlab.System
     methods (Access = protected)
 
         function setupImpl(obj)
-            obj.logger = mlog.Logger("logger");
+            obj.logger = Log.getInstance();
             obj.cfgs = load_config(obj.Config);
 
-            MasterClockRate = randi((obj.cfgs.MasterClockRateRange(2) - obj.cfgs.MasterClockRateRange(1)) / obj.cfgs.MasterClockRateStep) * obj.cfgs.MasterClockRateStep + obj.cfgs.MasterClockRateRange(1);
-            DCOffset = rand(1) * (obj.cfgs.DCOffsetRange(2) - obj.cfgs.DCOffsetRange(1)) + obj.cfgs.DCOffsetRange(1);
+            obj.forward = cell(1, length(obj.RxInfos));
 
-            IqImbalanceConfig.A = rand(1) * (obj.cfgs.IqImbalanceConfig.A(2) - obj.cfgs.IqImbalanceConfig.A(1)) + obj.cfgs.IqImbalanceConfig.A(1);
-            IqImbalanceConfig.P = rand(1) * (obj.cfgs.IqImbalanceConfig.P(2) - obj.cfgs.IqImbalanceConfig.P(1)) + obj.cfgs.IqImbalanceConfig.P(1);
+            for RxId = 1:length(obj.RxInfos)
+                ReceiverTypes = fieldnames(obj.cfgs.(obj.RxInfos{RxId}.ParentReceiverType));
+                ReceiverType = ReceiverTypes{randperm(numel(ReceiverTypes), 1)};
 
-            ThermalNoiseConfig.NoiseFigure = rand(1) * (obj.cfgs.ThermalNoiseConfig.NoiseFigure(2) - obj.cfgs.ThermalNoiseConfig.NoiseFigure(1)) + obj.cfgs.ThermalNoiseConfig.NoiseFigure(1);
-            MemoryLessNonlinearityConfig = MemoryLessNonlinearityRandom(obj.cfgs.MemoryLessNonlinearityConfig);
+                kwargs = obj.cfgs.(obj.RxInfos{RxId}.ParentReceiverType).(ReceiverType);
+                % verify receiver class exists and create instance
+                if ~exist(kwargs.handle, 'class')
+                    obj.logger.error("Receiver handle %s does not exist.", kwargs.handle);
+                    exit(1);
+                else
 
-            TimeDuration = rand(1) * (obj.cfgs.TimeDurationRange(2) - obj.cfgs.TimeDurationRange(1)) + obj.cfgs.TimeDurationRange(1);
-            obj.run = RRFSimulator(MasterClockRate = MasterClockRate, IqImbalanceConfig = IqImbalanceConfig, ...
-                CenterFrequency = obj.CenterFrequency, BandWidth = obj.BandWidth, ...
-                DCOffset = DCOffset, ThermalNoiseConfig = ThermalNoiseConfig, TimeDuration = TimeDuration, ...
-                NumReceiveAntennas = obj.NumReceiveAntennas, MemoryLessNonlinearityConfig = MemoryLessNonlinearityConfig, RxSiteConfig = obj.SiteConfig);
+                    if isfield(obj.RxInfos{RxId}, "MasterClockRateRange")
+                        MasterClockRateRange = obj.RxInfos{RxId}.MasterClockRateRange;
+                    else
+                        MasterClockRateRange = kwargs.MasterClockRateRange;
+                    end
+
+                    MasterClockRate = MasterClockRateRange(1);
+                    DCOffset = rand(1) * (kwargs.DCOffsetRange(2) - kwargs.DCOffsetRange(1)) + kwargs.DCOffsetRange(1);
+
+                    IqImbalanceConfig.A = rand(1) * (kwargs.IqImbalanceConfig.A(2) - kwargs.IqImbalanceConfig.A(1)) + kwargs.IqImbalanceConfig.A(1);
+                    IqImbalanceConfig.P = rand(1) * (kwargs.IqImbalanceConfig.P(2) - kwargs.IqImbalanceConfig.P(1)) + kwargs.IqImbalanceConfig.P(1);
+
+                    ThermalNoiseConfig.NoiseFigure = rand(1) * (kwargs.ThermalNoiseConfig.NoiseFigure(2) - kwargs.ThermalNoiseConfig.NoiseFigure(1)) + kwargs.ThermalNoiseConfig.NoiseFigure(1);
+                    MemoryLessNonlinearityConfig = MemoryLessNonlinearityRandom(kwargs.MemoryLessNonlinearityConfig);
+
+                    if isfield(obj.RxInfos{RxId}, "TimeDurationRange")
+                        TimeDurationRange = obj.RxInfos{RxId}.TimeDurationRange;
+                    else
+                        TimeDurationRange = kwargs.TimeDurationRange;
+                    end
+
+                    TimeDuration = rand(1) * (TimeDurationRange(2) - TimeDurationRange(1)) + TimeDurationRange(1);
+
+                    % create a function handle from the class name
+                    receiverClass = str2func(kwargs.handle);
+
+                    % instantiate the class using the function handle
+                    obj.forward{RxId} = receiverClass(MasterClockRate = MasterClockRate, IqImbalanceConfig = IqImbalanceConfig, ...
+                        CenterFrequency = obj.RxInfos{RxId}.CenterFrequency, BandWidth = obj.RxInfos{RxId}.BandWidth, ...
+                        DCOffset = DCOffset, ThermalNoiseConfig = ThermalNoiseConfig, TimeDuration = TimeDuration, ...
+                        NumReceiveAntennas = obj.RxInfos{RxId}.NumReceiveAntennas, MemoryLessNonlinearityConfig = MemoryLessNonlinearityConfig, SiteConfig = obj.RxInfos{RxId}.SiteConfig);
+                end
+
+            end
+
         end
 
         function out = stepImpl(obj, x, FrameId, RxId)
             % transmit
-            out = obj.run(x);
-            obj.logger.info("Receive signals of Frame-Rx %06d:%02d by SimSDR %s", FrameId, RxId, obj.SiteConfig.Name);
+            out = obj.forward{RxId}(x);
+            obj.logger.debug("Receive signals of Frame-Rx %06d:%02d by SimSDR %s", FrameId, RxId, obj.RxInfos{RxId}.SiteConfig.Name);
 
         end
 

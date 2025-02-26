@@ -6,7 +6,7 @@
                 100e4,
                 150e4
             ],
-            "MasterClockRateStep": 1e4,
+            "MasterClockRateStep": 1e3,
             "DCOffsetRange": [
                 -60,
                 -40

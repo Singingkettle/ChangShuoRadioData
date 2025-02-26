@@ -1,21 +1,39 @@
 classdef VSBAM < blocks.physical.modulate.analog.AM.DSBSCAM
+    % VSBAM Vestigial Sideband Amplitude Modulation
+    %   Implements VSB-AM modulation by filtering one sideband partially while
+    %   maintaining the other sideband completely. Inherits from DSBSCAM.
+    %
+    % Properties:
+    %   vf - Vestigial filter response array
+    %
+    % Methods:
+    %   genModulatorHandle - Generates the modulator function handle
+    %   baseModulator - Performs the core VSB-AM modulation
+    %   vestigialFilter - Implements the vestigial filter response
 
     properties (Access = private)
-        hf
+        vf % Vestigial filter response array
     end
 
     methods (Access = private)
 
-        function y = basefiler(obj, x, bw)
+        function h = vestigialFilter(obj, f, bw)
+            % Implements the vestigial filter response
+            % Args:
+            %   f: Frequency point to evaluate
+            %   bw: Bandwidth parameter (typically half of desired bandwidth)
+            % Returns:
+            %   h: Filter response value (0 to 1)
 
-            if x <- obj.ModulatorConfig.fa
-                y = 0;
-            elseif x > obj.ModulatorConfig.fa && x <= bw
-                y = 1;
-            elseif x > bw
-                y = 0;
+            if f <- obj.ModulatorConfig.cutoff
+                h = 0; % Complete attenuation below cutoff
+            elseif f > obj.ModulatorConfig.cutoff && f <= bw
+                h = 1; % Complete passthrough in passband
+            elseif f > bw
+                h = 0; % Complete attenuation above bandwidth
             else
-                y = (x + obj.ModulatorConfig.fa) / (2 * obj.ModulatorConfig.fa);
+                % Linear transition region
+                h = (f + obj.ModulatorConfig.cutoff) / (2 * obj.ModulatorConfig.cutoff);
             end
 
         end
@@ -25,25 +43,38 @@ classdef VSBAM < blocks.physical.modulate.analog.AM.DSBSCAM
     methods (Access = protected)
 
         function [y, bw] = baseModulator(obj, x)
+            % Performs VSB-AM modulation on input signal
+            % Args:
+            %   x: Input signal in time domain
+            % Returns:
+            %   y: Complex modulated signal
+            %   bw: Bandwidth limits of modulated signal [lower, upper]
 
             SamplePerFrame = length(x);
 
-            f = (-SamplePerFrame / 2:SamplePerFrame / 2 - 1) * (obj.SampleRate / SamplePerFrame);
-            f = f';
-            % tools = TCBUN.instance();
-            obj.hf = arrayfun(@(x)obj.basefiler(x, 30e3/2), f);
+            % Generate frequency axis
+            f = (-SamplePerFrame / 2:SamplePerFrame / 2 - 1)' * (obj.SampleRate / SamplePerFrame);
 
+            % Generate vestigial filter response
+            obj.vf = arrayfun(@(x)obj.vestigialFilter(x, 30e3/2), f);
+
+            % Transform input to frequency domain
+            X = fftshift(fft(x));
+
+            % Apply appropriate sideband filtering based on mode
             if strcmp(obj.ModulatorConfig.mode, 'upper')
-                imagP = fftshift(fft(x)) .* (flipud(obj.hf) - obj.hf);
-                bw = [-obj.ModulatorConfig.fa, obw(x, obj.SampleRate)];
+                % Keep upper sideband, partially filter lower
+                imagP = X .* (flipud(obj.vf) - obj.vf);
+                bw = [-obj.ModulatorConfig.cutoff, obw(x, obj.SampleRate)];
             else
-                imagP = fftshift(fft(x)) .* (obj.hf - flipud(obj.hf));
-                bw = [-obw(x, obj.SampleRate), obj.ModulatorConfig.fa];
+                % Keep lower sideband, partially filter upper
+                imagP = X .* (obj.vf - flipud(obj.vf));
+                bw = [-obw(x, obj.SampleRate), obj.ModulatorConfig.cutoff];
             end
 
+            % Convert back to time domain and create complex signal
             imagP = imag(ifft(ifftshift(imagP)));
             y = complex(x, imagP);
-
         end
 
     end
@@ -51,18 +82,24 @@ classdef VSBAM < blocks.physical.modulate.analog.AM.DSBSCAM
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
+            % Generates a function handle for the VSB-AM modulator
+            % Returns:
+            %   modulatorHandle: Function handle to perform modulation
 
+            % Set default configuration if not specified
             if ~isfield(obj.ModulatorConfig, 'mode')
+                % Randomly select upper or lower sideband mode
                 obj.ModulatorConfig.mode = randsample(["upper", "lower"], 1);
-                % 15e3 is base on the Audio block's bandwidth (one side = two side /2)
-                obj.ModulatorConfig.fa = (rand(1) * 0.01 + 0.01) * 15e3;
+                % Set cutoff frequency (1-2% of 15kHz audio bandwidth)
+                obj.ModulatorConfig.cutoff = (rand(1) * 0.01 + 0.01) * 15e3;
             end
 
+            % Configure as analog modulation with single antenna
             obj.IsDigital = false;
-            % donot consider multi-tx in analog modulation
             obj.NumTransmitAntennas = 1;
-            modulatorHandle = @(x)obj.baseModulator(x);
 
+            % Return modulator function handle
+            modulatorHandle = @(x)obj.baseModulator(x);
         end
 
     end

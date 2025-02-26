@@ -7,28 +7,33 @@ classdef CPFSK < blocks.physical.modulate.digital.CPM.GFSK
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
-
+            % Validate modulation order
             if obj.ModulatorOrder <= 2
-                error("Value of Modulator order must be large than 2.");
+                error("Modulation order must be greater than or equal to 2");
             end
 
+            % Initialize modulator parameters
             obj.NumTransmitAntennas = 1;
             obj.IsDigital = true;
 
-            if ~isfield(obj.ModulatorConfig, 'ModulatorIndex')
-                obj.ModulatorConfig.ModulatorIndex = rand(1) * 10;
+            % Create constellation for M-ary CPFSK
+            obj.const = (- (obj.ModulatorOrder - 1):2:(obj.ModulatorOrder - 1))';
+
+            % Set default modulator configuration if not provided
+            if ~isfield(obj.ModulatorConfig, 'ModulationIndex')
+                % Modulation index typically ranges from 0.5 to 1
+                obj.ModulatorConfig.ModulationIndex = 0.5 + rand(1) * 0.5;
                 obj.ModulatorConfig.InitialPhaseOffset = rand(1) * 2 * pi;
             end
 
-            obj.const = (- (obj.ModulatorOrder - 1):2:(obj.ModulatorOrder - 1))';
+            % Create CPFSK modulator
             obj.pureModulator = comm.CPFSKModulator( ...
                 ModulationOrder = obj.ModulatorOrder, ...
-                ModulationIndex = obj.ModulatorConfig.ModulatorIndex, ...
+                ModulationIndex = obj.ModulatorConfig.ModulationIndex, ...
                 InitialPhaseOffset = obj.ModulatorConfig.InitialPhaseOffset, ...
                 SamplesPerSymbol = obj.SamplePerSymbol);
 
             modulatorHandle = @(x)obj.baseModulator(x);
-
         end
 
     end

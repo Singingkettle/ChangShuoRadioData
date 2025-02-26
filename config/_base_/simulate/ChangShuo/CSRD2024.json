@@ -1,17 +1,22 @@
 {
     "runner": {
         "handle": "collection.runner",
-        "NumFrames": 1,
+        "NumFrames": 6,
         "Seed": 1234,
-        "LogLevel": "INFO",
+        "Log": {
+            "Name": "CSRD2024",
+            "FileThreshold": "INFO",
+            "CommandWindowThreshold": "INFO",
+            "MessageReceivedEventThreshold": "INFO"
+        },
         "Data": {
             "SaveFolder": "../results"
         },
         "Physical": {
             "handle": "collection.simulate.ChangShuo",
-            "NumMaxTx": 8,
-            "NumMaxRx": 8,
-            "NumMaxTransmitTimes": 4,
+            "NumMaxTx": 4,
+            "NumMaxRx": 4,
+            "NumMaxTransmitTimes": 3,
             "NumTransmitAntennasRange": [
                 1,
                 4
@@ -20,7 +25,7 @@
                 1,
                 4
             ],
-            "ADRatio": 10,
+            "ADRatio": 20,
             "SymbolRateRange": [
                 30e3,
                 50e3
@@ -31,8 +36,8 @@
                 8
             ],
             "MessageLengthRange": [
-                50000,
-                100000
+                5000,
+                10000
             ],
             "Message": {
                 "handle": "collection.simulate.physical.Message",

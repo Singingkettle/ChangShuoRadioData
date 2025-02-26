@@ -25,7 +25,7 @@ classdef Transmit < matlab.System
     methods (Access = protected)
 
         function setupImpl(obj)
-            obj.logger = mlog.Logger("logger");
+            obj.logger = Log.getInstance();
             obj.cfgs = load_config(obj.Config);
 
             obj.forward = cell(1, length(obj.TxInfos));
@@ -56,6 +56,10 @@ classdef Transmit < matlab.System
                     PhaseNoiseConfig.FrequencyOffset = randi(kwargs.PhaseNoiseConfig.FrequencyOffset(2) - kwargs.PhaseNoiseConfig.FrequencyOffset(1)) + kwargs.PhaseNoiseConfig.FrequencyOffset(1);
                     MemoryLessNonlinearityConfig = MemoryLessNonlinearityRandom(kwargs.MemoryLessNonlinearityConfig);
 
+                    CarrierFrequency = obj.TxInfos{TxId}.CarrierFrequency;
+                    BandWidth = obj.TxInfos{TxId}.BandWidth;
+                    SampleRate = obj.TxInfos{TxId}.SampleRate;
+
                     % Create a function handle from the class name
                     transmitterClass = str2func(kwargs.handle);
 
@@ -64,7 +68,10 @@ classdef Transmit < matlab.System
                         'IqImbalanceConfig', IqImbalanceConfig, 'DCOffset', DCOffset, ...
                         'PhaseNoiseConfig', PhaseNoiseConfig, ...
                         'MemoryLessNonlinearityConfig', MemoryLessNonlinearityConfig, ...
-                        'SiteConfig', obj.TxInfos{TxId}.SiteConfig);
+                        'SiteConfig', obj.TxInfos{TxId}.SiteConfig, ...
+                        'CarrierFrequency', CarrierFrequency, ...
+                        'BandWidth', BandWidth, ...
+                        'SampleRate', SampleRate);
                 end
 
             end
@@ -74,7 +81,7 @@ classdef Transmit < matlab.System
         function out = stepImpl(obj, x, FrameId, TxId, SegmentId)
             % transmit
             out = obj.forward{TxId}(x);
-            obj.logger.info("Transmit signals of Frame-Tx-Segment %06d:%02d:%02d by SimSDR %s", FrameId, TxId, SegmentId, obj.TxInfos{TxId}.SiteConfig.Name);
+            obj.logger.debug("Transmit signals of Frame-Tx-Segment %06d:%02d:%02d by SimSDR %s", FrameId, TxId, SegmentId, obj.TxInfos{TxId}.SiteConfig.Name);
 
         end
 

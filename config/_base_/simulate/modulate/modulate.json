@@ -37,7 +37,7 @@
       ]
     },
     "DVBSAPSK": {
-      "handle": "blocks.physical.modulate.digital.DVBSAPSK",
+      "handle": "blocks.physical.modulate.digital.APSK.DVBSAPSK",
       "Order": [
         16,
         32,

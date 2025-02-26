@@ -10,7 +10,7 @@ ModulatorOrder = 4;
 SamplePerSymbol = 8;
 ModulatorConfig.ModulatorIndex = 0.5;
 ModulatorConfig.InitialPhaseOffset = 0;
-% 
+%
 % CarrierFrequency = 200e3;
 % IqImbalanceConfig.A = 3;
 % IqImbalanceConfig.P = 10;
@@ -25,16 +25,16 @@ ModulatorConfig.InitialPhaseOffset = 0;
 % ThermalNoiseConfig.NoiseTemperature = 290;
 % AGCConfig.AveragingLength = 256 * 4;
 % AGCConfig.MaxPowerGain = 400;
-% 
+%
 % source = RandomSource(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulatorOrder=ModulatorOrder, ...
 %     SamplePerSymbol=SamplePerSymbol);
-% 
+%
 % x = source();
-% 
+%
 % %% 单天线场景
-% 
+%
 % txRF = TRFSimulator(StartTime=0.2, ...
 %     SampleRate = SampleRate, ...
 %     CarrierFrequency=CarrierFrequency, ...
@@ -45,11 +45,11 @@ ModulatorConfig.InitialPhaseOffset = 0;
 % rayChannel = Rayleigh(CarrierFrequency=CarrierFrequency, ...
 %     SampleRate=SampleRate, PathDelays=0, ...
 %     AveragePathGains=0, MaximumDopplerShift=0);
-% 
+%
 % ricChannel = Rician(CarrierFrequency=CarrierFrequency, ...
 %     SampleRate=SampleRate, PathDelays=0, ...
 %     AveragePathGains=0, MaximumDopplerShift=0);
-% 
+%
 % rxRF = RRFSimulator(StartTime=0, TimeDuration=2, SampleRate=SampleRate, ...
 %     NumReceiveAntennas=1, CarrierFrequency=200e3, Bandwidth=20e3, ...
 %     MasterClockRate=MasterClockRate, ...
@@ -58,22 +58,22 @@ ModulatorConfig.InitialPhaseOffset = 0;
 %     PhaseNoiseConfig=PhaseNoiseConfig, ...
 %     AGCConfig=AGCConfig, ...
 %     IqImbalanceConfig=IqImbalanceConfig);
-% 
+%
 % baseBandSignal = CPFSK(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulatorOrder=ModulatorOrder, ...
 %     SamplePerSymbol=SamplePerSymbol, ...
 %     ModulatorConfig=ModulatorConfig);
-% 
+%
 % x1= baseBandSignal(x);
 % x1 = txRF(x1);
 % x1 = rayChannel(x1);
 % y1 = rxRF({x1});
-% 
+%
 % %% 多天线场景
 % NumTransmitAntennas = 1;
 % NumReceiveAntennas = 2;
-% 
+%
 % txRF = TRFSimulator(StartTime=0.2, ...
 %     SampleRate = SampleRate, ...
 %     CarrierFrequency=CarrierFrequency, ...
@@ -94,14 +94,14 @@ ModulatorConfig.InitialPhaseOffset = 0;
 %     PhaseNoiseConfig=PhaseNoiseConfig, ...
 %     AGCConfig=AGCConfig, ...
 %     IqImbalanceConfig=IqImbalanceConfig);
-% 
+%
 % baseBandSignal = CPFSK(SampleRate=SampleRate, ...
 %     TimeDuration=TimeDuration, ...
 %     ModulatorOrder=ModulatorOrder, ...
 %     SamplePerSymbol=SamplePerSymbol, ...
 %     NumTransmitAntennas = NumTransmitAntennas, ...
 %     ModulatorConfig=ModulatorConfig);
-% 
+%
 % x2 = baseBandSignal(x);
 % x2 = txRF(x2);
 % x2 = mimoChannel(x2);
@@ -110,25 +110,36 @@ ModulatorConfig.InitialPhaseOffset = 0;
 % Simple test for filter
 M = 8; % Modulator order
 cpfskMod = comm.CPFSKModulator(M, ...
-    BitInput=false, SamplesPerSymbol=32);
+    BitInput = false, SamplesPerSymbol = 32);
 awgnChan = comm.AWGNChannel( ...
-    NoiseMethod='Signal to noise ratio (SNR)', ...
-    SNR=0);
+    NoiseMethod = 'Signal to noise ratio (SNR)', ...
+    SNR = 0);
 cpfskDemod = comm.CPFSKDemodulator(M, ...
-    BitOutput=false, SamplesPerSymbol=32);
-spf = 10000;        % Symobls per frame
+    BitOutput = false, SamplesPerSymbol = 32);
+spf = 10000; % Symobls per frame
 
 delay = cpfskDemod.TracebackDepth;
 errorRate = comm.ErrorRate( ...
-    ReceiveDelay=delay);
-data = randi([0 M-1],spf,1);
-const = (-(M-1):2:(M-1))';
-data = const(data(:)+1);
+    ReceiveDelay = delay);
+data = randi([0 M - 1], spf, 1);
+const = (- (M - 1):2:(M - 1))';
+data = const(data(:) + 1);
 modSignal = cpfskMod(data);
+
+% Calculate occupied bandwidth
 bw = obw(modSignal, SampleRate);
-y = lowpass(modSignal, 14000, SampleRate, ImpulseResponse="fir", Steepness=0.99);
+fprintf('Occupied Bandwidth: %.2f Hz\n', bw);
+
+% Calculate theoretical bandwidth
+h = 0.5; % modulation index
+Rs = SampleRate / 32; % symbol rate (SamplesPerSymbol = 32)
+theoretical_bw = (M - 1) * h * Rs + 2 * Rs; % Carson's rule for CPFSK
+fprintf('Theoretical Bandwidth: %.2f Hz\n', theoretical_bw);
+
+% Compare filtered signal
+y = lowpass(modSignal, 14000, SampleRate, ImpulseResponse = "fir", Steepness = 0.99);
 receivedData = cpfskDemod(modSignal);
-errorStats = errorRate(data,receivedData);
+errorStats = errorRate(data, receivedData);
 
 receivedData1 = cpfskDemod(y);
-errorStats1 = errorRate(data,receivedData1);
+errorStats1 = errorRate(data, receivedData1);

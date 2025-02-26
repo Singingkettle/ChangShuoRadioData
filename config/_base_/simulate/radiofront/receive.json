@@ -1,7 +1,7 @@
 {
     "Simulator": {
         "RRFSimulator": {
-            "handle": "blocks.physical.txRadiofront.rxRadioFront.RRFSimulator",
+            "handle": "blocks.physical.rxRadioFront.RRFSimulator",
             "MasterClockRateRange": [
                 200e4,
                 250e4
@@ -13,7 +13,7 @@
             ],
             "DCOffsetRange": [
                 -60,
-                40
+                -40
             ],
             "IqImbalanceConfig": {
                 "A": [
@@ -27,8 +27,8 @@
             },
             "ThermalNoiseConfig": {
                 "NoiseFigure": [
-                    0,
-                    10
+                    10,
+                    20
                 ]
             },
             "MemoryLessNonlinearityConfig": {

@@ -43,7 +43,7 @@ classdef ChangShuo < matlab.System
 
         function setupImpl(obj)
 
-            obj.logger = mlog.Logger("logger");
+            obj.logger = Log.getInstance();
 
         end
 
@@ -96,13 +96,15 @@ classdef ChangShuo < matlab.System
                 obj.logger.debug("Init modulate handle by using %s in the %dth Frame.", obj.Modulate.handle, FrameId);
                 runModulate = eval(sprintf("%s(Config=obj.Modulate.Config, ModulateInfos=ModulateInfos)", obj.Modulate.handle));
 
-                % % Init handles of receive
-                % obj.logger.info("Init receive handle by using %s.", obj.Receive.handle);
-                % runReceive = obj.Receive.handle;
-
                 for TxId = 1:length(txs)
 
-                    NumTransmitTimes = randi(obj.NumMaxTransmitTimes, 1);
+                    if ModulateInfos{TxId}.ParentModulatorType == "digital"
+                        NumTransmitTimes = randi(obj.NumMaxTransmitTimes, 1);
+                    else
+                        % For analog modulation, only one transmission is allowed to save the simulation time for a frame
+                        NumTransmitTimes = 1;
+                    end
+
                     ys = cell(1, NumTransmitTimes);
 
                     for SegmentId = 1:NumTransmitTimes
@@ -117,23 +119,29 @@ classdef ChangShuo < matlab.System
                 EventInfos = cell(1, 1);
                 EventInfos{1}.ParentEventType = "Wireless";
                 % Init handles of event
-                obj.logger.info("Init event handle by using %s in the %dth Frame.", obj.Event.handle, FrameId);
+                obj.logger.debug("Init event handle by using %s in the %dth Frame.", obj.Event.handle, FrameId);
                 runEvent = eval(sprintf("%s(Config=obj.Event.Config, EventInfos=EventInfos)", obj.Event.handle));
 
-                [txs, MasterClockRateRange, BandWidth] = runEvent(FrameId, 1, txs);
+                [txs, Infos, MasterClockRateRange, BandWidthRange] = runEvent(FrameId, 1, txs);
 
                 for TxId = 1:length(txs)
                     TxInfos{TxId}.MasterClockRateRange = MasterClockRateRange;
+                    TxInfos{TxId}.CarrierFrequency = Infos{TxId}.CarrierFrequency;
+                    TxInfos{TxId}.BandWidth = Infos{TxId}.BandWidth;
+                    TxInfos{TxId}.SampleRate = Infos{TxId}.SampleRate;
                 end
 
                 % Init handles of transmit
-                obj.logger.info("Init transmit handle by using %s in the %dth Frame.", obj.Transmit.handle, FrameId);
+                obj.logger.debug("Init transmit handle by using %s in the %dth Frame.", obj.Transmit.handle, FrameId);
                 runTransmit = eval(sprintf("%s(Config=obj.Transmit.Config, TxInfos=TxInfos)", obj.Transmit.handle));
 
                 for TxId = 1:length(txs)
 
                     for SegmentId = 1:length(txs{TxId})
+                        tic
+                        TxInfos{TxId}
                         txs{TxId}{SegmentId} = runTransmit(txs{TxId}{SegmentId}, FrameId, TxId, SegmentId);
+                        toc
                     end
 
                 end
@@ -142,16 +150,17 @@ classdef ChangShuo < matlab.System
                 RxInfos = cell(1, randi([1, obj.NumMaxRx]));
 
                 for RxId = 1:length(RxInfos)
-                    NumReceiveAntennas = randi(obj.NumReceiveAntennasRange(2) - obj.NumReceiveAntennasRange(1)) + obj.NumReceiveAntennasRange(1);
+                    NumReceiveAntennas = randsample(obj.NumReceiveAntennasRange(1):obj.NumReceiveAntennasRange(2), 1);
                     RxSiteConfig.owner = "ShuoChang";
                     RxSiteConfig.location = "Beijing";
                     currentTime = datetime('now', 'Format', 'yyyyMMdd_HHmmss');
                     RxSiteConfig.Name = sprintf('Rx_%s_%s_%s', RxSiteConfig.owner, RxSiteConfig.location, currentTime);
-                    RxInfos{RxId}.RxSiteConfig = RxSiteConfig;
+                    RxInfos{RxId}.SiteConfig = RxSiteConfig;
+                    RxInfos{RxId}.ParentReceiverType = "Simulator";
                     RxInfos{RxId}.NumReceiveAntennas = NumReceiveAntennas;
                     RxInfos{RxId}.MasterClockRateRange = [0, 0];
-                    RxInfos{RxId}.BandWidth = BandWidth;
-                    RxInfos{RxId}.CenterFrequency = (BandWidth(2) + BandWidth(1)) / 2;
+                    RxInfos{RxId}.BandWidth = BandWidthRange(2) - BandWidthRange(1);
+                    RxInfos{RxId}.CenterFrequency = (BandWidthRange(2) + BandWidthRange(1)) / 2;
                 end
 
                 ChannelInfos = cell(length(TxInfos), length(RxInfos));
@@ -173,11 +182,11 @@ classdef ChangShuo < matlab.System
                 end
 
                 % Init handles of channel
-                obj.logger.info("Init channel handle by using %s in the %dth Frame.", obj.Channel.handle, FrameId);
+                obj.logger.debug("Init channel handle by using %s in the %dth Frame.", obj.Channel.handle, FrameId);
                 runChannel = eval(sprintf("%s(Config=obj.Channel.Config, ChannelInfos=ChannelInfos)", obj.Channel.handle));
 
                 % Init handles of receive
-                obj.logger.info("Init receive handle by using %s in the %dth Frame.", obj.Receive.handle, FrameId);
+                obj.logger.debug("Init receive handle by using %s in the %dth Frame.", obj.Receive.handle, FrameId);
                 runReceive = eval(sprintf("%s(Config=obj.Receive.Config, RxInfos=RxInfos)", obj.Receive.handle));
 
                 out = cell(1, randi([1, length(RxInfos)]));

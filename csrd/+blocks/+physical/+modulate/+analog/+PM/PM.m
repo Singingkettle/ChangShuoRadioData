@@ -1,15 +1,20 @@
 classdef PM < blocks.physical.modulate.BaseModulator
+    % PM (Phase Modulation)
+    % - Bandwidth depends on phase deviation and message bandwidth
+    % - Similar to FM but modulates phase directly
+    % - Message signal directly affects phase (no integration needed)
 
-    methods (Access = private)
+    methods (Access = protected)
 
         function [y, bw] = baseModulator(obj, x)
-
-            y = complex(cos(obj.ModulatorConfig.PhaseDeviation * x + ...
-                obj.ModulatorConfig.InitPhase), ...
-                sin(obj.ModulatorConfig.PhaseDeviation * x + ...
+            % Phase modulation
+            y = exp(1i * (obj.ModulatorConfig.PhaseDeviation * x + ...
                 obj.ModulatorConfig.InitPhase));
-            bw = obw(y, obj.SampleRate);
 
+            % Calculate bandwidth
+            % Get message signal parameters
+            bw = obw(y, obj.SampleRate);
+            
         end
 
     end
@@ -17,17 +22,18 @@ classdef PM < blocks.physical.modulate.BaseModulator
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
+            % Set analog modulation parameters
+            obj.IsDigital = false;
+            obj.NumTransmitAntennas = 1;
 
-            if ~isfield(obj.ModulatorConfig, 'FrequencyDeviation')
-                obj.ModulatorConfig.PhaseDeviation = rand(1) * pi;
+            % Set default phase deviation if not provided
+            if ~isfield(obj.ModulatorConfig, 'PhaseDeviation')
+                % Random phase deviation between π/4 and π/2
+                obj.ModulatorConfig.PhaseDeviation = (pi / 4) + rand(1) * (pi / 4);
                 obj.ModulatorConfig.InitPhase = 0;
             end
 
-            obj.IsDigital = false;
-            % donot consider multi-tx in analog modulation
-            obj.NumTransmitAntennas = 1;
             modulatorHandle = @(x)obj.baseModulator(x);
-
         end
 
     end

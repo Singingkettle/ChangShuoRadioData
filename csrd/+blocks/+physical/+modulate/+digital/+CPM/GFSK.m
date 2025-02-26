@@ -1,17 +1,14 @@
 classdef GFSK < blocks.physical.modulate.BaseModulator
-    % https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
-    % MSK 和 GMSK 是CPFSK的特例，所以在构造数据集的时候不考虑更低阶，
-    % https://blog.csdn.net/Insomnia_X/article/details/126333301
-    % https://www.eevblog.com/forum/beginners/need-some-help-with-si4362-(gfsk-vs-gmsk)/
-    % 上面的链接是关于GFSK与GMSK的区别
-    % GFSK 的实现参考了: https://www.mathworks.com/help/deeplearning/ug/modulation-classification-with-deep-learning.html
-    % TODO: Support CPFSK in high order > 2
+    % GFSK (Gaussian Frequency Shift Keying) Modulator
+    % References:
+    % - https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
+    % - MSK and GMSK are special cases of CPFSK
+    % - GFSK implementation refers to: https://www.mathworks.com/help/deeplearning/ug/modulation-classification-with-deep-learning.html
+    % - For M-ary GFSK, bandwidth increases with modulation order
 
     properties
-
         pureModulator
         const
-
     end
 
     methods (Access = protected)
@@ -27,18 +24,20 @@ classdef GFSK < blocks.physical.modulate.BaseModulator
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
-
-            % if obj.ModulatorOrder <= 2
-            %     error("Value of Modulator order must be large than 2.");
-            % end
+            % Initialize modulator parameters
             obj.NumTransmitAntennas = 1;
             obj.IsDigital = true;
+
+            % Create constellation for M-ary GFSK
             obj.const = (- (obj.ModulatorOrder - 1):2:(obj.ModulatorOrder - 1))';
 
+            % Set default Bandwidth-Time product (BT)
             if ~isfield(obj.ModulatorConfig, 'BandwidthTimeProduct')
+                % BT typically ranges from 0.2 to 0.5
                 obj.ModulatorConfig.BandwidthTimeProduct = rand(1) * 0.2 + 0.2;
             end
 
+            % Create GFSK modulator with M-ary support
             obj.pureModulator = comm.CPMModulator( ...
                 ModulationOrder = obj.ModulatorOrder, ...
                 FrequencyPulse = "Gaussian", ...
@@ -47,7 +46,6 @@ classdef GFSK < blocks.physical.modulate.BaseModulator
                 SamplesPerSymbol = obj.SamplePerSymbol);
 
             modulatorHandle = @(x)obj.baseModulator(x);
-
         end
 
     end

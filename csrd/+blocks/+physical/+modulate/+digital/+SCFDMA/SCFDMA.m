@@ -1,4 +1,4 @@
-classdef SCFDMA < blocks.physical.modulate.OFDM.OFDM
+classdef SCFDMA < blocks.physical.modulate.digital.OFDM.OFDM
     % This class is based on https://www.mathworks.com/help/comm/ug/scfdma-vs-ofdm.html
 
     properties (Nontunable)

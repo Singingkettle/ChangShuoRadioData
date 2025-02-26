@@ -1,0 +1,527 @@
+{
+  "StartTime": 0,
+  "TimeDuration": 0.27397705078125,
+  "MasterClockRate": 1.6384E+6,
+  "NumReceiveAntennas": 4,
+  "SampleRateOffset": 0,
+  "DCOffset": -43.392043675867995,
+  "SDRDecimationFactor": 1,
+  "IqImbalanceConfig": {
+    "A": 3.1124843508234772,
+    "P": 0.51266641992979867
+  },
+  "MemoryLessNonlinearityConfig": {
+    "LinearGain": 4.8749271730986719,
+    "Smoothness": 0.42980803501452552,
+    "PhaseGainRadian": -0.218244579979613,
+    "PhaseSaturation": 0.82590144468902449,
+    "PhaseSmoothness": 3.5802205737505162,
+    "OutputSaturationLevel": 0.9925455678028503,
+    "Method": "Modified Rapp model",
+    "ReferenceImpedance": 1
+  },
+  "ThermalNoiseConfig": {
+    "NoiseFigure": 19.155243373524041
+  },
+  "SNRs": [
+    [
+      12.264737562082662,
+      11.668711442980975,
+      12.659901270560916
+    ],
+    16.070737438710815,
+    [
+      12.085419098156914,
+      13.864630740181624,
+      10.331094905651108
+    ],
+    19.322478050523525,
+    [
+      12.092339392720632,
+      12.015420082058217,
+      9.9481988077619459
+    ],
+    13.650270789908877,
+    [
+      12.669915872419079,
+      12.242963521703507,
+      12.156920830669378
+    ],
+    10.237124892207156
+  ],
+  "SiteConfig": {
+    "owner": "ShuoChang",
+    "location": "Beijing",
+    "Name": "Rx_ShuoChang_Beijing_20250226_161918"
+  },
+  "SDRMode": "Zero-IF Receiver",
+  "tx": [
+    [
+      {
+        "BandWidth": [
+          -22888,
+          22888
+        ],
+        "SamplePerSymbol": 6,
+        "ModulatorOrder": 2,
+        "IsDigital": true,
+        "NumTransmitAntennas": 1,
+        "ModulatorConfig": {
+          "ostbcSymbolRate": 0.75,
+          "beta": 0.72635860220472914,
+          "span": 14
+        },
+        "SampleRate": 1.152E+6,
+        "TimeDuration": 0.03,
+        "SamplePerFrame": 34560,
+        "ModulatorType": "OOK",
+        "StartTime": 0.086000000000000007,
+        "CarrierFrequency": 30572,
+        "DCOffset": -48.447731606588441,
+        "IqImbalanceConfig": {
+          "A": 3.1510381215671117,
+          "P": 2.8169278201288965
+        },
+        "MemoryLessNonlinearityConfig": {
+          "InputScaling": -0.63612330228005742,
+          "AMAMParametersLeft": [
+            2.157,
+            2.159
+          ],
+          "AMAMParametersRight": [
+            1.151,
+            1.152
+          ],
+          "AMPMParametersLeft": [
+            4.003,
+            4.004
+          ],
+          "AMPMParametersRight": [
+            9.103,
+            9.105
+          ],
+          "OutputScaling": -0.25372571911585395,
+          "Method": "Saleh model",
+          "AMAMParameters": [
+            2.157087144617595,
+            1.1515556120722668
+          ],
+          "AMPMParameters": [
+            4.0032123155937507,
+            9.103636831472528
+          ],
+          "ReferenceImpedance": 1
+        },
+        "PhaseNoiseConfig": {
+          "Level": -109,
+          "FrequencyOffset": 104
+        },
+        "SDRInterpolationFactor": 6,
+        "TxSiteConfig": {
+          "owner": "ShuoChang",
+          "location": "Beijing",
+          "Name": "Tx_ShuoChang_Beijing_20250226_161915"
+        },
+        "SDRMode": "Zero-IF Receiver",
+        "PathDelays": [
+          0,
+          9.9999999999999991E-6
+        ],
+        "AveragePathGains": [
+          0,
+          -10
+        ],
+        "NumReceiveAntennas": 4,
+        "FadingDistribution": "Rician",
+        "KFactor": 9.9130935072027242,
+        "MaximumDopplerShift": 0.00258951340962603,
+        "mode": "SIMO"
+      },
+      {
+        "BandWidth": [
+          -23028,
+          23028
+        ],
+        "SamplePerSymbol": 6,
+        "ModulatorOrder": 2,
+        "IsDigital": true,
+        "NumTransmitAntennas": 1,
+        "ModulatorConfig": {
+          "ostbcSymbolRate": 0.75,
+          "beta": 0.72635860220472914,
+          "span": 14
+        },
+        "SampleRate": 1.152E+6,
+        "TimeDuration": 0.0190625,
+        "SamplePerFrame": 21960,
+        "ModulatorType": "OOK",
+        "StartTime": 0.132,
+        "CarrierFrequency": 30572,
+        "DCOffset": -48.447731606588441,
+        "IqImbalanceConfig": {
+          "A": 3.1510381215671117,
+          "P": 2.8169278201288965
+        },
+        "MemoryLessNonlinearityConfig": {
+          "InputScaling": -0.63612330228005742,
+          "AMAMParametersLeft": [
+            2.157,
+            2.159
+          ],
+          "AMAMParametersRight": [
+            1.151,
+            1.152
+          ],
+          "AMPMParametersLeft": [
+            4.003,
+            4.004
+          ],
+          "AMPMParametersRight": [
+            9.103,
+            9.105
+          ],
+          "OutputScaling": -0.25372571911585395,
+          "Method": "Saleh model",
+          "AMAMParameters": [
+            2.157087144617595,
+            1.1515556120722668
+          ],
+          "AMPMParameters": [
+            4.0032123155937507,
+            9.103636831472528
+          ],
+          "ReferenceImpedance": 1
+        },
+        "PhaseNoiseConfig": {
+          "Level": -109,
+          "FrequencyOffset": 104
+        },
+        "SDRInterpolationFactor": 6,
+        "TxSiteConfig": {
+          "owner": "ShuoChang",
+          "location": "Beijing",
+          "Name": "Tx_ShuoChang_Beijing_20250226_161915"
+        },
+        "SDRMode": "Zero-IF Receiver",
+        "PathDelays": [
+          0,
+          9.9999999999999991E-6
+        ],
+        "AveragePathGains": [
+          0,
+          -10
+        ],
+        "NumReceiveAntennas": 4,
+        "FadingDistribution": "Rician",
+        "KFactor": 9.9130935072027242,
+        "MaximumDopplerShift": 0.00258951340962603,
+        "mode": "SIMO"
+      },
+      {
+        "BandWidth": [
+          -22834,
+          22834
+        ],
+        "SamplePerSymbol": 6,
+        "ModulatorOrder": 2,
+        "IsDigital": true,
+        "NumTransmitAntennas": 1,
+        "ModulatorConfig": {
+          "ostbcSymbolRate": 0.75,
+          "beta": 0.72635860220472914,
+          "span": 14
+        },
+        "SampleRate": 1.152E+6,
+        "TimeDuration": 0.0278125,
+        "SamplePerFrame": 32040,
+        "ModulatorType": "OOK",
+        "StartTime": 0.24606250000000002,
+        "CarrierFrequency": 30572,
+        "DCOffset": -48.447731606588441,
+        "IqImbalanceConfig": {
+          "A": 3.1510381215671117,
+          "P": 2.8169278201288965
+        },
+        "MemoryLessNonlinearityConfig": {
+          "InputScaling": -0.63612330228005742,
+          "AMAMParametersLeft": [
+            2.157,
+            2.159
+          ],
+          "AMAMParametersRight": [
+            1.151,
+            1.152
+          ],
+          "AMPMParametersLeft": [
+            4.003,
+            4.004
+          ],
+          "AMPMParametersRight": [
+            9.103,
+            9.105
+          ],
+          "OutputScaling": -0.25372571911585395,
+          "Method": "Saleh model",
+          "AMAMParameters": [
+            2.157087144617595,
+            1.1515556120722668
+          ],
+          "AMPMParameters": [
+            4.0032123155937507,
+            9.103636831472528
+          ],
+          "ReferenceImpedance": 1
+        },
+        "PhaseNoiseConfig": {
+          "Level": -109,
+          "FrequencyOffset": 104
+        },
+        "SDRInterpolationFactor": 6,
+        "TxSiteConfig": {
+          "owner": "ShuoChang",
+          "location": "Beijing",
+          "Name": "Tx_ShuoChang_Beijing_20250226_161915"
+        },
+        "SDRMode": "Zero-IF Receiver",
+        "PathDelays": [
+          0,
+          9.9999999999999991E-6
+        ],
+        "AveragePathGains": [
+          0,
+          -10
+        ],
+        "NumReceiveAntennas": 4,
+        "FadingDistribution": "Rician",
+        "KFactor": 9.9130935072027242,
+        "MaximumDopplerShift": 0.00258951340962603,
+        "mode": "SIMO"
+      }
+    ],
+    [
+      {
+        "BandWidth": [
+          -203400,
+          202400
+        ],
+        "SamplePerSymbol": 1,
+        "ModulatorOrder": 16,
+        "IsDigital": true,
+        "NumTransmitAntennas": 2,
+        "ModulatorConfig": {
+          "ostbcSymbolRate": 0.75,
+          "base": {
+            "mode": "psk",
+            "PhaseOffset": 3.4909775668353751,
+            "SymbolOrder": "bin"
+          },
+          "ofdm": {
+            "FFTLength": 2048,
+            "NumGuardBandCarriers": [
+              7,
+              12
+            ],
+            "InsertDCNull": false,
+            "CyclicPrefixLength": 15,
+            "Subcarrierspacing": 200,
+            "PilotCarrierIndices": [
+              [
+                [
+                  75,
+                  1146
+                ]
+              ],
+              [
+                [
+                  86,
+                  1160
+                ]
+              ],
+              [
+                [
+                  110,
+                  1211
+                ]
+              ],
+              [
+                [
+                  135,
+                  1250
+                ]
+              ],
+              [
+                [
+                  163,
+                  1296
+                ]
+              ],
+              [
+                [
+                  176,
+                  1373
+                ]
+              ],
+              [
+                [
+                  225,
+                  1395
+                ]
+              ],
+              [
+                [
+                  273,
+                  1396
+                ]
+              ],
+              [
+                [
+                  297,
+                  1426
+                ]
+              ],
+              [
+                [
+                  514,
+                  1508
+                ]
+              ],
+              [
+                [
+                  540,
+                  1579
+                ]
+              ],
+              [
+                [
+                  593,
+                  1629
+                ]
+              ],
+              [
+                [
+                  615,
+                  1636
+                ]
+              ],
+              [
+                [
+                  641,
+                  1664
+                ]
+              ],
+              [
+                [
+                  676,
+                  1677
+                ]
+              ],
+              [
+                [
+                  785,
+                  1678
+                ]
+              ],
+              [
+                [
+                  789,
+                  1707
+                ]
+              ],
+              [
+                [
+                  812,
+                  1712
+                ]
+              ],
+              [
+                [
+                  874,
+                  1879
+                ]
+              ],
+              [
+                [
+                  883,
+                  1941
+                ]
+              ],
+              [
+                [
+                  1030,
+                  1950
+                ]
+              ],
+              [
+                [
+                  1069,
+                  1973
+                ]
+              ],
+              [
+                [
+                  1115,
+                  2034
+                ]
+              ]
+            ],
+            "Windowing": false
+          },
+          "pilot": {
+            "mode": "psk",
+            "PhaseOffset": 4.0789733814389,
+            "SymbolOrder": "gray",
+            "ModulatorOrder": 4
+          }
+        },
+        "SampleRate": 1.6384E+6,
+        "TimeDuration": 0.0100732421875,
+        "SamplePerFrame": 16504,
+        "ModulatorType": "OFDM",
+        "baseModulatorType": "qam",
+        "StartTime": 0.092,
+        "CarrierFrequency": 266800,
+        "DCOffset": -51.540449593444876,
+        "IqImbalanceConfig": {
+          "A": 2.4322128496547357,
+          "P": 1.2583735564531344
+        },
+        "MemoryLessNonlinearityConfig": {
+          "LinearGain": 3.392950566918711,
+          "Smoothness": 0.5541670014575002,
+          "PhaseGainRadian": -0.19253137596806491,
+          "PhaseSaturation": 0.82885157501207629,
+          "PhaseSmoothness": 3.3982867664001071,
+          "OutputSaturationLevel": 0.90148770481884621,
+          "Method": "Modified Rapp model",
+          "ReferenceImpedance": 1
+        },
+        "PhaseNoiseConfig": {
+          "Level": -103,
+          "FrequencyOffset": 33
+        },
+        "SDRInterpolationFactor": 4,
+        "TxSiteConfig": {
+          "owner": "ShuoChang",
+          "location": "Beijing",
+          "Name": "Tx_ShuoChang_Beijing_20250226_161915"
+        },
+        "SDRMode": "Zero-IF Receiver",
+        "PathDelays": [
+          0,
+          1E-7,
+          1E-6
+        ],
+        "AveragePathGains": [
+          0,
+          -5,
+          -10
+        ],
+        "NumReceiveAntennas": 4,
+        "FadingDistribution": "Rayleigh",
+        "MaximumDopplerShift": 0.0083567707716044864,
+        "mode": "MIMO"
+      }
+    ]
+  ],
+  "filePrefix": "Frame_000005_Rx_0003"
+}

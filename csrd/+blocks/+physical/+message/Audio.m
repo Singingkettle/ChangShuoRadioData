@@ -2,6 +2,7 @@ classdef Audio < matlab.System
 
     properties
         AudioFile {mustBeFile} = "../data/audio_mix_441.wav"
+        scale = 20
     end
 
     properties (Access = private)
@@ -28,14 +29,15 @@ classdef Audio < matlab.System
         function out = stepImpl(obj, MessageLength, SymbolRate)
             % SymbolRate is an useless var, only used to keep consistent
             % with other message classes' step function
-            sample_times = round(MessageLength / 1024);
-            y = zeros(1024, samnple_times);
+            MessageLength = MessageLength * obj.scale;
+            sample_times = ceil(MessageLength / 1024);
+            y = zeros(1024, sample_times);
 
             for i = 1:sample_times
                 y(:, i) = obj.audioSrc();
             end
 
-            out.data = y(1:MessageLength);
+            out.data = y(1:MessageLength)';
 
             out.SymbolRate = obj.audioSrc.SampleRate;
             out.MessageLength = MessageLength;

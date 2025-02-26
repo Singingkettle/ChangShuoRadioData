@@ -25,7 +25,7 @@ classdef Channel < matlab.System
     methods (Access = protected)
 
         function setupImpl(obj)
-            obj.logger = mlog.Logger("logger");
+            obj.logger = Log.getInstance();
             obj.cfgs = load_config(obj.Config);
 
             if isempty(obj.ChannelInfos)
@@ -60,7 +60,7 @@ classdef Channel < matlab.System
                             PathDelays(2:end) = 10 .^ (sort(randi(3, 1, delay_num)) - 10);
                         else
                             % outdoor
-                            Distance = randi(kwargs.MaxDistance.Outdoor, 1) * 1000; % m
+                            Distance = randi(kwargs.MaxDistance.Outdoor, 1); % m
                             PathDelays(2:end) = 10 .^ (sort(randi(3, 1, delay_num)) - 8);
                         end
 
@@ -99,8 +99,24 @@ classdef Channel < matlab.System
         function out = stepImpl(obj, x, FrameId, RxId, TxId, SegmentId)
             % channel
             out = obj.forward{TxId, RxId}(x);
-            obj.logger.info("Pass Channel of Frame-Rx-Tx-Segment %06d:%02d:%02d:%02d by %d*%d-%s-MIMO", FrameId, RxId, TxId, SegmentId, obj.ChannelInfos{TxId, RxId}.NumTransmitAntennas, obj.ChannelInfos{TxId, RxId}.NumReceiveAntennas, obj.FadingDistribution{TxId, RxId});
 
+            % Determine antenna configuration type
+            numTx = obj.ChannelInfos{TxId, RxId}.NumTransmitAntennas;
+            numRx = obj.ChannelInfos{TxId, RxId}.NumReceiveAntennas;
+
+            if numTx > 1 && numRx > 1
+                antennaConfig = "MIMO";
+            elseif numTx > 1 && numRx == 1
+                antennaConfig = "MISO";
+            elseif numTx == 1 && numRx > 1
+                antennaConfig = "SIMO";
+            else
+                antennaConfig = "SISO";
+            end
+
+            obj.logger.debug("Pass Channel of Frame-Rx-Tx-Segment %06d:%02d:%02d:%02d by %d*%d-%s-%s", ...
+                FrameId, RxId, TxId, SegmentId, ...
+                numTx, numRx, obj.FadingDistribution{TxId, RxId}, antennaConfig);
         end
 
     end

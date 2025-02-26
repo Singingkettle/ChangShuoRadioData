@@ -1,0 +1,144 @@
+{
+  "StartTime": 0,
+  "TimeDuration": 0.040245361328125,
+  "MasterClockRate": 1.6384E+6,
+  "NumReceiveAntennas": 4,
+  "SampleRateOffset": 0,
+  "DCOffset": -51.142199220456149,
+  "SDRDecimationFactor": 1,
+  "IqImbalanceConfig": {
+    "A": 0.01734678798485545,
+    "P": 3.3102131869282325
+  },
+  "MemoryLessNonlinearityConfig": {
+    "LinearGain": 2.3058426334673241,
+    "TOISpecification": "IPsat",
+    "IIP3": 31.901279389538253,
+    "OIP3": 26.616139534414476,
+    "IP1dB": 36.583851668605405,
+    "OP1dB": 23.957341273861282,
+    "IPsat": 22.373724837057697,
+    "OPsat": 37.616418761862775,
+    "AMPMConversion": 13.657706632567006,
+    "PowerLowerLimit": 10,
+    "PowerUpperLimit": null,
+    "Method": "Cubic polynomial",
+    "ReferenceImpedance": 1
+  },
+  "ThermalNoiseConfig": {
+    "NoiseFigure": 10.244369582083959
+  },
+  "SNRs": [
+    13.863442057511197,
+    16.161611945852442,
+    12.016589979196858,
+    15.412737121779996
+  ],
+  "SiteConfig": {
+    "owner": "ShuoChang",
+    "location": "Beijing",
+    "Name": "Rx_ShuoChang_Beijing_20250226_161915"
+  },
+  "SDRMode": "Zero-IF Receiver",
+  "tx": [
+    [
+      {
+        "BandWidth": [
+          -202800,
+          201600
+        ],
+        "SamplePerSymbol": 1,
+        "ModulatorOrder": 4,
+        "IsDigital": true,
+        "NumTransmitAntennas": 2,
+        "ModulatorConfig": {
+          "ostbcSymbolRate": 0.5,
+          "base": {
+            "mode": "psk",
+            "PhaseOffset": 1.4078056638372805,
+            "SymbolOrder": "bin"
+          },
+          "ofdm": {
+            "FFTLength": 1024,
+            "NumGuardBandCarriers": [
+              5,
+              8
+            ],
+            "InsertDCNull": true,
+            "CyclicPrefixLength": 29,
+            "Subcarrierspacing": 400,
+            "Windowing": false
+          }
+        },
+        "SampleRate": 1.6384E+6,
+        "TimeDuration": 0.0051416015625,
+        "SamplePerFrame": 8424,
+        "ModulatorType": "OFDM",
+        "baseModulatorType": "psk",
+        "StartTime": 0.035,
+        "CarrierFrequency": 241500,
+        "DCOffset": -47.693347964079791,
+        "IqImbalanceConfig": {
+          "A": 1.8349158444858733,
+          "P": 1.0021505913581157
+        },
+        "MemoryLessNonlinearityConfig": {
+          "InputScaling": 0.83628305510860912,
+          "AMAMParametersLeft": [
+            2.157,
+            2.159
+          ],
+          "AMAMParametersRight": [
+            1.151,
+            1.152
+          ],
+          "AMPMParametersLeft": [
+            4.003,
+            4.004
+          ],
+          "AMPMParametersRight": [
+            9.103,
+            9.105
+          ],
+          "OutputScaling": -0.44745865411507824,
+          "Method": "Saleh model",
+          "AMAMParameters": [
+            2.1572198172637189,
+            1.1519860163090514
+          ],
+          "AMPMParameters": [
+            4.003401276930858,
+            9.10468660701594
+          ],
+          "ReferenceImpedance": 1
+        },
+        "PhaseNoiseConfig": {
+          "Level": -145,
+          "FrequencyOffset": 102
+        },
+        "SDRInterpolationFactor": 4,
+        "TxSiteConfig": {
+          "owner": "ShuoChang",
+          "location": "Beijing",
+          "Name": "Tx_ShuoChang_Beijing_20250226_161913"
+        },
+        "SDRMode": "Zero-IF Receiver",
+        "PathDelays": [
+          0,
+          1E-6,
+          9.9999999999999991E-6
+        ],
+        "AveragePathGains": [
+          0,
+          -5,
+          -10
+        ],
+        "NumReceiveAntennas": 4,
+        "FadingDistribution": "Rayleigh",
+        "MaximumDopplerShift": 0.020191921897078826,
+        "mode": "MIMO"
+      }
+    ]
+  ],
+  "filePrefix": "Frame_000004_Rx_0003"
+}

@@ -20,14 +20,14 @@ end
 % Add the message to the buffer
 obj.MessageBuffer(obj.BufferIndex) = msgObj;
 
-% Write to file
-if msgObj.Level <= obj.FileThreshold
-    obj.writeToLogFile(msgObj);
-end
-
 % Log to command window
 if msgObj.Level <= obj.CommandWindowThreshold
     obj.writeToCommandWindow(msgObj);
+end
+
+% Write to file
+if msgObj.Level <= obj.FileThreshold
+    obj.writeToLogFile(msgObj);
 end
 
 % Send event notifications

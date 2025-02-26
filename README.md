@@ -1,39 +1,231 @@
-# Introduction
+# ChangShuoRadioData (CSRD)
 
-A good data is curcial for the success of signal recognition tasks.
-However, some of few datas are publicly acesseed in the current time (such as [deepsig]() for modulation classification
-task, [ucla](https://cores.ee.ucla.edu/downloads/datasets/wisig/) for specific emmitter identification).
-Basically, a signal data recognition pipline is:
+## Overview
 
-1. signal detection or localision task: when (time duration) and where (center frequency and band) exists a signal
-2. signal type: modulation type or other type (such as: wifi vs 5g)
-3. emitter type: friendly or not friendly, which one (like face recognition)
-4. emitter location: figure out the intrerested signal location
-
-# Install
+ChangShuoRadioData is a comprehensive MATLAB-based framework for simulating, generating, and processing wireless communication signals. It supports a wide variety of modulation schemes, signal processing techniques, and radio frequency (RF) behaviors, enabling realistic simulation of complex wireless communication systems.
 
 
-1. Install [Advanced Logger for MATLAB](https://www.mathworks.com/matlabcentral/fileexchange/87322-advanced-logger-for-matlab) to log.
+## Features
 
+- Multiple modulation schemes support (analog and digital)
+- MIMO capability
+- Frequency and time domain signal tiling
+- Configurable signal overlap
+- Phase noise simulation
+- Channel modeling
+- RF front-end simulation
+- Ray tracing capabilities
 
-# What's new
+## System Requirements
 
-v0.0.1 was released in 23/01/2024, which was located in ref/DataSimulationTool
-you can run generate.m to simulate wireless data, and
-can use [ChangShuoRadioRecognition](https://github.com/Singingkettle/ChangShuoRadioRecognition) to do a joint DL model for
-radio detection and modulation classification. This dataset is used in the TWC paper["Joint Signal Detection and Automatic Modulation Classification via Deep Learning"](https://arxiv.org/abs/2405.00736)
+- MATLAB R2020b or newer
+- Required MATLAB Toolboxes:
+  - Communications Toolbox
+  - Signal Processing Toolbox
+  - DSP System Toolbox
+  - RF Toolbox
+  - Antenna Toolbox (for MIMO features)
+- Minimum 8GB RAM (16GB recommended for complex simulations)
+- GPU support (optional, for acceleration)
 
-# Notes
+## Installation
 
-These notes are mainly about how to simulate a real wireless communication system.
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/ChangShuoRadioData.git
+   ```
 
-1. How to convert a baseband to a passband signal (Date: 2024/05/23)
+2. Add the project to your MATLAB path:
+   ```matlab
+   addpath(genpath('/path/to/ChangShuoRadioData'));
+   ```
+
+3. Verify installation by running the demo:
+   ```matlab
+   cd /path/to/ChangShuoRadioData/tutorial
+   demo
+   ```
+
+## Project Structure
+
 ```
-https://www.mathworks.com/help/comm/ug/passband-modulation.html
+ChangShuoRadioData/
+├── csrd/                    # Core library code
+│   ├── +blocks/             # Signal processing blocks
+│   │   ├── +event/          # Event-based components
+│   │   ├── +physical/       # Physical layer components
+│   │   └── ...
+│   ├── +collection/         # Collection of runners and processors
+│   ├── utils/               # Utility functions
+│   └── input/               # Input data handlers
+├── config/                  # Configuration files
+│   └── _base_/              # Base configurations
+└── tutorial/                # Tutorial and example files
+    ├── demo.m               # Main demonstration file
+    ├── test_am.m            # Amplitude modulation example
+    ├── test_fm.m            # Frequency modulation example
+    ├── test_ofdm.m          # OFDM modulation example
+    └── ...                  # Other modulation and feature examples
 ```
 
-2. Using a cache tools to avoid duplicate initialization about some method (such as, filters' coefficients), which are very time consuming (Date: 2024/06/04).
+## Usage Guide
 
-3. Product of SPS and SPAN must be even.
+### Basic Usage
 
-4.  About the valid values for DVABSAPSK the doc in matlab is not consistent with the official code, we use the official code to define the config parameters' range. As a result, there are bugs about codeIDF about doc link: https://www.mathworks.com/help/comm/ref/dvbsapskmod.html
+1. Start by exploring the tutorial examples:
+
+```matlab
+% Run the general demo
+demo
+
+% Test specific modulation types
+test_am        % Amplitude modulation
+test_fm        % Frequency modulation
+test_ofdm      % OFDM modulation
+test_qam       % QAM modulation
+```
+
+2. Create a custom simulation:
+
+```matlab
+% Basic simulation setup example
+% 1. Initialize a modulator
+qamMod = csrd.blocks.physical.modulate.QAMModulator(...
+    'ModulatorOrder', 16, ...
+    'SampleRate', 1e6, ...
+    'NumTransmitAntennas', 1);
+
+% 2. Create input data
+inputData = struct('data', randi([0 1], 10000, 1));
+
+% 3. Modulate the data
+modulatedSignal = qamMod.step(inputData);
+
+% 4. Configure frequency tiling for multiple signals
+tiling = csrd.blocks.event.communication.wireless.Tiling(...
+    'IsOverlap', true, ...
+    'OverlapRadio', 0.2);
+
+% 5. Apply tiling to signals
+signalSets = {{modulatedSignal}};  % Single transmitter example
+[positionedSignals, txInfo, clockRate, bandWidth] = tiling.step(signalSets);
+
+% 6. Visualize the results
+% ... (visualization code would go here)
+```
+
+### Advanced Usage
+
+For more complex simulations, explore the test files in the tutorial directory. These demonstrate:
+- Multi-antenna (MIMO) configurations
+- Channel modeling
+- Phase noise effects
+- Ray tracing
+- Hardware impairments
+
+## Key Components
+
+### Modulation Schemes
+
+The framework supports numerous modulation types including:
+- Analog: AM, FM, PM
+- Digital: ASK, FSK, PSK, QAM, APSK, DVBS-APSK
+- Advanced: OFDM, SC-FDMA, OTFS, CPM, GMSK, GFSK, MSK
+
+### Signal Processing Blocks
+
+- **Tiling Module**: Arranges signals in frequency/time domains
+- **BaseModulator**: Foundation class for all modulation schemes
+- **DigitalUpConverter/DigitalDownConverter**: Frequency conversion
+- **PhaseNoise**: Simulates oscillator phase noise
+- **RayTrace**: Models signal propagation
+
+### Simulation Framework
+
+The collection module provides runner classes to execute complete simulations with:
+- Configurable scenarios
+- Progress tracking
+- Result collection
+- Performance measurement
+
+## Potential Vulnerabilities
+
+1. **Memory Management Issues**:
+   - Large signal arrays may cause out-of-memory errors
+   - No explicit memory usage monitoring
+
+2. **Computational Performance**:
+   - Inefficient implementations for large-scale simulations
+   - Limited GPU acceleration support
+   - Potential bottlenecks in multi-antenna configurations
+
+3. **Input Validation**:
+   - Insufficient validation of user inputs
+   - Potential for unexpected behavior with malformed inputs
+
+4. **Error Handling**:
+   - Limited robust error handling mechanisms
+   - Some edge cases may not be properly handled
+
+5. **Compatibility Issues**:
+   - Some functions may depend on specific MATLAB versions
+   - Potential compatibility issues between different components
+
+6. **Signal Processing Limitations**:
+   - Frequency tiling algorithm may produce suboptimal results in dense signal environments
+   - Phase noise modeling may not accurately reflect real-world hardware
+   - Random number generation dependencies may lead to reproducibility issues
+
+7. **Documentation Gaps**:
+   - Incomplete documentation for some advanced features
+   - Limited guidance for extending the framework
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Index exceeds matrix dimensions" error**:
+   - Ensure signal arrays are correctly formatted
+   - Check for empty or malformed signal structures
+
+2. **"Out of memory" errors**:
+   - Reduce simulation size or complexity
+   - Process signals in smaller batches
+
+3. **GPU acceleration issues**:
+   - Verify GPU availability with `gpuDeviceCount > 0`
+   - Ensure compatible CUDA/GPU drivers
+   - Implement fallback to CPU processing
+
+### Performance Optimization
+
+1. **Reduce sample rates** where possible
+2. **Pre-allocate arrays** for large signal processing
+3. **Use smaller frame sizes** for complex modulations
+4. **Optimize visualization** settings for large datasets
+
+## Contributing
+
+Contributions to ChangShuoRadioData are welcome! To contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please ensure your code follows the project's style guidelines and includes appropriate tests.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- MATLAB and MathWorks for the underlying platform and toolboxes
+- The wireless communications research community
+- Contributors to the ChangShuoRadioData project
+
+---
+
+For more information, bug reports, or feature requests, please contact the project maintainers.

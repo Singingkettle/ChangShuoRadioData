@@ -9,6 +9,7 @@ classdef RRFSimulator < matlab.System
     properties
         % Configuration parameters for the receiver
         StartTime (1, 1) {mustBeGreaterThanOrEqual(StartTime, 0), mustBeReal} = 0 % Start time of simulation in seconds
+        DecimationFactor (1, 1) {mustBePositive, mustBeReal} = 1 % Decimation factor
         NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1 % Number of receive antennas
         BandWidth {mustBePositive, mustBeReal, mustBeInteger} = 20e3 % Receiver bandwidth in Hz
         CenterFrequency (1, 1) {mustBePositive, mustBeReal, mustBeInteger} = 20e3 % Center frequency in Hz
@@ -18,7 +19,7 @@ classdef RRFSimulator < matlab.System
         DCOffset {mustBeReal} = -50 % DC offset in dB
 
         % Configuration structs for RF impairments
-        RxSiteConfig struct % Configuration for receiver site parameters
+        SiteConfig struct % Configuration for receiver site parameters
         IqImbalanceConfig struct % Configuration for IQ imbalance parameters
         MemoryLessNonlinearityConfig struct % Configuration for nonlinearity parameters
         ThermalNoiseConfig struct % Configuration for thermal noise parameters
@@ -36,6 +37,7 @@ classdef RRFSimulator < matlab.System
         AGC % Automatic Gain Control object
         SNR % Signal-to-Noise Ratio
         SampleShifter % Sample rate offset object
+        BandpassFilter % Bandpass filter object
     end
 
     methods (Access = private)
@@ -65,11 +67,12 @@ classdef RRFSimulator < matlab.System
                 LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
                     Method = 'Cubic polynomial', ...
                     LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
-                    TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification, ...
-                    IIP3 = obj.MemoryLessNonlinearityConfig.IIP3);
+                    TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification);
 
                 % Set appropriate TOI specification parameter
-                if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
+                if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IIP3')
+                    LowerNoiseAmplifier.IIP3 = obj.MemoryLessNonlinearityConfig.IIP3;
+                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
                     LowerNoiseAmplifier.OIP3 = obj.MemoryLessNonlinearityConfig.OIP3;
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IP1dB')
                     LowerNoiseAmplifier.IP1dB = obj.MemoryLessNonlinearityConfig.IP1dB;
@@ -137,6 +140,15 @@ classdef RRFSimulator < matlab.System
                 Offset = obj.MasterClockRate);
         end
 
+        function bpFilt = genBandpassFilter(obj)
+            % Generates bandpass filter object with specified center frequency and bandwidth
+            bpFilt = designfilt('bandpassiir', ...
+                FilterOrder = 8, ...
+                HalfPowerFrequency1 = obj.CenterFrequency - obj.BandWidth / 2, ...
+                HalfPowerFrequency2 = obj.CenterFrequency + obj.BandWidth / 2, ...
+                SampleRate = obj.MasterClockRate);
+        end
+
     end
 
     methods
@@ -157,6 +169,7 @@ classdef RRFSimulator < matlab.System
             obj.SampleShifter = obj.genSampleShifter; % Initialize sample rate offset
             obj.ThermalNoise = obj.genThermalNoise; % Initialize thermal noise
             obj.IQImbalance = obj.genIqImbalance; % Initialize IQ imbalance
+            obj.BandpassFilter = obj.genBandpassFilter; % Initialize bandpass filter
         end
 
         function out = stepImpl(obj, chs)
@@ -190,137 +203,110 @@ classdef RRFSimulator < matlab.System
                 end
 
                 % Add random margin to duration
-                obj.TimeDuration = (rand(1) * 0.1 + 1) * obj.TimeDuration;
+                obj.TimeDuration = obj.TimeDuration + (rand(1) * 0.1 + 1) * 0.0001;
             end
 
             % Initialize arrays for combined signals
-            datas = zeros(round(obj.MasterClockRate * obj.TimeDuration * obj.InterpDecim), ...
+            datas = zeros(round(obj.MasterClockRate * obj.TimeDuration), ...
                 num_tx, ...
                 obj.NumReceiveAntennas);
 
             datas_info = cell(1, num_tx);
 
-            % Process each transmitter's signals
             for tx_id = 1:num_tx
                 txs = chs{tx_id};
-                partinfo = zeros(2, length(txs));
-                InputSampleRate = txs{1}.SampleRate;
 
-                gcd_val = gcd(obj.MasterClockRate, InputSampleRate);
+                partinfo = cell(length(txs), 3);
+                hbw = 0;
+                cf = 0;
+                sp = 0;
 
-                if gcd_val ~= min(obj.MasterClockRate, InputSampleRate)
-                    error("The master clock rate and input sample rate are not coprime");
-                else
-                    InterpDecim = max(obj.MasterClockRate, InputSampleRate) / gcd_val;
-                end
-
-                % Combine signals from all parts of this transmitter
-                sub_datas = zeros(round(InputSampleRate * obj.TimeDuration), obj.NumReceiveAntennas);
-                Bandwidth = max(abs(txs{1}.BandWidth)) + txs{1}.CarrierFrequency;
-                CenterFrequency = txs{1}.CarrierFrequency;
-
-                % Process each part of the transmission
                 for part_id = 1:length(txs)
                     tx = txs{part_id};
 
-                    % Verify sample rate consistency
-                    if tx.SampleRate ~= InputSampleRate
-                        error("The sample rate of the %dth part of the %dth tx is not equal to the input sample rate", part_id, tx_id);
-                    end
+                    if obj.MasterClockRate ~= tx.SampleRate
+                        useSR = true;
 
-                    % Update bandwidth if necessary
-                    if max(abs(tx.BandWidth)) + tx.CarrierFrequency > Bandwidth
-                        Bandwidth = max(abs(tx.BandWidth)) + tx.CarrierFrequency;
-                    end
+                        if max(abs(tx.BandWidth)) > hbw
+                            hbw = max(abs(tx.BandWidth));
+                        end
 
-                    % Place data at correct time offset
-                    startIdx = fix(InputSampleRate * tx.StartTime) + 1;
-                    sub_datas(startIdx:length(tx.data) + startIdx - 1, :) = tx.data;
-                    partinfo(1, part_id) = fix(obj.MasterClockRate * tx.StartTime) + 1;
-                    partinfo(2, part_id) = fix(obj.MasterClockRate * (tx.StartTime + tx.TimeDuration)) + 1;
-                end
+                        cf = tx.CarrierFrequency;
+                        sp = tx.SampleRate;
 
-                % Perform sample rate conversion
-                if InterpDecim ~= 1
-
-                    if InputSampleRate > obj.MasterClockRate
-                        % Configure digital down converter
-                        DDC = dsp.DigitalDownConverter( ...
-                            DecimationFactor = InterpDecim, ...
-                            SampleRate = obj.MasterClockRate, ...
-                            Bandwidth = Bandwidth, ...
-                            StopbandAttenuation = 60, ...
-                            PassbandRipple = 0.1, ...
-                            CenterFrequency = CenterFrequency);
-                        sub_datas = DDC(sub_datas);
                     else
-                        % Configure digital up converter
-                        DUC = dsp.DigitalUpConverter( ...
-                            InterpolationFactor = InterpDecim, ...
-                            SampleRate = obj.MasterClockRate, ...
-                            Bandwidth = Bandwidth, ...
-                            StopbandAttenuation = 60, ...
-                            PassbandRipple = 0.1, ...
-                            CenterFrequency = CenterFrequency);
-                        sub_datas = DUC(sub_datas);
+                        useSR = false;
+                        break;
                     end
 
                 end
 
-                datas(:, tx_id, :) = sub_datas(1:round(obj.MasterClockRate * obj.TimeDuration), :);
+                if useSR
+                    src = dsp.SampleRateConverter( ...
+                        Bandwidth = hbw + cf, ...
+                        InputSampleRate = sp, ...
+                        OutputSampleRate = obj.MasterClockRate);
+                end
+
+                for part_id = 1:length(txs)
+                    tx = txs{part_id};
+
+                    if useSR
+                        x = src(tx.data);
+                    else
+                        x = tx.data;
+                    end
+
+                    startIdx = fix(obj.MasterClockRate * tx.StartTime) + 1;
+                    datas(startIdx:length(x) + startIdx - 1, tx_id, :) = x;
+                    partinfo{part_id, 1} = startIdx;
+                    partinfo{part_id, 2} = length(x) + startIdx - 1;
+                    partinfo{part_id, 3} = sum(abs(x) .^ 2, 1); % the power of the signal for calculating SNR
+                end
+
                 datas_info{tx_id} = partinfo;
             end
 
-            % Initialize output arrays
-            y = cell(1, obj.NumReceiveAntennas);
+            % Apply bandpass filter
+            datas = sum(datas, 2);
+            datas = reshape(datas, [], obj.NumReceiveAntennas);
+            datas = filter(obj.BandpassFilter, datas);
+
+            % Apply RF impairments
+            x = obj.LowerPowerAmplifier(datas);
+            % TODO: add sample rate offset, it will be used in the future
+            % However, it is not used in the current implementation.
+            % Because the sample rate offset implementation has bugs.
+            % x = obj.SampleShifter(x);
+
+            release(obj.ThermalNoise);
+            xAwgn = obj.ThermalNoise(x);
+            n = xAwgn - x;
+            % Apply DC offset and IQ imbalance
+            x = xAwgn + 10 ^ (obj.DCOffset / 10);
+            y = obj.IQImbalance(x);
+            % Initialize output cell array
             SNRs = cell(num_tx, obj.NumReceiveAntennas);
 
             % Process each receive antenna
             for ra_id = 1:obj.NumReceiveAntennas
-                % Combine signals from all transmitters
-                x = sum(datas(:, :, ra_id), 2);
-
-                % Apply bandpass filter
-                x = bandpass(x, ...
-                    [obj.CenterFrequency - obj.BandWidth / 2, ...
-                     obj.CenterFrequency + obj.BandWidth / 2], ...
-                    obj.MasterClockRate, ...
-                    ImpulseResponse = "fir", ...
-                    Steepness = 0.99, ...
-                    StopbandAttenuation = 100);
-
-                % Apply RF impairments
-                x = obj.LowerPowerAmplifier(x);
-                x = obj.SampleShifter(x);
-                xAwgn = obj.ThermalNoise(x);
-
                 % Calculate SNR for each transmission
-                n = xAwgn - x;
-
                 for tx_id = 1:num_tx
-                    num_parts = size(datas_info{tx_id}, 2);
+                    num_parts = size(datas_info{tx_id}, 1);
                     part_SNRs = zeros(1, num_parts);
 
                     % Calculate SNR for each part
                     for part_id = 1:num_parts
-                        left = datas_info{tx_id}(1, part_id);
-                        right = datas_info{tx_id}(2, part_id);
-                        px = x(left:right, 1);
-                        pn = n(left:right, 1);
-                        part_SNRs(part_id) = 10 * log10(sum(abs(px) .^ 2) / sum(abs(pn) .^ 2));
+                        left = datas_info{tx_id}{part_id, 1};
+                        right = datas_info{tx_id}{part_id, 2};
+                        pn = n(left:right, ra_id);
+                        part_SNRs(part_id) = 10 * log10(datas_info{tx_id}{part_id, 3}(ra_id) / sum(abs(pn) .^ 2));
                     end
 
                     SNRs{tx_id, ra_id} = part_SNRs;
                 end
 
-                % Apply DC offset and IQ imbalance
-                x = x + 10 ^ (obj.DCOffset / 10);
-                x = obj.IQImbalance(x);
-                y{ra_id} = x;
             end
-
-            % Combine all antenna outputs
-            y = cell2mat(y);
 
             % Prepare output structure
             out.data = y;
@@ -330,11 +316,13 @@ classdef RRFSimulator < matlab.System
             out.NumReceiveAntennas = obj.NumReceiveAntennas;
             out.SampleRateOffset = obj.SampleRateOffset;
             out.DCOffset = obj.DCOffset;
+            out.SDRDecimationFactor = obj.DecimationFactor;
             out.IqImbalanceConfig = obj.IqImbalanceConfig;
             out.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;
             out.ThermalNoiseConfig = obj.ThermalNoiseConfig;
             out.SNRs = SNRs;
-            out.RxSiteConfig = obj.RxSiteConfig;
+            out.SiteConfig = obj.SiteConfig;
+            out.SDRMode = "Zero-IF Receiver";
 
             % Store transmitter information without data
             out.tx = cell(num_tx, 1);

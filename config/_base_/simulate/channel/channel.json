@@ -4,9 +4,9 @@
             "handle": "blocks.physical.environment.channel.MIMO",
             "MaxPaths": 3,
             "MaxDistance": {
-                "Ratio": 50,
+                "Ratio": 0,
                 "Indoor": 10,
-                "Outdoor": 10
+                "Outdoor": [100, 1000]
             },
             "SpeedRange": [
                 1.5,

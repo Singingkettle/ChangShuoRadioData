@@ -66,7 +66,7 @@ classdef Event < matlab.System
 
         function setupImpl(obj)
             % Initialize logger and load configurations
-            obj.logger = mlog.Logger("logger");
+            obj.logger = Log.getInstance();
             obj.cfgs = load_config(obj.Config);
 
             % Validate EventInfos
@@ -119,13 +119,13 @@ classdef Event < matlab.System
 
         end
 
-        function [out, TxMasterClockRateRange] = stepImpl(obj, FrameId, EventIndex, txs)
+        function [out, TxInfos, TxMasterClockRateRange, BandWidthRange] = stepImpl(obj, FrameId, EventIndex, txs)
             % Input validation
             validateattributes(FrameId, {'numeric'}, {'scalar', 'positive', 'integer'});
 
             % Generate messages
-            [out, TxMasterClockRateRange] = obj.forward{EventIndex}(txs);
-            obj.logger.info("Generate event of Frame %06d using %s-%s", FrameId, obj.EventInfos{EventIndex}.ParentEventType, obj.EventInfos{EventIndex}.EventType);
+            [out, TxInfos, TxMasterClockRateRange, BandWidthRange] = obj.forward{EventIndex}(txs);
+            obj.logger.debug("Generate event of Frame %06d using %s-%s", FrameId, obj.EventInfos{EventIndex}.ParentEventType, obj.EventInfos{EventIndex}.EventType);
         end
 
     end

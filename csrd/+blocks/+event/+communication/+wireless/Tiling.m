@@ -1,11 +1,26 @@
 classdef Tiling < matlab.System
+    % Tiling - Arranges wireless signals in the time and frequency domains
+    %
+    % This class implements a "tiling" strategy to position multiple transmitter
+    % signals in both time and frequency domains with configurable overlap.
+    %
+    % Properties:
+    %   IsOverlap - Boolean flag to enable/disable frequency overlap between signals
+    %   OverlapRadio - Probability of overlap when IsOverlap is true (range: 0-1)
+    %   FrequencyOverlapRadioRange - Range of overlap ratios [min, max] (range: 0-1)
 
     properties
+        % IsOverlap - Enable/disable frequency overlap between signals
+        % Default: false
+        IsOverlap (1, 1) logical = false
 
-        IsOverlap (1, 1) = false
-        OverlapRadio = 0.2;
-        FrequencyOverlapRadioRange = [0, 0.1];
+        % OverlapRadio - Probability of overlap when IsOverlap is true
+        % Range: 0-1, Default: 0.2
+        OverlapRadio (1, 1) {mustBeNumeric, mustBeInRange(OverlapRadio, 0, 1)} = 0.2;
 
+        % FrequencyOverlapRadioRange - Range of overlap ratios [min, max]
+        % Range: 0-1 for each value, Default: [0, 0.1]
+        FrequencyOverlapRadioRange (1, 2) {mustBeNumeric, mustBeInRange(FrequencyOverlapRadioRange, 0, 1)} = [0, 0.1];
     end
 
     methods
@@ -18,10 +33,21 @@ classdef Tiling < matlab.System
 
     methods (Access = protected)
 
-        function [xs, MasterClockRateRange, BandWidth] = stepImpl(obj, xs)
-            % 打乱顺序
-            % 本质上采取的是一种类似贴瓷砖的策略，针对单个发射机，按照时域将数据依次排开
-            % 紧接着，按照频域将数据依次排开
+        function [xs, txInfos, MasterClockRateRange, BandWidthRange] = stepImpl(obj, xs)
+            % stepImpl - Positions signals in time and frequency domains
+            %
+            % Inputs:
+            %   xs - Cell array of transmitter signals
+            %        Each element is a cell array containing signal segments
+            %        Each segment should have BandWidth, ModulatorType, SampleRate properties
+            %
+            % Outputs:
+            %   xs - Updated signal array with assigned frequencies and start times
+            %   txInfos - Cell array of transmitter information structures
+            %             Each structure has CarrierFrequency, BandWidth, SampleRate fields
+            %   MasterClockRateRange - [min, max] range for master clock rate in Hz
+            %   BandWidthRange - [min, max] frequency range covered by all signals in Hz
+
             num_tx = length(xs);
             base_frequency = fix(10 ^ (rand(1) * 2 + 2) / 100) * 100;
 
@@ -32,8 +58,9 @@ classdef Tiling < matlab.System
             ts = linspace(0.001, 0.1, 100);
             max_sample_rate = 0;
 
-            for i = 1:num_tx
+            txInfos = cell(1, num_tx);
 
+            for i = 1:num_tx
                 min_left = 0;
                 max_right = 0;
 
@@ -50,12 +77,18 @@ classdef Tiling < matlab.System
                 end
 
                 current_band_width = max_right - min_left;
-                % randi(100, 1)*1e2 随机设置的两个信号间的频率间隔
-                move_step = current_band_width + randi(100, 1) * 1e2;
+
+                % Set frequency spacing based on modulation type
+                if strcmpi(xs{1}{1}.ModulatorType, 'OFDM') || strcmpi(xs{1}{1}.ModulatorType, 'SCFDMA') || strcmpi(xs{1}{1}.ModulatorType, 'OTFS') || strcmpi(xs{1}{1}.ModulatorType, 'CPFSK')
+                    move_step = current_band_width + randi(100, 1) * 1e3;
+                else
+                    move_step = current_band_width + randi(100, 1) * 1e2;
+                end
 
                 if obj.IsOverlap
 
-                    if rand(1) < obj.OverlapRadio
+                    if rand(1) < obj.OverlapRadio && i > 1
+                        % Apply overlap for signals after the first one
                         move_step = (1 - rand(1) * (obj.FrequencyOverlapRadioRange(2) - obj.FrequencyOverlapRadioRange(1))) * current_band_width;
                     end
 
@@ -75,6 +108,18 @@ classdef Tiling < matlab.System
                     bound.right = CarrierFrequency + max_right;
                 end
 
+                info.CarrierFrequency = CarrierFrequency;
+                hbw = max(abs([min_left, max_right]));
+                hbw = ceil(hbw / 100) * 100;
+
+                if strcmpi(xs{i}{1}.ModulatorType, 'OFDM') || strcmpi(xs{i}{1}.ModulatorType, 'SCFDMA') || strcmpi(xs{i}{1}.ModulatorType, 'OTFS') || strcmpi(xs{i}{1}.ModulatorType, 'CPFSK')
+                    bw = fix(hbw / 1000) * 1000 * 2;
+                else
+                    bw = 2 * hbw;
+                end
+
+                info.BandWidth = bw;
+
                 for j = 1:length(xs{i})
                     x = xs{i}{j};
                     item_start_time = current_start_time + randsample(ts, 1);
@@ -84,20 +129,23 @@ classdef Tiling < matlab.System
                     xs{i}{j} = x;
                 end
 
+                info.SampleRate = x.SampleRate;
+
                 if max_sample_rate < x.SampleRate
                     max_sample_rate = x.SampleRate;
                 end
 
+                txInfos{i} = info;
             end
 
-            if max_sample_rate * 2 > bound.right * 2
-                MasterClockRateRange = [max_sample_rate * 2 + randi(10, 1) * 1e2, max_sample_rate * 2 + randi(10, 1) * 1e4];
+            % Set appropriate master clock rate range based on signal bandwidth
+            if max_sample_rate > bound.right * 2
+                MasterClockRateRange = [max_sample_rate + randi(10, 1) * 1e2, max_sample_rate + randi(10, 1) * 1e4];
             else
                 MasterClockRateRange = [bound.right * 2 + randi(10, 1) * 1e2, bound.right * 2 + randi(10, 1) * 1e4];
             end
 
-            BandWidth = [bound.left, bound.right];
-
+            BandWidthRange = [bound.left, bound.right];
         end
 
     end

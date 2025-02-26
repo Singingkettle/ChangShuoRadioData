@@ -66,7 +66,7 @@ classdef Message < matlab.System
 
         function setupImpl(obj)
             % Initialize logger and load configurations
-            obj.logger = mlog.Logger("logger");
+            obj.logger = Log.getInstance();
             obj.cfgs = load_config(obj.Config);
 
             % Validate MessageInfos
@@ -101,7 +101,7 @@ classdef Message < matlab.System
 
             % Generate messages
             out = obj.forward{MessageIndex}(MessageLength, SymbolRate);
-            obj.logger.info("Generate messages of Frame-Tx-Segment %06d:%02d:%02d using %s", ...
+            obj.logger.debug("Generate messages of Frame-Tx-Segment %06d:%02d:%02d using %s", ...
                 FrameId, MessageIndex, SegmentId, obj.MessageInfos{MessageIndex}.MessageType);
         end
 
