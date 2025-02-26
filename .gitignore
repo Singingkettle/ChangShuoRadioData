@@ -120,6 +120,7 @@ ref/
 *.pkl.json
 *.log.json
 work_dirs/
+results/
 
 # Pytorch
 *.pth
