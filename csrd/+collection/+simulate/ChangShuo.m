@@ -71,7 +71,11 @@ classdef ChangShuo < matlab.System
 
                     SymbolRate = randi((obj.SymbolRateRange(2) - obj.SymbolRateRange(1)) / obj.SymbolRateStep) * obj.SymbolRateStep + obj.SymbolRateRange(1);
                     SamplePerSymbol = randsample(obj.SamplePerSymbolRange(1):obj.SamplePerSymbolRange(2), 1);
-                    NumTransmitAntennas = randsample(obj.NumTransmitAntennasRange(1):obj.NumTransmitAntennasRange(2), 1);
+                    if randi(100) <= 50
+                        NumTransmitAntennas = 1;
+                    else
+                        NumTransmitAntennas = randsample(obj.NumTransmitAntennasRange(1):obj.NumTransmitAntennasRange(2), 1);
+                    end
                     TxSiteConfig.owner = "ShuoChang";
                     TxSiteConfig.location = "Beijing";
                     currentTime = datetime('now', 'Format', 'yyyyMMdd_HHmmss');
@@ -138,10 +142,7 @@ classdef ChangShuo < matlab.System
                 for TxId = 1:length(txs)
 
                     for SegmentId = 1:length(txs{TxId})
-                        tic
-                        TxInfos{TxId}
                         txs{TxId}{SegmentId} = runTransmit(txs{TxId}{SegmentId}, FrameId, TxId, SegmentId);
-                        toc
                     end
 
                 end
@@ -160,7 +161,7 @@ classdef ChangShuo < matlab.System
                     RxInfos{RxId}.NumReceiveAntennas = NumReceiveAntennas;
                     RxInfos{RxId}.MasterClockRateRange = [0, 0];
                     RxInfos{RxId}.BandWidth = BandWidthRange(2) - BandWidthRange(1);
-                    RxInfos{RxId}.CenterFrequency = (BandWidthRange(2) + BandWidthRange(1)) / 2;
+                    RxInfos{RxId}.CenterFrequency = round((BandWidthRange(2) + BandWidthRange(1)) / 2);
                 end
 
                 ChannelInfos = cell(length(TxInfos), length(RxInfos));

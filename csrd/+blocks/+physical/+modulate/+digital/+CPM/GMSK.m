@@ -11,7 +11,7 @@ classdef GMSK < blocks.physical.modulate.digital.FSK.FSK
             if ~isfield(obj.ModulatorConfig, 'BandwidthTimeProduct')
                 % BT typically ranges from 0.2 to 0.5
                 % Lower BT means better spectral efficiency but more ISI
-                obj.ModulatorConfig.BandwidthTimeProduct = rand(1) * 0.2 + 0.2;
+                obj.ModulatorConfig.BandwidthTimeProduct = rand(1) * 0.3 + 0.2;
                 obj.ModulatorConfig.PulseLength = randi([4, 10], 1);
                 obj.ModulatorConfig.SymbolPrehistory = randsample([-1, 1], 1);
                 obj.ModulatorConfig.InitialPhaseOffset = rand(1) * 2 * pi;

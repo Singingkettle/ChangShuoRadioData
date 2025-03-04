@@ -1,41 +1,72 @@
 classdef MIMO < blocks.physical.environment.channel.BaseChannel
+    % MIMO - Multiple-Input Multiple-Output Channel Model
+    %
+    % This class implements a MIMO channel model with configurable fading,
+    % path delays, and Doppler effects. It supports both Rayleigh and Rician
+    % fading distributions.
+    %
+    % Properties (Nontunable):
+    %   FadingDistribution - Type of fading ('Rayleigh' or 'Rician')
+    %   PathDelays - Discrete path delays in seconds
+    %   AveragePathGains - Average path gains in dB
+    %   KFactor - Rician K-factor (only used for Rician fading)
+    %   MaximumDopplerShift - Maximum Doppler shift in Hz
+    %   FadingTechnique - Method for generating fading ('Sum of sinusoids')
+    %   InitialTimeSource - Source of initial time ('Input port')
+    %
+    % Methods:
+    %   setupImpl - Initializes the MIMO channel object
+    %   stepImpl - Processes input signal through the channel
+    %   infoImpl - Returns channel configuration information
+    %
+    % Example:
+    %   ch = MIMO('NumTransmitAntennas', 2, ...
+    %             'NumReceiveAntennas', 2, ...
+    %             'FadingDistribution', 'Rayleigh');
+    %   out = ch.step(in);
 
     properties (Nontunable)
         FadingDistribution = 'Rayleigh'
-        %PathDelays Discrete path delays (s)
-        %   Specify the delays of the discrete paths in seconds as a double
-        %   precision, real, scalar or row vector. When PathDelays is a scalar,
-        %   the channel is frequency-flat; When PathDelays is a vector, the
-        %   channel is frequency-selective. The default is 0.
+        % FadingDistribution - Type of fading distribution
+        % Specify as 'Rayleigh' or 'Rician'. Default: 'Rayleigh'
+        
         PathDelays = 0
-        %AveragePathGains Average path gains (dB)
-        %   Specify the average gains of the discrete paths in dB as a double
-        %   precision, real, scalar or row vector. AveragePathGains must have
-        %   the same size as PathDelays. The default is 0.
+        % PathDelays - Discrete path delays (s)
+        % Specify delays as a scalar (frequency-flat) or row vector 
+        % (frequency-selective). Default: 0
+        
         AveragePathGains = 0
-        %KFactor K-factors, only used for the rician
-        %   Specify the K factor of a Rician fading channel as a double
-        %   precision, real, positive scalar. The first discrete path is a
-        %   Rician fading process with a Rician K-factor of KFactor and the
-        %   remaining discrete paths are independent Rayleigh fading processes.
-        %   The default is 3.
+        % AveragePathGains - Average path gains (dB)
+        % Specify gains as a scalar or row vector matching PathDelays size.
+        % Default: 0
+        
         KFactor = 3
-        %MaximumDopplerShift Maximum Doppler shift (Hz)
-        %   Specify the maximum Doppler shift for the path(s) of the channel in
-        %   Hz as a double precision, real, nonnegative scalar. It applies to
-        %   all the paths of the channel. When MaximumDopplerShift is 0, the
-        %   channel is static for the entire input and you can use the reset
-        %   method to generate a new channel realization. The
-        %   MaximumDopplerShift must be smaller than SampleRate/10 for each
-        %   path. The default is 0.
+        % KFactor - Rician K-factor
+        % Specify as a positive scalar. Only used for Rician fading.
+        % First path uses this K-factor, remaining paths are Rayleigh.
+        % Default: 3
+        
         MaximumDopplerShift = 0
+        % MaximumDopplerShift - Maximum Doppler shift (Hz)
+        % Specify as a nonnegative scalar < SampleRate/10.
+        % Applies to all paths. When 0, channel is static.
+        % Default: 0
+        
         FadingTechnique = "Sum of sinusoids"
+        % FadingTechnique - Method for generating fading
+        % Currently supports "Sum of sinusoids" only
+        
         InitialTimeSource = "Input port"
+        % InitialTimeSource - Source of initial time
+        % Specifies how initial time is determined
     end
 
     methods (Access = protected)
-
         function setupImpl(obj)
+            % setupImpl - Initialize the MIMO channel object
+            %
+            % Creates a comm.MIMOChannel object with specified parameters
+            % Different configurations for Rayleigh and Rician fading
 
             if strcmp(obj.FadingDistribution, 'Rayleigh')
                 obj.MultipathChannel = comm.MIMOChannel( ...
@@ -63,16 +94,32 @@ classdef MIMO < blocks.physical.environment.channel.BaseChannel
                     NumTransmitAntennas = obj.NumTransmitAntennas, ...
                     NumReceiveAntennas = obj.NumReceiveAntennas);
             end
-
         end
 
         function out = stepImpl(obj, x)
+            % stepImpl - Process input signal through the channel
+            %
+            % Syntax:
+            %   out = stepImpl(obj, x)
+            %
+            % Inputs:
+            %   x - Input signal structure with fields:
+            %       data - Signal data
+            %       SampleRate - Sampling rate
+            %       StartTime - Signal start time
+            %
+            % Outputs:
+            %   out - Output structure with added channel effects
+            
+            % Apply path loss
             x.data = x.data / 10 ^ (obj.PathLoss / 20);
+            
             % Add channel impairments
             release(obj.MultipathChannel);
             obj.MultipathChannel.SampleRate = x.SampleRate;
             y = obj.addMultipathFading(x.data, x.StartTime);
 
+            % Prepare output structure
             out = x;
             out.data = y;
             out.PathDelays = obj.PathDelays;
@@ -86,10 +133,16 @@ classdef MIMO < blocks.physical.environment.channel.BaseChannel
 
             out.MaximumDopplerShift = obj.MaximumDopplerShift;
             out.mode = obj.mode;
-
         end
 
         function s = infoImpl(obj)
+            % infoImpl - Return channel configuration information
+            %
+            % Returns structure with fields:
+            %   mode - Channel mode (SISO/MIMO/MISO/SIMO)
+            %   FadingDistribution - Type of fading
+            %   NumTransmitAntennas - Number of transmit antennas
+            %   NumReceiveAntennas - Number of receive antennas
 
             if isempty(obj.MultipathChannel)
                 setupImpl(obj);
@@ -101,7 +154,5 @@ classdef MIMO < blocks.physical.environment.channel.BaseChannel
                 'NumTransmitAntennas', obj.NumTransmitAntennas, ...
                 'NumReceiveAntennas', obj.NumReceiveAntennas);
         end
-
     end
-
 end

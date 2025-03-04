@@ -60,20 +60,14 @@
       "handle": "blocks.physical.modulate.digital.CPM.CPFSK",
       "Order": [
         4,
-        8,
-        16,
-        32,
-        64
+        8
       ]
     },
     "GFSK": {
       "handle": "blocks.physical.modulate.digital.CPM.GFSK",
       "Order": [
         4,
-        8,
-        16,
-        32,
-        64
+        8
       ]
     },
     "GMSK": {
@@ -89,9 +83,7 @@
       "Order": [
         2,
         4,
-        8,
-        16,
-        32
+        8
       ]
     },
     "OOK": {

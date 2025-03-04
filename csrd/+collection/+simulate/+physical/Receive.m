@@ -2,7 +2,8 @@ classdef Receive < matlab.System
 
     properties
         % config for receive
-        Config {mustBeFile} = "../config/_base_/simulate/radiofront/receive.json"
+        Config {mustBeFile} = fullfile(fileparts(mfilename('fullpath')), '..', '..', '..', '..', ...
+            'config', '_base_', 'simulate', 'radiofront', 'receive.json')
         RxInfos
 
     end

@@ -1,29 +1,29 @@
 classdef TRFSimulator < matlab.System
     % https://www.mathworks.com/help/comm/ug/end-to-end-qam-simulation-with-rf-impairments-and-corrections.html
-    % The simulation of transminter is based on the function
-    % "QAMwithRFImpairmentsSim" of the aformentioned example.
+    % The simulation of transmitter is based on the function
+    % "QAMwithRFImpairmentsSim" of the aforementioned example.
     % Where the txGain is not defined in our code.
-    % 此外我们还参考了USRP的零中频设计架构实现发射器模拟
+    % Additionally, we referenced the USRP zero-IF design architecture to implement the transmitter simulation
     % https://kb.ettus.com/UHD
     % https://zhuanlan.zhihu.com/p/24217098
     % https://www.mathworks.com/help/simrf/ug/modeling-an-rf-mmwave-transmitter-with-hybrid-beamforming.html
     % =====================================================================
-    % 关于发射机的模拟，里面的射频损失主要是依据论文："ORACLE: Optimized Radio
-    % clAssification through Convolutional neuraL nEtworks"和USRP官网给出的
-    % 关于硬件示意图：https://kb.ettus.com/UHD
-    % 其中，DUC的两个关键参数作用：https://blog.csdn.net/u010565765/article/details/54925659/
-    % DUC的取值主要参考这个链接：https://www.mathworks.com/matlabcentral/answers/772293-passband-ripple-and-stopband-attenuation
+    % Regarding the transmitter simulation, the RF impairments are mainly based on the paper:
+    % "ORACLE: Optimized Radio clAssification through Convolutional neuraL nEtworks"
+    % and the USRP hardware diagram from: https://kb.ettus.com/UHD
+    % The two key parameters of DUC (Digital Up-Converter) and their effects:
+    % https://blog.csdn.net/u010565765/article/details/54925659/
+    % The DUC values mainly reference this link:
+    % https://www.mathworks.com/matlabcentral/answers/772293-passband-ripple-and-stopband-attenuation
     % =====================================================================
 
     properties
-
         % Master clock rate, specified as a scalar in Hz. The master clock
         % rate is the A/D and D/A clock rate. The valid range of values for
         % this property depends on the radio platform that is connected.
         % This value depends on the ettus usrp devices.
         % Please refer:
         % https://www.mathworks.com/help/comm/usrpradio/ug/sdrutransmitter.html
-
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 184.32e6
         DCOffset {mustBeReal} = -50
         TxPowerDb (1, 1) {mustBeReal} = 50 % Desired transmission power in dBm (default: 10 dBm)
@@ -35,7 +35,6 @@ classdef TRFSimulator < matlab.System
         IqImbalanceConfig struct
         PhaseNoiseConfig struct
         MemoryLessNonlinearityConfig struct
-
     end
 
     properties (Access = protected)
@@ -51,29 +50,39 @@ classdef TRFSimulator < matlab.System
     methods (Access = protected)
 
         function DUC = genDUC(obj)
+            % Generates Digital Up-Converter (DUC) object
+            % Returns:
+            %   DUC: Digital Up-Converter object configured with interpolation factor,
+            %        sample rate, bandwidth, and carrier frequency settings
             obj.InterpolationFactor = ceil(obj.MasterClockRate / obj.SampleRate);
-            obj.InterpolationFactor = ceil(obj.InterpolationFactor / 2) * 2;
+            % Check if InterpolationFactor is prime
+            if obj.InterpolationFactor == 1
+                obj.InterpolationFactor = 4;
+            else
+                while isprime(obj.InterpolationFactor)
+                    obj.InterpolationFactor = obj.InterpolationFactor +1;
+                end
+            end
+            
             obj.MasterClockRate = obj.InterpolationFactor * obj.SampleRate;
             bw = obj.BandWidth;
-            if bw <= 0
-                error("hello");
-            end
             DUC = dsp.DigitalUpConverter( ...
                 InterpolationFactor = obj.InterpolationFactor, ...
                 SampleRate = obj.SampleRate, ...
                 Bandwidth = bw, ...
-                PassbandRipple = 0.1, ...
-                StopbandAttenuation = 50, ...
+                PassbandRipple = 0.2, ...
+                StopbandAttenuation = 40, ...
                 CenterFrequency = obj.CarrierFrequency);
         end
 
         function IQImbalance = genIqImbalance(obj)
-
-            % https://www.mathworks.com/help/comm/ref/iqimbal.html
+            % Generates IQ imbalance function handle
+            % Returns:
+            %   IQImbalance: Function handle that applies amplitude and phase imbalance
+            %                using the configured parameters
             IQImbalance = @(x)iqimbal(x, ...
                 obj.IqImbalanceConfig.A, ...
                 obj.IqImbalanceConfig.P);
-
         end
 
         function PhaseNoise = genPhaseNoise(obj)
@@ -155,24 +164,35 @@ classdef TRFSimulator < matlab.System
         end
 
         function setupImpl(obj)
-
+            % Initialize system object
+            % Sets up all necessary components including IQ imbalance, phase noise,
+            % nonlinearity, and digital up-converter
             obj.IQImbalance = obj.genIqImbalance;
             obj.PhaseNoise = obj.genPhaseNoise;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
             obj.DUC = obj.genDUC;
-
         end
 
         function y = DUCH(obj, x)
-
+            % Applies Digital Up-Conversion to input signal
+            % Args:
+            %   x: Input baseband signal
+            % Returns:
+            %   y: Up-converted signal
             y = obj.DUC(x);
         end
 
         function out = stepImpl(obj, x)
-
+            % Main processing function that applies RF impairments and up-conversion
+            % Args:
+            %   x: Input structure containing baseband signal and configuration
+            % Returns:
+            %   out: Structure containing processed signal and updated configuration
+            
             % Add impairments
             y = obj.IQImbalance(x.data);
             y = y + 10 ^ (obj.DCOffset / 10);
+            release(obj.PhaseNoise);
             y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
 
@@ -215,9 +235,10 @@ classdef TRFSimulator < matlab.System
     methods
 
         function obj = TRFSimulator(varargin)
-
+            % Constructor for TRFSimulator
+            % Args:
+            %   varargin: Name-value pairs for setting object properties
             setProperties(obj, nargin, varargin{:});
-
         end
 
     end

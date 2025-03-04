@@ -43,7 +43,8 @@
 classdef Event < matlab.System
 
     properties
-        Config {mustBeFile} = "../config/_base_/simulate/event/event.json"
+        Config {mustBeFile} = fullfile(fileparts(mfilename('fullpath')), '..', '..', '..', '..', ...
+            'config', '_base_', 'simulate', 'event', 'event.json')
         EventInfos
     end
 

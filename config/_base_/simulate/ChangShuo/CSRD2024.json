@@ -1,7 +1,7 @@
 {
     "runner": {
         "handle": "collection.runner",
-        "NumFrames": 6,
+        "NumFrames": 4,
         "Seed": 1234,
         "Log": {
             "Name": "CSRD2024",
@@ -37,7 +37,7 @@
             ],
             "MessageLengthRange": [
                 5000,
-                10000
+                6000
             ],
             "Message": {
                 "handle": "collection.simulate.physical.Message",

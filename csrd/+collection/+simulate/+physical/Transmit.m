@@ -2,7 +2,8 @@ classdef Transmit < matlab.System
 
     properties
         % config for modulate
-        Config {mustBeFile} = "../config/_base_/simulate/radiofront/transmit.json"
+        Config {mustBeFile} = fullfile(fileparts(mfilename('fullpath')), '..', '..', '..', '..', ...
+            'config', '_base_', 'simulate', 'radiofront', 'transmit.json')
         TxInfos
 
     end

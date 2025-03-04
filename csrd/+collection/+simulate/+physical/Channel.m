@@ -2,7 +2,8 @@ classdef Channel < matlab.System
 
     properties
         % config for modulate
-        Config {mustBeFile} = "../config/_base_/simulate/channel/channel.json"
+        Config {mustBeFile} = fullfile(fileparts(mfilename('fullpath')), '..', '..', '..', '..', ...
+            'config', '_base_', 'simulate', 'channel', 'channel.json')
         ChannelInfos
     end
 

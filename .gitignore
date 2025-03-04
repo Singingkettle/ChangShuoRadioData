@@ -114,6 +114,7 @@ data
 .idea
 ref/
 .DS_Store
+.cursor/
 
 # custom
 *.pkl

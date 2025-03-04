@@ -34,7 +34,7 @@ classdef GFSK < blocks.physical.modulate.BaseModulator
             % Set default Bandwidth-Time product (BT)
             if ~isfield(obj.ModulatorConfig, 'BandwidthTimeProduct')
                 % BT typically ranges from 0.2 to 0.5
-                obj.ModulatorConfig.BandwidthTimeProduct = rand(1) * 0.2 + 0.2;
+                obj.ModulatorConfig.BandwidthTimeProduct = rand(1) * 0.3 + 0.2;
             end
 
             % Create GFSK modulator with M-ary support

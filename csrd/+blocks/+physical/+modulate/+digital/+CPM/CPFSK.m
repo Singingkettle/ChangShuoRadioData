@@ -1,7 +1,12 @@
 classdef CPFSK < blocks.physical.modulate.digital.CPM.GFSK
-    % https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
-    % MSK 和 GMSK 是CPFSK的特例，所以在构造数据集的时候不考虑更低阶，
-    % https://blog.csdn.net/Insomnia_X/article/details/126333301
+    % CPFSK Continuous Phase Frequency Shift Keying Modulator
+    %
+    % References:
+    % - https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
+    % - MSK and GMSK are special cases of CPFSK, so lower orders are not considered
+    %   when constructing the dataset
+    % - For implementation details:
+    %   https://blog.csdn.net/Insomnia_X/article/details/126333301
     % TODO: Support CPFSK in high order > 2
 
     methods

@@ -1,10 +1,37 @@
 classdef OFDM < blocks.physical.modulate.BaseModulator
-    % https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
-    % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html  关于如何实现对OFDM信号采样的仿真，本质上是一个转换
-    % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
-    % https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html 基于这个例子确定OFDM-MIMO的整体流程
-    % https://www.mathworks.com/help/comm/ug/ofdm-transmitter-and-receiver.html
-    % 这个链接里面详细介绍了如何定义OFDM调制信号的采样率以及带宽
+    % OFDM - Orthogonal Frequency Division Multiplexing Modulator
+    %
+    % This class implements OFDM modulation with configurable parameters and
+    % support for MIMO transmission.
+    %
+    % Properties:
+    %   firstStageModulator - Primary modulation (PSK/QAM)
+    %   ostbc - Orthogonal Space-Time Block Coding
+    %   secondStageModulator - OFDM modulation stage
+    %   NumDataSubcarriers - Number of data subcarriers
+    %   usePilot - Flag for pilot usage
+    %   acrossSymbol - Flag for pilot pattern across symbols
+    %   pilotModulator - Pilot signal modulator
+    %   NumSymbols - Number of OFDM symbols (default: 100)
+    %
+    % Methods:
+    %   genModulatorHandle - Configures modulation parameters
+    %   baseModulator - Implements core OFDM modulation
+    %   genFirstStageModulator - Creates primary modulation stage
+    %   genPilotModulator - Creates pilot modulation
+    %   genSecondStageModulator - Creates OFDM modulation stage
+
+    %
+    % References:
+    % - https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
+    % - Regarding OFDM signal sampling simulation, essentially a conversion process:
+    %   https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html
+    % - OFDM signal sampling simulation implementation:
+    %   https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m
+    % - OFDM-MIMO overall process based on:
+    %   https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html
+    % - Detailed explanation of OFDM modulation signal sampling rate and bandwidth:
+    %   https://www.mathworks.com/help/comm/ug/ofdm-transmitter-and-receiver.html
 
     properties
         firstStageModulator
@@ -174,12 +201,8 @@ classdef OFDM < blocks.physical.modulate.BaseModulator
                     validRange = cat(2, validRangeLeft, validRangeRight);
 
                     if obj.NumTransmitAntennas > 1
-                        % 这块为了避免出bug，针对多天线场景，导频的设置，暂时不考虑
-                        % 每个符号的导频都不一致, 但是保证每个天线上的导频不一致
-                        % To minimize interference between transmissions
-                        % across more than one transmit antenna, the pilot
-                        % indices per symbol must be mutually distinct
-                        % across the antennas.
+                        % To avoid bugs in multi-antenna scenarios, pilot settings are temporarily not considered
+                        % Pilots are different for each symbol, but ensure pilots are different across antennas
                         if floor(length(validRange) / nPilot) < obj.NumTransmitAntennas
                             obj.NumTransmitAntennas = floor(length(validRange) / nPilot);
                         end
@@ -249,9 +272,8 @@ classdef OFDM < blocks.physical.modulate.BaseModulator
 end
 
 function shuffledArray = shuffleArray(array)
-    % 生成随机排列的索引数组
+    % Generate random permutation of indices
     randomIndices = randperm(numel(array));
-
-    % 使用随机索引对原数组进行重新排序
+    % Reorder the original array using random indices
     shuffledArray = array(randomIndices);
 end

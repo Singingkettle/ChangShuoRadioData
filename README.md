@@ -1,231 +1,192 @@
-# ChangShuoRadioData (CSRD)
+# ChangShuo Radio Data (CSRD)
 
-## Overview
+A comprehensive MATLAB-based radio communication simulation framework for wireless communication system simulation and analysis. 
 
-ChangShuoRadioData is a comprehensive MATLAB-based framework for simulating, generating, and processing wireless communication signals. It supports a wide variety of modulation schemes, signal processing techniques, and radio frequency (RF) behaviors, enabling realistic simulation of complex wireless communication systems.
+## Project Structure
 
+```
+csrd/
+├── +blocks/             # Core simulation blocks
+│   ├── +event/         # Event-based components
+│   │   └── +communication/
+│   │       └── +wireless/
+│   └── +physical/      # Physical layer implementations
+│       ├── +environment/
+│       │   └── +channel/
+│       ├── +message/   # Message generation
+│       ├── +modulate/  # Modulation schemes
+│       └── +txRadioFront/
+├── +collection/        # Data collection utilities
+├── utils/             # Utility functions
+└── input/             # Input data and configurations
+```
 
 ## Features
 
-- Multiple modulation schemes support (analog and digital)
-- MIMO capability
-- Frequency and time domain signal tiling
-- Configurable signal overlap
-- Phase noise simulation
-- Channel modeling
-- RF front-end simulation
-- Ray tracing capabilities
+### Physical Layer Components
+
+#### Modulation Schemes
+- **Analog Modulation**
+  - AM: DSBAM, DSBSCAM, SSBAM, VSBAM
+  - FM: Frequency Modulation
+  - PM: Phase Modulation
+
+- **Digital Modulation**
+  - APSK & DVBS-APSK
+  - ASK & OOK
+  - CPM: CPFSK, GFSK, GMSK, MSK
+  - FSK
+  - OFDM
+  - OTFS
+  - SC-FDMA
+  
+#### Channel Models
+- SISO/MIMO Channel Support
+- RayTracing (coming soon)
+
+#### Radio Front-end Simulation
+- **Transmitter (TRFSimulator)**
+  - IQ Imbalance
+  - Phase Noise
+  - DC Offset
+  - Memory-less Nonlinearity
+  - Digital Up-Conversion
+
+- **Receiver (RRFSimulator)**
+  - Thermal Noise
+  - Frequency Offset
+  - Sample Rate Offset
+  - Automatic Gain Control
+
+### Event-based Components
+- Wireless Communication Event Handling
+- Signal Tiling and Scheduling
+- Time-Frequency Resource Management
 
 ## System Requirements
 
-- MATLAB R2020b or newer
-- Required MATLAB Toolboxes:
+### Software Requirements
+- MATLAB R2021a or later
+- Required Toolboxes:
   - Communications Toolbox
   - Signal Processing Toolbox
   - DSP System Toolbox
   - RF Toolbox
   - Antenna Toolbox (for MIMO features)
-- Minimum 8GB RAM (16GB recommended for complex simulations)
+
+### Hardware Requirements
+- Minimum 8GB RAM (16GB recommended)
+- Multi-core processor
 - GPU support (optional, for acceleration)
 
 ## Installation
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/ChangShuoRadioData.git
-   ```
-
-2. Add the project to your MATLAB path:
-   ```matlab
-   addpath(genpath('/path/to/ChangShuoRadioData'));
-   ```
-
-3. Verify installation by running the demo:
-   ```matlab
-   cd /path/to/ChangShuoRadioData/tutorial
-   demo
-   ```
-
-## Project Structure
-
-```
-ChangShuoRadioData/
-├── csrd/                    # Core library code
-│   ├── +blocks/             # Signal processing blocks
-│   │   ├── +event/          # Event-based components
-│   │   ├── +physical/       # Physical layer components
-│   │   └── ...
-│   ├── +collection/         # Collection of runners and processors
-│   ├── utils/               # Utility functions
-│   └── input/               # Input data handlers
-├── config/                  # Configuration files
-│   └── _base_/              # Base configurations
-└── tutorial/                # Tutorial and example files
-    ├── demo.m               # Main demonstration file
-    ├── test_am.m            # Amplitude modulation example
-    ├── test_fm.m            # Frequency modulation example
-    ├── test_ofdm.m          # OFDM modulation example
-    └── ...                  # Other modulation and feature examples
+```bash
+git clone https://github.com/yourusername/csrd.git
 ```
 
-## Usage Guide
+2. Add to MATLAB path:
+```matlab
+addpath(genpath('/path/to/csrd'));
+```
 
-### Basic Usage
+3. Verify installation:
+```matlab
+cd /path/to/csrd/tutorial
+test_runner
+```
 
-1. Start by exploring the tutorial examples:
+## Quick Start Guide
+
+### Basic Usage Example
 
 ```matlab
-% Run the general demo
-demo
-
-% Test specific modulation types
-test_am        % Amplitude modulation
-test_fm        % Frequency modulation
-test_ofdm      % OFDM modulation
-test_qam       % QAM modulation
-```
-
-2. Create a custom simulation:
-
-```matlab
-% Basic simulation setup example
-% 1. Initialize a modulator
-qamMod = csrd.blocks.physical.modulate.QAMModulator(...
+% 1. Initialize modulator
+ofdmMod = blocks.physical.modulate.digital.OFDM.OFDM(...
     'ModulatorOrder', 16, ...
-    'SampleRate', 1e6, ...
-    'NumTransmitAntennas', 1);
+    'NumTransmitAntennas', 2);
 
-% 2. Create input data
-inputData = struct('data', randi([0 1], 10000, 1));
+% 2. Generate test data
+messageGen = blocks.physical.message.RandomBit();
+inputData = messageGen.step(1000, 1e6);
 
-% 3. Modulate the data
-modulatedSignal = qamMod.step(inputData);
+% 3. Modulate signal
+modulatedSignal = ofdmMod.step(inputData);
 
-% 4. Configure frequency tiling for multiple signals
-tiling = csrd.blocks.event.communication.wireless.Tiling(...
-    'IsOverlap', true, ...
-    'OverlapRadio', 0.2);
+% 4. Configure channel
+channel = blocks.physical.environment.channel.MIMO(...
+    'NumTransmitAntennas', 2, ...
+    'NumReceiveAntennas', 2);
 
-% 5. Apply tiling to signals
-signalSets = {{modulatedSignal}};  % Single transmitter example
-[positionedSignals, txInfo, clockRate, bandWidth] = tiling.step(signalSets);
-
-% 6. Visualize the results
-% ... (visualization code would go here)
+% 5. Process through channel
+receivedSignal = channel.step(modulatedSignal);
 ```
 
-### Advanced Usage
+### Advanced Features
 
-For more complex simulations, explore the test files in the tutorial directory. These demonstrate:
-- Multi-antenna (MIMO) configurations
-- Channel modeling
-- Phase noise effects
-- Ray tracing
-- Hardware impairments
+```matlab
+% Multi-transmitter scenario with frequency tiling
+tiling = blocks.event.communication.wireless.Tiling(...
+    'IsOverlap', true, ...
+    'OverlapRatio', 0.3);
 
-## Key Components
+% Configure multiple signals
+signals = {signal1, signal2, signal3};
+[tiledSignals, info] = tiling.step(signals);
+```
 
-### Modulation Schemes
+## Development and Testing
 
-The framework supports numerous modulation types including:
-- Analog: AM, FM, PM
-- Digital: ASK, FSK, PSK, QAM, APSK, DVBS-APSK
-- Advanced: OFDM, SC-FDMA, OTFS, CPM, GMSK, GFSK, MSK
+- Development rules: See `docs/csrd-rule.mdc`
+- Run tests: `runtests('csrd/tests')`
+- API Reference: `docs/api_reference.md`
+- Examples: `tutorial/`
 
-### Signal Processing Blocks
+## Performance Optimization
 
-- **Tiling Module**: Arranges signals in frequency/time domains
-- **BaseModulator**: Foundation class for all modulation schemes
-- **DigitalUpConverter/DigitalDownConverter**: Frequency conversion
-- **PhaseNoise**: Simulates oscillator phase noise
-- **RayTrace**: Models signal propagation
-
-### Simulation Framework
-
-The collection module provides runner classes to execute complete simulations with:
-- Configurable scenarios
-- Progress tracking
-- Result collection
-- Performance measurement
-
-## Potential Vulnerabilities
-
-1. **Memory Management Issues**:
-   - Large signal arrays may cause out-of-memory errors
-   - No explicit memory usage monitoring
-
-2. **Computational Performance**:
-   - Inefficient implementations for large-scale simulations
-   - Limited GPU acceleration support
-   - Potential bottlenecks in multi-antenna configurations
-
-3. **Input Validation**:
-   - Insufficient validation of user inputs
-   - Potential for unexpected behavior with malformed inputs
-
-4. **Error Handling**:
-   - Limited robust error handling mechanisms
-   - Some edge cases may not be properly handled
-
-5. **Compatibility Issues**:
-   - Some functions may depend on specific MATLAB versions
-   - Potential compatibility issues between different components
-
-6. **Signal Processing Limitations**:
-   - Frequency tiling algorithm may produce suboptimal results in dense signal environments
-   - Phase noise modeling may not accurately reflect real-world hardware
-   - Random number generation dependencies may lead to reproducibility issues
-
-7. **Documentation Gaps**:
-   - Incomplete documentation for some advanced features
-   - Limited guidance for extending the framework
+### Memory Management
+- Use preallocated arrays
+- Process large signals in chunks
+- Clear temporary variables
 
 ## Troubleshooting
 
-### Common Issues
+Common issues and solutions:
+1. Memory errors
+   - Reduce signal length
+   - Use chunked processing
+   - Clear unused variables
 
-1. **"Index exceeds matrix dimensions" error**:
-   - Ensure signal arrays are correctly formatted
-   - Check for empty or malformed signal structures
+2. Performance issues
+   - Enable GPU acceleration
+   - Optimize array operations
+   - Use parallel processing
 
-2. **"Out of memory" errors**:
-   - Reduce simulation size or complexity
-   - Process signals in smaller batches
-
-3. **GPU acceleration issues**:
-   - Verify GPU availability with `gpuDeviceCount > 0`
-   - Ensure compatible CUDA/GPU drivers
-   - Implement fallback to CPU processing
-
-### Performance Optimization
-
-1. **Reduce sample rates** where possible
-2. **Pre-allocate arrays** for large signal processing
-3. **Use smaller frame sizes** for complex modulations
-4. **Optimize visualization** settings for large datasets
-
-## Contributing
-
-Contributions to ChangShuoRadioData are welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please ensure your code follows the project's style guidelines and includes appropriate tests.
+## References
+- USRP Hardware Driver (UHD)
+- DVB-S2 Standards
+- IEEE 802.11 Specifications
+- Matlab Official Docs
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+See LICENSE file for details.
 
-## Acknowledgments
+## Contact
 
-- MATLAB and MathWorks for the underlying platform and toolboxes
-- The wireless communications research community
-- Contributors to the ChangShuoRadioData project
+- Project Lead: [Shuo Chang]
+- Technical Support: [changshuo@bupt.edu.cn]
+  
+## Citation
 
----
+If you use CSRD in your research, please cite:
 
-For more information, bug reports, or feature requests, please contact the project maintainers.
+```
+@software{csrd2024,
+  title = {ChangShuo Radio Data},
+  author = {Shuo Chang},
+  year = {2024},
+  url = {https://github.com/Singingkettle/ChangShuoRadioData}
+}
+```

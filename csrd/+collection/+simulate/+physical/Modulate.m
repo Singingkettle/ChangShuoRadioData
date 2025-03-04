@@ -42,8 +42,11 @@
 classdef Modulate < matlab.System
 
     properties
-        % Path to JSON configuration file containing modulation parameters
-        Config {mustBeFile} = "../config/_base_/simulate/modulate/modulate.json"
+        % Config - Path to modulation configuration file
+        % If not specified, will use default path relative to project root
+        Config = fullfile(fileparts(mfilename('fullpath')), '..', '..', '..', '..', ...
+            'config', '_base_', 'simulate', 'modulate', 'modulate.json')
+        
         % Cell array containing modulation settings for each transmitter
         ModulateInfos
     end

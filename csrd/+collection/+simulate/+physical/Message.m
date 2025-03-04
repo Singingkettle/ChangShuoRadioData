@@ -43,7 +43,12 @@
 classdef Message < matlab.System
 
     properties
-        Config {mustBeFile} = "../config/_base_/simulate/message/message.json"
+        % Config - Path to message configuration file
+        % If not specified, will use default path relative to project root
+        Config = fullfile(fileparts(mfilename('fullpath')), '..', '..', '..', '..', ...
+            'config', '_base_', 'simulate', 'message', 'message.json')
+        
+        % MessageInfos - Cell array of message configuration for each transmitter
         MessageInfos
     end
 
@@ -54,18 +59,27 @@ classdef Message < matlab.System
     end
 
     methods
-
         function obj = Message(varargin)
-            % Constructor
+            % Message - Constructor for Message class
+            % 
+            % Syntax:
+            %   obj = Message()
+            %   obj = Message('Config', configPath, 'MessageInfos', messageInfos)
+            %
+            % Inputs:
+            %   varargin - Name-value pairs for configuration
+            
+            % Set properties from name-value pairs
             setProperties(obj, nargin, varargin{:});
         end
 
     end
 
     methods (Access = protected)
-
         function setupImpl(obj)
-            % Initialize logger and load configurations
+            % setupImpl - Initialize the Message object
+            
+            % Initialize logger
             obj.logger = Log.getInstance();
             obj.cfgs = load_config(obj.Config);
 
@@ -92,6 +106,15 @@ classdef Message < matlab.System
         end
 
         function out = stepImpl(obj, FrameId, MessageIndex, SegmentId, MessageLength, SymbolRate)
+            % stepImpl - Generate messages based on input parameters
+            %
+            % Inputs:
+            %   FrameId - Frame identifier
+            %   MessageIndex - Transmitter identifier
+            %   SegmentId - Segment identifier
+            %   MessageLength - Length of message to generate
+            %   SymbolRate - Symbol rate for transmission
+            
             % Input validation
             validateattributes(FrameId, {'numeric'}, {'scalar', 'positive', 'integer'});
             validateattributes(MessageIndex, {'numeric'}, {'scalar', 'positive', 'integer'});

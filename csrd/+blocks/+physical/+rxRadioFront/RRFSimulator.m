@@ -41,26 +41,27 @@ classdef RRFSimulator < matlab.System
     end
 
     methods (Access = private)
-
         function IQImbalance = genIqImbalance(obj)
             % Generates IQ imbalance function handle
-            % Returns a function that applies amplitude (A) and phase (P) imbalance
-            % to the input signal using the iqimbal function
-
+            % Returns:
+            %   IQImbalance: Function handle that applies amplitude (A) and phase (P) imbalance
+            %                to the input signal using the iqimbal function
             IQImbalance = @(x)iqimbal(x, ...
                 obj.IqImbalanceConfig.A, ...
                 obj.IqImbalanceConfig.P);
         end
 
         function LowerNoiseAmplifier = genLowerPowerAmplifier(obj)
-            % Generates and configures the nonlinear amplifier object based on configuration
-            % Supports multiple nonlinearity models:
-            % - Cubic polynomial
-            % - Hyperbolic tangent
-            % - Saleh model
-            % - Ghorbani model
-            % - Modified Rapp model
-            % - Lookup table
+            % Generates and configures the nonlinear amplifier object
+            % Returns:
+            %   LowerNoiseAmplifier: Configured nonlinear amplifier object based on specified method
+            %                        Supports multiple nonlinearity models:
+            %                        - Cubic polynomial
+            %                        - Hyperbolic tangent
+            %                        - Saleh model
+            %                        - Ghorbani model
+            %                        - Modified Rapp model
+            %                        - Lookup table
 
             if strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Cubic polynomial')
                 % Configure cubic polynomial model
@@ -88,6 +89,7 @@ classdef RRFSimulator < matlab.System
                 LowerNoiseAmplifier.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
                 LowerNoiseAmplifier.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
                 LowerNoiseAmplifier.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
+
             elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Hyperbolic tangent')
                 % Configure hyperbolic tangent model
                 LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
@@ -127,7 +129,9 @@ classdef RRFSimulator < matlab.System
         end
 
         function ThermalNoise = genThermalNoise(obj)
-            % Generates thermal noise object with specified noise figure and sample rate
+            % Generates thermal noise object with specified parameters
+            % Returns:
+            %   ThermalNoise: Configured thermal noise generator object
             ThermalNoise = comm.ThermalNoise( ...
                 NoiseMethod = "Noise figure", ...
                 NoiseFigure = obj.ThermalNoiseConfig.NoiseFigure, ...
@@ -135,50 +139,54 @@ classdef RRFSimulator < matlab.System
         end
 
         function SampleShifter = genSampleShifter(obj)
-            % Generates sample rate offset object with specified master clock rate
+            % Generates sample rate offset object
+            % Returns:
+            %   SampleShifter: Sample rate offset object configured with master clock rate
             SampleShifter = comm.SampleRateOffset( ...
                 Offset = obj.MasterClockRate);
         end
 
         function bpFilt = genBandpassFilter(obj)
-            % Generates bandpass filter object with specified center frequency and bandwidth
+            % Generates bandpass filter object
+            % Returns:
+            %   bpFilt: Bandpass filter object configured with center frequency and bandwidth
             bpFilt = designfilt('bandpassiir', ...
                 FilterOrder = 8, ...
                 HalfPowerFrequency1 = obj.CenterFrequency - obj.BandWidth / 2, ...
                 HalfPowerFrequency2 = obj.CenterFrequency + obj.BandWidth / 2, ...
                 SampleRate = obj.MasterClockRate);
         end
-
     end
 
     methods
-
         function obj = RRFSimulator(varargin)
             % Constructor for RRFSimulator
-            % Accepts name-value pairs to set object properties
+            % Args:
+            %   varargin: Name-value pairs for setting object properties
             setProperties(obj, nargin, varargin{:});
         end
-
     end
 
     methods (Access = protected)
-
         function setupImpl(obj)
             % Initialize all RF impairment components before processing
-            obj.LowerPowerAmplifier = obj.genLowerPowerAmplifier; % Initialize nonlinear amplifier
-            obj.SampleShifter = obj.genSampleShifter; % Initialize sample rate offset
-            obj.ThermalNoise = obj.genThermalNoise; % Initialize thermal noise
-            obj.IQImbalance = obj.genIqImbalance; % Initialize IQ imbalance
-            obj.BandpassFilter = obj.genBandpassFilter; % Initialize bandpass filter
+            % Sets up the nonlinear amplifier, sample rate offset, thermal noise,
+            % IQ imbalance, and bandpass filter components
+            obj.LowerPowerAmplifier = obj.genLowerPowerAmplifier;
+            obj.SampleShifter = obj.genSampleShifter;
+            obj.ThermalNoise = obj.genThermalNoise;
+            obj.IQImbalance = obj.genIqImbalance;
+            % Note: Filter function is not used in current implementation due to performance considerations
+            % obj.BandpassFilter = obj.genBandpassFilter;
         end
 
         function out = stepImpl(obj, chs)
             % Main processing function that applies RF impairments to input signals
-            % Input:
+            % Args:
             %   chs: Cell array of input channels, each containing signal data
-            % Output:
+            % Returns:
             %   out: Structure containing processed signals and configuration info
-
+            
             % Calculate simulation duration based on input signals
             num_tx = length(chs);
 
@@ -245,7 +253,8 @@ classdef RRFSimulator < matlab.System
                     src = dsp.SampleRateConverter( ...
                         Bandwidth = hbw + cf, ...
                         InputSampleRate = sp, ...
-                        OutputSampleRate = obj.MasterClockRate);
+                        OutputSampleRate = obj.MasterClockRate, ...
+                        OutputRateTolerance = 0.01);
                 end
 
                 for part_id = 1:length(txs)
@@ -270,13 +279,12 @@ classdef RRFSimulator < matlab.System
             % Apply bandpass filter
             datas = sum(datas, 2);
             datas = reshape(datas, [], obj.NumReceiveAntennas);
-            datas = filter(obj.BandpassFilter, datas);
+            % Note: Filter function is not used in current implementation due to performance considerations
+            % datas = filter(obj.BandpassFilter, datas);
 
             % Apply RF impairments
             x = obj.LowerPowerAmplifier(datas);
-            % TODO: add sample rate offset, it will be used in the future
-            % However, it is not used in the current implementation.
-            % Because the sample rate offset implementation has bugs.
+            % Note: Sample rate offset is not used in current implementation due to bugs
             % x = obj.SampleShifter(x);
 
             release(obj.ThermalNoise);
@@ -285,6 +293,7 @@ classdef RRFSimulator < matlab.System
             % Apply DC offset and IQ imbalance
             x = xAwgn + 10 ^ (obj.DCOffset / 10);
             y = obj.IQImbalance(x);
+            
             % Initialize output cell array
             SNRs = cell(num_tx, obj.NumReceiveAntennas);
 
@@ -305,7 +314,6 @@ classdef RRFSimulator < matlab.System
 
                     SNRs{tx_id, ra_id} = part_SNRs;
                 end
-
             end
 
             % Prepare output structure
@@ -334,11 +342,7 @@ classdef RRFSimulator < matlab.System
                     item = rmfield(chs{tx_id}{part_id}, 'data');
                     out.tx{tx_id}{part_id} = item;
                 end
-
             end
-
         end
-
     end
-
 end

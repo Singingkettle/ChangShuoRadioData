@@ -182,11 +182,11 @@ classdef BaseModulator < matlab.System
             end
 
             % Ensure the length of the data is a multiple of n bits
-            dataLength = length(x.data);
+            dataLength = size(x.data, 1);
             remainder = mod(dataLength, n);
 
             if remainder ~= 0
-                x.data = x.data(1:end - remainder); % Discard the final bits
+                x.data = x.data(1:end - remainder, :); % Discard the final bits
             end
 
             % When the modulator is a multi-carrier modulation, ensure that the input data length
@@ -195,7 +195,7 @@ classdef BaseModulator < matlab.System
 
                 if isfield(obj.ModulatorConfig, 'ofdm')
                     min_num_bits = obj.NumDataSubcarriers * n * 2;
-                elseif isfield(obj.ModulatorConfig, 'scdma')
+                elseif isfield(obj.ModulatorConfig, 'scfdma')
                     min_num_bits = obj.ModulatorConfig.scfdma.NumDataSubcarriers * n * 2;
                 elseif isfield(obj.ModulatorConfig, 'otfs')
                     min_num_bits = obj.ModulatorConfig.otfs.DelayLength * n * 2;
@@ -207,8 +207,8 @@ classdef BaseModulator < matlab.System
                     % Copy x.data and truncate to ensure length equals min_num_bits
                     repeated_data = repmat(x.data, ceil(min_num_bits / length(x.data)), 1);
                     x.data = repeated_data(1:min_num_bits, :);
-                    % Random permutation
-                    x.data = x.data(randperm(length(x.data)));
+                    % Random permutation by row
+                    x.data = x.data(randperm(size(x.data, 1)), :);
                 end
 
             end
