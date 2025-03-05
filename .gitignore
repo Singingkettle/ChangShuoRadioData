@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 .VscodeCounter/
 _gsdata_
+tools/logs/
 
 # C extensions
 *.so
