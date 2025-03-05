@@ -28,7 +28,7 @@ for /l %%i in (1,1,%numw%) do (
     start "Worker %%i" /D "%SCRIPTDIR%" matlab -nodesktop -nosplash -r "cd('%SCRIPTDIR%'); clc; clear; close all; simulation(%%i,%numw%);exit;"
     
     :: Wait briefly for the process to start
-    timeout /t 10 /nobreak > nul
+    timeout /t 15 /nobreak > nul
     
     :: Get the PID of the newly started MATLAB process
     for /f "skip=1 delims=" %%p in ('wmic process where "name='matlab.exe'" get ProcessId^,CommandLine') do (
