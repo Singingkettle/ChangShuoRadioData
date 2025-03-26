@@ -110,7 +110,6 @@ venv.bak/
 .mypy_cache/
 
 data/
-data
 .vscode
 .idea
 .DS_Store
@@ -121,7 +120,6 @@ data
 *.pkl.json
 *.log.json
 work_dirs/
-results/
 
 # Pytorch
 *.pth
