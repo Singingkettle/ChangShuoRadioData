@@ -10,7 +10,7 @@
             "MessageReceivedEventThreshold": "INFO"
         },
         "Data": {
-            "SaveFolder": "../results"
+            "SaveFolder": "../data"
         },
         "Physical": {
             "handle": "collection.simulate.ChangShuo",
