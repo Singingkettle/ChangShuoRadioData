@@ -1,8 +1,8 @@
-# ChangShuo Radio Data (CSRD)
+# 📡 ChangShuo Radio Data (CSRD)
 
 A comprehensive MATLAB-based radio communication simulation framework for wireless communication system simulation and analysis. 
 
-## Project Structure
+## 🔍 Project Structure
 
 ```
 csrd/
@@ -21,11 +21,20 @@ csrd/
 └── input/             # Input data and configurations
 ```
 
-## Features
+## 🚀 What's New
 
-### Physical Layer Components
+V1.0.0 was released in 26/03/2025, please open `tools/simulation.m` to see the basic usage. 
 
-#### Modulation Schemes
+## 📜 History
+
+V0.0.0 was released in 23/01/2024, which was located in history/DataSimulationTool. you can run generate.m to simulate wireless data, and can use [ChangShuoRadioRecognition](https://github.com/Singingkettle/ChangShuoRadioRecognition) to do a joint DL model for radio detection and modulation classification. This dataset is used in the TWC paper["Joint Signal Detection and Automatic Modulation Classification via Deep Learning"](https://arxiv.org/abs/2405.00736)
+
+
+## ✨ Features
+
+### 📊 Physical Layer Components
+
+#### 📲 Modulation Schemes
 - **Analog Modulation**
   - AM: DSBAM, DSBSCAM, SSBAM, VSBAM
   - FM: Frequency Modulation
@@ -40,11 +49,11 @@ csrd/
   - OTFS
   - SC-FDMA
   
-#### Channel Models
+#### 📡 Channel Models
 - SISO/MIMO Channel Support
 - RayTracing (coming soon)
 
-#### Radio Front-end Simulation
+#### 🔌 Radio Front-end Simulation
 - **Transmitter (TRFSimulator)**
   - IQ Imbalance
   - Phase Noise
@@ -58,14 +67,14 @@ csrd/
   - Sample Rate Offset
   - Automatic Gain Control
 
-### Event-based Components
+### ⏱️ Event-based Components
 - Wireless Communication Event Handling
 - Signal Tiling and Scheduling
 - Time-Frequency Resource Management
 
-## System Requirements
+## 💻 System Requirements
 
-### Software Requirements
+### 🔧 Software Requirements
 - MATLAB R2021a or later
 - Required Toolboxes:
   - Communications Toolbox
@@ -74,12 +83,12 @@ csrd/
   - RF Toolbox
   - Antenna Toolbox (for MIMO features)
 
-### Hardware Requirements
+### 🖥️ Hardware Requirements
 - Minimum 8GB RAM (16GB recommended)
 - Multi-core processor
 - GPU support (optional, for acceleration)
 
-## Installation
+## 📥 Installation
 
 1. Clone the repository:
 ```bash
@@ -88,105 +97,46 @@ git clone https://github.com/yourusername/csrd.git
 
 2. Add to MATLAB path:
 ```matlab
-addpath(genpath('/path/to/csrd'));
+cd tools;
+simulation(1, 1);
 ```
 
-3. Verify installation:
-```matlab
-cd /path/to/csrd/tutorial
-test_runner
-```
+## ⚡ Performance Optimization
 
-## Quick Start Guide
-
-### Basic Usage Example
-
-```matlab
-% 1. Initialize modulator
-ofdmMod = blocks.physical.modulate.digital.OFDM.OFDM(...
-    'ModulatorOrder', 16, ...
-    'NumTransmitAntennas', 2);
-
-% 2. Generate test data
-messageGen = blocks.physical.message.RandomBit();
-inputData = messageGen.step(1000, 1e6);
-
-% 3. Modulate signal
-modulatedSignal = ofdmMod.step(inputData);
-
-% 4. Configure channel
-channel = blocks.physical.environment.channel.MIMO(...
-    'NumTransmitAntennas', 2, ...
-    'NumReceiveAntennas', 2);
-
-% 5. Process through channel
-receivedSignal = channel.step(modulatedSignal);
-```
-
-### Advanced Features
-
-```matlab
-% Multi-transmitter scenario with frequency tiling
-tiling = blocks.event.communication.wireless.Tiling(...
-    'IsOverlap', true, ...
-    'OverlapRatio', 0.3);
-
-% Configure multiple signals
-signals = {signal1, signal2, signal3};
-[tiledSignals, info] = tiling.step(signals);
-```
-
-## Development and Testing
-
-- Development rules: See `docs/csrd-rule.mdc`
-- Run tests: `runtests('csrd/tests')`
-- API Reference: `docs/api_reference.md`
-- Examples: `tutorial/`
-
-## Performance Optimization
-
-### Memory Management
+### 🧠 Memory Management
 - Use preallocated arrays
 - Process large signals in chunks
 - Clear temporary variables
 
-## Troubleshooting
+## 🔍 Troubleshooting
 
 Common issues and solutions:
-1. Memory errors
+1. 🚫 Memory errors
    - Reduce signal length
    - Use chunked processing
    - Clear unused variables
 
-2. Performance issues
-   - Enable GPU acceleration
+2. ⏱️ Performance issues
    - Optimize array operations
    - Use parallel processing
 
-## References
+## 📚 References
 - USRP Hardware Driver (UHD)
 - DVB-S2 Standards
 - IEEE 802.11 Specifications
 - Matlab Official Docs
 
-## License
+## 📄 License
 
-See LICENSE file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## Contact
+## 📞 Contact
 
-- Project Lead: [Shuo Chang]
-- Technical Support: [changshuo@bupt.edu.cn]
-  
-## Citation
+- Project Lead: Shuo Chang
+- Technical Support: changshuo@bupt.edu.cn
+
+## 📝 Citation
 
 If you use CSRD in your research, please cite:
 
-```
-@software{csrd2024,
-  title = {ChangShuo Radio Data},
-  author = {Shuo Chang},
-  year = {2024},
-  url = {https://github.com/Singingkettle/ChangShuoRadioData}
-}
 ```
