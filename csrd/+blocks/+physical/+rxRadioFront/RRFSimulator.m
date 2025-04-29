@@ -291,6 +291,7 @@ classdef RRFSimulator < matlab.System
             % Note: Sample rate offset is not used in current implementation due to bugs
             % x = obj.SampleShifter(x);
 
+            release(obj.ThermalNoise);
             xAwgn = obj.ThermalNoise(x);
             n = xAwgn - x;
             % IQ imbalance

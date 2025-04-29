@@ -194,10 +194,13 @@ classdef TRFSimulator < matlab.System
             % Add impairments
             y = obj.IQImbalance(x.data);
             y = y + 10 ^ (obj.DCOffset / 10);
+            release(obj.PhaseNoise);
             y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
 
             % Transform the baseband to passband
+            release(obj.DUC);
+
             if x.NumTransmitAntennas > 1
                 % Process multiple antennas in parallel using arrayfun
                 y = arrayfun(@(col) obj.DUC(y(:, col)), 1:x.NumTransmitAntennas, 'UniformOutput', false);
