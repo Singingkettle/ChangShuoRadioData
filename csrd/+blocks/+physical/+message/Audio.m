@@ -26,10 +26,10 @@ classdef Audio < matlab.System
     %   %   - MessageLength: Actual message length
 
     properties
-        AudioFile {mustBeFile} = "audio_mix_441.wav"
+        AudioFile {mustBeFile} = "../csrd/+blocks/+physical/+message/audio_mix_441.wav"
         % AudioFile - Path to input audio file
-        % Must be a valid file path. Default: "audio_mix_441.wav"
-
+        % Must be a valid file path. Default: "../csrd/+blocks/+physical/+message/audio_mix_441.wav"
+        
         scale = 20
         % scale - Message length scaling factor
         % Multiplies requested message length by this factor
@@ -37,11 +37,10 @@ classdef Audio < matlab.System
     end
 
     properties (Access = private)
-        audioSrc % Audio file reader object
+        audioSrc  % Audio file reader object
     end
 
     methods
-
         function obj = Audio(varargin)
             % Audio - Constructor for Audio message generator
             %
@@ -52,21 +51,19 @@ classdef Audio < matlab.System
             % Optional Parameters:
             %   AudioFile - Path to input audio file
             %   scale - Message length scaling factor
-
+            
             setProperties(obj, nargin, varargin{:});
         end
-
     end
 
     methods (Access = protected)
-
         function setupImpl(obj)
             % setupImpl - Initialize the audio file reader
             %
             % Creates a dsp.AudioFileReader object configured for:
             % - 1024 samples per frame
             % - Infinite playback count (loops when reaching end)
-
+            
             obj.audioSrc = dsp.AudioFileReader(obj.AudioFile, ...
                 'SamplesPerFrame', 1024, 'PlayCount', inf);
         end
@@ -86,7 +83,7 @@ classdef Audio < matlab.System
             %       data - Audio samples [MessageLength * scale x 1]
             %       SymbolRate - Audio sample rate from source file
             %       MessageLength - Actual message length after scaling
-
+            
             % Scale the requested message length
             MessageLength = MessageLength * obj.scale;
             sample_times = ceil(MessageLength / 1024);
@@ -102,7 +99,5 @@ classdef Audio < matlab.System
             out.SymbolRate = obj.audioSrc.SampleRate;
             out.MessageLength = MessageLength;
         end
-
     end
-
 end
