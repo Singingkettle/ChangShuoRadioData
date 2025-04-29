@@ -59,11 +59,13 @@ classdef TRFSimulator < matlab.System
             if obj.InterpolationFactor == 1
                 obj.InterpolationFactor = 4;
             else
+
                 while isprime(obj.InterpolationFactor)
                     obj.InterpolationFactor = obj.InterpolationFactor +1;
                 end
+
             end
-            
+
             obj.MasterClockRate = obj.InterpolationFactor * obj.SampleRate;
             bw = obj.BandWidth;
             DUC = dsp.DigitalUpConverter( ...
@@ -188,17 +190,14 @@ classdef TRFSimulator < matlab.System
             %   x: Input structure containing baseband signal and configuration
             % Returns:
             %   out: Structure containing processed signal and updated configuration
-            
+
             % Add impairments
             y = obj.IQImbalance(x.data);
             y = y + 10 ^ (obj.DCOffset / 10);
-            release(obj.PhaseNoise);
             y = obj.PhaseNoise(y);
             y = obj.MemoryLessNonlinearity(y);
 
             % Transform the baseband to passband
-            release(obj.DUC);
-
             if x.NumTransmitAntennas > 1
                 % Process multiple antennas in parallel using arrayfun
                 y = arrayfun(@(col) obj.DUC(y(:, col)), 1:x.NumTransmitAntennas, 'UniformOutput', false);

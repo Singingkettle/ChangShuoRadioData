@@ -134,8 +134,8 @@ classdef RRFSimulator < matlab.System
             % Returns:
             %   ThermalNoise: Configured thermal noise generator object
             ThermalNoise = comm.ThermalNoise( ...
-                NoiseMethod = "Noise figure", ...
-                NoiseFigure = obj.ThermalNoiseConfig.NoiseFigure, ...
+                NoiseMethod = "Noise temperature", ...
+                NoiseTemperature = obj.ThermalNoiseConfig.NoiseTemperature, ...
                 SampleRate = obj.MasterClockRate);
         end
 
@@ -291,12 +291,10 @@ classdef RRFSimulator < matlab.System
             % Note: Sample rate offset is not used in current implementation due to bugs
             % x = obj.SampleShifter(x);
 
-            release(obj.ThermalNoise);
             xAwgn = obj.ThermalNoise(x);
             n = xAwgn - x;
-            % Apply DC offset and IQ imbalance
-            m = xAwgn + 10 ^ (obj.DCOffset / 10);
-            y = obj.IQImbalance(m);
+            % IQ imbalance
+            y = obj.IQImbalance(xAwgn);
 
             % Initialize output cell array
             SNRs = cell(num_tx, obj.NumReceiveAntennas);
@@ -312,9 +310,9 @@ classdef RRFSimulator < matlab.System
                     for part_id = 1:num_parts
                         left = datas_info{tx_id}{part_id, 1};
                         right = datas_info{tx_id}{part_id, 2};
-                        x = x(left:right, ra_id);
+                        px = x(left:right, ra_id);
                         pn = n(left:right, ra_id);
-                        part_SNRs(part_id) = 10 * log10(var(x) / var(pn));
+                        part_SNRs(part_id) = 10 * log10(var(px) / var(pn));
                     end
 
                     SNRs{tx_id, ra_id} = part_SNRs;

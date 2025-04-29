@@ -54,7 +54,7 @@ classdef Receive < matlab.System
                     IqImbalanceConfig.A = rand(1) * (kwargs.IqImbalanceConfig.A(2) - kwargs.IqImbalanceConfig.A(1)) + kwargs.IqImbalanceConfig.A(1);
                     IqImbalanceConfig.P = rand(1) * (kwargs.IqImbalanceConfig.P(2) - kwargs.IqImbalanceConfig.P(1)) + kwargs.IqImbalanceConfig.P(1);
 
-                    ThermalNoiseConfig.NoiseFigure = rand(1) * (kwargs.ThermalNoiseConfig.NoiseFigure(2) - kwargs.ThermalNoiseConfig.NoiseFigure(1)) + kwargs.ThermalNoiseConfig.NoiseFigure(1);
+                    ThermalNoiseConfig.NoiseTemperature = rand(1) * (kwargs.ThermalNoiseConfig.NoiseTemperature(2) - kwargs.ThermalNoiseConfig.NoiseTemperature(1)) + kwargs.ThermalNoiseConfig.NoiseTemperature(1);
                     MemoryLessNonlinearityConfig = MemoryLessNonlinearityRandom(kwargs.MemoryLessNonlinearityConfig);
 
                     if isfield(obj.RxInfos{RxId}, "TimeDurationRange")
