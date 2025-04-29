@@ -275,7 +275,6 @@ classdef RRFSimulator < matlab.System
                     datas(startIdx:length(x) + startIdx - 1, tx_id, :) = x;
                     partinfo{part_id, 1} = startIdx;
                     partinfo{part_id, 2} = length(x) + startIdx - 1;
-                    partinfo{part_id, 3} = sum(abs(x) .^ 2, 1); % the power of the signal for calculating SNR
                 end
 
                 datas_info{tx_id} = partinfo;
@@ -296,8 +295,8 @@ classdef RRFSimulator < matlab.System
             xAwgn = obj.ThermalNoise(x);
             n = xAwgn - x;
             % Apply DC offset and IQ imbalance
-            x = xAwgn + 10 ^ (obj.DCOffset / 10);
-            y = obj.IQImbalance(x);
+            m = xAwgn + 10 ^ (obj.DCOffset / 10);
+            y = obj.IQImbalance(m);
 
             % Initialize output cell array
             SNRs = cell(num_tx, obj.NumReceiveAntennas);
@@ -313,8 +312,9 @@ classdef RRFSimulator < matlab.System
                     for part_id = 1:num_parts
                         left = datas_info{tx_id}{part_id, 1};
                         right = datas_info{tx_id}{part_id, 2};
+                        x = x(left:right, ra_id);
                         pn = n(left:right, ra_id);
-                        part_SNRs(part_id) = 10 * log10(datas_info{tx_id}{part_id, 3}(ra_id) / sum(abs(pn) .^ 2));
+                        part_SNRs(part_id) = 10 * log10(var(x) / var(pn));
                     end
 
                     SNRs{tx_id, ra_id} = part_SNRs;
