@@ -41,6 +41,7 @@ classdef RRFSimulator < matlab.System
     end
 
     methods (Access = private)
+
         function IQImbalance = genIqImbalance(obj)
             % Generates IQ imbalance function handle
             % Returns:
@@ -156,18 +157,22 @@ classdef RRFSimulator < matlab.System
                 HalfPowerFrequency2 = obj.CenterFrequency + obj.BandWidth / 2, ...
                 SampleRate = obj.MasterClockRate);
         end
+
     end
 
     methods
+
         function obj = RRFSimulator(varargin)
             % Constructor for RRFSimulator
             % Args:
             %   varargin: Name-value pairs for setting object properties
             setProperties(obj, nargin, varargin{:});
         end
+
     end
 
     methods (Access = protected)
+
         function setupImpl(obj)
             % Initialize all RF impairment components before processing
             % Sets up the nonlinear amplifier, sample rate offset, thermal noise,
@@ -186,7 +191,7 @@ classdef RRFSimulator < matlab.System
             %   chs: Cell array of input channels, each containing signal data
             % Returns:
             %   out: Structure containing processed signals and configuration info
-            
+
             % Calculate simulation duration based on input signals
             num_tx = length(chs);
 
@@ -293,7 +298,7 @@ classdef RRFSimulator < matlab.System
             % Apply DC offset and IQ imbalance
             x = xAwgn + 10 ^ (obj.DCOffset / 10);
             y = obj.IQImbalance(x);
-            
+
             % Initialize output cell array
             SNRs = cell(num_tx, obj.NumReceiveAntennas);
 
@@ -314,35 +319,72 @@ classdef RRFSimulator < matlab.System
 
                     SNRs{tx_id, ra_id} = part_SNRs;
                 end
+
             end
 
             % Prepare output structure
-            out.data = y;
-            out.StartTime = obj.StartTime;
-            out.TimeDuration = size(y, 1) / obj.MasterClockRate;
-            out.MasterClockRate = obj.MasterClockRate;
-            out.NumReceiveAntennas = obj.NumReceiveAntennas;
-            out.SampleRateOffset = obj.SampleRateOffset;
-            out.DCOffset = obj.DCOffset;
-            out.SDRDecimationFactor = obj.DecimationFactor;
-            out.IqImbalanceConfig = obj.IqImbalanceConfig;
-            out.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;
-            out.ThermalNoiseConfig = obj.ThermalNoiseConfig;
-            out.SNRs = SNRs;
-            out.SiteConfig = obj.SiteConfig;
-            out.SDRMode = "Zero-IF Receiver";
+            out = struct(); % Initialize the main output struct
+            out.data = y; % Assign the processed data
 
-            % Store transmitter information without data
-            out.tx = cell(num_tx, 1);
+            out.annotation = struct(); % Initialize the annotation struct
+            out.annotation.rx = struct(); % Initialize the receiver annotation struct
+
+            % Assign receiver-specific metadata to out.annotation.rx
+            out.annotation.rx.StartTime = obj.StartTime;
+            out.annotation.rx.TimeDuration = size(y, 1) / obj.MasterClockRate;
+            out.annotation.rx.MasterClockRate = obj.MasterClockRate;
+            out.annotation.rx.NumReceiveAntennas = obj.NumReceiveAntennas;
+            out.annotation.rx.SampleRateOffset = obj.SampleRateOffset;
+            out.annotation.rx.DCOffset = obj.DCOffset;
+            out.annotation.rx.SDRDecimationFactor = obj.DecimationFactor;
+            out.annotation.rx.IqImbalanceConfig = obj.IqImbalanceConfig;
+            out.annotation.rx.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;
+            out.annotation.rx.ThermalNoiseConfig = obj.ThermalNoiseConfig;
+            out.annotation.rx.SNRs = SNRs;
+            out.annotation.rx.SiteConfig = obj.SiteConfig;
+            out.annotation.rx.SDRMode = "Zero-IF Receiver";
+
+            % Store transmitter information without data under out.annotation.tx
+            out.annotation.tx = cell(num_tx, 1);
 
             for tx_id = 1:num_tx
-                out.tx{tx_id} = cell(length(chs{tx_id}), 1);
 
-                for part_id = 1:length(chs{tx_id})
-                    item = rmfield(chs{tx_id}{part_id}, 'data');
-                    out.tx{tx_id}{part_id} = item;
+                if ~isempty(chs{tx_id})
+                    % Get common info from the first part, remove varying fields and data
+                    commonItem = rmfield(chs{tx_id}{1}, {'data', 'BandWidth', 'StartTime', 'TimeDuration', 'SamplePerFrame'});
+
+                    num_parts = length(chs{tx_id});
+                    bandWidth = zeros(num_parts, 2);
+                    startTimes = zeros(1, num_parts);
+                    timeDurations = zeros(1, num_parts);
+                    samplePerFrames = zeros(1, num_parts);
+
+                    % Collect varying fields from all parts
+                    for part_id = 1:num_parts
+                        partItem = chs{tx_id}{part_id};
+                        bandWidth(part_id, :) = partItem.BandWidth;
+                        startTimes(part_id) = partItem.StartTime;
+                        timeDurations(part_id) = partItem.TimeDuration;
+                        samplePerFrames(part_id) = partItem.SamplePerFrame;
+                    end
+
+                    % Add collected arrays to the common info struct
+                    commonItem.BandWidth = bandWidth;
+                    commonItem.StartTimes = startTimes;
+                    commonItem.TimeDurations = timeDurations;
+                    commonItem.SamplePerFrames = samplePerFrames;
+
+                    % Assign the consolidated struct to the output cell array under annotation.tx
+                    out.annotation.tx{tx_id} = commonItem;
+                else
+                    % Handle case where a transmitter might have no parts (optional, but good practice)
+                    out.annotation.tx{tx_id} = struct();
                 end
+
             end
+
         end
+
     end
+
 end
