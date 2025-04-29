@@ -12,8 +12,8 @@
                 0.2
             ],
             "DCOffsetRange": [
-                -60,
-                -40
+                -150,
+                -100
             ],
             "IqImbalanceConfig": {
                 "A": [
@@ -26,9 +26,9 @@
                 ]
             },
             "ThermalNoiseConfig": {
-                "NoiseFigure": [
-                    10,
-                    20
+                "NoiseTemperature": [
+                    0,
+                    290
                 ]
             },
             "MemoryLessNonlinearityConfig": {
