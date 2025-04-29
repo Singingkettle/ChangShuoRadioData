@@ -1,7 +1,7 @@
 {
     "runner": {
         "handle": "collection.runner",
-        "NumFrames": 1000000,
+        "NumFrames": 100000000,
         "Seed": 1234,
         "Log": {
             "Name": "CSRD2024",
@@ -10,7 +10,7 @@
             "MessageReceivedEventThreshold": "INFO"
         },
         "Data": {
-            "SaveFolder": "../data"
+            "SaveFolder": "../data/CSRD2025"
         },
         "Physical": {
             "handle": "collection.simulate.ChangShuo",
