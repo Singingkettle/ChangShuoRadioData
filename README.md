@@ -85,7 +85,7 @@ V0.0.0 was released in 23/01/2024, which was located in history/DataSimulationTo
 
 ### 🖥️ Hardware Requirements
 - Minimum 64GB RAM (128GB recommended)
-- Minimum 20000TB of free disk space
+- Minimum 20TB of free disk space (for 1000000 Frames)
 - Multi-core processor
 - GPU support (optional, for acceleration)
 
