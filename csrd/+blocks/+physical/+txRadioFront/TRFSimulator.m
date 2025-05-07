@@ -228,7 +228,7 @@ classdef TRFSimulator < matlab.System
             out.SamplePerFrame = size(y, 1);
             out.TimeDuration = out.SamplePerFrame / out.SampleRate;
             out.CarrierFrequency = x.CarrierFrequency;
-            out.TxSiteConfig = obj.SiteConfig;
+            out.SiteConfig = obj.SiteConfig;
             out.SDRMode = "Zero-IF Receiver";
         end
 

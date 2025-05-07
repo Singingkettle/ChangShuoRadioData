@@ -7,13 +7,18 @@ classdef ChangShuo < matlab.System
         NumTransmitAntennasRange (2, 1) {mustBePositive, mustBeReal} = [1, 4]
 
         NumMaxRx (1, 1) {mustBePositive, mustBeReal} = 8
-        NumReceiveAntennasRange (2, 1) {mustBePositive, mustBeReal} = [1; 4]
+        NumReceiveAntennasRange (2, 1) {mustBePositive, mustBeReal} = [1, 4]
 
         ADRatio (1, 1) {mustBePositive, mustBeReal, mustBeLessThanOrEqual(ADRatio, 100)} = 10
-        SymbolRateRange (2, 1) {mustBePositive, mustBeReal} = [30e3; 100e3]
+        SymbolRateRange (2, 1) {mustBePositive, mustBeReal} = [30e3, 100e3]
         SymbolRateStep (1, 1) {mustBePositive, mustBeInteger} = 1e3
         MessageLengthRange (2, 1) {mustBePositive, mustBeInteger} = [1, 2]
         SamplePerSymbolRange (2, 1) {mustBePositive, mustBeInteger} = [2, 8]
+
+        AntennaHeightRange (2, 1) {mustBePositive, mustBeReal} = [10, 100]
+
+        TxMode
+        RxMode
 
         Message
         Modulate
@@ -71,11 +76,13 @@ classdef ChangShuo < matlab.System
 
                     SymbolRate = randi((obj.SymbolRateRange(2) - obj.SymbolRateRange(1)) / obj.SymbolRateStep) * obj.SymbolRateStep + obj.SymbolRateRange(1);
                     SamplePerSymbol = randsample(obj.SamplePerSymbolRange(1):obj.SamplePerSymbolRange(2), 1);
+
                     if randi(100) <= 50
                         NumTransmitAntennas = 1;
                     else
                         NumTransmitAntennas = randsample(obj.NumTransmitAntennasRange(1):obj.NumTransmitAntennasRange(2), 1);
                     end
+
                     TxSiteConfig.owner = "ShuoChang";
                     TxSiteConfig.location = "Beijing";
                     currentTime = datetime('now', 'Format', 'yyyyMMdd_HHmmss');
@@ -89,6 +96,11 @@ classdef ChangShuo < matlab.System
                     TxInfos{TxId}.ParentTransmitterType = "Simulator";
                     TxInfos{TxId}.NumTransmitAntennas = NumTransmitAntennas;
                     TxInfos{TxId}.SiteConfig = TxSiteConfig;
+                    TxInfos{TxId}.SiteConfig.Antenna.CoordinateSystem = "geographic";
+                    TxInfos{TxId}.SiteConfig.Antenna.NumTransmitAntennas = NumTransmitAntennas;
+                    TxInfos{TxId}.SiteConfig.Antenna.Angle = [randsample(-180:180, 1), randsample(-30:10, 1)];
+                    TxInfos{TxId}.SiteConfig.Antenna.Spacing = 0.5;
+                    TxInfos{TxId}.SiteConfig.Antenna.Height = randsample(obj.AntennaHeightRange(1):obj.AntennaHeightRange(2), 1);
 
                 end
 
@@ -118,6 +130,16 @@ classdef ChangShuo < matlab.System
                     end
 
                     txs{TxId} = ys;
+                    TxInfos{TxId}.NumTransmitAntennas = ys{1}.NumTransmitAntennas;
+                    TxInfos{TxId}.SiteConfig.Antenna.NumTransmitAntennas = ys{1}.NumTransmitAntennas;
+
+                    % Determine Array Type based on even/odd number of antennas
+                    if mod(TxInfos{TxId}.NumTransmitAntennas, 2) == 0 && TxInfos{TxId}.NumTransmitAntennas > 2 % Even number
+                        TxInfos{TxId}.SiteConfig.Antenna.Array = "URA";
+                    else % Odd number
+                        TxInfos{TxId}.SiteConfig.Antenna.Array = "ULA";
+                    end
+
                 end
 
                 EventInfos = cell(1, 1);
@@ -162,6 +184,18 @@ classdef ChangShuo < matlab.System
                     RxInfos{RxId}.MasterClockRateRange = [0, 0];
                     RxInfos{RxId}.BandWidth = BandWidthRange(2) - BandWidthRange(1);
                     RxInfos{RxId}.CenterFrequency = round((BandWidthRange(2) + BandWidthRange(1)) / 2);
+                    RxInfos{RxId}.SiteConfig.Antenna.CoordinateSystem = "geographic";
+                    RxInfos{RxId}.SiteConfig.Antenna.NumReceiveAntennas = NumReceiveAntennas;
+                    RxInfos{RxId}.SiteConfig.Antenna.Angle = [randsample(-180:180, 1), randsample(-30:10, 1)];
+                    RxInfos{RxId}.SiteConfig.Antenna.Spacing = 0.5;
+                    RxInfos{RxId}.SiteConfig.Antenna.Height = randsample(obj.AntennaHeightRange(1):obj.AntennaHeightRange(2), 1);
+
+                    if mod(RxInfos{RxId}.NumReceiveAntennas, 2) == 0 && RxInfos{RxId}.NumReceiveAntennas > 2 % Even number
+                        RxInfos{RxId}.SiteConfig.Antenna.Array = "URA";
+                    else % Odd number
+                        RxInfos{RxId}.SiteConfig.Antenna.Array = "ULA";
+                    end
+
                 end
 
                 ChannelInfos = cell(length(TxInfos), length(RxInfos));
@@ -184,7 +218,7 @@ classdef ChangShuo < matlab.System
 
                 % Init handles of channel
                 obj.logger.debug("Init channel handle by using %s in the %dth Frame.", obj.Channel.handle, FrameId);
-                runChannel = eval(sprintf("%s(Config=obj.Channel.Config, ChannelInfos=ChannelInfos)", obj.Channel.handle));
+                runChannel = eval(sprintf("%s(Config=obj.Channel.Config, ChannelInfos=ChannelInfos, TxInfos=TxInfos, RxInfos=RxInfos)", obj.Channel.handle));
 
                 % Init handles of receive
                 obj.logger.debug("Init receive handle by using %s in the %dth Frame.", obj.Receive.handle, FrameId);
@@ -199,11 +233,34 @@ classdef ChangShuo < matlab.System
 
                         for SegmentId = 1:length(txs{TxId})
                             chs{TxId}{SegmentId} = runChannel(txs{TxId}{SegmentId}, FrameId, RxId, TxId, SegmentId);
+
+                            % If channel processing results in empty, discard this transmitter's contribution
+                            if isempty(chs{TxId}{SegmentId})
+                                obj.logger.warning("Channel output empty for Frame %d, Rx %d, Tx %d, Segment %d. Discarding Tx %d for this Rx.", FrameId, RxId, TxId, SegmentId, TxId);
+                                chs{TxId} = []; % Remove all segments for this Tx by assigning empty cell
+                                break; % Stop processing further segments for this Tx
+                            end
+
                         end
 
                     end
 
-                    out{RxId} = runReceive(chs, FrameId, RxId);
+                    % Remove empty cells from chs
+                    chs = chs(~cellfun('isempty', chs));
+
+                    if isempty(chs)
+                        out{RxId} = [];
+                    else
+                        out{RxId} = runReceive(chs, FrameId, RxId);
+                    end
+
+                end
+
+                % Remove empty cells from out
+                out = out(~cellfun('isempty', out));
+
+                if runChannel.use_raytracing
+                    close(runChannel.forward.siteViewer);
                 end
 
             end

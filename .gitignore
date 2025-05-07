@@ -11,6 +11,7 @@ tools/logs/
 
 # Distribution / packaging
 .Python
+appdata/
 data/
 build/
 work_dirs/

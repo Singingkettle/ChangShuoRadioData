@@ -340,7 +340,7 @@ classdef RRFSimulator < matlab.System
             out.annotation.rx.MemoryLessNonlinearityConfig = obj.MemoryLessNonlinearityConfig;
             out.annotation.rx.ThermalNoiseConfig = obj.ThermalNoiseConfig;
             out.annotation.rx.SNRs = SNRs;
-            out.annotation.rx.SiteConfig = obj.SiteConfig;
+            out.annotation.rx.SiteConfig = chs{1}{1}.RxSiteConfig;
             out.annotation.rx.SDRMode = "Zero-IF Receiver";
 
             % Store transmitter information without data under out.annotation.tx
@@ -350,7 +350,7 @@ classdef RRFSimulator < matlab.System
 
                 if ~isempty(chs{tx_id})
                     % Get common info from the first part, remove varying fields and data
-                    commonItem = rmfield(chs{tx_id}{1}, {'data', 'BandWidth', 'StartTime', 'TimeDuration', 'SamplePerFrame'});
+                    commonItem = rmfield(chs{tx_id}{1}, {'data', 'BandWidth', 'StartTime', 'TimeDuration', 'SamplePerFrame', 'RxSiteConfig'});
 
                     num_parts = length(chs{tx_id});
                     bandWidth = zeros(num_parts, 2);

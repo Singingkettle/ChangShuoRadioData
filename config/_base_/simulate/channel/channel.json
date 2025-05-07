@@ -1,12 +1,19 @@
 {
     "Simulate": {
+        "probabilities": {
+            "MIMO": 0.9,
+            "RayTracing": 0.1
+        },
         "MIMO": {
             "handle": "blocks.physical.environment.channel.MIMO",
             "MaxPaths": 3,
             "MaxDistance": {
                 "Ratio": 0,
                 "Indoor": 10,
-                "Outdoor": [100, 1000]
+                "Outdoor": [
+                    100,
+                    1000
+                ]
             },
             "SpeedRange": [
                 1.5,
@@ -34,6 +41,15 @@
                     "Distribution": "Available fading distribution types"
                 }
             }
+        },
+        "RayTracing": {
+            "handle": "blocks.physical.environment.channel.RayTracing",
+            "PropagationModelConfig": {
+                "Method": "SBR",
+                "MaxNumReflections": 3,
+                "MaxNumDiffractions": 1
+            },
+            "MapFolder": "../appdata/map/osm"
         }
     }
 }

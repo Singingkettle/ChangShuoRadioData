@@ -80,6 +80,7 @@ classdef runner < matlab.System
                 "NumMaxTx=obj.Physical.NumMaxTx, " + ...
                 "NumMaxRx=obj.Physical.NumMaxRx, " + ...
                 "NumMaxTransmitTimes=obj.Physical.NumMaxTransmitTimes, " + ...
+                "AntennaHeightRange=obj.Physical.AntennaHeightRange, " + ...
                 "NumTransmitAntennasRange=obj.Physical.NumTransmitAntennasRange, " + ...
                 "NumReceiveAntennasRange=obj.Physical.NumReceiveAntennasRange, " + ...
                 "ADRatio=obj.Physical.ADRatio, " + ...
@@ -259,6 +260,12 @@ classdef runner < matlab.System
                         globalFrameId = batchGlobalFrames(i);
                         localFrameId = batchLocalFrames(i);
                         out = batchResults{i};
+
+                        if isempty(out)
+                            obj.logger.warning("Frame %d: Empty output. Skipping frame.", batchGlobalFrames(i));
+                            continue;
+                        end
+
                         frameTime = batchTimes(i);
 
                         % Save frame results
@@ -310,12 +317,19 @@ classdef runner < matlab.System
                 for localFrameId = 1:workerFrames
                     % Calculate global frame ID
                     globalFrameId = localFrameId + startFrame - 1;
-
+                    if globalFrameId == 270
+                        a = 1;
+                    end
                     % Record frame start time
                     frameStartTime = tic;
 
                     % Execute frame simulation
                     out = obj.run(globalFrameId);
+
+                    if isempty(out)
+                        obj.logger.warning("Frame %d: Empty output. Skipping frame.", globalFrameId);
+                        continue;
+                    end
 
                     % Save frame results
                     for RxId = 1:length(out)

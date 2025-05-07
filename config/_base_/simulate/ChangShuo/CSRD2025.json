@@ -17,6 +17,10 @@
             "NumMaxTx": 4,
             "NumMaxRx": 4,
             "NumMaxTransmitTimes": 3,
+            "AntennaHeightRange": [
+                3,
+                20
+            ],
             "NumTransmitAntennasRange": [
                 1,
                 4
