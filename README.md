@@ -1,3 +1,5 @@
+![Citybuster Studio Logo](config/logo.svg)
+
 # 📡 ChangShuo Radio Data (CSRD)
 
 A comprehensive MATLAB-based radio communication simulation framework for wireless communication system simulation and analysis. 
@@ -250,3 +252,5 @@ If you use CSRD in your research, please cite:
   keywords={Feature extraction;Signal detection;Frequency modulation;Time-frequency analysis;Signal to noise ratio;Industries;Deep learning;Automatic modulation classification;dataset design;hierarchical classification head},
   doi={10.1109/TWC.2024.3450972}}
 ```
+
+All rights of interpretation for this project belong to Citybuster Studio.
