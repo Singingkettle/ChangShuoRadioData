@@ -91,6 +91,8 @@ V0.0.0 was released in 23/01/2024, which was located in history/DataSimulationTo
 
 ## 📦 Dataset Simulation
 
+> **The CSRD simulation framework code is open-source. However, the specific 2000TB CSRD2025 dataset instance characterized herein is not hosted for direct download due to the prohibitive costs associated with storage and bandwidth for data of this scale. This large dataset size is primarily because the default configuration file `config/_base_/simulate/ChangShuo/CSRD2025.json` sets `"NumFrames": 100000000`. The dataset is designed to be fully reproducible using the provided framework, configurations, and fixed random seeds available in the repository. If you do not have the resources for such a large dataset, you can modify this `NumFrames` parameter to generate a smaller, more manageable dataset.**
+
 This section outlines the basic workflow for generating a dataset using the CSRD framework.
 
 1.  **Clone the Repository:**

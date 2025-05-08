@@ -14,7 +14,7 @@
 clear; close all; clc;
 
 %% --- Configuration ---
-enableVisualization = false; % Set to true to visualize bounding boxes (slows down processing)
+enableVisualization = true; % Set to true to visualize bounding boxes (slows down processing)
 
 baseDataPath = '../data/CSRD2025'; % Path to the dataset
 annoDir = fullfile(baseDataPath, 'anno');
@@ -551,7 +551,7 @@ function supercat = getModulationSupercategory(modType)
     modTypeUpper = upper(modType);
 
     switch modTypeUpper
-        case {'DSBAM', 'SSBAM', 'VSBAM'}
+        case {'DSBAM', 'DSBSCAM', 'SSBAM', 'VSBAM'}
             supercat = 'AM';
         case {'FM', 'PM', 'FSK'}
             supercat = modTypeUpper;
@@ -563,7 +563,7 @@ function supercat = getModulationSupercategory(modType)
             supercat = 'APSK';
         case {'PSK', 'BPSK', 'QPSK', '8PSK', '16PSK', 'DPSK', 'OQPSK'}
             supercat = 'PSK';
-        case {'QAM', '16QAM', '32QAM', '64QAM', '128QAM', '256QAM', 'Mill88QAM'}
+        case {'QAM', '16QAM', '32QAM', '64QAM', '128QAM', '256QAM', 'MILL88QAM'}
             supercat = 'QAM';
         case {'PAM', '4PAM', '8PAM'}
             supercat = 'PAM';
@@ -649,13 +649,13 @@ function visualizeBoundingBox(spectrogramData, f, t, sampleRate, ...
         yLims = ylim;
 
         % Plot vertical time lines (Magenta, Dashed)
-        line([timeStartMeta timeStartMeta], yLims, 'Color', 'm', 'LineStyle', '--', 'LineWidth', 1);
-        line([timeEndMeta timeEndMeta], yLims, 'Color', 'm', 'LineStyle', '--', 'LineWidth', 1);
+        line([timeStartMeta timeStartMeta], [yLims(1) freqLowMeta], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 2);
+        line([timeEndMeta timeEndMeta], [yLims(1) freqLowMeta], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 2);
 
         % Plot horizontal frequency lines (Magenta, Dashed)
-        line(xLims, [centerFreqHz centerFreqHz], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 1);
-        line(xLims, [freqLowMeta freqLowMeta], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 1);
-        line(xLims, [freqHighMeta freqHighMeta], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 1);
+        line([xLims(1) timeStartMeta], [centerFreqHz centerFreqHz], 'Color', 'g', 'LineStyle', '--', 'LineWidth', 2);
+        line([xLims(1) timeStartMeta], [freqLowMeta freqLowMeta], 'Color', 'g', 'LineStyle', '--', 'LineWidth', 2);
+        line([xLims(1) timeStartMeta], [freqHighMeta freqHighMeta], 'Color', 'g', 'LineStyle', '--', 'LineWidth', 2);
 
         fprintf('  Nominal   Time: [%.4f, %.4f], Freq: [%.1f, %.1f, %.1f]\n', timeStartMeta, timeEndMeta, freqLowMeta, centerFreqHz, freqHighMeta);
 

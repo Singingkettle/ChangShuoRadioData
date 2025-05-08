@@ -1,8 +1,8 @@
 {
     "Simulate": {
         "probabilities": {
-            "MIMO": 0.9,
-            "RayTracing": 0.1
+            "MIMO": 1,
+            "RayTracing": 0
         },
         "MIMO": {
             "handle": "blocks.physical.environment.channel.MIMO",
