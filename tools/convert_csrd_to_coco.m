@@ -14,7 +14,7 @@
 clear; close all; clc;
 
 %% --- Configuration ---
-enableVisualization = true; % Set to true to visualize bounding boxes (slows down processing)
+enableVisualization = false; % Set to true to visualize bounding boxes (slows down processing)
 
 baseDataPath = '../data/CSRD2025'; % Path to the dataset
 annoDir = fullfile(baseDataPath, 'anno');
@@ -34,7 +34,7 @@ end
 % STFT Parameters (Shared)
 stftWindowLength = 256; % Window length
 stftOverlapLength = 16; % Overlap length (ensure <= stftWindowLength)
-stftFftLength = 512; % FFT length
+stftFftLength = 1024; % FFT length
 
 % Window Configurations to Process
 % Add more window functions from the Signal Processing Toolbox as needed
@@ -77,7 +77,7 @@ for winIdx = 1:size(windowConfigs, 1)
     % --- COCO Structure Initialization (Reset for each window) ---
     cocoData = struct();
     cocoData.info = struct('description', sprintf('CSRD Spectrogram Dataset (%s window)', windowName), ...
-        'version', '1.0', 'year', 2024, 'date_created', datestr(now, 'yyyy/mm/dd'));
+        'version', 'CSRD2025', 'year', 2025, 'date_created', datestr(now, 'yyyy/mm/dd'));
     cocoData.licenses = {struct('id', 1, 'name', 'Default License', 'url', '')};
     cocoData.images = [];
     cocoData.annotations = [];
@@ -91,7 +91,11 @@ for winIdx = 1:size(windowConfigs, 1)
     imageIdToFrameIdMap = containers.Map('KeyType', 'double', 'ValueType', 'char'); % Map image ID to Frame ID string
 
     % --- Process Files for the current window ---
-    jsonFiles = dir(fullfile(annoDir, 'Frame_*.json'));
+    % Use faster file search with pattern matching
+    allFiles = dir(annoDir);
+    isJsonFile = arrayfun(@(x) startsWith(x.name, 'Frame_') && endsWith(x.name, '.json'), allFiles);
+    jsonFiles = allFiles(isJsonFile);
+
     numFiles = length(jsonFiles);
     fprintf('Found %d JSON files to process for window %s...\n', numFiles, windowName);
 
@@ -108,6 +112,15 @@ for winIdx = 1:size(windowConfigs, 1)
     for k = 1:numFiles
         jsonFileName = jsonFiles(k).name;
         jsonFilePath = fullfile(annoDir, jsonFileName);
+        % --- Extract Frame ID from filename ---
+        frameIdMatch = regexp(jsonFileName, 'Frame_(\d+)_Rx_', 'tokens');
+
+        frameIdStr = frameIdMatch{1}{1};
+        frameId = str2double(frameIdStr);
+
+        if frameId > 10000
+            break;
+        end
 
         % Progress indicator within window loop
         if mod(k, 100) == 0
@@ -128,15 +141,10 @@ for winIdx = 1:size(windowConfigs, 1)
             rxInfo = meta.annotation.rx;
             txArray = meta.annotation.tx;
 
-            % --- Extract Frame ID from filename ---
-            frameIdMatch = regexp(jsonFileName, 'Frame_(\d+)_Rx_', 'tokens');
-
             if isempty(frameIdMatch) || isempty(frameIdMatch{1})
                 warning('Could not parse Frame ID from filename: %s. Skipping.', jsonFileName);
                 continue;
             end
-
-            frameIdStr = frameIdMatch{1}{1};
 
             % Ensure txArray is always a cell array for consistent processing
             if isstruct(txArray) % Handle struct array case (e.g., Frame_000002_Rx_0002)
@@ -188,7 +196,16 @@ for winIdx = 1:size(windowConfigs, 1)
 
             [s, f, t] = stft(x, sampleRate, 'Window', stftWindow, 'OverlapLength', stftOverlapLength, 'FFTLength', stftFftLength, 'FrequencyRange', 'centered');
 
-            % --- Process STFT result ---
+            % --- Process STFT result: Keep only positive frequencies (and zero) ---
+            zeroFreqIndex = find(f >= 0, 1, 'first');
+
+            if isempty(zeroFreqIndex)
+                warning('Could not find zero frequency. Using entire spectrum for %s.', jsonFileName);
+            else
+                s = s(zeroFreqIndex:end, :); % Keep s from zero frequency upwards
+                f = f(zeroFreqIndex:end); % Keep f from zero frequency upwards
+            end
+
             % Keep complex result, separate real/imag parts, and stack as channels
             realPart = real(s);
             imagPart = imag(s);
@@ -197,6 +214,12 @@ for winIdx = 1:size(windowConfigs, 1)
 
             % Get dimensions from the original STFT result (frequency x time)
             [numFreqBins, numTimeBins] = size(s);
+
+            % --- Skip if numTimeBins < numFreqBins ---
+            if numTimeBins < numFreqBins
+                warning('Skipping %s for window %s: numTimeBins (%d) < numFreqBins (%d).', jsonFileName, windowName, numTimeBins, numFreqBins);
+                continue; % Skip to the next JSON file
+            end
 
             % --- Save STFT Tensor as MAT ---
             matFileName = sprintf('%s.mat', baseName);
@@ -260,11 +283,11 @@ for winIdx = 1:size(windowConfigs, 1)
                     try % Wrap name generation in try-catch for missing fields
 
                         switch supercategoryName
-                            case 'OFDM'
+                            case {'OFDM', 'SCFDMA', 'OTFS'}
 
                                 if isfield(txInfo, 'ModulatorOrder') && ~isempty(txInfo.ModulatorOrder) && ...
                                         isfield(txInfo, 'baseModulatorType') && ~isempty(txInfo.baseModulatorType)
-                                    categoryName = sprintf('%d-%s-%s', txInfo.ModulatorOrder, upper(txInfo.baseModulatorType), originalModType);
+                                    categoryName = sprintf('%d-%s-%s', sum(txInfo.ModulatorOrder), upper(txInfo.baseModulatorType), originalModType);
                                 else
                                     warning('Missing ModulatorOrder or BaseModulator for OFDM type in %s. Using "OFDM".', jsonFileName);
                                     categoryName = 'OFDM'; % Fallback name
@@ -273,7 +296,7 @@ for winIdx = 1:size(windowConfigs, 1)
                             case {'PSK', 'QAM', 'PAM', 'APSK', 'ASK', 'CPM', 'FSK'}
 
                                 if isfield(txInfo, 'ModulatorOrder') && ~isempty(txInfo.ModulatorOrder)
-                                    categoryName = sprintf('%d-%s', txInfo.ModulatorOrder, originalModType);
+                                    categoryName = sprintf('%d-%s', sum(txInfo.ModulatorOrder), originalModType);
                                 else
                                     warning('Missing ModulatorOrder for %s type in %s. Using original type name.', supercategoryName, jsonFileName);
                                     categoryName = originalModType; % Fallback name
@@ -350,12 +373,21 @@ for winIdx = 1:size(windowConfigs, 1)
                     [~, startFreqIndex] = min(abs(f - freqMin));
                     [~, endFreqIndex] = min(abs(f - freqMax));
                     if startFreqIndex > endFreqIndex, [startFreqIndex, endFreqIndex] = deal(endFreqIndex, startFreqIndex); end
-                    bbox_y = startFreqIndex;
-                    bbox_height = max(1, endFreqIndex - startFreqIndex + 1);
+                    bbox_y_raw = startFreqIndex; % This is from bottom-left (low freq = low index)
+                    bbox_height_raw = max(1, endFreqIndex - startFreqIndex + 1);
+
+                    % Adjust bbox_y for COCO format (top-left origin)
+                    % The new y is from the top edge of the image.
+                    % (numFreqBins - (bottom_y + height -1)) effectively flips the y-coordinate origin
+                    % where bottom_y is the original bbox_y_raw.
+                    bbox_y = numFreqBins - (bbox_y_raw + bbox_height_raw -1) +1; % +1 for 1-based indexing from top
+                    bbox_y = max(1, bbox_y); % Ensure it's at least 1
+
+                    bbox_height = bbox_height_raw;
 
                     % Clamp bounding box to image dimensions
                     bbox_x = max(1, min(bbox_x, numTimeBins));
-                    bbox_y = max(1, min(bbox_y, numFreqBins));
+                    bbox_y = max(1, min(bbox_y, numFreqBins)); % Use potentially updated numFreqBins
                     bbox_width = min(bbox_width, numTimeBins - bbox_x + 1);
                     bbox_height = min(bbox_height, numFreqBins - bbox_y + 1);
 
@@ -376,6 +408,50 @@ for winIdx = 1:size(windowConfigs, 1)
 
                     end
 
+                    % --- Calculate SNR for the event ---
+                    processedSnr = NaN; % Default SNR value
+                    snrsForCurrentEventAcrossAntennas = []; % Stores SNRs for current event, across all Rx antennas
+
+                    % Ensure rxInfo and necessary subfields for SNR are available
+                    if isfield(rxInfo, 'SNRs') && ~isempty(rxInfo.SNRs) && ...
+                            isfield(rxInfo, 'NumReceiveAntennas') && ~isempty(rxInfo.NumReceiveAntennas) && rxInfo.NumReceiveAntennas > 0
+
+                        allRxSnrsDataFromJSON = rxInfo.SNRs; % This is the 1D cell array from JSON
+                        numActualRxAntennas = rxInfo.NumReceiveAntennas;
+
+                        if length(txArray) > 1
+
+                            snrs = zeros(numActualRxAntennas, 1);
+
+                            for rxAntIdx = 1:numActualRxAntennas
+                                rowId = (rxAntIdx - 1) * length(txArray) + txIdx;
+
+                                if iscell(allRxSnrsDataFromJSON)
+                                    snr_data = allRxSnrsDataFromJSON{rowId}(eventIdx);
+                                else
+
+                                    snr_data = allRxSnrsDataFromJSON(rowId, eventIdx);
+                                end
+
+                                snrs(rxAntIdx) = snr_data;
+                            end
+
+                            processedSnr = mean(snrs);
+
+                        else
+
+                            if numActualRxAntennas > 1
+                                processedSnr = mean(rxInfo.SNRs(:, eventIdx));
+                            else
+                                processedSnr = rxInfo.SNRs(eventIdx);
+                            end
+
+                        end
+
+                    end
+
+                    % --- End SNR Calculation ---
+
                     % Create Annotation
                     annotationEntry = struct();
                     annotationEntry.id = annotationId;
@@ -385,6 +461,7 @@ for winIdx = 1:size(windowConfigs, 1)
                     annotationEntry.area = bbox_width * bbox_height;
                     annotationEntry.bbox = [bbox_x, bbox_y, bbox_width, bbox_height];
                     annotationEntry.iscrowd = 0;
+                    annotationEntry.snr = processedSnr; % Add the processed SNR value
 
                     annotationsForThisImage = [annotationsForThisImage, annotationEntry];
                     annotationId = annotationId + 1;
@@ -427,24 +504,26 @@ for winIdx = 1:size(windowConfigs, 1)
         continue;
     end
 
-    % --- Shuffle and Split Frame IDs ---
-    rng('default'); % for reproducibility
-    shuffledFrameIndices = randperm(numUniqueFrames);
-    shuffledFrameIds = uniqueFrameIds(shuffledFrameIndices);
+    % --- Split Frame IDs (Sequential Order from uniqueFrameIds) ---
+    % Frame IDs are taken in the order returned by unique(), which is sorted.
+    % No random shuffling is performed.
+    % rng('default'); % Removed: No longer shuffling
+    % shuffledFrameIndices = randperm(numUniqueFrames); % Removed: No longer shuffling
+    % shuffledFrameIds = uniqueFrameIds(shuffledFrameIndices); % Removed: Using uniqueFrameIds directly
 
     numTrainFrames = floor(trainRatio * numUniqueFrames);
     numValFrames = floor(valRatio * numUniqueFrames);
     numTestFrames = numUniqueFrames - numTrainFrames - numValFrames; % Ensure all frames are used
 
-    fprintf('  Total unique frames: %d\n', numUniqueFrames);
+    fprintf('  Total unique frames: %d (split sequentially, not shuffled)\n', numUniqueFrames); % Updated message
     fprintf('    Training frames:   %d (%.1f%%)\n', numTrainFrames, trainRatio * 100);
     fprintf('    Validation frames: %d (%.1f%%)\n', numValFrames, valRatio * 100);
     fprintf('    Testing frames:    %d (%.1f%%)\n', numTestFrames, (numTestFrames / numUniqueFrames) * 100);
 
-    % Assign Frame IDs to splits
-    trainFrameIdList = shuffledFrameIds(1:numTrainFrames);
-    valFrameIdList = shuffledFrameIds(numTrainFrames + 1:numTrainFrames + numValFrames);
-    testFrameIdList = shuffledFrameIds(numTrainFrames + numValFrames + 1:end);
+    % Assign Frame IDs to splits sequentially from uniqueFrameIds
+    trainFrameIdList = uniqueFrameIds(1:numTrainFrames);
+    valFrameIdList = uniqueFrameIds(numTrainFrames + 1:numTrainFrames + numValFrames);
+    testFrameIdList = uniqueFrameIds(numTrainFrames + numValFrames + 1:end);
 
     % Create maps for quick Frame ID lookup per split
     trainFrameIdMap = containers.Map(trainFrameIdList, true(1, numTrainFrames));
@@ -567,9 +646,12 @@ function supercat = getModulationSupercategory(modType)
             supercat = 'QAM';
         case {'PAM', '4PAM', '8PAM'}
             supercat = 'PAM';
-        case {'OFDM', 'OTFS', 'SCFDMA'}
+        case {'OFDM'}
             supercat = 'OFDM';
-            % Add more specific cases or pattern matching if needed
+        case {'OTFS'}
+            supercat = 'OTFS';
+        case {'SCFDMA'}
+            supercat = 'SCFDMA';
         otherwise
             % Attempt basic pattern matching for common prefixes
             if startsWith(modTypeUpper, 'QAM'), supercat = 'QAM';
@@ -587,48 +669,49 @@ function supercat = getModulationSupercategory(modType)
 end
 
 function visualizeBoundingBox(spectrogramData, f, t, sampleRate, ...
-        bbox_x, bbox_y, bbox_width, bbox_height, ...
+        bbox_x_coco, bbox_y_coco, bbox_width_coco, bbox_height_coco, ... % These are COCO bbox values
         centerFreqHz, bandwidthHz, eventStartSample, eventEndSample, ...
         fileName, eventIdx, categoryName)
     % Displays the spectrogram and the calculated bounding box for an event.
+    % Note: spectrogramData and f here should be the positive-frequency only versions.
 
     figure; % Create a new figure for each visualization
     imagesc(t, f, spectrogramData); % Use imagesc for better performance with large data
     axis xy; % Ensure frequency axis is oriented correctly (low to high)
     colorbar;
     xlabel('Time (s)');
-    ylabel('Frequency (Hz)');
+    ylabel('Frequency (Hz) - Positive Half');
     titleStr = sprintf('%s - Event %d (%s)', strrep(fileName, '_', '\_'), eventIdx, categoryName);
     title(titleStr);
 
-    % --- Draw Bounding Box Rectangle (from bin indices) ---
+    % --- Draw Bounding Box Rectangle (from COCO bbox values) ---
     hold on; % Ensure subsequent plots are overlaid
 
     try
-        % Start time and frequency from indices
-        rect_x = t(bbox_x);
-        rect_y = f(bbox_y);
+        % Convert COCO bbox_y_coco back to plot coordinates if needed or adjust drawing
+        % For rectangle function, [x, y, width, height], y is typically from bottom.
+        % If f(1) is 0 Hz, and axis xy is used, then f(bbox_y_plot_start_index) is the y-coord.
+        % COCO bbox_y_coco is from top-left. We need to convert it back for plotting
+        % if the y-axis of the plot starts from low frequency at the bottom.
 
-        % End time and frequency bins
-        end_time_bin = min(bbox_x + bbox_width - 1, length(t));
-        end_freq_bin = min(bbox_y + bbox_height - 1, length(f));
+        numFreqBinsPlot = length(f);
+        rect_plot_y_start = f(numFreqBinsPlot - (bbox_y_coco + bbox_height_coco - 1) +1); % Bottom-left y for rectangle
+        rect_plot_y_end = f(numFreqBinsPlot - bbox_y_coco + 1); % Top-left y for rectangle
 
-        % Width and height in data units
-        time_step = mean(diff(t)); if isnan(time_step) || time_step == 0, time_step = t(end); end % Handle single time bin
-        freq_step = mean(diff(f)); if isnan(freq_step) || freq_step == 0, freq_step = f(end) - f(1); end % Handle single freq bin
-
-        rect_w = t(end_time_bin) - t(bbox_x) + time_step / 2;
-        rect_h = f(end_freq_bin) - f(bbox_y) + freq_step / 2;
-        rect_w = max(rect_w, time_step / 2);
-        rect_h = max(rect_h, freq_step / 2);
+        rect_x_plot = t(bbox_x_coco);
+        rect_width_plot = (t(min(length(t), bbox_x_coco + bbox_width_coco -1)) - t(bbox_x_coco)) + mean(diff(t)) / 2;
+        rect_height_plot = abs(rect_plot_y_end - rect_plot_y_start) + mean(diff(f)) / 2;
+        rect_width_plot = max(rect_width_plot, mean(diff(t)) / 2); % Ensure minimum width
+        rect_height_plot = max(rect_height_plot, mean(diff(f)) / 2); % Ensure minimum height
 
         % Draw the rectangle (Red, Solid)
-        rectangle('Position', [rect_x, rect_y, rect_w, rect_h], ...
+        rectangle('Position', [rect_x_plot, rect_plot_y_start, rect_width_plot, rect_height_plot], ...
             'EdgeColor', 'r', ...
             'LineWidth', 1.5, ...
             'LineStyle', '-');
 
-        fprintf('  Rectangle Time: [%.4f, %.4f], Freq: [%.1f, %.1f]\n', rect_x, rect_x + rect_w, rect_y, rect_y + rect_h);
+        fprintf('  COCO BBox: [x:%d, y:%d, w:%d, h:%d]\n', bbox_x_coco, bbox_y_coco, bbox_width_coco, bbox_height_coco);
+        fprintf('  Plotted Rectangle Time: [%.4f, %.4f], Freq: [%.1f, %.1f]\n', rect_x_plot, rect_x_plot + rect_width_plot, rect_plot_y_start, rect_plot_y_start + rect_height_plot);
 
     catch rectError
         warning('Could not draw rectangle for event %d in %s: %s', eventIdx, fileName, rectError.message);
