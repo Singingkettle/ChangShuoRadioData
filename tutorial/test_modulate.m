@@ -1,2 +1,0 @@
-a = modulate();
-b = a();

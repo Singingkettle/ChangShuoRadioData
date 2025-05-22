@@ -1,0 +1,8 @@
+appdata/
+*.csv
+*.mat
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp

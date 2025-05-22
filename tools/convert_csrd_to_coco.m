@@ -14,7 +14,7 @@
 clear; close all; clc;
 
 %% --- Configuration ---
-enableVisualization = false; % Set to true to visualize bounding boxes (slows down processing)
+enableVisualization = true; % Set to true to visualize bounding boxes (slows down processing)
 
 baseDataPath = '../data/CSRD2025'; % Path to the dataset
 annoDir = fullfile(baseDataPath, 'anno');
@@ -373,17 +373,8 @@ for winIdx = 1:size(windowConfigs, 1)
                     [~, startFreqIndex] = min(abs(f - freqMin));
                     [~, endFreqIndex] = min(abs(f - freqMax));
                     if startFreqIndex > endFreqIndex, [startFreqIndex, endFreqIndex] = deal(endFreqIndex, startFreqIndex); end
-                    bbox_y_raw = startFreqIndex; % This is from bottom-left (low freq = low index)
-                    bbox_height_raw = max(1, endFreqIndex - startFreqIndex + 1);
-
-                    % Adjust bbox_y for COCO format (top-left origin)
-                    % The new y is from the top edge of the image.
-                    % (numFreqBins - (bottom_y + height -1)) effectively flips the y-coordinate origin
-                    % where bottom_y is the original bbox_y_raw.
-                    bbox_y = numFreqBins - (bbox_y_raw + bbox_height_raw -1) +1; % +1 for 1-based indexing from top
-                    bbox_y = max(1, bbox_y); % Ensure it's at least 1
-
-                    bbox_height = bbox_height_raw;
+                    bbox_y = startFreqIndex; % This is from bottom-left (low freq = low index)
+                    bbox_height = max(1, endFreqIndex - startFreqIndex + 1);
 
                     % Clamp bounding box to image dimensions
                     bbox_x = max(1, min(bbox_x, numTimeBins));
@@ -688,30 +679,21 @@ function visualizeBoundingBox(spectrogramData, f, t, sampleRate, ...
     hold on; % Ensure subsequent plots are overlaid
 
     try
-        % Convert COCO bbox_y_coco back to plot coordinates if needed or adjust drawing
-        % For rectangle function, [x, y, width, height], y is typically from bottom.
-        % If f(1) is 0 Hz, and axis xy is used, then f(bbox_y_plot_start_index) is the y-coord.
-        % COCO bbox_y_coco is from top-left. We need to convert it back for plotting
-        % if the y-axis of the plot starts from low frequency at the bottom.
-
-        numFreqBinsPlot = length(f);
-        rect_plot_y_start = f(numFreqBinsPlot - (bbox_y_coco + bbox_height_coco - 1) +1); % Bottom-left y for rectangle
-        rect_plot_y_end = f(numFreqBinsPlot - bbox_y_coco + 1); % Top-left y for rectangle
-
         rect_x_plot = t(bbox_x_coco);
+        rect_y_plot = t(bbox_y_coco);
         rect_width_plot = (t(min(length(t), bbox_x_coco + bbox_width_coco -1)) - t(bbox_x_coco)) + mean(diff(t)) / 2;
-        rect_height_plot = abs(rect_plot_y_end - rect_plot_y_start) + mean(diff(f)) / 2;
+        rect_height_plot = (f(min(length(f), bbox_y_coco + bbox_height_coco -1)) - f(bbox_y_coco)) + mean(diff(f)) / 2;
         rect_width_plot = max(rect_width_plot, mean(diff(t)) / 2); % Ensure minimum width
         rect_height_plot = max(rect_height_plot, mean(diff(f)) / 2); % Ensure minimum height
 
         % Draw the rectangle (Red, Solid)
-        rectangle('Position', [rect_x_plot, rect_plot_y_start, rect_width_plot, rect_height_plot], ...
+        rectangle('Position', [rect_x_plot, rect_y_plot, rect_width_plot, rect_height_plot], ...
             'EdgeColor', 'r', ...
             'LineWidth', 1.5, ...
             'LineStyle', '-');
 
         fprintf('  COCO BBox: [x:%d, y:%d, w:%d, h:%d]\n', bbox_x_coco, bbox_y_coco, bbox_width_coco, bbox_height_coco);
-        fprintf('  Plotted Rectangle Time: [%.4f, %.4f], Freq: [%.1f, %.1f]\n', rect_x_plot, rect_x_plot + rect_width_plot, rect_plot_y_start, rect_plot_y_start + rect_height_plot);
+        fprintf('  Plotted Rectangle Time: [%.4f, %.4f], Freq: [%.1f, %.1f]\n', rect_x_plot, rect_x_plot + rect_width_plot, rect_y_plot, rect_y_plot + rect_height_plot);
 
     catch rectError
         warning('Could not draw rectangle for event %d in %s: %s', eventIdx, fileName, rectError.message);
