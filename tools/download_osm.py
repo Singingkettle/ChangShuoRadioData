@@ -6,7 +6,7 @@ import re
 
 # --- Configuration ---
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"  # Use the .de mirror, often has lower load
-OUTPUT_BASE_DIR = "appdata/map/osm"  # Base directory for storing datasets
+OUTPUT_BASE_DIR = "data/map/osm"  # Base directory for storing datasets
 BOX_SIZE_KM = 2.0  # Side length of each scene box (kilometers)
 REQUEST_TIMEOUT = 1800  # HTTP request timeout (seconds)
 API_DELAY = 15  # Pause time after each API call (seconds)
