@@ -1,4 +1,4 @@
-function rxConfigs = generateScenarioReceiverConfigurations(obj, transmitters, receivers, factoryConfigs)
+function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers, factoryConfigs)
     % generateScenarioReceiverConfigurations - Generate fixed receiver configurations for scenario
     %
     % Creates receiver configurations that define the observable frequency
@@ -18,7 +18,7 @@ function rxConfigs = generateScenarioReceiverConfigurations(obj, transmitters, r
         rxFactoryConfig = factoryConfigs.Receive;
 
         % Select receiver type and parameters
-        rxConfig.Type = selectReceiverType(obj, receiver, rxFactoryConfig);
+        rxConfig.Type = selectReceiverType(obj, rxFactoryConfig);
         rxConfig.SampleRate = selectSampleRate(obj, receiver, rxFactoryConfig);
         rxConfig.ObservableRange = [0, rxConfig.SampleRate];
         rxConfig.Sensitivity = selectSensitivity(obj, receiver, rxFactoryConfig);

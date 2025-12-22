@@ -22,7 +22,7 @@ function [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities,
     % Initialize scenario-level configurations on first frame
     if ~obj.scenarioInitialized
         obj.logger.debug('Frame %d: Initializing scenario-level communication configurations', frameId);
-        initializeScenarioConfigurations(obj, frameId, entities, factoryConfigs);
+        initializeScenarioConfigurations(obj, entities, factoryConfigs);
         obj.scenarioInitialized = true;
     end
 

@@ -1,4 +1,4 @@
-function receiverType = selectReceiverType(obj, receiver, factoryConfig)
+function receiverType = selectReceiverType(obj, factoryConfig)
     % selectReceiverType - Select appropriate receiver type from top-level receiver types
     % Only select from receiver types (e.g., 'Simulation'), not receiver models
     if isfield(factoryConfig, 'Types') && ~isempty(factoryConfig.Types)

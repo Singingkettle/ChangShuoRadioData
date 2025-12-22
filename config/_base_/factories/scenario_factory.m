@@ -16,9 +16,9 @@ function config = scenario_factory()
 
     % Physical Environment Configuration
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Max = 4;
+    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Max = 8;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Min = 1;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 2;
+    config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 8;
     config.Factories.Scenario.PhysicalEnvironment.Entities.InitialDistribution = 'Random';
 
     % Map Configuration

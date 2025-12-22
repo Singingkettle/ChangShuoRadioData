@@ -130,12 +130,12 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
     methods (Access = private)
         % Scenario-level configuration methods
-        initializeScenarioConfigurations(obj, frameId, entities, factoryConfigs)
+        initializeScenarioConfigurations(obj, entities, factoryConfigs)
         [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj, frameId)
 
         % Entity processing methods
         [transmitters, receivers] = separateEntitiesByType(obj, entities)
-        rxConfigs = generateScenarioReceiverConfigurations(obj, transmitters, receivers, factoryConfigs)
+        rxConfigs = generateScenarioReceiverConfigurations(obj, receivers, factoryConfigs)
         [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(obj, transmitters, rxConfigs, factoryConfigs)
 
         % Frequency allocation methods
@@ -155,7 +155,7 @@ classdef CommunicationBehaviorSimulator < matlab.System
         [txConfigs, rxConfigs, globalLayout] = optimizeSystemConfiguration(obj, frameId, txConfigs, rxConfigs, globalLayout)
 
         % Configuration generation methods
-        receiverType = selectReceiverType(obj, receiver, factoryConfig)
+        receiverType = selectReceiverType(obj, factoryConfig)
         sampleRate = selectSampleRate(obj, receiver, factoryConfig)
         sensitivity = selectSensitivity(obj, receiver, factoryConfig)
         noiseFigure = selectNoiseFigure(obj, receiver, factoryConfig)

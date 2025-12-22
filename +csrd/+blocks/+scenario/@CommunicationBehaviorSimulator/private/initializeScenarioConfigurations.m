@@ -1,4 +1,4 @@
-function initializeScenarioConfigurations(obj, frameId, entities, factoryConfigs)
+function initializeScenarioConfigurations(obj, entities, factoryConfigs)
     % initializeScenarioConfigurations - Initialize fixed scenario-level configurations
     %
     % This method sets up all the communication parameters that remain fixed
@@ -12,7 +12,7 @@ function initializeScenarioConfigurations(obj, frameId, entities, factoryConfigs
         length(transmitters), length(receivers));
 
     % Generate fixed receiver configurations for the scenario
-    obj.scenarioRxConfigs = generateScenarioReceiverConfigurations(obj, transmitters, receivers, factoryConfigs);
+    obj.scenarioRxConfigs = generateScenarioReceiverConfigurations(obj, receivers, factoryConfigs);
 
     % Generate fixed transmitter configurations for the scenario
     [obj.scenarioTxConfigs, obj.scenarioGlobalLayout] = generateScenarioTransmitterConfigurations( ...
