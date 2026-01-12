@@ -4,6 +4,36 @@
 
 A comprehensive MATLAB-based radio communication simulation framework for wireless communication system simulation and analysis. 
 
+---
+
+## ⚠️ **IMPORTANT NOTICE / 重要提示**
+
+### 🔄 **Code Refactoring in Progress / 代码重构进行中**
+
+**English:**
+> ⚠️ **The codebase is currently undergoing extensive refactoring.** The refactoring is driven by two main reasons:
+> 
+> 1. **Ray Tracing Stability Issues**: The original implementation has problems that cause instability in ray tracing, especially when OSM files do not contain buildings, which leads to exceptions. While patches can be applied, the author believes this is not a good approach and will address this properly during the refactoring.
+> 
+> 2. **Module Design Confusion**: The current module design is somewhat chaotic, and the refactored version will address this issue.
+> 
+> **Note**: The author is a junior faculty member (青椒) and is the sole maintainer of this project. Due to busy schedules, updates can only be made when time permits. **If you need to run the code, please refer to a previous stable version**:
+> 
+> **Stable Version**: [https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
+
+**中文：**
+> ⚠️ **代码库目前正在进行大规模重构。** 重构主要基于两方面的原因：
+> 
+> 1. **Ray Tracing 稳定性问题**：原来的实现存在一些问题，导致基于 raytracing 实现不稳定，尤其是当 OSM 文件中不存在 buildings 时候，会有异常。当然可以进行打补丁解决，但是作者认为这个方法并不好，我们会在重构中进行考虑。
+> 
+> 2. **模块设计混乱**：模块的设计还是有点混乱，在重构代码的版本对这块会有修改。
+> 
+> **说明**：本人是一名青椒，目前整个项目的维护只有一个人在维护，平时太忙了，只能抽空进行必要的更新。**大家要想运行的话可以翻看历史的版本**：
+> 
+> **稳定版本**：[https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
+
+---
+
 ## 🌟 What's New in 2025
 
 ### 🔄 Revolutionary Frequency Translation System
