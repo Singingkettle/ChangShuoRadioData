@@ -249,7 +249,7 @@ masterConfig = {
       digital: {...},         % Digital modulation configs
       analog: {...}           % Analog modulation configs
     },
-    Message: {...},           % Message generation (RandomBits, CustomPattern)
+    Message: {...},           % Message generation (RandomBit, Audio)
     Transmit: {...},          % RF front-end impairment models
     Channel: {...},           % Channel propagation models
     Receive: {...}            % Receiver front-end models
@@ -339,6 +339,7 @@ y = x .* freqShift;
 - **[Frequency Translation System Upgrade](docs/frequency_translation_system_upgrade.md)**: Complete technical details
 - **[Test Suite Guide](tests/README.md)**: Comprehensive testing documentation
 - **[Usage Examples](examples/)**: Practical implementation examples
+- **[TWC Dataset Simulation](twc/README.md)**: Dataset generator for the TWC paper (IEEE Xplore: https://ieeexplore.ieee.org/abstract/document/10667001)
 
 ## 🧪 Testing and Validation
 
