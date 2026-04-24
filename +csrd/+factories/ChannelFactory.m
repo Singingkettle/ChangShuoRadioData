@@ -59,7 +59,8 @@ classdef ChannelFactory < matlab.System
 
             [linkDistance_m, linkDistance_km] = obj.computeLinkDistance(txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo);
             computedPathLoss_dB = obj.computeFreeSpacePathLoss(linkDistance_m, rxSpecificInfo, channelLinkSpecificInfo);
-            computedSNR_dB = obj.computeLinkBudgetSNR(computedPathLoss_dB, txSpecificInfo);
+            computedSNR_dB = obj.computeLinkBudgetSNR(computedPathLoss_dB, txSpecificInfo, ...
+                inputSignalStruct, rxSpecificInfo);
 
             inputSignalStruct.LinkDistance = linkDistance_m;
             inputSignalStruct.PathLoss = computedPathLoss_dB;
@@ -96,7 +97,23 @@ classdef ChannelFactory < matlab.System
 
                 receivedSignalStruct = obj.mergeChannelOutput(inputSignalStruct, channelBlockOutput);
                 receivedSignalStruct.LinkDistance = linkDistance_m;
-                receivedSignalStruct.PathLoss = getStructField(receivedSignalStruct, 'PathLoss', computedPathLoss_dB);
+
+                % Always preserve the analytical FSPL value so AI/ML
+                % consumers can reason about the link budget that the
+                % planning layer used. AppliedPathLoss reflects what the
+                % actual channel block produced (e.g. RayTracing) when
+                % available; otherwise it equals the analytical value.
+                receivedSignalStruct.AnalyticalPathLoss = computedPathLoss_dB;
+                if isfield(channelBlockOutput, 'PathLoss') && ~isempty(channelBlockOutput.PathLoss)
+                    receivedSignalStruct.AppliedPathLoss = channelBlockOutput.PathLoss;
+                elseif isfield(receivedSignalStruct, 'PathLoss') && ~isempty(receivedSignalStruct.PathLoss)
+                    receivedSignalStruct.AppliedPathLoss = receivedSignalStruct.PathLoss;
+                else
+                    receivedSignalStruct.AppliedPathLoss = computedPathLoss_dB;
+                end
+                % Backwards-compat alias, keep as the analytical value.
+                receivedSignalStruct.PathLoss = computedPathLoss_dB;
+
                 receivedSignalStruct.ComputedSNR = computedSNR_dB;
                 receivedSignalStruct.ChannelModel = channelModelName;
 
@@ -369,18 +386,54 @@ classdef ChannelFactory < matlab.System
             end
         end
 
-        function snr_dB = computeLinkBudgetSNR(obj, pathLoss_dB, txInfo)
+        function snr_dB = computeLinkBudgetSNR(obj, pathLoss_dB, txInfo, inputSignalStruct, rxInfo)
+            % Compute analytical link-budget SNR.
+            %
+            % Noise bandwidth defaults to the receiver observation
+            % bandwidth (rxInfo.SampleRate or rxInfo.ObservableRange) and
+            % is clamped down to the planned occupied bandwidth of the
+            % current Tx segment when the latter is narrower. Without
+            % this clamp the noise floor is dominated by spectrum the
+            % current Tx is not even using, and narrow-band signals get
+            % a systematically pessimistic SNR label.
+
             txPower_dBm = getStructField(txInfo, 'Power', 20);
             noisePSD = -174;
-            noiseBW = 50e6;
+            configuredBW = [];
             noiseFig = 6;
 
             if isfield(obj.factoryConfig, 'LinkBudget')
                 lb = obj.factoryConfig.LinkBudget;
                 noisePSD = getStructField(lb, 'ThermalNoisePSD', noisePSD);
-                noiseBW = getStructField(lb, 'NoiseBandwidth', noiseBW);
+                if isfield(lb, 'NoiseBandwidth') && ~isempty(lb.NoiseBandwidth) && lb.NoiseBandwidth > 0
+                    configuredBW = lb.NoiseBandwidth;
+                end
                 noiseFig = getStructField(lb, 'NoiseFigure', noiseFig);
             end
+
+            rxBW = [];
+            if nargin >= 5 && isstruct(rxInfo)
+                if isfield(rxInfo, 'SampleRate') && ~isempty(rxInfo.SampleRate) && rxInfo.SampleRate > 0
+                    rxBW = rxInfo.SampleRate;
+                elseif isfield(rxInfo, 'ObservableRange') && numel(rxInfo.ObservableRange) >= 2
+                    rxBW = abs(rxInfo.ObservableRange(2) - rxInfo.ObservableRange(1));
+                elseif isfield(rxInfo, 'BandWidth') && ~isempty(rxInfo.BandWidth) && rxInfo.BandWidth > 0
+                    rxBW = rxInfo.BandWidth;
+                end
+            end
+
+            txBW = [];
+            if nargin >= 4 && isstruct(inputSignalStruct)
+                if isfield(inputSignalStruct, 'Bandwidth') && ~isempty(inputSignalStruct.Bandwidth) && inputSignalStruct.Bandwidth > 0
+                    txBW = inputSignalStruct.Bandwidth;
+                elseif isfield(inputSignalStruct, 'Planned') && isstruct(inputSignalStruct.Planned) && ...
+                        isfield(inputSignalStruct.Planned, 'Bandwidth') && inputSignalStruct.Planned.Bandwidth > 0
+                    txBW = inputSignalStruct.Planned.Bandwidth;
+                end
+            end
+
+            noiseBW = csrd.utils.linkbudget.resolveNoiseBandwidth( ...
+                configuredBW, rxBW, txBW, 50e6);
 
             noisePower_dBm = noisePSD + 10 * log10(noiseBW) + noiseFig;
             snr_dB = txPower_dBm - pathLoss_dB - noisePower_dBm;
