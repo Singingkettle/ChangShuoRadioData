@@ -11,26 +11,49 @@ A comprehensive MATLAB-based radio communication simulation framework for wirele
 ### 🔄 **Code Refactoring in Progress / 代码重构进行中**
 
 **English:**
-> ⚠️ **The codebase is currently undergoing extensive refactoring.** The refactoring is driven by two main reasons:
-> 
-> 1. **Ray Tracing Stability Issues**: The original implementation has problems that cause instability in ray tracing, especially when OSM files do not contain buildings, which leads to exceptions. While patches can be applied, the author believes this is not a good approach and will address this properly during the refactoring.
-> 
-> 2. **Module Design Confusion**: The current module design is somewhat chaotic, and the refactored version will address this issue.
-> 
-> **Note**: The author is a junior faculty member (青椒) and is the sole maintainer of this project. Due to busy schedules, updates can only be made when time permits. **If you need to run the code, please refer to a previous stable version**:
-> 
-> **Stable Version**: [https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
+> ⚠️ **The codebase is still undergoing active, multi-stage refactoring.** Although a deep audit pass has just landed on `main` (see "Recent audit pass" below), the public API, configuration schema, annotation layout, and several block contracts are **NOT frozen yet** and may still change without notice.
+>
+> The original drivers for the refactor:
+>
+> 1. **Ray Tracing Stability Issues**: The original implementation has problems that cause instability in ray tracing, especially when OSM files do not contain buildings, which leads to exceptions. While patches can be applied, the author believes this is not a good approach and is addressing it properly during the refactoring (see `tests/regression/test_empty_osm_raytracing.m`).
+>
+> 2. **Module Design Confusion**: The original modules confused planning with execution. The refactor enforces a strict split: scenario blocks (`PhysicalEnvironmentSimulator`, `CommunicationBehaviorSimulator`) **plan** what every Tx/Rx should do; factories (`ScenarioFactory`, `ModulationFactory`, `MessageFactory`, `TransmitFactory`, `ChannelFactory`, `ReceiveFactory`) **execute** those plans and write the realized values into annotations.
+>
+> **Note**: The author is a junior faculty member (青椒) and is the sole maintainer of this project. Updates land only when time permits. **If you need a known-good revision for running experiments today, use the v1 stable tag**:
+>
+> **Stable Version (v1, JSAC paper)**: [https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
 
 **中文：**
-> ⚠️ **代码库目前正在进行大规模重构。** 重构主要基于两方面的原因：
-> 
-> 1. **Ray Tracing 稳定性问题**：原来的实现存在一些问题，导致基于 raytracing 实现不稳定，尤其是当 OSM 文件中不存在 buildings 时候，会有异常。当然可以进行打补丁解决，但是作者认为这个方法并不好，我们会在重构中进行考虑。
-> 
-> 2. **模块设计混乱**：模块的设计还是有点混乱，在重构代码的版本对这块会有修改。
-> 
-> **说明**：本人是一名青椒，目前整个项目的维护只有一个人在维护，平时太忙了，只能抽空进行必要的更新。**大家要想运行的话可以翻看历史的版本**：
-> 
-> **稳定版本**：[https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
+> ⚠️ **代码库目前仍处于多阶段、滚动式重构状态。** 虽然 `main` 上刚刚合并了一轮端到端审计修复（见下方 "Recent audit pass"），但公共 API、配置 schema、标注结构以及若干 block 契约 **仍未冻结**，后续可能继续调整。
+>
+> 重构的两个原始驱动力：
+>
+> 1. **Ray Tracing 稳定性问题**：原始实现在 raytracing 上不稳定，尤其当 OSM 中不存在建筑物时会异常。打补丁不是好办法，我们在重构里把这条路彻底走通（回归测试见 `tests/regression/test_empty_osm_raytracing.m`）。
+>
+> 2. **模块设计混乱**：原版本里"规划"和"执行"混在一起。重构强制二者分离：场景层（`PhysicalEnvironmentSimulator` + `CommunicationBehaviorSimulator`）**只负责规划**每个 Tx/Rx 应该怎么发什么；工厂层（`ScenarioFactory` 等 6 个 Factory）**只负责执行**规划，并把"真实兑现的值"写回标注。
+>
+> **说明**：作者是青椒，独自维护这个项目，只能抽空更新。**如果您今天就需要稳定可用的版本来跑实验，请用 v1 稳定 tag**：
+>
+> **稳定版本（v1，对应 JSAC 论文）**：[https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
+
+### 🛠️ Recent audit pass (review/spectrum-sim-audit, merged into `main`)
+
+This branch landed an end-to-end review and 18 fix commits across five stages. Key things that changed:
+
+- **Physical correctness**
+  - `BaseChannel.fspl` distance is now in **meters** end-to-end (was silently treated as km — a 60 dB error per 100 m).
+  - `TRFSimulator` writes IIP3 to the IIP3 property (not OIP3); RRFSimulator class doc now reflects only the actually-wired stages.
+  - Antenna upgrade (SISO → MIMO) is propagated back to `TxInfo` instead of dying inside a value-passed struct.
+- **Annotation truthfulness**
+  - Per-source annotation is now split into `Planned` / `Realized` / `Temporal` / `Spatial` / `LinkBudget` / `Channel` substructures. `Planned` is **never** filled from `Realized`.
+  - RayTracing path loss is recorded as `AppliedPathLoss`; the analytical FSPL the planner reasoned about is recorded separately as `AnalyticalPathLoss`.
+  - Link-budget noise bandwidth is now `min(rxFs, txOccupiedBW, configured)` so narrow-band signals stop carrying pessimistic SNR labels.
+- **Exception contract**
+  - Scenario-skip identifiers (`SkipScenario`, `NoBuildingData`, `NoValidPaths`) are classified by a single helper (`csrd.utils.scenario.isScenarioSkipException`) and propagate cleanly all the way up to `SimulationRunner.runScenario`, instead of being smothered by `ChannelFactory.stepImpl`.
+- **Testing**
+  - 11 unit suites (52 cases) and 7 regression scripts now run green via `run_all_tests('unit'|'regression'|'all')`. `'all'` finally sweeps all three categories instead of aliasing to `'regression'`.
+- **Development discipline**
+  - Five Cursor rule files at `.cursor/rules/csrd-{physics,architecture,matlab,testing,workflow}.mdc` codify the conventions enforced during the audit.
 
 ---
 
@@ -52,60 +75,90 @@ A comprehensive MATLAB-based radio communication simulation framework for wirele
 
 ```
 ChangShuoRadioData/
-├── +csrd/                           # Core CSRD package
-│   ├── SimulationRunner.m          # Main simulation execution engine
-│   ├── +core/                      # Core simulation components
-│   │   └── ChangShuo.m             # Central simulation engine
-│   ├── +factories/                 # Factory pattern implementations
-│   │   ├── ScenarioFactory.m       # Scenario instantiation strategies
-│   │   ├── ModulationFactory.m     # 22 modulation types support
-│   │   ├── MessageFactory.m        # Message generation
-│   │   ├── TransmitFactory.m       # Transmitter configuration
-│   │   ├── ChannelFactory.m        # Channel models
-│   │   └── ReceiveFactory.m        # Receiver configuration
-│   ├── +blocks/                    # Simulation building blocks
-│   │   ├── +scenario/              # Scenario planning and allocation
-│   │   │   └── ParameterDrivenPlanner.m  # Receiver-centric frequency planner
-│   │   └── +physical/              # Physical layer implementations
-│   │       ├── +txRadioFront/      # Advanced transmitter front-end
-│   │       │   └── TRFSimulator.m  # Complex exponential frequency translation
-│   │       ├── +rxRadioFront/      # Receiver front-end
-│   │       │   └── RRFSimulator.m  # Receiver-centric processing
-│   │       ├── +modulate/          # Comprehensive modulation library
-│   │       │   ├── +digital/       # 16 digital modulation schemes
-│   │       │   └── +analog/        # 6 analog modulation schemes
-│   │       ├── +channel/           # Channel models
-│   │       └── +message/           # Message generation utilities
-│   └── +utils/                     # Utility functions and system tools
-│       ├── config_loader.m         # Modular configuration loader
-│       ├── DocumentationGenerator.m # Automated documentation generation
-│       ├── +logger/                # Logging system components
-│       └── +sysinfo/               # System information utilities
-├── config/                         # Modular configuration system
-│   ├── _base_/                     # Base configuration files
-│   │   ├── factories/              # Factory configurations (scenario, modulation, etc.)
-│   │   ├── runners/                # Runner configurations (default, high_performance)
-│   │   └── logging/                # Logging configurations (default, debug)
-│   ├── csrd2025/                   # Example configuration dataset
-│   │   └── csrd2025.m              # Complete modular config example (5.7KB)
-│   └── README.md                   # Configuration system documentation
-├── tests/                          # Comprehensive test suite
-│   ├── run_all_tests.m            # Advanced test runner
-│   ├── unit/                      # Unit tests with MATLAB unittest framework
-│   │   ├── TRFSimulatorTest.m     # Frequency translation system tests
-│   │   └── ParameterDrivenPlannerTest.m  # Scenario planning tests
-│   └── integration/               # End-to-end integration tests
-│       └── FrequencyTranslationSystemTest.m  # Complete system validation
-├── docs/                          # Documentation
-│   └── frequency_translation_system_upgrade.md  # Technical details
-├── examples/                      # Usage examples
-│   └── use_new_frequency_system.m  # Complete system demonstration
-└── tools/                         # Development and simulation tools
-    ├── simulation.m               # Main simulation entry point (15KB)
-    ├── multi_simulation.bat       # Windows batch simulation script
-    ├── multi_simulation.sh        # Unix shell simulation script
-    ├── download_osm.py            # OSM map data downloader
-    └── convert_csrd_to_coco.m     # COCO dataset format converter
+├── +csrd/                                        # Core CSRD package
+│   ├── SimulationRunner.m                       # Top-level multi-worker orchestrator
+│   ├── +core/                                   # Core simulation engine
+│   │   └── @ChangShuo/                         # Central per-scenario engine (class folder)
+│   │       └── private/                         # Per-frame helpers
+│   │           ├── generateSingleFrame.m
+│   │           ├── processSingleTransmitter.m
+│   │           ├── processSingleSegment.m
+│   │           ├── processTransmitImpairments.m
+│   │           ├── processChannelPropagation.m
+│   │           ├── processReceiverProcessing.m  # Planned/Realized split lives here
+│   │           └── updateTransmitterAntennaConfig.m
+│   ├── +factories/                              # Factory pattern (executors of the plan)
+│   │   ├── ScenarioFactory.m                   # Scenario instantiation
+│   │   ├── ModulationFactory.m                 # 22 modulation types
+│   │   ├── MessageFactory.m                    # Message generation (Seed/SeedValue alias)
+│   │   ├── TransmitFactory.m                   # Tx front-end
+│   │   ├── ChannelFactory.m                    # Channel orchestration + link budget
+│   │   └── ReceiveFactory.m                    # Rx front-end
+│   ├── +blocks/                                 # Simulation building blocks
+│   │   ├── +scenario/                          # Planners (no execution side effects)
+│   │   │   ├── @PhysicalEnvironmentSimulator/  # Map / entities / mobility / weather
+│   │   │   └── @CommunicationBehaviorSimulator/# Tx-Rx links, freq plan, time pattern
+│   │   └── +physical/                          # Physical layer (executors)
+│   │       ├── +txRadioFront/TRFSimulator.m    # Complex-exp frequency translation, IIP3, IQI, PN
+│   │       ├── +rxRadioFront/RRFSimulator.m    # LNA → ThermalNoise → IQImbalance → SampleShifter
+│   │       ├── +modulate/+digital/             # 16 digital modulators
+│   │       ├── +modulate/+analog/              # 6 analog modulators
+│   │       ├── +channel/                       # BaseChannel, AWGN, MIMO, RayTracing
+│   │       └── +message/                       # RandomBit (Seed-driven), Audio
+│   ├── +test_support/                          # Test-only stubs (kept out of production)
+│   │   └── ThrowingChannelBlock.m              # Channel block that injects errors for tests
+│   └── +utils/                                  # Utility packages
+│       ├── config_loader.m
+│       ├── +logger/                            # Centralised logging
+│       ├── +scenario/
+│       │   ├── isScenarioSkipException.m       # Single source of truth for skip-tokens
+│       │   └── checkTransmissionInterval.m
+│       ├── +linkbudget/
+│       │   └── resolveNoiseBandwidth.m         # min(rxFs, txOccupiedBW, configured)
+│       ├── +core/
+│       │   └── applyAntennaConfigFromSegments.m# SISO→MIMO writeback helper
+│       └── +sysinfo/
+├── config/                                      # Modular configuration system
+│   ├── _base_/                                 # Base configs (factories/runners/logging)
+│   ├── csrd2025/csrd2025.m                     # Example end-to-end config
+│   └── README.md
+├── tests/                                       # Comprehensive test suite
+│   ├── run_all_tests.m                         # 'unit' | 'regression' | 'integration' | 'all'
+│   ├── unit/                                   # matlab.unittest classes (52 cases)
+│   │   ├── AWGNChannelTest.m
+│   │   ├── BaseChannelDistanceTest.m
+│   │   ├── CalculateTransmissionStateTest.m
+│   │   ├── ChannelExceptionPropagationTest.m
+│   │   ├── LinkBudgetNoiseBWTest.m
+│   │   ├── MessageFactorySeedAliasTest.m
+│   │   ├── RandomBitSeedTest.m
+│   │   ├── RRFSimulatorTest.m
+│   │   ├── SegmentIdContractTest.m
+│   │   ├── TRFSimulatorTest.m
+│   │   └── UpdateAntennaConfigTest.m
+│   ├── regression/                             # End-to-end functions (test_*.m)
+│   │   ├── test_bandwidth_consistency.m
+│   │   ├── test_channel_exception_propagation.m
+│   │   ├── test_empty_osm_raytracing.m         # OSM-with-no-buildings skip path
+│   │   ├── test_entity_snapshot_consistency.m
+│   │   ├── test_map_config_validation.m
+│   │   ├── test_osm_building_raytracing.m
+│   │   └── test_refactoring.m                  # 18 sub-cases over 5 multi-Tx scenarios
+│   └── integration/                            # (placeholder; populated as needed)
+├── docs/                                        # Documentation (Refactoring / Weather / etc.)
+├── examples/                                    # Usage examples
+├── tools/                                       # Simulation entry & helpers
+│   ├── simulation.m
+│   ├── multi_simulation.bat / .sh
+│   ├── download_osm.py
+│   └── convert_csrd_to_coco.m
+├── .cursor/rules/                              # Cursor AI development rules (tracked in git)
+│   ├── csrd-physics.mdc
+│   ├── csrd-architecture.mdc
+│   ├── csrd-matlab.mdc
+│   ├── csrd-testing.mdc
+│   └── csrd-workflow.mdc
+└── AGENTS.md                                    # Human-readable contributor rules (mirror of mdc)
 ```
 
 ## ✨ Key Features
@@ -179,10 +232,14 @@ use_new_frequency_system();
 ### 3. Run Test Suite
 ```matlab
 cd tests
-results = run_all_tests();                  % All tests
-results = run_all_tests('unit');            % Unit tests only
-results = run_all_tests('verbose', true);   % Verbose output
+results = run_all_tests();                       % regression suite (default)
+results = run_all_tests('unit');                 % matlab.unittest classes only
+results = run_all_tests('regression');           % top-level test_*.m only
+results = run_all_tests('all');                  % regression + unit + integration
+results = run_all_tests('all', 'verbose', true); % include extended error reports
 ```
+
+> The selector `'all'` previously aliased to `'regression'`, which silently hid every unit and integration suite. After the audit pass it really sweeps all three categories. See `tests/run_all_tests.m`.
 
 ## ⚙️ System Requirements
 
@@ -336,10 +393,24 @@ y = x .* freqShift;
 ## 📖 Documentation
 
 - **[Modular Configuration System](config/README.md)**: Complete configuration system guide
-- **[Frequency Translation System Upgrade](docs/frequency_translation_system_upgrade.md)**: Complete technical details
-- **[Test Suite Guide](tests/README.md)**: Comprehensive testing documentation
+- **[Refactoring Notes](docs/README_Refactoring.md)** and **[Communication Behavior Notes](docs/README_CommunicationBehavior.md)**: Design notes for the in-flight refactor
+- **[Test Suite Guide](tests/README.md)**: Test layout and conventions
 - **[Usage Examples](examples/)**: Practical implementation examples
-- **[TWC Dataset Simulation](twc/README.md)**: Dataset generator for the TWC paper (IEEE Xplore: https://ieeexplore.ieee.org/abstract/document/10667001)
+- **[Contributor / AI rules (`AGENTS.md`)](AGENTS.md)**: Human-readable mirror of `.cursor/rules/*.mdc`
+- **[TWC Dataset Simulation](twc/README.md)**: Dataset generator for the TWC paper ([IEEE Xplore](https://ieeexplore.ieee.org/abstract/document/10667001)). Note: `twc/` is **outside** the current refactoring scope.
+
+## 🧷 Development Standards (refactor-era contract)
+
+This refactor enforces a small set of non-negotiable conventions. They are codified in
+`.cursor/rules/csrd-{physics,architecture,matlab,testing,workflow}.mdc` (auto-loaded by
+Cursor) and mirrored in `AGENTS.md` for non-Cursor contributors. Headlines:
+
+- **Units are explicit and never silently converted**: distance is meters, frequency is Hz, power is dBm. Helpers that need other units (`fogpl` km, etc.) must be wrapped with a clearly named adapter.
+- **Planning vs execution stays separated**: scenario blocks plan; factories execute. Factories must NOT inject random parameters at execution time to fill in missing plan fields — that is a planner bug.
+- **Annotations cannot fabricate `Planned` from `Realized`**: if the producer did not record a planned value, the field stays as an empty struct.
+- **`SampleRate` always comes from the producer**: missing or non-positive `SampleRate` raises `CSRD:Core:MissingSampleRate`. No `length(Signal)/Duration` reverse derivation, no hard-coded `200e3` fallbacks.
+- **Scenario-skip exceptions propagate**: any `try/catch` that may need to distinguish "skip this scenario, keep going" from "abort the run" must consult `csrd.utils.scenario.isScenarioSkipException` and rethrow on match.
+- **Every fix ships with a test**: a fix without a test that would have caught the bug does not land. Tests live only under `tests/{unit,regression,integration}/` — never in the repo root or `examples/`.
 
 ## 🧪 Testing and Validation
 
@@ -350,17 +421,20 @@ y = x .* freqShift;
 
 ### Test Execution
 ```matlab
-% Quick validation
+% Quick smoke check of the test infrastructure (no production code path)
 cd tests
 quick_test_example()
 
-% Full test suite
-results = run_all_tests('all', 'verbose', true, 'outputFormat', 'junit');
+% Full test suite (unit + regression + integration), verbose error reports
+results = run_all_tests('all', 'verbose', true);
 
 % Specific test categories
-results = run_all_tests('unit');        % Unit tests only
-results = run_all_tests('integration'); % Integration tests only
+results = run_all_tests('unit');         % matlab.unittest classes (52 cases)
+results = run_all_tests('regression');   % end-to-end test_*.m functions
+results = run_all_tests('integration');  % cross-block integration suites
 ```
+
+> The legacy `'outputFormat'` parameter (JUnit XML, etc.) has been removed during the audit pass. If you need machine-readable output for CI, wrap `runtests` directly with `XMLPlugin` from `matlab.unittest.plugins`. We can add this back as a flag if there is demand.
 
 ## 📊 Performance & Efficiency
 
@@ -388,9 +462,8 @@ results = run_all_tests('integration'); % Integration tests only
 - **English Only**: All comments and documentation in English
 
 ### Continuous Integration
-- **Automated Testing**: JUnit XML output for CI/CD integration
-- **Code Coverage**: Comprehensive coverage reporting
-- **Performance Monitoring**: Execution time and memory tracking
+- **Automated Testing**: `tests/run_all_tests.m` returns a structured `results` struct (`Success`, `TotalTests`, `Passed`, `Failed`, `Records`) suitable for shell-driven CI gating. JUnit-style XML output is intentionally not bundled today; if you need it, add `matlab.unittest.plugins.XMLPlugin` around `runtests` in your wrapper.
+- **Performance Monitoring**: per-suite and per-case wall-clock duration is captured in `results.Records.DurationSeconds`.
 
 ## 🔗 Related Projects
 
