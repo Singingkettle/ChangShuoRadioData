@@ -225,14 +225,30 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
                     end
                     if isfield(ann, 'SignalSources') && ~isempty(ann.SignalSources)
                         src = ann.SignalSources(1);
-                        if isfield(src, 'Planned') && isfield(src, 'Realized')
+                        if isfield(src, 'Planned') && isfield(src, 'Realized') && ...
+                                isstruct(src.Planned) && isstruct(src.Realized) && ...
+                                isfield(src.Planned, 'Bandwidth') && ...
+                                isfield(src.Realized, 'Bandwidth') && ...
+                                ~isempty(src.Planned.Bandwidth) && ~isempty(src.Realized.Bandwidth) && ...
+                                src.Planned.Bandwidth > 0 && src.Realized.Bandwidth > 0
                             pBW = src.Planned.Bandwidth;
                             rBW = src.Realized.Bandwidth;
                             bwRatio = abs(pBW - rBW) / max(pBW, 1);
                             fprintf(', PlannedBW=%.0f, RealizedBW=%.0f (diff=%.1f%%)', pBW, rBW, bwRatio*100);
-                            if bwRatio > 0.2
-                                fprintf(' [WARN: >20%% BW discrepancy]');
-                            end
+
+                            % Hard contract: realised bandwidth must be
+                            % within 50% of planned. The planner/executor
+                            % drift used to be flagged as a soft fprintf
+                            % warning, which made every dataset
+                            % regression invisible to CI. Tighter thresholds
+                            % (e.g. 20%) are enforced per-modulation in
+                            % dedicated unit tests; this regression test
+                            % only blocks catastrophic drift.
+                            assert(bwRatio <= 0.5, ...
+                                sprintf(['Frame %d, Rx %d: PlannedBW=%.0f Hz vs ', ...
+                                         'RealizedBW=%.0f Hz (drift %.1f%%) ', ...
+                                         'exceeds 50%% tolerance.'], ...
+                                    f, rxIdx, pBW, rBW, bwRatio*100));
                         end
                     end
                     fprintf('\n');
