@@ -471,24 +471,94 @@ classdef MessageFactory < matlab.System
 
             % Simplistic approach: if block has properties matching fields in segmentMessageParams, set them.
             % This is generic. Specific blocks might have dedicated methods or a single struct input for step.
+            %
+            % Reproducibility note: scenarios historically refer to the
+            % per-segment seed as ``SeedValue`` while message blocks
+            % (e.g. csrd.blocks.physical.message.RandomBit) expose the
+            % property as ``Seed``. The previous generic isprop loop
+            % silently dropped the value, breaking deterministic replay.
+            % We resolve aliases here so that scenario-defined seeds
+            % actually drive the underlying RNG. Reset-sensitive
+            % properties (like Seed) trigger a release/setup cycle so the
+            % new value actually re-initialises the random stream.
+            propAliases = struct('SeedValue', 'Seed');
+            resetSensitiveProps = {'Seed', 'BitProbability'};
+
             propNames = fieldnames(segmentMessageParams);
 
+            resolvedAssignments = cell(0, 2);
             for k = 1:length(propNames)
                 propName = propNames{k};
+                value = segmentMessageParams.(propName);
 
-                if isprop(currentMessageBlock, propName)
-
-                    try
-                        currentMessageBlock.(propName) = segmentMessageParams.(propName);
-                        obj.logger.debug('Set property ''%s'' to ''%s'' on message block %s for TypeID ''%s''', ...
-                            propName, num2str(segmentMessageParams.(propName)), class(currentMessageBlock), messageTypeID);
-                    catch ME_setprop
-                        obj.logger.warning('Could not set property ''%s'' on message block %s. Error: %s', ...
-                            propName, class(currentMessageBlock), ME_setprop.message);
-                    end
-
+                targetName = propName;
+                if isfield(propAliases, propName) && ~isprop(currentMessageBlock, propName) ...
+                        && isprop(currentMessageBlock, propAliases.(propName))
+                    targetName = propAliases.(propName);
+                    obj.logger.debug('Mapping scenario field ''%s'' to block property ''%s'' on %s.', ...
+                        propName, targetName, class(currentMessageBlock));
                 end
 
+                if ~isprop(currentMessageBlock, targetName)
+                    continue;
+                end
+
+                resolvedAssignments(end + 1, :) = {targetName, value}; %#ok<AGROW>
+            end
+
+            needsResetCycle = false;
+            if isa(currentMessageBlock, 'matlab.System') && isLocked(currentMessageBlock)
+                for k = 1:size(resolvedAssignments, 1)
+                    if any(strcmp(resolvedAssignments{k, 1}, resetSensitiveProps))
+                        try
+                            existing = currentMessageBlock.(resolvedAssignments{k, 1});
+                        catch
+                            existing = [];
+                        end
+                        if ~isequal(existing, resolvedAssignments{k, 2})
+                            needsResetCycle = true;
+                            break;
+                        end
+                    end
+                end
+            end
+
+            if needsResetCycle
+                try
+                    release(currentMessageBlock);
+                    obj.logger.debug('Released message block %s before reapplying reset-sensitive properties.', ...
+                        class(currentMessageBlock));
+                catch ME_release
+                    obj.logger.warning('Could not release message block %s before re-seeding: %s', ...
+                        class(currentMessageBlock), ME_release.message);
+                end
+            end
+
+            for k = 1:size(resolvedAssignments, 1)
+                targetName = resolvedAssignments{k, 1};
+                value = resolvedAssignments{k, 2};
+                try
+                    currentMessageBlock.(targetName) = value;
+                    if isnumeric(value) && isscalar(value)
+                        valueStr = num2str(value);
+                    else
+                        valueStr = sprintf('<%s>', class(value));
+                    end
+                    obj.logger.debug('Set property ''%s'' to ''%s'' on message block %s for TypeID ''%s''', ...
+                        targetName, valueStr, class(currentMessageBlock), messageTypeID);
+                catch ME_setprop
+                    obj.logger.warning('Could not set property ''%s'' on message block %s. Error: %s', ...
+                        targetName, class(currentMessageBlock), ME_setprop.message);
+                end
+            end
+
+            if needsResetCycle && isa(currentMessageBlock, 'matlab.System')
+                try
+                    setup(currentMessageBlock);
+                catch ME_setup
+                    obj.logger.warning('Could not setup message block %s after re-seeding: %s', ...
+                        class(currentMessageBlock), ME_setup.message);
+                end
             end
 
             symbolRate = 100e3;
