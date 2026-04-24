@@ -84,6 +84,18 @@ classdef CommunicationBehaviorSimulator < matlab.System
         % logger - Logging system for debugging and monitoring
         logger
 
+        % unifiedReceiverConfig - Unified receiver configuration for all receivers
+        % DESIGN: All spectrum monitoring receivers share the SAME configuration
+        % to simplify spectrum sensing algorithm design by removing device heterogeneity
+        % Structure:
+        %   .Type - Receiver type (e.g., 'Simulation')
+        %   .SampleRate - Unified sample rate (Hz)
+        %   .ObservableRange - Observable frequency range [-SampleRate/2, SampleRate/2]
+        %   .CenterFrequency - Center frequency (baseband = 0)
+        %   .RealCarrierFrequency - Actual RF carrier frequency (Hz)
+        %   .NumAntennas - Number of antennas
+        unifiedReceiverConfig struct = struct()
+
         % scenarioTxConfigs - Fixed transmitter configurations for the entire scenario
         scenarioTxConfigs
 
@@ -92,6 +104,9 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         % scenarioGlobalLayout - Fixed global layout for the entire scenario
         scenarioGlobalLayout
+
+        % scenarioEntities - Reference to entities with Snapshots (shared with PhysicalEnv)
+        scenarioEntities
 
         % transmissionScheduler - Transmission scheduling engine for frame-level control
         transmissionScheduler
@@ -125,18 +140,19 @@ classdef CommunicationBehaviorSimulator < matlab.System
     methods (Access = protected)
         % Main simulation methods - defined in separate files
         setupImpl(obj)
-        [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities, factoryConfigs)
+        [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities)
     end
 
     methods (Access = private)
         % Scenario-level configuration methods
-        initializeScenarioConfigurations(obj, entities, factoryConfigs)
-        [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj, frameId)
+        entities = initializeScenarioConfigurations(obj, entities)
+        [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj, frameId, entities)
 
         % Entity processing methods
         [transmitters, receivers] = separateEntitiesByType(obj, entities)
-        rxConfigs = generateScenarioReceiverConfigurations(obj, receivers, factoryConfigs)
-        [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(obj, transmitters, rxConfigs, factoryConfigs)
+        rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
+        [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(obj, transmitters, rxConfigs)
+        entities = updateEntityCommunicationState(obj, entities, txConfigs, rxConfigs)
 
         % Frequency allocation methods
         [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, observableRange, globalLayout)
@@ -146,28 +162,12 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         % Transmission state methods
         transmissionState = calculateTransmissionState(obj, frameId, txConfig)
-        transmissionState = updateBurstState(obj, frameId, txConfig)
-        transmissionState = updateScheduledState(obj, frameId, txConfig)
-        transmissionPattern = generateTransmissionPattern(obj, transmitter, factoryConfig)
-        patternType = selectTransmissionPatternType(obj)
-
-        % System optimization methods
-        [txConfigs, rxConfigs, globalLayout] = optimizeSystemConfiguration(obj, frameId, txConfigs, rxConfigs, globalLayout)
 
         % Configuration generation methods
-        receiverType = selectReceiverType(obj, factoryConfig)
-        sampleRate = selectSampleRate(obj, receiver, factoryConfig)
-        sensitivity = selectSensitivity(obj, receiver, factoryConfig)
-        noiseFigure = selectNoiseFigure(obj, receiver, factoryConfig)
-        transmitterType = selectTransmitterType(obj, transmitter, factoryConfig)
-        power = selectTransmitPower(obj, transmitter, factoryConfig)
         gain = calculateAntennaGain(obj, numAntennas)
-        messageConfig = generateMessageConfiguration(obj, transmitter, factoryConfig)
-        modulationConfig = generateModulationConfiguration(obj, transmitter, factoryConfig)
         bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
 
         % Utility methods
-        burstParams = generateBurstParameters(obj)
         hasOverlap = checkFrequencyOverlap(obj, range1, range2)
         value = randomInRange(obj, minVal, maxVal)
 

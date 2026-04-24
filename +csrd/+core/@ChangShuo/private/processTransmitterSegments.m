@@ -12,16 +12,24 @@ function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentT
     % Outputs:
     %   signalSegmentsPerTx - Cell array of processed signal segments
 
-    signalSegmentsPerTx = cell(1, currentTxScenario.NumSegments);
+    % Determine which interval indices to process
+    if isfield(currentTxScenario, 'ActiveSegmentIndices')
+        activeIndices = currentTxScenario.ActiveSegmentIndices;
+    else
+        activeIndices = 1:currentTxScenario.NumSegments;
+    end
 
-    for segIdx = 1:currentTxScenario.NumSegments
+    signalSegmentsPerTx = cell(1, length(activeIndices));
+
+    for k = 1:length(activeIndices)
+        segIdx = activeIndices(k);
 
         try
-            signalSegmentsPerTx{segIdx} = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx);
+            signalSegmentsPerTx{k} = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx);
         catch ME_seg
             obj.logger.error('Frame %d, TxID %s, Seg %d: Error processing segment: %s', ...
                 FrameId, string(currentTxId), segIdx, ME_seg.message);
-            signalSegmentsPerTx{segIdx} = [];
+            signalSegmentsPerTx{k} = [];
         end
 
     end

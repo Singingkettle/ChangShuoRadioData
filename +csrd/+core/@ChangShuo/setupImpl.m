@@ -1,121 +1,50 @@
 function setupImpl(obj)
-    % setupImpl - Initialize factories and validate configurations (ONE-TIME SETUP)
+    % setupImpl - Initialize all factories (one-time setup)
     %
-    % This method performs complete simulation environment initialization including:
-    % - Configuration validation for scenario and factory settings
-    % - ONE-TIME factory instantiation based on configuration parameters
-    % - Comprehensive logging system integration
-    % - Error handling and validation for all components
-    %
-    % The method validates essential configurations, instantiates all required
-    % factories ONCE, and prepares the engine for simulation execution.
-    % After setup, stepImpl will call the step() methods of these instantiated factories.
+    % Each factory is instantiated with ONLY its own configuration,
+    % ensuring independence between factories. The ScenarioFactory
+    % receives only scenario-level parameters (time-frequency resources,
+    % physical environment), not the entire FactoryConfigs.
 
-    obj.logger.debug('ChangShuo Engine Core: setupImpl started.');
+    obj.logger.debug('ChangShuo Engine: Initializing...');
 
-    % Validate essential configurations
+    % Validate configurations
     if isempty(obj.FactoryConfigs) || ~isstruct(obj.FactoryConfigs)
-        error('ChangShuo:ConfigurationError', 'FactoryConfigs property must be a valid struct.');
+        error('ChangShuo:ConfigurationError', 'FactoryConfigs must be a valid struct.');
     end
 
-    % Validate scenario configuration is available in FactoryConfigs
-    if ~isfield(obj.FactoryConfigs, 'Scenario') || ~isstruct(obj.FactoryConfigs.Scenario)
-        error('ChangShuo:ConfigurationError', 'Scenario configuration must be available in FactoryConfigs.Scenario.');
+    if ~isfield(obj.FactoryConfigs, 'Scenario')
+        error('ChangShuo:ConfigurationError', 'Scenario configuration required in FactoryConfigs.');
     end
 
-    obj.logger.debug('FactoryConfigs struct validated, scenario configuration available.');
+    validateFactoryConfigs(obj);
 
-    validateFactoryConfigs(obj); % Validates obj.Message, obj.Modulate etc. are structs with .handle and .Config (which is also a struct)
+    % Initialize Factories container
+    obj.Factories = struct();
 
-    % Instantiate factories (ONE-TIME initialization for entire simulation)
-    factoryNames = {'Scenario', 'Message', 'Modulate', 'Transmit', 'Channel', 'Receive'};
-    privateFactoryPropNames = {'pScenarioFactory', 'pMessageFactory', 'pModulationFactory', 'pTransmitFactory', 'pChannelFactory', 'pReceiveFactory'};
+    % Factory instantiation map: each factory gets ONLY its own config
+    factoryMap = {
+        'Scenario',   'csrd.factories.ScenarioFactory',   obj.FactoryConfigs.Scenario;
+        'Message',    'csrd.factories.MessageFactory',    obj.FactoryConfigs.Message;
+        'Modulation', 'csrd.factories.ModulationFactory', obj.FactoryConfigs.Modulation;
+        'Transmit',   'csrd.factories.TransmitFactory',   obj.FactoryConfigs.Transmit;
+        'Channel',    'csrd.factories.ChannelFactory',    obj.FactoryConfigs.Channel;
+        'Receive',    'csrd.factories.ReceiveFactory',    obj.FactoryConfigs.Receive;
+    };
 
-    for i = 1:length(factoryNames)
-        factoryKey = factoryNames{i}; % e.g.,'Message'
-        privatePropKey = privateFactoryPropNames{i}; % e.g.,'pMessageFactory'
-
-        % obj.(factoryKey) is the struct like {handle: '...', Config: <struct>}
-        factoryConfigStructFromRunner = obj.(factoryKey);
-
-        obj.logger.debug('Setting up %s factory...', factoryKey);
-
-        if isempty(factoryConfigStructFromRunner) || ~isfield(factoryConfigStructFromRunner, 'handle') || isempty(factoryConfigStructFromRunner.handle)
-            obj.logger.warning('%s factory configuration is missing or handle is empty. Skipping instantiation.', factoryKey);
-            obj.(privatePropKey) = [];
-            continue;
-        end
-
-        factoryHandleStr = factoryConfigStructFromRunner.handle;
-        % factoryOwnConfig is now the actual struct, not a path
-        factoryOwnConfigStruct = [];
-
-        if isfield(factoryConfigStructFromRunner, 'Config') && isstruct(factoryConfigStructFromRunner.Config)
-            factoryOwnConfigStruct = factoryConfigStructFromRunner.Config;
-            obj.logger.debug('%s factory has a .Config struct.', factoryKey);
-        else
-            obj.logger.debug('%s factory does not have an explicit .Config struct. Some factories might not require it or use defaults.', factoryKey);
-        end
-
-        obj.logger.debug('FACTORY_INSTANTIATION_POINT for [%s]: Handle=''%s''', factoryKey, factoryHandleStr);
+    for i = 1:size(factoryMap, 1)
+        name = factoryMap{i, 1};
+        handle = factoryMap{i, 2};
+        config = factoryMap{i, 3};
 
         try
-            obj.logger.debug('Instantiating %s factory using handle: %s', factoryKey, factoryHandleStr);
-
-            constructorArgs = {};
-            % If the factory has a Config property AND a config struct was provided for it
-            if ~isempty(factoryOwnConfigStruct)
-                % Pass the struct directly as 'Config' argument
-                constructorArgs = [constructorArgs, {'Config', factoryOwnConfigStruct}];
-                obj.logger.debug('Passing .Config struct to %s factory constructor.', factoryKey);
-            end
-
-            % Format constructor arguments for debugging
-            try
-                argDetails = '';
-
-                for argIdx = 1:2:length(constructorArgs)
-
-                    if argIdx < length(constructorArgs)
-                        argName = constructorArgs{argIdx};
-                        argValue = constructorArgs{argIdx + 1};
-
-                        if isstruct(argValue)
-                            argDetails = [argDetails, sprintf('%s=<struct>, ', argName)];
-                        elseif ischar(argValue) || isstring(argValue)
-                            argDetails = [argDetails, sprintf('%s=%s, ', argName, string(argValue))];
-                        else
-                            argDetails = [argDetails, sprintf('%s=<%s>, ', argName, class(argValue))];
-                        end
-
-                    end
-
-                end
-
-                obj.logger.debug('FACTORY_INSTANTIATION_POINT for [%s]: Constructor args: %s', factoryKey, argDetails);
-            catch debugError
-                % Silently continue if debug logging fails
-                obj.logger.debug('FACTORY_INSTANTIATION_POINT for [%s]: Debug arg formatting failed', factoryKey);
-            end
-
-            obj.logger.debug('FACTORY_INSTANTIATION_POINT for [%s]: Final constructorArgs before feval: %d args provided', factoryKey, length(constructorArgs));
-
-            if isempty(constructorArgs)
-                obj.(privatePropKey) = feval(factoryHandleStr);
-                obj.logger.debug('%s factory instantiated without explicit constructor args.', factoryKey);
-            else
-                obj.(privatePropKey) = feval(factoryHandleStr, constructorArgs{:});
-                obj.logger.debug('%s factory instantiated with constructor args.', factoryKey);
-            end
-
-            obj.logger.debug('%s factory created successfully: %s', factoryKey, class(obj.(privatePropKey)));
+            obj.Factories.(name) = feval(handle, 'Config', config);
+            obj.logger.debug('Factory [%s] initialized with own config.', name);
         catch ME
-            obj.logger.error('Failed to instantiate or configure %s factory (%s). Error: %s', factoryKey, factoryHandleStr, ME.message);
-            obj.logger.error('Stack trace: %s', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            obj.logger.error('Failed to instantiate %s factory: %s', name, ME.message);
             rethrow(ME);
         end
-
     end
 
-    obj.logger.debug('ChangShuo Engine Core: setupImpl completed.');
+    obj.logger.debug('ChangShuo Engine: Initialization complete.');
 end

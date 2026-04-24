@@ -48,7 +48,7 @@ classdef ChangShuo < matlab.System
     %
     % Properties (Factory Configuration):
     %   Message - Message generation factory configuration
-    %   Modulate - Modulation factory configuration
+    %   Modulation - Modulation factory configuration
     %   Scenario - Scenario instantiation factory configuration
     %   Transmit - Transmitter RF front-end factory configuration
     %   Channel - Channel modeling factory configuration
@@ -79,58 +79,32 @@ classdef ChangShuo < matlab.System
     %           csrd.utils.logger.Log
 
     properties
-        % FactoryConfigs - Consolidated factory configuration structure
-        % Scenario configuration is accessed via FactoryConfigs.Scenario
+        % FactoryConfigs - Unified factory configuration structure
+        %
+        % This is the SINGLE source of truth for all factory configurations.
+        % Structure:
+        %   FactoryConfigs.Scenario - Scenario blueprint (time-frequency resources, physical env)
+        %   FactoryConfigs.Message - Message source configuration (types, parameters)
+        %   FactoryConfigs.Modulation - Modulation configuration (types, orders)
+        %   FactoryConfigs.Transmit - Transmitter RF impairment configuration
+        %   FactoryConfigs.Channel - Channel model configuration
+        %   FactoryConfigs.Receive - Receiver RF impairment configuration
+        %
+        % Each factory is instantiated with ONLY its own config, ensuring independence.
         FactoryConfigs struct
-
-        % Factory Configuration Properties
-        % Each factory configuration is a struct with two required fields:
-        % .handle (string) - Factory class name for instantiation
-        % .Config (struct) - Factory-specific configuration parameters
-
-        % Message - Message generation factory configuration
-        Message
-
-        % Modulate - Modulation factory configuration
-        Modulate
-
-        % Scenario - Scenario instantiation factory configuration
-        Scenario
-
-        % Transmit - Transmitter RF front-end factory configuration
-        Transmit
-
-        % Channel - Channel modeling factory configuration
-        Channel
-
-        % Receive - Receiver processing factory configuration
-        Receive
     end
 
     properties (Access = private)
-        % logger - Integrated logging framework instance
+        % logger - Logging framework instance
         logger
 
-        % Factory Instance Properties
-        % These properties store instantiated factory objects for component processing
+        % Factories - Container for all instantiated factory objects
+        % Fields: Scenario, Message, Modulation, Transmit, Channel, Receive
+        Factories
 
-        % pMessageFactory - Message generation factory instance
-        pMessageFactory
-
-        % pModulationFactory - Modulation processing factory instance
-        pModulationFactory
-
-        % pScenarioFactory - Scenario instantiation factory instance
-        pScenarioFactory
-
-        % pTransmitFactory - Transmitter RF front-end factory instance
-        pTransmitFactory
-
-        % pChannelFactory - Channel modeling factory instance
-        pChannelFactory
-
-        % pReceiveFactory - Receiver processing factory instance
-        pReceiveFactory
+        % ScenarioConfig - Current frame's scenario configuration
+        % Populated by processScenarioInstantiation for use by transmitter/receiver processing
+        ScenarioConfig
     end
 
     methods
@@ -144,16 +118,16 @@ classdef ChangShuo < matlab.System
             %
             % Syntax:
             %   obj = ChangShuo()
-            %   obj = ChangShuo('PropertyName', PropertyValue, ...)
+            %   obj = ChangShuo('FactoryConfigs', configStruct)
             %
             % Input Arguments (Name-Value Pairs):
-            %   'FactoryConfigs' - Factory configuration structure
-            %   'Message' - Message factory configuration
-            %   'Modulate' - Modulation factory configuration
-            %   'Scenario' - Scenario factory configuration
-            %   'Transmit' - Transmitter factory configuration
-            %   'Channel' - Channel factory configuration
-            %   'Receive' - Receiver factory configuration
+            %   'FactoryConfigs' - Unified factory configuration structure containing:
+            %       .Scenario   - Scenario blueprint (spatial, temporal, frequency)
+            %       .Message    - Message source types and parameters
+            %       .Modulation - Modulation types and parameters
+            %       .Transmit   - Transmitter RF impairments
+            %       .Channel    - Channel model settings
+            %       .Receive    - Receiver RF impairments
 
             % Initialize integrated logging framework
             obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
@@ -180,7 +154,7 @@ classdef ChangShuo < matlab.System
         framesPerScenario = getFramesPerScenarioFromConfig(obj)
 
         % generateSingleFrame - Generate data for a single frame (internal method)
-        [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId, scenarioId, frameInScenario)
+        [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
 
         % Scenario processing methods
         [instantiatedTxs, instantiatedRxs, globalLayout] = processScenarioInstantiation(obj, FrameId)

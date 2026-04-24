@@ -164,8 +164,8 @@ classdef BaseModulator < matlab.System
             %
             % Returns:
             %   out - Struct containing:
-            %     - data: Modulated signal
-            %     - BandWidth: Signal bandwidth [min max]
+            %     - Signal: Modulated IQ signal
+            %     - Bandwidth: Signal bandwidth [min max] in Hz
             %     - SamplePerSymbol: Samples per symbol
             %     - ModulatorOrder: Modulation order
             %     - IsDigital: Digital/analog flag
@@ -229,8 +229,8 @@ classdef BaseModulator < matlab.System
                 bw(2) = fix(bw(2));
             end
 
-            out.data = y;
-            out.BandWidth = bw;
+            out.Signal = y;
+            out.Bandwidth = bw;
 
             if isfield(obj.ModulatorConfig, 'base')
                 out.SamplePerSymbol = 1;

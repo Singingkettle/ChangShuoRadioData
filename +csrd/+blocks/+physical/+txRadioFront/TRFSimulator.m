@@ -201,12 +201,12 @@ classdef TRFSimulator < matlab.System
             phaseNoiseObject = comm.PhaseNoise( ...
                 Level = obj.PhaseNoiseConfig.Level, ...
                 FrequencyOffset = obj.PhaseNoiseConfig.FrequencyOffset, ...
-                SampleRate = obj.TargetSampleRate); % Use target sample rate
+                SampleRate = obj.SampleRate);
 
             % Configure optional random stream settings for reproducibility
             if isfield(obj.PhaseNoiseConfig, 'RandomStream')
 
-                if strcmp(obj.PhaseNoiseConfig.RandomStream, 'mt19936ar with seed')
+                if strcmp(obj.PhaseNoiseConfig.RandomStream, 'mt19937ar with seed')
                     phaseNoiseObject.RandomStream = "mt19937ar with seed";
                     phaseNoiseObject.Seed = obj.PhaseNoiseConfig.Seed;
                 end
@@ -296,15 +296,20 @@ classdef TRFSimulator < matlab.System
 
             elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Lookup table')
                 nonlinearityObject = comm.MemorylessNonlinearity( ...
-                    Method = 'Look table', ...
+                    Method = 'Lookup table', ...
                     Table = obj.MemoryLessNonlinearityConfig.Table);
+            else
+                warning('TRFSimulator:UnknownNonlinearityMethod', ...
+                    'Unknown nonlinearity method: %s. Using default Cubic polynomial.', ...
+                    obj.MemoryLessNonlinearityConfig.Method);
+                nonlinearityObject = comm.MemorylessNonlinearity(Method = 'Cubic polynomial');
             end
 
             % Set reference impedance for power calculations
             nonlinearityObject.ReferenceImpedance = obj.MemoryLessNonlinearityConfig.ReferenceImpedance;
         end
 
-        function setupImpl(obj)
+        function setupImpl(obj, ~)
             % setupImpl - Initialize transmitter radio front-end system components
             %
             % Sets up all necessary RF impairment models and system objects for
@@ -313,17 +318,11 @@ classdef TRFSimulator < matlab.System
             %   - IQ imbalance function handle
             %   - Phase noise system object
             %   - Memoryless nonlinearity system object
-            %
-            % Note: DUC initialization has been removed in favor of the new
-            % complex exponential frequency translation approach.
 
             % Initialize RF impairment models
             obj.IQImbalance = obj.genIqImbalance;
             obj.PhaseNoise = obj.genPhaseNoise;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
-
-            % Legacy DUC initialization removed:
-            % obj.DUC = obj.genDUC;  % No longer needed
         end
 
         function translatedSignal = frequencyTranslate(obj, inputSignal, targetFrequency, signalSampleRate)
@@ -410,17 +409,33 @@ classdef TRFSimulator < matlab.System
             %   - Column-wise processing for multi-antenna signals
 
             if inputSampleRate == obj.TargetSampleRate
-                % No resampling needed - return input signal unchanged
                 resampledSignal = inputSignal;
             else
-                % Calculate rational resampling factors with high precision
-                [upsampleFactor, downsampleFactor] = rat(obj.TargetSampleRate / inputSampleRate, 1e-6);
+                % Use moderate tolerance to keep P/Q factors manageable
+                [upsampleFactor, downsampleFactor] = rat(obj.TargetSampleRate / inputSampleRate, 0.001);
+
+                % Cap P/Q to avoid extremely long FIR filters in resample()
+                maxFactor = 500;
+                if upsampleFactor > maxFactor || downsampleFactor > maxFactor
+                    scaleFactor = max(upsampleFactor, downsampleFactor) / maxFactor;
+                    upsampleFactor = max(1, round(upsampleFactor / scaleFactor));
+                    downsampleFactor = max(1, round(downsampleFactor / scaleFactor));
+                end
+
+                % Ensure P/Q != 0 and recalculate actual output rate for validation
+                upsampleFactor = max(1, upsampleFactor);
+                downsampleFactor = max(1, downsampleFactor);
+                actualOutputRate = inputSampleRate * upsampleFactor / downsampleFactor;
+                rateError = abs(actualOutputRate - obj.TargetSampleRate) / obj.TargetSampleRate;
+                if rateError > 0.05
+                    warning('TRFSimulator:ResampleError', ...
+                        'Resample P/Q=%d/%d gives %.0f Hz vs target %.0f Hz (%.1f%% error)', ...
+                        upsampleFactor, downsampleFactor, actualOutputRate, obj.TargetSampleRate, rateError*100);
+                end
 
                 if size(inputSignal, 2) == 1
-                    % Single antenna - direct resampling
                     resampledSignal = resample(inputSignal, upsampleFactor, downsampleFactor);
                 else
-                    % Multi-antenna - resample each antenna column separately
                     numAntennas = size(inputSignal, 2);
                     outputLength = ceil(size(inputSignal, 1) * upsampleFactor / downsampleFactor);
                     resampledSignal = zeros(outputLength, numAntennas);
@@ -457,38 +472,31 @@ classdef TRFSimulator < matlab.System
             %
             % Input Arguments:
             %   inputSignal - Input structure containing:
-            %     .data - Baseband signal data [samples x antennas]
-            %     .carrierFrequency - Target carrier frequency (Hz) [optional]
-            %     .sampleRate - Input sample rate (Hz) [optional]
+            %     .Signal - Baseband IQ signal data [samples x antennas]
+            %     .FrequencyOffset - Target carrier frequency offset (Hz) [optional]
+            %     .SampleRate - Input sample rate (Hz) [optional]
             %
             % Output Arguments:
             %   outputSignal - Output structure containing:
-            %     .data - Processed RF signal [samples x antennas]
-            %     .carrierFrequency - Applied carrier frequency (Hz)
-            %     .sampleRate - Output sample rate (Hz)
-            %     .bandwidth - Signal bandwidth (Hz)
-            %     .txPower - Transmission power (dBm)
+            %     .Signal - Processed RF signal [samples x antennas]
+            %     .FrequencyOffset - Applied carrier frequency offset (Hz)
+            %     .SampleRate - Output sample rate (Hz)
+            %     .Bandwidth - Signal bandwidth (Hz)
+            %     .TxPower - Transmission power (dBm)
             %
             % Example:
             %   % Create input signal structure
-            %   input.data = randn(1024, 2) + 1j*randn(1024, 2);  % 2-antenna signal
-            %   input.carrierFrequency = 2.4e9;  % 2.4 GHz carrier
-            %   input.sampleRate = 20e6;         % 20 MHz sample rate
+            %   input.Signal = randn(1024, 2) + 1j*randn(1024, 2);  % 2-antenna signal
+            %   input.FrequencyOffset = 2.4e9;  % 2.4 GHz carrier
+            %   input.SampleRate = 20e6;         % 20 MHz sample rate
             %
             %   % Process through transmitter
             %   output = trf(input);
 
-            % Extract input parameters with defaults
-            if isstruct(inputSignal)
-                basebandData = inputSignal.data;
-                carrierFreq = inputSignal.carrierFrequency;
-                inputSampleRate = inputSignal.sampleRate;
-            else
-                % Direct signal input - use object properties
-                basebandData = inputSignal;
-                carrierFreq = obj.CarrierFrequency;
-                inputSampleRate = obj.SampleRate;
-            end
+            % Direct signal array input - use object properties
+            basebandData = inputSignal;
+            carrierFreq = obj.CarrierFrequency;
+            inputSampleRate = obj.SampleRate;
 
             % Step 1: Apply IQ imbalance to simulate quadrature imperfections
             processedSignal = obj.IQImbalance(basebandData);
@@ -511,36 +519,18 @@ classdef TRFSimulator < matlab.System
 
             % Step 7: Apply final power scaling to achieve desired transmission power
             signalDuration = size(resampledSignal, 1) / obj.TargetSampleRate;
-            signalPower = sum(abs(resampledSignal(:, 1)) .^ 2) / size(resampledSignal, 1);
+            signalPower = mean(abs(resampledSignal(:)) .^ 2);
 
             % Convert dBm to linear power (Watts) and calculate scaling factor
             targetPowerWatts = 10 ^ (obj.TxPowerDb / 10) / 1000; % Convert dBm to Watts
-            scalingFactor = sqrt(targetPowerWatts / (signalPower * signalDuration)) * sqrt(signalDuration);
+            if signalPower > eps
+                scalingFactor = sqrt(targetPowerWatts / signalPower);
+            else
+                scalingFactor = 1;
+            end
             finalSignal = resampledSignal * scalingFactor;
 
-            % Create output structure with processed signal and metadata
-            if isstruct(inputSignal)
-                % Return structure with same format as input
-                outputSignal = inputSignal;
-                outputSignal.data = finalSignal;
-                outputSignal.carrierFrequency = carrierFreq;
-                outputSignal.sampleRate = obj.TargetSampleRate;
-                outputSignal.bandwidth = obj.BandWidth;
-                outputSignal.txPower = obj.TxPowerDb;
-                outputSignal.samplePerFrame = size(finalSignal, 1);
-                outputSignal.timeDuration = outputSignal.samplePerFrame / outputSignal.sampleRate;
-                outputSignal.sdrMode = "Complex Exponential Frequency Translation";
-
-                % Include RF impairment configuration for reference
-                outputSignal.rfImpairments.dcOffset = obj.DCOffset;
-                outputSignal.rfImpairments.iqImbalanceConfig = obj.IqImbalanceConfig;
-                outputSignal.rfImpairments.phaseNoiseConfig = obj.PhaseNoiseConfig;
-                outputSignal.rfImpairments.nonlinearityConfig = obj.MemoryLessNonlinearityConfig;
-                outputSignal.rfImpairments.siteConfig = obj.SiteConfig;
-            else
-                % Return direct signal for simple input
-                outputSignal = finalSignal;
-            end
+            outputSignal = finalSignal;
 
         end
 

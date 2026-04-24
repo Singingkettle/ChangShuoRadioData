@@ -182,6 +182,7 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         % Main simulation methods - defined in separate files
         setupImpl(obj)
         [entities, environment] = stepImpl(obj, frameId)
+        releaseImpl(obj)
     end
 
     methods (Access = private)

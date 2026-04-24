@@ -13,8 +13,8 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
     % Outputs:
     %   txsSignalSegments - Modified signal segments with impairments applied
 
-    if ~isempty(obj.pTransmitFactory)
-        obj.logger.debug("Frame %d: Applying transmit impairments using pTransmitFactory.", FrameId);
+    if ~isempty(obj.Factories.Transmit)
+        obj.logger.debug("Frame %d: Applying transmit impairments.", FrameId);
 
         for txIdx = 1:length(txsSignalSegments)
 
@@ -24,18 +24,41 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
                 if ~isempty(txsSignalSegments{txIdx})
                     currentTxInfo = TxInfos{txIdx};
 
+                    % Get transmitter scenario config (handle both cell array and struct array)
+                    if iscell(obj.ScenarioConfig.Transmitters)
+                        txScenarioConfig = obj.ScenarioConfig.Transmitters{txIdx};
+                    elseif isstruct(obj.ScenarioConfig.Transmitters)
+                        txScenarioConfig = obj.ScenarioConfig.Transmitters(txIdx);
+                    else
+                        txScenarioConfig = struct();
+                    end
                     for segIdx = 1:length(txsSignalSegments{txIdx})
 
-                        if ~isempty(txsSignalSegments{txIdx}{segIdx})
+                        if ~isempty(txsSignalSegments{txIdx}{segIdx}) && isstruct(txsSignalSegments{txIdx}{segIdx})
                             obj.logger.debug("Frame %d, TxID %s, Seg %d: Applying transmit impairments.", ...
                                 FrameId, string(currentTxId), segIdx);
 
                             try
-                                txsSignalSegments{txIdx}{segIdx} = step(obj.pTransmitFactory, ...
-                                    txsSignalSegments{txIdx}{segIdx}, FrameId, currentTxInfo, segIdx);
+                                segSignal = txsSignalSegments{txIdx}{segIdx};
+
+                                if ~isfield(segSignal, 'FrequencyOffset')
+                                    segSignal.FrequencyOffset = 0;
+                                end
+                                if ~isfield(segSignal, 'SampleRate')
+                                    segSignal.SampleRate = 200e3;
+                                end
+                                if ~isfield(segSignal, 'Signal') || isempty(segSignal.Signal)
+                                    obj.logger.debug("Frame %d, TxID %s, Seg %d: No signal data, skipping transmit impairments.", ...
+                                        FrameId, string(currentTxId), segIdx);
+                                    continue;
+                                end
+
+                                txsSignalSegments{txIdx}{segIdx} = step(obj.Factories.Transmit, ...
+                                    segSignal, FrameId, currentTxInfo, txScenarioConfig);
                             catch ME_transmit
                                 obj.logger.error("Frame %d, TxID %s, Seg %d: Error during transmit impairments: %s", ...
                                     FrameId, string(currentTxId), segIdx, ME_transmit.message);
+                                txsSignalSegments{txIdx}{segIdx}.TransmitError = true;
                             end
 
                         end

@@ -19,20 +19,19 @@ function modulatedSignalSegment = modulateSegmentMessage(obj, FrameId, currentTx
     obj.logger.debug("Frame %d, TxID %s, Seg %d: Modulating message (Modulation TypeID: %s).", ...
         FrameId, string(currentTxId), segIdx, num2str(modulationConfigIdentifier));
 
-    if isempty(obj.pModulationFactory)
-        obj.logger.error("Frame %d, TxID %s, Seg %d: ModulationFactory not initialized.", FrameId, string(currentTxId), segIdx);
+    if isempty(obj.Factories.Modulation)
+        obj.logger.error("Frame %d, TxID %s, Seg %d: Modulation factory not initialized.", FrameId, string(currentTxId), segIdx);
         modulatedSignalSegment = [];
         return;
     end
 
     % Setup placement configuration
-    currentPlacementConfig = struct(); % Initialize empty
-
+    currentPlacementConfig = struct();
     if isfield(currentSegmentScenario, 'Placement')
         currentPlacementConfig = currentSegmentScenario.Placement;
     end
 
-    modulatedSignalSegment = step(obj.pModulationFactory, ...
+    modulatedSignalSegment = step(obj.Factories.Modulation, ...
         rawMessageStruct.data, ...
         FrameId, ...
         string(currentTxId), ...
