@@ -270,11 +270,24 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
                 hasTxPos = isfield(sp, 'TxPosition') && ~isempty(sp.TxPosition);
                 hasRxPos = isfield(sp, 'RxPosition') && ~isempty(sp.RxPosition);
                 hasDist = isfield(sp, 'LinkDistance');
-                hasPL = isfield(sp, 'PathLoss');
+                lb = struct();
+                if isfield(src, 'LinkBudget') && isstruct(src.LinkBudget)
+                    lb = src.LinkBudget;
+                end
+                if isfield(lb, 'AppliedPathLoss')
+                    pathLossDb = lb.AppliedPathLoss;
+                    hasPL = true;
+                elseif isfield(lb, 'AnalyticalPathLoss')
+                    pathLossDb = lb.AnalyticalPathLoss;
+                    hasPL = true;
+                else
+                    pathLossDb = NaN;
+                    hasPL = false;
+                end
                 if hasTxPos && hasRxPos && hasDist && hasPL
                     fprintf('  Frame %d, Rx %d, Src %d: TxPos=[%.1f,%.1f,%.1f], Dist=%.1fm, PL=%.1fdB\n', ...
                         f, rxIdx, sIdx, sp.TxPosition(1), sp.TxPosition(2), sp.TxPosition(3), ...
-                        sp.LinkDistance, sp.PathLoss);
+                        sp.LinkDistance, pathLossDb);
                 else
                     fprintf('  [WARN] Frame %d, Rx %d, Src %d: Incomplete spatial info.\n', f, rxIdx, sIdx);
                     spatialValid = false;
