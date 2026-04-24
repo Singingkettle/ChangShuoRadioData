@@ -291,9 +291,7 @@ classdef SimulationRunner < matlab.System
                 obj.logger.debug('Worker %d, Scenario %d: Data saved successfully', workerId, scenarioId);
 
             catch engineError
-                if contains(engineError.identifier, 'SkipScenario') || ...
-                        contains(engineError.identifier, 'NoBuildingData') || ...
-                        contains(engineError.identifier, 'NoValidPaths')
+                if csrd.utils.scenario.isScenarioSkipException(engineError)
                     obj.logger.warning('Worker %d, Scenario %d: Scenario skipped - %s', ...
                         workerId, scenarioId, engineError.message);
                     return;

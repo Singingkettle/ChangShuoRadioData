@@ -1,0 +1,60 @@
+---
+description: Wireless physics consistency for CSRD - units, link budget, planned vs realized, annotation truthfulness
+globs: +csrd/**/*.m
+alwaysApply: false
+---
+
+# CSRD Physics & Annotation Rules
+
+## 1. Units MUST be explicit and documented
+
+All distances are **meters**. All frequencies are **Hz**. All powers are **dBm** unless suffixed `_dB`.
+Never quietly multiply by 1000 to convert km<->m. If a toolbox helper expects a different unit
+(e.g. some `gaspl` variants use km), wrap it in a thin `metersToHelperUnit` helper and document it.
+
+```matlab
+% BAD - silently treated meters as kilometers, 60 dB error
+freeSpacePL = fspl(obj.Distance * 1000, obj.WaveLength);
+
+% GOOD - meters in, meters used
+freeSpacePL = fspl(max(obj.Distance, 1), obj.WaveLength);
+```
+
+## 2. Planned values are NEVER fabricated from realized values
+
+`Planned` reflects what the planner asked for. `Realized` reflects what the executed signal
+actually produced. If the producer did not populate `Planned`, leave it as an empty struct -
+do not copy `Realized` into `Planned` to make annotations look complete.
+
+```matlab
+% BAD
+sourceInfo.Planned.Bandwidth = comp.Bandwidth;  % this is realized, not planned!
+
+% GOOD
+if isfield(comp, 'Planned') && isstruct(comp.Planned)
+    sourceInfo.Planned = comp.Planned;
+else
+    sourceInfo.Planned = struct();
+end
+```
+
+## 3. Link budget noise bandwidth must be clamped
+
+When computing analytical SNR, the noise bandwidth must be the smallest positive among
+{configured, receiver Fs, transmitter occupied BW}. Otherwise narrow-band signals carry
+a systematically pessimistic SNR label.
+
+Use `csrd.utils.linkbudget.resolveNoiseBandwidth` - do NOT reinvent the picker locally.
+
+## 4. Distinguish AnalyticalPathLoss from AppliedPathLoss
+
+When a channel block (e.g. ray tracing) returns its own path loss, store that in
+`AppliedPathLoss`. The FSPL the planner reasoned about goes in `AnalyticalPathLoss`.
+Keep both so AI/ML consumers can audit drift.
+
+## 5. Sample rate must come from the producer
+
+Modulators MUST set `SampleRate`. Channel blocks MUST set `SampleRate` (or pass it
+through). When `SampleRate` is missing or `<= 0`, raise `CSRD:Core:MissingSampleRate`
+with frame / Tx / segment context. Never back-derive from `length(Signal)/Duration`
+or hardcode `200e3`.

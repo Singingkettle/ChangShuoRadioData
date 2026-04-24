@@ -73,68 +73,7 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             FrameAnnotation{rxIdx}.SignalSources = [];
             for compIdx = 1:length(rxSignals.SignalComponents)
                 comp = rxSignals.SignalComponents{compIdx};
-                sourceInfo = struct();
-                sourceInfo.TxID = comp.TxID;
-                sourceInfo.SegmentID = comp.SegmentID;
-
-                sourceInfo.Realized = struct();
-                sourceInfo.Realized.FrequencyOffset = comp.FrequencyOffset;
-                sourceInfo.Realized.Bandwidth = comp.Bandwidth;
-                sourceInfo.Realized.SampleRate = comp.SampleRate;
-                if isfield(comp, 'ChannelModel')
-                    sourceInfo.Realized.ChannelModel = comp.ChannelModel;
-                end
-                if isfield(comp, 'RayCount')
-                    sourceInfo.Realized.RayCount = comp.RayCount;
-                end
-                if isfield(comp, 'ChannelFallback')
-                    sourceInfo.Realized.ChannelFallback = comp.ChannelFallback;
-                end
-
-                if isfield(comp, 'Planned')
-                    sourceInfo.Planned = comp.Planned;
-                else
-                    sourceInfo.Planned = struct('FrequencyOffset', comp.FrequencyOffset, ...
-                                                'Bandwidth', comp.Bandwidth);
-                end
-
-                if isfield(comp, 'ModulationType')
-                    sourceInfo.ModulationType = comp.ModulationType;
-                end
-                if isfield(comp, 'RFImpairments')
-                    sourceInfo.RFImpairments = comp.RFImpairments;
-                end
-
-                % Spatial and link budget annotation
-                sourceInfo.Spatial = struct();
-                if isfield(comp, 'TxPosition')
-                    sourceInfo.Spatial.TxPosition = comp.TxPosition;
-                end
-                if isfield(comp, 'TxVelocity')
-                    sourceInfo.Spatial.TxVelocity = comp.TxVelocity;
-                end
-                if isfield(comp, 'RxPosition')
-                    sourceInfo.Spatial.RxPosition = comp.RxPosition;
-                end
-                if isfield(comp, 'LinkDistance')
-                    sourceInfo.Spatial.LinkDistance = comp.LinkDistance;
-                end
-                if isfield(comp, 'PathLoss')
-                    sourceInfo.Spatial.PathLoss = comp.PathLoss;
-                end
-                if isfield(comp, 'ComputedSNR')
-                    sourceInfo.Spatial.ComputedSNR = comp.ComputedSNR;
-                end
-                if isfield(comp, 'AppliedSNRdB')
-                    sourceInfo.Spatial.AppliedSNRdB = comp.AppliedSNRdB;
-                end
-                if isfield(comp, 'AppliedPathLoss')
-                    sourceInfo.Spatial.AppliedPathLoss = comp.AppliedPathLoss;
-                end
-                if isfield(comp, 'ChannelInfo')
-                    sourceInfo.Channel = comp.ChannelInfo;
-                end
-
+                sourceInfo = buildSourceAnnotation(comp);
                 FrameAnnotation{rxIdx}.SignalSources = [FrameAnnotation{rxIdx}.SignalSources, sourceInfo];
             end
 
@@ -151,6 +90,109 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
     end
 
     obj.logger.debug("Frame %d: All receiver processing complete.", FrameId);
+end
+
+function sourceInfo = buildSourceAnnotation(comp)
+    %BUILDSOURCEANNOTATION Build the per-source annotation struct.
+    %
+    %   The annotation is split into four orthogonal sub-structures so
+    %   downstream AI/ML consumers can rely on a stable schema:
+    %
+    %     * Planned   - what the scenario asked for (NEVER fabricated
+    %                   from realised values; absent => empty struct).
+    %     * Realized  - what actually happened in the executed signal
+    %                   (FrequencyOffset, Bandwidth, SampleRate, ...).
+    %     * Temporal  - timing information (StartTime, Duration,
+    %                   SegmentId).
+    %     * Spatial   - geometry only (positions, velocities, distance).
+    %     * LinkBudget- link-budget figures (path losses + SNR).
+    %     * Channel   - channel-specific metadata (model name, ray
+    %                   count, fallback flag, RF impairments).
+
+    sourceInfo = struct();
+    sourceInfo.TxID = comp.TxID;
+
+    sourceInfo.Realized = struct();
+    sourceInfo.Realized.FrequencyOffset = getFieldOrDefault(comp, 'FrequencyOffset', NaN);
+    sourceInfo.Realized.Bandwidth = getFieldOrDefault(comp, 'Bandwidth', NaN);
+    sourceInfo.Realized.SampleRate = getFieldOrDefault(comp, 'SampleRate', NaN);
+
+    % Planned MUST come from the producer; we never copy realised
+    % values into it because that would silently hide planner/executor
+    % drift from any downstream consistency checks.
+    if isfield(comp, 'Planned') && isstruct(comp.Planned)
+        sourceInfo.Planned = comp.Planned;
+    else
+        sourceInfo.Planned = struct();
+    end
+
+    sourceInfo.Temporal = struct();
+    if isfield(comp, 'SegmentId')
+        sourceInfo.Temporal.SegmentId = comp.SegmentId;
+    end
+    if isfield(comp, 'StartTime')
+        sourceInfo.Temporal.StartTime = comp.StartTime;
+    end
+    if isfield(comp, 'Duration')
+        sourceInfo.Temporal.Duration = comp.Duration;
+    end
+
+    sourceInfo.Spatial = struct();
+    if isfield(comp, 'TxPosition')
+        sourceInfo.Spatial.TxPosition = comp.TxPosition;
+    end
+    if isfield(comp, 'TxVelocity')
+        sourceInfo.Spatial.TxVelocity = comp.TxVelocity;
+    end
+    if isfield(comp, 'RxPosition')
+        sourceInfo.Spatial.RxPosition = comp.RxPosition;
+    end
+    if isfield(comp, 'LinkDistance')
+        sourceInfo.Spatial.LinkDistance = comp.LinkDistance;
+    end
+
+    sourceInfo.LinkBudget = struct();
+    if isfield(comp, 'PathLoss')
+        sourceInfo.LinkBudget.AnalyticalPathLoss = comp.PathLoss;
+    end
+    if isfield(comp, 'AppliedPathLoss')
+        sourceInfo.LinkBudget.AppliedPathLoss = comp.AppliedPathLoss;
+    end
+    if isfield(comp, 'ComputedSNR')
+        sourceInfo.LinkBudget.ComputedSNR = comp.ComputedSNR;
+    end
+    if isfield(comp, 'AppliedSNRdB')
+        sourceInfo.LinkBudget.AppliedSNRdB = comp.AppliedSNRdB;
+    end
+
+    sourceInfo.Channel = struct();
+    if isfield(comp, 'ChannelModel')
+        sourceInfo.Channel.Model = comp.ChannelModel;
+    end
+    if isfield(comp, 'RayCount')
+        sourceInfo.Channel.RayCount = comp.RayCount;
+    end
+    if isfield(comp, 'ChannelFallback')
+        sourceInfo.Channel.Fallback = comp.ChannelFallback;
+    end
+    if isfield(comp, 'ChannelInfo')
+        sourceInfo.Channel.Info = comp.ChannelInfo;
+    end
+
+    if isfield(comp, 'ModulationType')
+        sourceInfo.ModulationType = comp.ModulationType;
+    end
+    if isfield(comp, 'RFImpairments')
+        sourceInfo.RFImpairments = comp.RFImpairments;
+    end
+end
+
+function value = getFieldOrDefault(s, fieldName, defaultValue)
+    if isfield(s, fieldName) && ~isempty(s.(fieldName))
+        value = s.(fieldName);
+    else
+        value = defaultValue;
+    end
 end
 
 function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)

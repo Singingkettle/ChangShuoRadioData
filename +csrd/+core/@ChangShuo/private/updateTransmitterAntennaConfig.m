@@ -1,41 +1,17 @@
-function updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo)
-    % updateTransmitterAntennaConfig - Update transmitter antenna configuration
+function TxInfo = updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo)
+    % updateTransmitterAntennaConfig - Update transmitter antenna configuration.
     %
-    % This method updates the transmitter antenna configuration based on
-    % the modulator output, ensuring consistency between the configuration
-    % and the actual signal segments generated.
-    %
-    % Inputs:
-    %   obj - ChangShuo object instance
-    %   FrameId - Global frame identifier
-    %   currentTxId - Current transmitter ID
-    %   signalSegmentsPerTx - Cell array of signal segments for this transmitter
-    %   TxInfo - Transmitter information structure (modified by reference)
+    % Thin wrapper around csrd.utils.core.applyAntennaConfigFromSegments
+    % so that the pure logic can be unit-tested without standing up a
+    % full ChangShuo runtime. MATLAB structs are passed by value; the
+    % function MUST return the (possibly) updated TxInfo to the caller.
 
-    if ~isempty(signalSegmentsPerTx) && ~isempty(signalSegmentsPerTx{end}) && ...
-            isstruct(signalSegmentsPerTx{end}) && isfield(signalSegmentsPerTx{end}, 'NumTransmitAntennas')
+    previousNum = TxInfo.NumTransmitAntennas;
+    [TxInfo, didChange, finalNumAntennas, ~] = ...
+        csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, signalSegmentsPerTx);
 
-        finalNumAntennas = signalSegmentsPerTx{end}.NumTransmitAntennas;
-
-        if TxInfo.NumTransmitAntennas ~= finalNumAntennas
-            obj.logger.debug("Frame %d, TxID %s: Updating NumTransmitAntennas from %d to %d based on modulator output.", ...
-                FrameId, string(currentTxId), TxInfo.NumTransmitAntennas, finalNumAntennas);
-
-            TxInfo.NumTransmitAntennas = finalNumAntennas;
-            TxInfo.SiteConfig.Antenna.NumAntennas = finalNumAntennas;
-
-            % Array type determination
-            if finalNumAntennas == 1
-                arrayType = 'Isotropic';
-            elseif mod(finalNumAntennas, 2) == 0 && finalNumAntennas > 2
-                arrayType = "URA";
-            else
-                arrayType = "ULA";
-            end
-
-            TxInfo.SiteConfig.Antenna.Array = arrayType;
-        end
-
+    if didChange
+        obj.logger.debug("Frame %d, TxID %s: Updating NumTransmitAntennas from %d to %d based on modulator output.", ...
+            FrameId, string(currentTxId), previousNum, finalNumAntennas);
     end
-
 end

@@ -75,9 +75,7 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         obj.logger.debug("Scenario frame %d: Single frame generation completed successfully.", FrameId);
 
     catch ME
-        if contains(ME.identifier, 'SkipScenario') || ...
-                contains(ME.identifier, 'NoBuildingData') || ...
-                contains(ME.identifier, 'NoValidPaths')
+        if csrd.utils.scenario.isScenarioSkipException(ME)
             rethrow(ME);
         end
         obj.logger.error("Scenario frame %d: Error during frame generation: %s", FrameId, ME.message);

@@ -54,10 +54,13 @@ classdef BaseChannel < matlab.System
         % Specify as a positive integer. Default: 1 (SISO/MISO)
     end
 
-    properties (Access = protected)
+    properties (GetAccess = public, SetAccess = protected)
         WaveLength % Signal wavelength (m)
         PathLoss % Total path loss (dB)
         mode % Channel configuration mode
+    end
+
+    properties (Access = protected)
         MultipathChannel % Multipath channel model object
     end
 
@@ -76,30 +79,36 @@ classdef BaseChannel < matlab.System
             %    - Gas: Up to 100km with standard atmospheric pressure
             %    - Rain: Up to 2km with 3mm/h rain rate
 
-            % Calculate free space path loss
-            freeSpacePL = fspl(obj.Distance * 1000, obj.WaveLength);
+            % All MATLAB Communications Toolbox propagation helpers
+            % (fspl/fogpl/gaspl/rainpl) take range in METERS. Distance
+            % property is also documented in meters, so no unit conversion
+            % is performed here. Range is clamped per the published
+            % validity domain of each model.
+            distance_m = max(obj.Distance, 1);
+
+            freeSpacePL = fspl(distance_m, obj.WaveLength);
 
             T = 15; % Temperature in degree C
 
             switch obj.atmosCond % Get path loss in dB
                 case 'Fog' % Fog
                     den = .05; % Liquid water density in g/m^3
-                    % Approximate maximum 18km for fog/cloud
+                    % fogpl validity ~ up to 18 km
                     PathLoss = freeSpacePL + ...
-                        fogpl(min(obj.Distance, 18) * 1000, obj.CarrierFrequency, T, den);
+                        fogpl(min(distance_m, 18000), obj.CarrierFrequency, T, den);
                 case 'FreeSpace' % Free space
                     PathLoss = freeSpacePL;
                 case 'Gas' % Gas
                     P = 101.325e3; % Dry air pressure in Pa
                     den = 7.5; % Water vapor density in g/m^3
-                    % Approximate maximum 100km for atmospheric gases
+                    % gaspl validity ~ up to 100 km
                     PathLoss = freeSpacePL + ...
-                        gaspl(min(obj.Distance, 100) * 1000, obj.CarrierFrequency, T, P, den);
+                        gaspl(min(distance_m, 100000), obj.CarrierFrequency, T, P, den);
                 otherwise % Rain
                     RR = 3; % Rain rate in mm/h
-                    % Approximate maximum 2km for rain
+                    % rainpl validity ~ up to 2 km
                     PathLoss = freeSpacePL + ...
-                        rainpl(min(obj.Distance, 2) * 1000, obj.CarrierFrequency, RR);
+                        rainpl(min(distance_m, 2000), obj.CarrierFrequency, RR);
             end
 
         end

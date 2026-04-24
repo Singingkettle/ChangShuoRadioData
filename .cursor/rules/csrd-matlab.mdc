@@ -1,0 +1,67 @@
+---
+description: MATLAB-specific gotchas in CSRD - System object lifecycle, struct value semantics, signal conventions
+globs: +csrd/**/*.m, tests/**/*.m
+alwaysApply: false
+---
+
+# CSRD MATLAB Conventions
+
+## 1. structs are value types - mutating helpers MUST return them
+
+MATLAB structs are passed by value. A helper that "modifies" a struct without returning it
+silently throws the change away.
+
+```matlab
+% BAD - caller never sees the antenna upgrade
+function updateAntennaConfig(TxInfo, segments)
+    TxInfo.NumTransmitAntennas = segments{end}.NumTransmitAntennas;
+end
+
+% GOOD
+function TxInfo = updateAntennaConfig(TxInfo, segments)
+    TxInfo.NumTransmitAntennas = segments{end}.NumTransmitAntennas;
+end
+```
+
+Class instances (`matlab.System`, `handle`) are reference types - mutating them in-place is fine.
+
+## 2. System object lifecycle - reset RNG when reusing cached instances
+
+Cached `matlab.System` objects retain their internal RNG state across `step()` calls. If a
+test or pipeline expects deterministic output for a fixed `Seed`, either:
+- create a fresh instance per call, or
+- explicitly `release(obj); setup(obj, ...)` before each `step`.
+
+Calling `step` twice on the same cached `RandomBit` with the same `Seed` does NOT produce
+the same bits the second time.
+
+## 3. Complex signals: `samples x antennas`, column-major
+
+All baseband / RF signals are `numSamples x numAntennas` complex doubles. Multi-antenna
+processing iterates over columns. Do not transpose silently; channel/RF blocks assume the
+first dimension is time.
+
+## 4. Random streams - prefer named seeded streams for reproducibility
+
+```matlab
+% GOOD
+obj.pRandomStream = RandStream('mt19937ar', 'Seed', obj.Seed);
+realNoise = randn(obj.pRandomStream, size(signalData));
+```
+
+Document the `Seed` property; expose it as a public, settable property for any block that
+generates random samples. Accept legacy aliases (`SeedValue` -> `Seed`) in factories so
+older configs do not silently fall back to the default seed.
+
+## 5. Property access for testability
+
+Internal handles that tests need to inspect (e.g. `MemoryLessNonlinearity`,
+`SampleShifter`) should be `properties (GetAccess = public, SetAccess = protected)`.
+Pure-protected blocks force tests to subclass or hack `struct(obj)`, both of which are
+maintenance traps.
+
+## 6. Avoid `try ... catch <swallow>` without identifier filtering
+
+Generic `catch ME end` blocks hide both transient noise and serious physics errors.
+Always look at `ME.identifier` and either rethrow scenario-skip identifiers (see
+`csrd-architecture.mdc` rule 4) or log + classify the error.

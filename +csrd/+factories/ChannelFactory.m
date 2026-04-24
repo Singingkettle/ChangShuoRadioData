@@ -59,7 +59,8 @@ classdef ChannelFactory < matlab.System
 
             [linkDistance_m, linkDistance_km] = obj.computeLinkDistance(txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo);
             computedPathLoss_dB = obj.computeFreeSpacePathLoss(linkDistance_m, rxSpecificInfo, channelLinkSpecificInfo);
-            computedSNR_dB = obj.computeLinkBudgetSNR(computedPathLoss_dB, txSpecificInfo);
+            computedSNR_dB = obj.computeLinkBudgetSNR(computedPathLoss_dB, txSpecificInfo, ...
+                inputSignalStruct, rxSpecificInfo);
 
             inputSignalStruct.LinkDistance = linkDistance_m;
             inputSignalStruct.PathLoss = computedPathLoss_dB;
@@ -79,7 +80,7 @@ classdef ChannelFactory < matlab.System
 
             if ~obj.isRayTracingSelected
                 obj.configureStatisticalBlock(currentChannelBlock, frameId, txIdStr, rxIdStr, ...
-                    txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_km, computedSNR_dB);
+                    txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB);
             end
 
             try
@@ -96,7 +97,23 @@ classdef ChannelFactory < matlab.System
 
                 receivedSignalStruct = obj.mergeChannelOutput(inputSignalStruct, channelBlockOutput);
                 receivedSignalStruct.LinkDistance = linkDistance_m;
-                receivedSignalStruct.PathLoss = getStructField(receivedSignalStruct, 'PathLoss', computedPathLoss_dB);
+
+                % Always preserve the analytical FSPL value so AI/ML
+                % consumers can reason about the link budget that the
+                % planning layer used. AppliedPathLoss reflects what the
+                % actual channel block produced (e.g. RayTracing) when
+                % available; otherwise it equals the analytical value.
+                receivedSignalStruct.AnalyticalPathLoss = computedPathLoss_dB;
+                if isfield(channelBlockOutput, 'PathLoss') && ~isempty(channelBlockOutput.PathLoss)
+                    receivedSignalStruct.AppliedPathLoss = channelBlockOutput.PathLoss;
+                elseif isfield(receivedSignalStruct, 'PathLoss') && ~isempty(receivedSignalStruct.PathLoss)
+                    receivedSignalStruct.AppliedPathLoss = receivedSignalStruct.PathLoss;
+                else
+                    receivedSignalStruct.AppliedPathLoss = computedPathLoss_dB;
+                end
+                % Backwards-compat alias, keep as the analytical value.
+                receivedSignalStruct.PathLoss = computedPathLoss_dB;
+
                 receivedSignalStruct.ComputedSNR = computedSNR_dB;
                 receivedSignalStruct.ChannelModel = channelModelName;
 
@@ -106,6 +123,17 @@ classdef ChannelFactory < matlab.System
                 obj.logger.error('Frame %d, Tx %s to Rx %s: Error during step of channel block %s. Error: %s', ...
                     frameId, txIdStr, rxIdStr, class(currentChannelBlock), ME_step.message);
                 obj.logger.error('Stack: %s', getReport(ME_step, 'extended', 'hyperlinks', 'off'));
+
+                % Scenario-level identifiers (NoValidPaths, NoBuildingData,
+                % SkipScenario) MUST propagate up so that SimulationRunner
+                % can skip the offending scenario instead of writing a
+                % half-corrupted frame full of "ChannelBlockStepFailed"
+                % markers. Generic, transient errors are still swallowed
+                % so a single bad link does not abort the whole run.
+                if csrd.utils.scenario.isScenarioSkipException(ME_step)
+                    rethrow(ME_step);
+                end
+
                 receivedSignalStruct = inputSignalStruct;
                 if ~isfield(receivedSignalStruct, 'Signal'), receivedSignalStruct.Signal = []; end
                 receivedSignalStruct.Error = 'ChannelBlockStepFailed';
@@ -180,12 +208,13 @@ classdef ChannelFactory < matlab.System
             end
         end
 
-        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr)
-            if obj.isRayTracingModelName(modelName)
-                cacheKey = modelName;
-            else
-                cacheKey = sprintf('%s|Tx=%s|Rx=%s', modelName, char(txIdStr), char(rxIdStr));
-            end
+        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr) %#ok<INUSL>
+            % All channel models, including ray tracing, MUST be cached per
+            % Tx-Rx link. Sharing a single ray-tracing block across links
+            % causes per-link state (rays, channel filters, antenna sites,
+            % seed) to leak between transmitters/receivers and corrupts
+            % every link except the most recently configured one.
+            cacheKey = sprintf('%s|Tx=%s|Rx=%s', modelName, char(txIdStr), char(rxIdStr));
         end
 
         function tf = isRayTracingModelName(~, modelName)
@@ -254,20 +283,27 @@ classdef ChannelFactory < matlab.System
         end
 
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...
-                txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_km, computedSNR_dB)
+                txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB)
+            % NOTE: linkDistance_m is in METERS to match the documented
+            % BaseChannel.Distance unit. The previous signature used
+            % linkDistance_km but the body referenced linkDistance_m,
+            % which would crash with an undefined-variable error if the
+            % distance-based SNR branch was ever taken on a statistical
+            % channel.
 
             enableDistSNR = true;
             if isfield(obj.factoryConfig, 'LinkBudget') && isfield(obj.factoryConfig.LinkBudget, 'EnableDistanceBasedSNR')
                 enableDistSNR = obj.factoryConfig.LinkBudget.EnableDistanceBasedSNR;
             end
 
-            if enableDistSNR && linkDistance_km > 0
+            if enableDistSNR && linkDistance_m > 0
                 if isprop(currentChannelBlock, 'SNRdB')
                     currentChannelBlock.SNRdB = computedSNR_dB;
                 end
                 if isprop(currentChannelBlock, 'Distance')
                     try
-                        currentChannelBlock.Distance = linkDistance_km;
+                        % BaseChannel.Distance is documented in METERS.
+                        currentChannelBlock.Distance = max(linkDistance_m, 1);
                     catch ME_dist
                         obj.logger.warning('Could not update channel Distance: %s', ME_dist.message);
                     end
@@ -361,18 +397,54 @@ classdef ChannelFactory < matlab.System
             end
         end
 
-        function snr_dB = computeLinkBudgetSNR(obj, pathLoss_dB, txInfo)
+        function snr_dB = computeLinkBudgetSNR(obj, pathLoss_dB, txInfo, inputSignalStruct, rxInfo)
+            % Compute analytical link-budget SNR.
+            %
+            % Noise bandwidth defaults to the receiver observation
+            % bandwidth (rxInfo.SampleRate or rxInfo.ObservableRange) and
+            % is clamped down to the planned occupied bandwidth of the
+            % current Tx segment when the latter is narrower. Without
+            % this clamp the noise floor is dominated by spectrum the
+            % current Tx is not even using, and narrow-band signals get
+            % a systematically pessimistic SNR label.
+
             txPower_dBm = getStructField(txInfo, 'Power', 20);
             noisePSD = -174;
-            noiseBW = 50e6;
+            configuredBW = [];
             noiseFig = 6;
 
             if isfield(obj.factoryConfig, 'LinkBudget')
                 lb = obj.factoryConfig.LinkBudget;
                 noisePSD = getStructField(lb, 'ThermalNoisePSD', noisePSD);
-                noiseBW = getStructField(lb, 'NoiseBandwidth', noiseBW);
+                if isfield(lb, 'NoiseBandwidth') && ~isempty(lb.NoiseBandwidth) && lb.NoiseBandwidth > 0
+                    configuredBW = lb.NoiseBandwidth;
+                end
                 noiseFig = getStructField(lb, 'NoiseFigure', noiseFig);
             end
+
+            rxBW = [];
+            if nargin >= 5 && isstruct(rxInfo)
+                if isfield(rxInfo, 'SampleRate') && ~isempty(rxInfo.SampleRate) && rxInfo.SampleRate > 0
+                    rxBW = rxInfo.SampleRate;
+                elseif isfield(rxInfo, 'ObservableRange') && numel(rxInfo.ObservableRange) >= 2
+                    rxBW = abs(rxInfo.ObservableRange(2) - rxInfo.ObservableRange(1));
+                elseif isfield(rxInfo, 'BandWidth') && ~isempty(rxInfo.BandWidth) && rxInfo.BandWidth > 0
+                    rxBW = rxInfo.BandWidth;
+                end
+            end
+
+            txBW = [];
+            if nargin >= 4 && isstruct(inputSignalStruct)
+                if isfield(inputSignalStruct, 'Bandwidth') && ~isempty(inputSignalStruct.Bandwidth) && inputSignalStruct.Bandwidth > 0
+                    txBW = inputSignalStruct.Bandwidth;
+                elseif isfield(inputSignalStruct, 'Planned') && isstruct(inputSignalStruct.Planned) && ...
+                        isfield(inputSignalStruct.Planned, 'Bandwidth') && inputSignalStruct.Planned.Bandwidth > 0
+                    txBW = inputSignalStruct.Planned.Bandwidth;
+                end
+            end
+
+            noiseBW = csrd.utils.linkbudget.resolveNoiseBandwidth( ...
+                configuredBW, rxBW, txBW, 50e6);
 
             noisePower_dBm = noisePSD + 10 * log10(noiseBW) + noiseFig;
             snr_dB = txPower_dBm - pathLoss_dB - noisePower_dBm;

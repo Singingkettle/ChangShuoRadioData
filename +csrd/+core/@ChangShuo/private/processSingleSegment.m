@@ -66,12 +66,21 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         modulatedSignalSegment.Duration = currentSegmentScenario.Placement.Duration;
         modulatedSignalSegment.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
 
-        % Ensure SampleRate is explicitly set
-        if ~isfield(modulatedSignalSegment, 'SampleRate') || isempty(modulatedSignalSegment.SampleRate)
-            if isfield(modulatedSignalSegment, 'Signal') && ~isempty(modulatedSignalSegment.Signal)
-                modulatedSignalSegment.SampleRate = length(modulatedSignalSegment.Signal) / ...
-                    max(modulatedSignalSegment.Duration, eps);
-            end
+        % Modulators are required to set SampleRate explicitly. The
+        % previous implementation back-derived SampleRate from
+        % length(Signal)/Duration, which silently masks modulator bugs
+        % and produces non-physical sampling rates whenever the segment
+        % length is not aligned with the planned duration. Fail fast
+        % instead so the offending modulator is fixed at the source.
+        if ~isfield(modulatedSignalSegment, 'SampleRate') || ...
+                isempty(modulatedSignalSegment.SampleRate) || ...
+                modulatedSignalSegment.SampleRate <= 0
+            error('CSRD:Core:MissingSampleRate', ...
+                ['Frame %d, TxID %s, Segment %d: modulator returned no ', ...
+                 'valid SampleRate. Modulators MUST populate ', ...
+                 'modulatedSignalSegment.SampleRate; back-derivation ', ...
+                 'from length(Signal)/Duration is no longer permitted.'], ...
+                FrameId, string(currentTxId), segIdx);
         end
 
         modulatedSignalSegment.Planned = struct();

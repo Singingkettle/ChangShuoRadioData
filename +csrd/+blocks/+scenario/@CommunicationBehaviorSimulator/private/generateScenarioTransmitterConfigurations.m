@@ -447,6 +447,11 @@ function pattern = generateTemporalPattern(obj, temporalParams)
     pattern.Type = selectedType;
     pattern.ObservationDuration = temporalParams.ObservationDuration;
     pattern.NumFrames = temporalParams.NumFramesPerScenario;
+    if pattern.NumFrames > 0
+        pattern.FrameDuration = pattern.ObservationDuration / pattern.NumFrames;
+    else
+        pattern.FrameDuration = pattern.ObservationDuration;
+    end
     
     switch selectedType
         case 'Continuous'

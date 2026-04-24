@@ -98,14 +98,30 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
 
                     component = struct();
                     component.TxID = txInfo.ID;
-                    component.SegmentID = segIdx;
-                    component.Signal = channelOutput.Signal;
-                    if isfield(channelOutput, 'SampleRate')
-                        component.SampleRate = channelOutput.SampleRate;
-                    elseif isfield(segmentSignal, 'SampleRate')
-                        component.SampleRate = segmentSignal.SampleRate;
+                    if isfield(segmentSignal, 'SegmentId') && ~isempty(segmentSignal.SegmentId)
+                        component.SegmentId = segmentSignal.SegmentId;
                     else
-                        component.SampleRate = 0;
+                        component.SegmentId = segIdx;
+                    end
+                    component.Signal = channelOutput.Signal;
+                    if isfield(channelOutput, 'SampleRate') && ~isempty(channelOutput.SampleRate) && channelOutput.SampleRate > 0
+                        component.SampleRate = channelOutput.SampleRate;
+                    elseif isfield(segmentSignal, 'SampleRate') && ~isempty(segmentSignal.SampleRate) && segmentSignal.SampleRate > 0
+                        component.SampleRate = segmentSignal.SampleRate;
+                    elseif isfield(rxInfo, 'SampleRate') && ~isempty(rxInfo.SampleRate) && rxInfo.SampleRate > 0
+                        component.SampleRate = rxInfo.SampleRate;
+                        obj.logger.warning(['Frame %d, Tx %s -> Rx %s, Seg %d: ', ...
+                            'channel/segment SampleRate missing; ', ...
+                            'falling back to receiver SampleRate %.0f Hz. ', ...
+                            'Upstream stages should populate SampleRate.'], ...
+                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx, ...
+                            rxInfo.SampleRate);
+                    else
+                        error('CSRD:Core:MissingSampleRate', ...
+                            ['Frame %d, Tx %s -> Rx %s, Seg %d: cannot ', ...
+                             'determine signal SampleRate (channel, segment ', ...
+                             'and receiver values are all missing).'], ...
+                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
                     end
                     component.FrequencyOffset = channelOutput.FrequencyOffset;
                     component.Bandwidth = channelOutput.Bandwidth;
@@ -170,6 +186,13 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
             catch ME_channel
                 obj.logger.error("Frame %d, Tx %s -> Rx %s: Channel error: %s", ...
                     FrameId, string(txInfo.ID), string(rxInfo.ID), ME_channel.message);
+
+                % Scenario-level identifiers must propagate up to
+                % SimulationRunner so that the offending scenario can be
+                % skipped instead of producing a half-corrupted frame.
+                if csrd.utils.scenario.isScenarioSkipException(ME_channel)
+                    rethrow(ME_channel);
+                end
             end
         end
     end

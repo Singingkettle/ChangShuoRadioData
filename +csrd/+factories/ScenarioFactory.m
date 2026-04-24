@@ -136,8 +136,7 @@ classdef ScenarioFactory < matlab.System
                 obj.logger.debug('Frame %d: Generated %d Tx, %d Rx', frameId, length(txConfigs), length(rxConfigs));
 
             catch ME
-                if contains(ME.identifier, 'SkipScenario') || ...
-                        contains(ME.identifier, 'NoBuildingData')
+                if csrd.utils.scenario.isScenarioSkipException(ME)
                     rethrow(ME);
                 end
                 obj.logger.error('Frame %d: Scenario generation failed: %s', frameId, ME.message);

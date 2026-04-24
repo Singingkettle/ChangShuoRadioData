@@ -25,7 +25,7 @@ function rawMessageStruct = generateSegmentMessage(obj, FrameId, currentTxId, se
     end
 
     segmentInfo = struct();
-    segmentInfo.SegmentID = sprintf('%s_Seg%d', string(currentTxId), segIdx);
+    segmentInfo.SegmentId = sprintf('%s_Seg%d', string(currentTxId), segIdx);
     segmentInfo.Message = msgConfig;
     if isfield(currentSegmentScenario, 'Modulation') && isfield(currentSegmentScenario.Modulation, 'SymbolRate')
         segmentInfo.Message.SymbolRate = currentSegmentScenario.Modulation.SymbolRate;

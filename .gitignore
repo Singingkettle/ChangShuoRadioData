@@ -115,6 +115,13 @@ data/
 .idea
 .DS_Store
 .cursor/
+# Track project-wide AI development rules; ignore everything else under .cursor/
+!.cursor/
+!.cursor/rules/
+!.cursor/rules/**
+
+# Local reference clone of the v1 repo (not part of this project's source)
+ref/
 
 # custom
 *.pkl

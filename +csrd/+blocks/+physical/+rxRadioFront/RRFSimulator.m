@@ -1,46 +1,44 @@
 classdef RRFSimulator < matlab.System
     % RRFSimulator: Radio Receiver Front-end Simulator
-    % Simulates various RF impairments and processing stages of a radio receiver front-end
-    % including nonlinear amplification, thermal noise, IQ imbalance, DC offset, etc.
     %
-    % The simulator processes input signals through multiple stages to model real-world
-    % RF receiver behavior and impairments.
+    % Models the receiver-side RF chain that is currently implemented.
+    % Today the actively connected stages, in order, are:
+    %   1. Low-noise amplifier nonlinearity (comm.MemorylessNonlinearity)
+    %   2. Thermal noise (comm.ThermalNoise)
+    %   3. IQ imbalance (iqimbal)
+    %   4. ADC sample-rate offset in ppm (comm.SampleRateOffset)
+    %
+    % Stages historically declared but never wired (phase noise, AGC,
+    % bandpass filter, Doppler frequency shifter) have been removed from
+    % this class so that the documented capabilities match the runtime
+    % behaviour. Re-enable them only after they are integrated into
+    % stepImpl with proper validation.
 
     properties
-        % Configuration parameters for the receiver
         StartTime (1, 1) {mustBeGreaterThanOrEqual(StartTime, 0), mustBeReal} = 0 % Start time of simulation in seconds
         DecimationFactor (1, 1) {mustBePositive, mustBeReal} = 1 % Decimation factor
         NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1 % Number of receive antennas
         BandWidth {mustBePositive, mustBeReal, mustBeInteger} = 20e6 % Receiver bandwidth in Hz (updated default)
         CenterFrequency (1, 1) {mustBeReal, mustBeInteger} = 0 % Center frequency in Hz (now allows 0 for baseband-centric)
-        SampleRateOffset (1, 1) {mustBeReal} = 0 % Sample rate offset affecting crystal frequency and sampling
+        SampleRateOffset (1, 1) {mustBeReal} = 0 % ADC clock offset in parts per million (ppm)
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 0.1 % Total simulation duration in seconds
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 20e6 % Master clock rate in Hz (updated default)
         DCOffset {mustBeReal} = -50 % DC offset in dB
 
-        % NEW: Enable receiver-centric frequency processing
         UseReceiverCentricMode (1, 1) logical = true % Use new frequency allocation approach
 
-        % Configuration structs for RF impairments
         SiteConfig struct % Configuration for receiver site parameters
         IqImbalanceConfig struct % Configuration for IQ imbalance parameters
         MemoryLessNonlinearityConfig struct % Configuration for nonlinearity parameters
         ThermalNoiseConfig struct % Configuration for thermal noise parameters
     end
 
-    properties (Access = protected)
-        % Internal properties used during signal processing
-        SamplePerFrame % Number of samples per frame
-        FrequencyOffset % Frequency offset value
-        LowerPowerAmplifier % Nonlinear amplifier object
-        FrequencyShifter % Doppler shift object
-        ThermalNoise % Thermal noise generator object
-        PhaseNoise % Phase noise generator object
-        IQImbalance % IQ imbalance object
-        AGC % Automatic Gain Control object
-        SNR % Signal-to-Noise Ratio
-        SampleShifter % Sample rate offset object
-        BandpassFilter % Bandpass filter object
+    properties (GetAccess = public, SetAccess = protected)
+        % Read-only handles to the actually-connected impairment objects.
+        LowerPowerAmplifier % comm.MemorylessNonlinearity instance
+        ThermalNoise        % comm.ThermalNoise instance
+        IQImbalance         % function handle applying iqimbal
+        SampleShifter       % comm.SampleRateOffset instance
     end
 
     methods (Access = private)
@@ -149,21 +147,11 @@ classdef RRFSimulator < matlab.System
         end
 
         function SampleShifter = genSampleShifter(obj)
-            % Generates sample rate offset object
-            % Offset is in ppm (parts per million)
+            % Generates the ADC sample-rate-offset object.
+            % Offset is in ppm (parts per million); 0 ppm is a no-op
+            % (identity) and therefore safe to instantiate unconditionally.
             SampleShifter = comm.SampleRateOffset( ...
                 Offset = obj.SampleRateOffset);
-        end
-
-        function bpFilt = genBandpassFilter(obj)
-            % Generates bandpass filter object
-            % Returns:
-            %   bpFilt: Bandpass filter object configured with center frequency and bandwidth
-            bpFilt = designfilt('bandpassiir', ...
-                FilterOrder = 8, ...
-                HalfPowerFrequency1 = obj.CenterFrequency - obj.BandWidth / 2, ...
-                HalfPowerFrequency2 = obj.CenterFrequency + obj.BandWidth / 2, ...
-                SampleRate = obj.MasterClockRate);
         end
 
     end
@@ -182,35 +170,41 @@ classdef RRFSimulator < matlab.System
     methods (Access = protected)
 
         function setupImpl(obj, ~)
-            % Initialize all RF impairment components before processing
             obj.LowerPowerAmplifier = obj.genLowerPowerAmplifier;
-            obj.SampleShifter = obj.genSampleShifter;
             obj.ThermalNoise = obj.genThermalNoise;
             obj.IQImbalance = obj.genIqImbalance;
+            obj.SampleShifter = obj.genSampleShifter;
         end
 
         function outputSignal = stepImpl(obj, inputSignal)
-            % stepImpl - Apply RF impairments to pre-combined signal
+            % stepImpl - Apply receiver RF impairments to a pre-combined signal.
             %
-            % Refactored receiver-centric approach:
-            % Signal combination is now done upstream in processReceiverProcessing.
-            % This method focuses solely on applying receiver RF impairments:
-            %   1. LNA nonlinearity
-            %   2. Thermal noise (AWGN)
-            %   3. IQ imbalance
+            % Signal combination is performed upstream in
+            % processReceiverProcessing. The active impairment chain is:
+            %   1. LNA nonlinearity (comm.MemorylessNonlinearity)
+            %   2. Thermal noise   (comm.ThermalNoise)
+            %   3. IQ imbalance    (iqimbal)
+            %   4. ADC sample-rate offset (comm.SampleRateOffset, ppm)
+            %
+            % comm.SampleRateOffset is invoked unconditionally because
+            % an offset of 0 ppm is a deterministic identity. When the
+            % configured offset is non-zero the output length may
+            % differ from the input length by one sample (Farrow filter).
             %
             % Args:
             %   inputSignal: Pre-combined numeric signal array [samples x antennas]
             % Returns:
-            %   outputSignal: Processed signal array with RF impairments applied
+            %   outputSignal: Signal array after the impairment chain.
 
-            % Apply RF impairments chain
             x = obj.LowerPowerAmplifier(inputSignal);
 
             release(obj.ThermalNoise);
             xAwgn = obj.ThermalNoise(x);
 
-            outputSignal = obj.IQImbalance(xAwgn);
+            xIq = obj.IQImbalance(xAwgn);
+
+            release(obj.SampleShifter);
+            outputSignal = obj.SampleShifter(xIq);
         end
 
     end

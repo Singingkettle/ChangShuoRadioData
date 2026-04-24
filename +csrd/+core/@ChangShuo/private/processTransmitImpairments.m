@@ -44,9 +44,36 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
                                 if ~isfield(segSignal, 'FrequencyOffset')
                                     segSignal.FrequencyOffset = 0;
                                 end
-                                if ~isfield(segSignal, 'SampleRate')
-                                    segSignal.SampleRate = 200e3;
+
+                                % SampleRate must come from the modulator
+                                % output (processSingleSegment now enforces
+                                % that). If it is still missing, derive it
+                                % from the planned occupied bandwidth
+                                % (Nyquist factor 2 with a small guard) and
+                                % emit a warning - never silently fall back
+                                % to a magic 200 kHz default.
+                                if ~isfield(segSignal, 'SampleRate') || ...
+                                        isempty(segSignal.SampleRate) || ...
+                                        segSignal.SampleRate <= 0
+                                    plannedBW = localResolvePlannedBandwidth(txScenarioConfig);
+                                    if ~isempty(plannedBW) && plannedBW > 0
+                                        segSignal.SampleRate = 2.5 * plannedBW;
+                                        obj.logger.warning(['Frame %d, TxID %s, Seg %d: ', ...
+                                            'modulator output missing SampleRate; ', ...
+                                            'derived %.0f Hz from planned bandwidth ', ...
+                                            '%.0f Hz. Fix the modulator to set SampleRate explicitly.'], ...
+                                            FrameId, string(currentTxId), segIdx, ...
+                                            segSignal.SampleRate, plannedBW);
+                                    else
+                                        error('CSRD:Core:MissingSampleRate', ...
+                                            ['Frame %d, TxID %s, Seg %d: cannot ', ...
+                                             'apply transmit impairments because ', ...
+                                             'segment SampleRate is missing and no ', ...
+                                             'planned bandwidth is available to derive it.'], ...
+                                            FrameId, string(currentTxId), segIdx);
+                                    end
                                 end
+
                                 if ~isfield(segSignal, 'Signal') || isempty(segSignal.Signal)
                                     obj.logger.debug("Frame %d, TxID %s, Seg %d: No signal data, skipping transmit impairments.", ...
                                         FrameId, string(currentTxId), segIdx);
@@ -76,4 +103,25 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
     end
 
     obj.logger.debug("Frame %d: Transmit impairment stage complete.", FrameId);
+end
+
+function plannedBW = localResolvePlannedBandwidth(txScenarioConfig)
+    %LOCALRESOLVEPLANNEDBANDWIDTH Return the planned occupied bandwidth in Hz.
+    %
+    % Looks for ``Spectrum.PlannedBandwidth`` (current TxPlan field) and
+    % falls back to the legacy ``Spectrum.TargetBandwidth`` field if the
+    % former is absent. Returns [] when neither is available.
+
+    plannedBW = [];
+    if ~isstruct(txScenarioConfig) || ~isfield(txScenarioConfig, 'Spectrum')
+        return;
+    end
+    spec = txScenarioConfig.Spectrum;
+    if isfield(spec, 'PlannedBandwidth') && ~isempty(spec.PlannedBandwidth) && spec.PlannedBandwidth > 0
+        plannedBW = spec.PlannedBandwidth;
+        return;
+    end
+    if isfield(spec, 'TargetBandwidth') && ~isempty(spec.TargetBandwidth) && spec.TargetBandwidth > 0
+        plannedBW = spec.TargetBandwidth;
+    end
 end
