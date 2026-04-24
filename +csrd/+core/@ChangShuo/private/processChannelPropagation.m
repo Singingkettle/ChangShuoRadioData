@@ -190,10 +190,7 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                 % Scenario-level identifiers must propagate up to
                 % SimulationRunner so that the offending scenario can be
                 % skipped instead of producing a half-corrupted frame.
-                identifier = string(ME_channel.identifier);
-                if contains(identifier, 'SkipScenario') || ...
-                        contains(identifier, 'NoBuildingData') || ...
-                        contains(identifier, 'NoValidPaths')
+                if csrd.utils.scenario.isScenarioSkipException(ME_channel)
                     rethrow(ME_channel);
                 end
             end
