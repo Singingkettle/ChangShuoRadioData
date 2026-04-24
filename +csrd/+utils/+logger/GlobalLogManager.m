@@ -109,17 +109,17 @@ classdef GlobalLogManager < handle
 
             switch logLevel
                 case 'DEBUG'
-                    mlogLevel = mlog.Level.DEBUG;
+                    mlogLevel = csrd.utils.logger.mlog.Level.DEBUG;
                 case 'INFO'
-                    mlogLevel = mlog.Level.INFO;
+                    mlogLevel = csrd.utils.logger.mlog.Level.INFO;
                 case 'WARNING'
-                    mlogLevel = mlog.Level.WARNING;
+                    mlogLevel = csrd.utils.logger.mlog.Level.WARNING;
                 case 'ERROR'
-                    mlogLevel = mlog.Level.ERROR;
+                    mlogLevel = csrd.utils.logger.mlog.Level.ERROR;
                 case 'CRITICAL'
-                    mlogLevel = mlog.Level.CRITICAL;
+                    mlogLevel = csrd.utils.logger.mlog.Level.CRITICAL;
                 otherwise
-                    mlogLevel = mlog.Level.INFO; % Default
+                    mlogLevel = csrd.utils.logger.mlog.Level.INFO; % Default
                     % Use direct console output since logger isn't fully initialized yet
                     if logConfig.DisplayInConsole
                         disp(sprintf('[GlobalLogManager] Unknown log level "%s", using INFO', logLevel));
@@ -132,13 +132,13 @@ classdef GlobalLogManager < handle
                 manager.loggerInstance.FileThreshold = mlogLevel;
                 manager.loggerInstance.LogFolder = manager.logDirectory;
             else
-                manager.loggerInstance.FileThreshold = mlog.Level.NONE; % Disable file logging
+                manager.loggerInstance.FileThreshold = csrd.utils.logger.mlog.Level.NONE; % Disable file logging
             end
 
             if logConfig.DisplayInConsole
                 manager.loggerInstance.CommandWindowThreshold = mlogLevel;
             else
-                manager.loggerInstance.CommandWindowThreshold = mlog.Level.NONE; % Disable console logging
+                manager.loggerInstance.CommandWindowThreshold = csrd.utils.logger.mlog.Level.NONE; % Disable console logging
             end
 
             manager.isInitialized = true;

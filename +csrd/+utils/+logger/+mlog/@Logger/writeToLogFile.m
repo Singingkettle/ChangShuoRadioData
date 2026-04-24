@@ -6,7 +6,7 @@ function writeToLogFile(obj, msgObj)
     % Validate inputs
     arguments
         obj
-        msgObj (1, 1) mlog.Message
+        msgObj (1, 1) csrd.utils.logger.mlog.Message
     end
 
     %% Check if we need a new log file

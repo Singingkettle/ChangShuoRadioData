@@ -6,8 +6,8 @@ function addMessage(obj, msgObj)
 
 % Check arguments
 arguments
-    obj (1,1) mlog.Logger
-    msgObj (1,1) mlog.Message
+    obj (1,1) csrd.utils.logger.mlog.Logger
+    msgObj (1,1) csrd.utils.logger.mlog.Message
 end
 
 % Get the next position in the circular MessageBuffer

@@ -47,16 +47,16 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
         LogFile (1,1) string
 
         % Period of when to rotate to a new log file ("none" produces a single file)
-        RotationPeriod (1,1) mlog.RotationPeriod = mlog.RotationPeriod.none
+        RotationPeriod (1,1) csrd.utils.logger.mlog.RotationPeriod = csrd.utils.logger.mlog.RotationPeriod.none
 
         % Level of messages to save to the log file
-        FileThreshold (1,1) mlog.Level = mlog.Level.INFO
+        FileThreshold (1,1) csrd.utils.logger.mlog.Level = csrd.utils.logger.mlog.Level.INFO
 
         % Level of messages to display in the command window
-        CommandWindowThreshold (1,1) mlog.Level = mlog.Level.WARNING
+        CommandWindowThreshold (1,1) csrd.utils.logger.mlog.Level = csrd.utils.logger.mlog.Level.WARNING
 
         % Level of messages to trigger MessageReceived event notification
-        MessageReceivedEventThreshold (1,1) mlog.Level = mlog.Level.MESSAGE
+        MessageReceivedEventThreshold (1,1) csrd.utils.logger.mlog.Level = csrd.utils.logger.mlog.Level.MESSAGE
 
         % Number of messages to retain
         BufferSize (1,1) uint32 {mustBePositive} = 1000
@@ -70,14 +70,14 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
     properties (Dependent, SetObservable, SetAccess = protected)
 
         % Log message history
-        Messages (:,1) mlog.Message
+        Messages (:,1) csrd.utils.logger.mlog.Message
 
     end %properties
 
 
     properties (Dependent, SetAccess = protected)
         % Most recent log message
-        LastMessage (:,1) mlog.Message
+        LastMessage (:,1) csrd.utils.logger.mlog.Message
 
         % Messages in table format for display purposes
         MessageTable table
@@ -98,7 +98,7 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
     properties (Access = protected)
 
         % Circular buffer of log messages
-        MessageBuffer (:,1) mlog.Message = repmat(mlog.Message, 1000, 1)
+        MessageBuffer (:,1) csrd.utils.logger.mlog.Message = repmat(csrd.utils.logger.mlog.Message, 1000, 1)
 
         % Index of last message in buffer
         BufferIndex (1,1) double = 0
@@ -107,7 +107,7 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
         BufferIsWrapped (1,1) logical = false
 
         % Message type constructor
-        MessageConstructor (1,1) function_handle = @mlog.Message
+        MessageConstructor (1,1) function_handle = @csrd.utils.logger.mlog.Message
 
     end %properties
 
@@ -196,14 +196,14 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
             % Define input arguments
             arguments
-                obj (1,1) mlog.Logger
+                obj (1,1) csrd.utils.logger.mlog.Logger
                 name (1,1) string = "Advanced_Logger_for_MATLAB"
             end
 
             % Track a singleton logger for each unique name
             persistent AllLoggers
             if isempty(AllLoggers)
-                AllLoggers = mlog.Logger.empty(0);
+                AllLoggers = csrd.utils.logger.mlog.Logger.empty(0);
             end
             AllLoggers(~isvalid(AllLoggers)) = [];
 
@@ -303,7 +303,7 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
             if isstruct(s)
                 warning("mlog:loadobjFailed",...
                     "Unable to load saved logger. Creating a new instance.");
-                obj = mlog.Logger(s.Name, s.LogFile);
+                obj = csrd.utils.logger.mlog.Logger(s.Name, s.LogFile);
             else
                 obj = s;
             end

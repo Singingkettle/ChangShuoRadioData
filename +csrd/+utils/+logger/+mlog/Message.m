@@ -17,10 +17,13 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
         Time (1, 1) datetime
 
         % The severity level
-        Level (1, 1) mlog.Level = mlog.Level.ERROR
+        Level (1, 1) csrd.utils.logger.mlog.Level = csrd.utils.logger.mlog.Level.ERROR
 
         % The message text
         Text (1, 1) string
+
+        % Caller information (function:line)
+        Caller (1, 1) string = ""
 
     end %properties
 
@@ -31,7 +34,7 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
             % Construct the message
 
             obj.Time = datetime('now', 'TimeZone', 'local');
-            obj.Time.Format = 'MM/dd HH:MM:SS'; % mmengine style timestamp
+            obj.Time.Format = 'MM/dd HH:mm:ss'; % mmengine style timestamp
 
         end %function
 
@@ -65,22 +68,22 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
             % Check arguments
             arguments
-                obj (1, 1) mlog.Message
+                obj (1, 1) csrd.utils.logger.mlog.Message
                 fig (1, 1) matlab.ui.Figure
                 title (1, 1) string = ""
             end
 
             % Which icon to show?
             iconLevels = [
-                          mlog.Level.NONE
-                          mlog.Level.ERROR
-                          mlog.Level.WARNING
-                          mlog.Level.INFO
+                          csrd.utils.logger.mlog.Level.NONE
+                          csrd.utils.logger.mlog.Level.ERROR
+                          csrd.utils.logger.mlog.Level.WARNING
+                          csrd.utils.logger.mlog.Level.INFO
                           ];
 
             if any(obj.Level == iconLevels)
                 icon = lower(string(obj.Level));
-            elseif obj.Level == mlog.Level.MESSAGE
+            elseif obj.Level == csrd.utils.logger.mlog.Level.MESSAGE
                 icon = "message";
             else
                 icon = "";
@@ -112,37 +115,55 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
     end %methods
 
-    methods (Access = {?mlog.Message, ?mlog.Logger})
+    methods (Access = {?csrd.utils.logger.mlog.Message, ?csrd.utils.logger.mlog.Logger})
 
         function str = createDisplayMessage(obj, loggerName)
             % Get the message formatted for display (mmengine style for console)
-            % Timestamp - LoggerName - Level - Message
+            % Timestamp - LoggerName - Level - [Caller] Message
             arguments
-                obj mlog.Message
+                obj csrd.utils.logger.mlog.Message
                 loggerName (1, 1) string = "DefaultLogger"
             end
 
-            str = sprintf('%s - %s - %-8s %s', ...
-                string(obj.Time), ...
-                loggerName, ...
-                obj.Level, ...
-                obj.Text);
+            if strlength(obj.Caller) > 0
+                str = sprintf('%s - %s - %-8s [%s] %s', ...
+                    string(obj.Time), ...
+                    loggerName, ...
+                    obj.Level, ...
+                    obj.Caller, ...
+                    obj.Text);
+            else
+                str = sprintf('%s - %s - %-8s %s', ...
+                    string(obj.Time), ...
+                    loggerName, ...
+                    obj.Level, ...
+                    obj.Text);
+            end
 
         end %function
 
         function str = createLogFileMessage(obj, loggerName)
             % Get the message formatted for log file (mmengine style)
-            % Timestamp - LoggerName - Level - Message
+            % Timestamp - LoggerName - Level - [Caller] Message
             arguments
-                obj mlog.Message
+                obj csrd.utils.logger.mlog.Message
                 loggerName (1, 1) string = "DefaultLogger"
             end
 
-            str = sprintf('%s - %s - %-8s %s', ...
-                string(obj.Time), ...
-                loggerName, ...
-                obj.Level, ...
-                obj.Text);
+            if strlength(obj.Caller) > 0
+                str = sprintf('%s - %s - %-8s [%s] %s', ...
+                    string(obj.Time), ...
+                    loggerName, ...
+                    obj.Level, ...
+                    obj.Caller, ...
+                    obj.Text);
+            else
+                str = sprintf('%s - %s - %-8s %s', ...
+                    string(obj.Time), ...
+                    loggerName, ...
+                    obj.Level, ...
+                    obj.Text);
+            end
 
         end %function
 

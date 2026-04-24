@@ -5,7 +5,7 @@ function varargout = trace(obj, varargin)
 
 
 % Construct the message
-level = mlog.Level.TRACE;
+level = csrd.utils.logger.mlog.Level.TRACE;
 msg = constructMessage(obj, level, varargin{:});
 
 % Add the message to the log

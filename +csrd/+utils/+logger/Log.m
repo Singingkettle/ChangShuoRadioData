@@ -14,11 +14,11 @@ classdef Log < handle
             end
 
             % Add validation to ensure mlog package is available
-            if ~exist('mlog.Logger', 'class')
+            if ~exist('csrd.utils.logger.mlog.Logger', 'class')
                 error('Log:DependencyError', 'mlog package is required but not found');
             end
 
-            obj.Instance = mlog.Logger(obj.Name);
+            obj.Instance = csrd.utils.logger.mlog.Logger(obj.Name);
         end
 
     end

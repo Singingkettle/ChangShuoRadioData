@@ -291,6 +291,14 @@ classdef SimulationRunner < matlab.System
                 obj.logger.debug('Worker %d, Scenario %d: Data saved successfully', workerId, scenarioId);
 
             catch engineError
+                if contains(engineError.identifier, 'SkipScenario') || ...
+                        contains(engineError.identifier, 'NoBuildingData') || ...
+                        contains(engineError.identifier, 'NoValidPaths')
+                    obj.logger.warning('Worker %d, Scenario %d: Scenario skipped - %s', ...
+                        workerId, scenarioId, engineError.message);
+                    return;
+                end
+
                 obj.logger.error('Worker %d, Scenario %d: ChangShuo engine error: %s', ...
                     workerId, scenarioId, engineError.message);
                 rethrow(engineError);
@@ -311,59 +319,16 @@ classdef SimulationRunner < matlab.System
         function configureChangShuoEngine(obj, engine, scenarioId)
             % configureChangShuoEngine - Configure ChangShuo engine for specific scenario
             %
-            % Sets up the ChangShuo engine with factory configurations and
-            % parameters needed for frame generation.
-
-            % Set factory configurations - ChangShuo only needs factory configurations
+            % DESIGN PRINCIPLE:
+            %   - Each factory receives ONLY its own configuration
+            %   - ScenarioFactory: scenario blueprint (spatial, temporal, frequency)
+            %   - Other factories: their specific implementation details
+            %   - NO cross-factory dependencies in configuration
+            
+            % Single assignment - FactoryConfigs is the unified config source
             engine.FactoryConfigs = obj.FactoryConfigs;
 
-            % Set factory configurations on engine properties
-            if ~isempty(obj.FactoryConfigs)
-                factoryNames = fieldnames(obj.FactoryConfigs);
-
-                for i = 1:length(factoryNames)
-                    factoryName = factoryNames{i};
-
-                    % Map factory names to engine properties
-                    engineProperty = obj.mapFactoryNameToEngineProperty(factoryName);
-
-                    if ~isempty(engineProperty) && isprop(engine, engineProperty)
-                        factoryConfig = struct();
-                        factoryConfig.handle = sprintf('csrd.factories.%sFactory', factoryName);
-                        factoryConfig.Config = obj.FactoryConfigs.(factoryName);
-                        engine.(engineProperty) = factoryConfig;
-
-                        obj.logger.debug('Configured %s factory on engine property %s', factoryName, engineProperty);
-                    end
-
-                end
-
-            end
-
             obj.logger.debug('ChangShuo engine configured for scenario %d', scenarioId);
-        end
-
-        function engineProperty = mapFactoryNameToEngineProperty(obj, factoryName)
-            % mapFactoryNameToEngineProperty - Map factory names to engine properties
-
-            switch factoryName
-                case 'Message'
-                    engineProperty = 'Message';
-                case 'Modulation'
-                    engineProperty = 'Modulate';
-                case 'Scenario'
-                    engineProperty = 'Scenario';
-                case 'Transmit'
-                    engineProperty = 'Transmit';
-                case 'Channel'
-                    engineProperty = 'Channel';
-                case 'Receive'
-                    engineProperty = 'Receive';
-                otherwise
-                    obj.logger.warning('Unknown factory type: %s', factoryName);
-                    engineProperty = '';
-            end
-
         end
 
         function saveScenarioData(obj, scenarioData, scenarioAnnotation, scenarioId, workerId)

@@ -16,13 +16,13 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
     properties (AbortSet)
 
         % Logger to monitor
-        Log mlog.Logger {mustBeScalarOrEmpty}
+        Log csrd.utils.logger.mlog.Logger {mustBeScalarOrEmpty}
 
         % Most severe level of messages to display
-        UpperDisplayThreshold (1,1) mlog.Level = mlog.Level.NONE
+        UpperDisplayThreshold (1,1) csrd.utils.logger.mlog.Level = csrd.utils.logger.mlog.Level.NONE
 
         % Least severe level of messages to display
-        LowerDisplayThreshold (1,1) mlog.Level = mlog.Level.INFO
+        LowerDisplayThreshold (1,1) csrd.utils.logger.mlog.Level = csrd.utils.logger.mlog.Level.INFO
 
         % Number of messages to display
         MaxDisplay (1,1) uint16 {mustBePositive} = 100
@@ -84,7 +84,7 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
             if ~isempty(obj.Log) && isvalid(obj.Log)
                 messages = obj.Log.Messages;
             else
-                messages = mlog.Message.empty(0,1);
+                messages = csrd.utils.logger.mlog.Message.empty(0,1);
             end
 
             % Filter messages by severity
@@ -157,7 +157,7 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function set.LogName(obj,value)
             if strlength(value)
-                obj.Log = mlog.Logger(value);
+                obj.Log = csrd.utils.logger.mlog.Logger(value);
             else
                 obj.Log(:) = [];
             end

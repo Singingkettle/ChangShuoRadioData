@@ -7,7 +7,7 @@ function tf = isLevelLogged(obj, level)
 % Check arguments
 arguments
     obj
-    level (1,1) mlog.Level
+    level (1,1) csrd.utils.logger.mlog.Level
 end
 
 tf = level <= obj.FileThreshold || ...
