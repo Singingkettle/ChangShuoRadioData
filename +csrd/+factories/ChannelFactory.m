@@ -267,7 +267,10 @@ classdef ChannelFactory < matlab.System
                 end
                 if isprop(currentChannelBlock, 'Distance')
                     try
-                        currentChannelBlock.Distance = linkDistance_km;
+                        % BaseChannel.Distance is documented in METERS.
+                        % Pass meters here so the path loss calculation
+                        % inside the channel block stays unit-consistent.
+                        currentChannelBlock.Distance = max(linkDistance_m, 1);
                     catch ME_dist
                         obj.logger.warning('Could not update channel Distance: %s', ME_dist.message);
                     end
