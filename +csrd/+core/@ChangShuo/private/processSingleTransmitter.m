@@ -71,6 +71,7 @@ function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, 
     % Process only active segments for this transmitter
     signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentTxScenario, currentTxId);
 
-    % Update antenna configuration based on modulator output
-    updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo);
+    % Update antenna configuration based on modulator output.
+    % Must reassign TxInfo because MATLAB structs are passed by value.
+    TxInfo = updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo);
 end
