@@ -123,6 +123,17 @@ classdef ChannelFactory < matlab.System
                 obj.logger.error('Frame %d, Tx %s to Rx %s: Error during step of channel block %s. Error: %s', ...
                     frameId, txIdStr, rxIdStr, class(currentChannelBlock), ME_step.message);
                 obj.logger.error('Stack: %s', getReport(ME_step, 'extended', 'hyperlinks', 'off'));
+
+                % Scenario-level identifiers (NoValidPaths, NoBuildingData,
+                % SkipScenario) MUST propagate up so that SimulationRunner
+                % can skip the offending scenario instead of writing a
+                % half-corrupted frame full of "ChannelBlockStepFailed"
+                % markers. Generic, transient errors are still swallowed
+                % so a single bad link does not abort the whole run.
+                if csrd.utils.scenario.isScenarioSkipException(ME_step)
+                    rethrow(ME_step);
+                end
+
                 receivedSignalStruct = inputSignalStruct;
                 if ~isfield(receivedSignalStruct, 'Signal'), receivedSignalStruct.Signal = []; end
                 receivedSignalStruct.Error = 'ChannelBlockStepFailed';
