@@ -76,32 +76,9 @@ function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
 end
 
 function [isActive, intervalIdx, startTime, endTime] = checkIntervals(frameId, pattern)
-    % checkIntervals - Check if frameId falls within any transmission interval
-    
-    isActive = false;
-    intervalIdx = 0;
-    startTime = 0;
-    endTime = 0;
-    
-    intervals = pattern.Intervals;
-    observationDuration = pattern.ObservationDuration;
-    
-    if isfield(pattern, 'NumFrames') && ~isempty(pattern.NumFrames)
-        numFrames = pattern.NumFrames;
-    else
-        numFrames = 10;
-    end
-    
-    % Calculate frame time (assuming equal frame distribution)
-    frameTime = (frameId - 1) / numFrames * observationDuration;
-    
-    for i = 1:size(intervals, 1)
-        if frameTime >= intervals(i, 1) && frameTime < intervals(i, 2)
-            isActive = true;
-            intervalIdx = i;
-            startTime = intervals(i, 1);
-            endTime = intervals(i, 2);
-            return;
-        end
-    end
+    % checkIntervals - Thin wrapper around csrd.utils.scenario.checkTransmissionInterval.
+    % Kept here so existing call sites stay short; the testable
+    % implementation lives in +csrd/+utils/+scenario/.
+    [isActive, intervalIdx, startTime, endTime] = ...
+        csrd.utils.scenario.checkTransmissionInterval(frameId, pattern);
 end
