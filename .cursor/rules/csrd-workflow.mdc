@@ -1,0 +1,68 @@
+---
+description: CSRD workflow - no-bullshit principle, hand-verify critical bugs, single-purpose commits
+globs: **/*
+alwaysApply: false
+---
+
+# CSRD Workflow Rules
+
+## 1. The "no bullshit" principle
+
+If a fix has not been tested, do NOT save it and tell the user it works. The user has
+explicitly stated:
+
+> 你做的代码修改你需要设计合理的测试程序进行测试确保没问题再保存，你不能睁眼说瞎话
+
+Concretely:
+- Never claim "tests pass" without showing the actual MATLAB output.
+- Never mark a todo `completed` because the patch *looks* right; mark it completed when the
+  associated test ran green.
+- If you cannot run the test (environment issue, missing toolbox), say so explicitly and
+  ask before proceeding.
+
+## 2. Hand-verify critical bugs - do not trust subagent reports
+
+Subagent / search-tool reports often have plausible-looking but wrong line numbers. Before
+acting on a "High" severity finding:
+1. Open the cited file with `Read`.
+2. Confirm the bug is at the cited lines.
+3. Reproduce it (call the function, inspect the result), then patch.
+
+Skipping step 1-2 is how you ship a "fix" that breaks a different module.
+
+## 3. One commit, one concern
+
+Each commit changes one logical thing. The commit message body lists:
+- Affected files (short list, NOT the diff).
+- Bug ID from the review plan if applicable (`H1`, `H7`, `B5`, ...).
+- Test that was added / extended and its result.
+
+Avoid mega-commits like `fix everything` or `stage A done`. They are unreviewable and
+unrevertible.
+
+## 4. Stop and ask when the decision is irreversible
+
+Things that need an explicit user decision before action:
+- Renaming public APIs / config keys (breaks every existing scenario file).
+- Deleting a feature even if it is currently broken (e.g. AGC, bandpass filter in RRF).
+- Force-pushing or rewriting history on a shared branch.
+- Merging into `main`.
+
+Default: prepare the change on a side branch, show the diff, ask.
+
+## 5. New files MUST land in the correct package
+
+- Block implementations: `+csrd/+blocks/+<category>/`
+- Factories: `+csrd/+factories/`
+- Utilities: `+csrd/+utils/+<category>/`
+- Test support: `+csrd/+test_support/`
+- Tests: `tests/{unit,regression,integration}/`
+
+Never create a new `.m` file in the repo root or in `docs/`. If unsure, search for an
+existing sibling and put the new file next to it.
+
+## 6. Document deviations from the plan
+
+If during implementation you discover the plan was wrong (e.g. a "bug" turns out to be
+intended behaviour), do NOT silently change scope. Update the plan/todo list with the new
+finding, justify the change in the commit body, and proceed.

@@ -1,0 +1,70 @@
+---
+description: CSRD testing conventions - directory layout, fix-with-test discipline, run-before-commit
+globs: tests/**/*.m, +csrd/**/*.m
+alwaysApply: false
+---
+
+# CSRD Testing Rules
+
+## 1. Test files live ONLY under `tests/`
+
+Allowed:
+- `tests/unit/*Test.m`              - matlab.unittest classes for one block
+- `tests/regression/test_*.m`       - top-level functions, end-to-end behaviour
+- `tests/integration/*Test.m`       - matlab.unittest classes for cross-block flows
+
+Forbidden:
+- `test_*.m` in the repo root or anywhere outside `tests/`
+- New files under `examples/` or `+csrd/` named `test_*`
+- Stand-alone scripts that "smoke test" by side effect of being run
+
+`tests/run_all_tests.m` discovers files automatically; do NOT hardcode test names in lists
+that have to be edited every time a test is added.
+
+## 2. Every fix MUST come with at least one test
+
+If you patch a bug, write or extend a test that *would have failed before the patch*. Run the
+test red first when feasible. The test must:
+- live in the right directory (rule 1),
+- name the bug it pins (in the comment header),
+- exercise the production code path, not a re-implementation of the same logic.
+
+## 3. Test must run the real code, not a re-implementation
+
+```matlab
+% BAD - test passes even if production swallows the exception
+function runHarness()
+    try
+        error('CSRD:Channel:NoValidPaths', 'msg');
+    catch ME
+        if csrd.utils.scenario.isScenarioSkipException(ME)
+            rethrow(ME);  % this is the test, NOT processChannelPropagation
+        end
+    end
+end
+
+% GOOD - real ChannelFactory + stub channel block
+factory = csrd.factories.ChannelFactory('Config', cfg);  % cfg points handle at stub block
+testCase.verifyError(@() step(factory, ...), 'RayTracing:NoValidPaths');
+```
+
+When real code is too heavy to spin up, supplement with a *static-text* assertion that the
+production file calls the shared utility (e.g. `assert(contains(fileread(file), needle))`).
+
+## 4. Run the suites before committing
+
+Before any commit that touches `+csrd/` or `tests/`:
+
+```matlab
+results = run_all_tests('unit');         % seconds
+results = run_all_tests('regression');   % minutes
+% optionally: run_all_tests('all')
+```
+
+Both suites must report `Success=1`. If you have to disable a test, link the issue/plan
+in the comment and remove the disable in the same commit that fixes the underlying problem.
+
+## 5. Test-only support code goes under `+csrd/+test_support`
+
+Stub channel blocks, throwing helpers, etc., live in `+csrd/+test_support`. Do not pollute
+`+csrd/+blocks/` with classes only the test suite uses.

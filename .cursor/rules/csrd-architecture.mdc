@@ -1,0 +1,62 @@
+---
+description: CSRD architecture - planning vs execution, factory contracts, receiver-centric design
+globs: +csrd/**/*.m
+alwaysApply: false
+---
+
+# CSRD Architecture Rules
+
+## 1. Planning and execution MUST stay separated
+
+The scenario layer (`+csrd/+blocks/+scenario`) produces `TxPlan`, `RxPlan`, `GlobalLayout`.
+The factory layer (`+csrd/+factories`) instantiates classes and runs them. Factories must
+NOT inject random parameters into a half-empty plan during execution - every Tx in the plan
+already knows its modulation, message type, bandwidth window, and timing pattern.
+
+If a factory finds itself reaching for `randi` to "fill in" a missing field, that field is
+a planner bug; fix the planner instead of papering over it in the factory.
+
+## 2. Receiver-centric frequency allocation
+
+All carrier frequencies live inside the receiver's observable range `[-Fs/2, +Fs/2]` (relative
+to the receiver center). The planner allocates carriers in this window; the channel + receiver
+chain enforces it. Do not store absolute RF carriers in segment signals - keep them as
+`FrequencyOffset` relative to the receiver.
+
+## 3. Data contracts (segment signal struct)
+
+A modulator/transmit-impair output struct MUST include:
+- `.Signal` (samples x antennas, complex)
+- `.SampleRate` (Hz, > 0)
+- `.FrequencyOffset` (Hz, relative to Rx center)
+- `.Bandwidth` (Hz, occupied)
+- `.SegmentId` (string, unique within frame; legacy `.SegmentID` accepted for read-only)
+
+A channel output adds `.PathLoss`, `.LinkDistance`, optional `.AppliedPathLoss`,
+`.ChannelModel`, `.ChannelInfo`.
+
+A receiver-side annotation source MUST split into `.Planned`, `.Realized`, `.Temporal`,
+`.Spatial`, `.LinkBudget`, `.Channel` substructures. See `csrd-physics.mdc` rule 2.
+
+## 4. Scenario-skip exceptions are first class
+
+Use `csrd.utils.scenario.isScenarioSkipException(ME)` everywhere a `try/catch` may need to
+distinguish "skip this scenario, keep going" from "abort the run". Recognised tokens
+(substring match on identifier): `SkipScenario`, `NoBuildingData`, `NoValidPaths`.
+
+```matlab
+% GOOD
+catch ME_step
+    if csrd.utils.scenario.isScenarioSkipException(ME_step)
+        rethrow(ME_step);
+    end
+    % swallow generic / transient errors here
+end
+```
+
+## 5. Cache keys MUST encode all sources of state
+
+Cached `matlab.System` instances are stateful. Always include enough identity in the cache
+key to prevent state leakage between independent links. RayTracing channel blocks in
+particular MUST be cached per `Tx-Rx` pair; sharing them across links corrupts every link
+except the most recently configured one.
