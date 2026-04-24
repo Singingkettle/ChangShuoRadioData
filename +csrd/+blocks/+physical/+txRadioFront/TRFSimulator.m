@@ -247,9 +247,12 @@ classdef TRFSimulator < matlab.System
                     LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
                     TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification);
 
-                % Configure third-order intercept specification
+                % Configure third-order intercept specification.
+                % Each TOISpecification name corresponds to the
+                % comm.MemorylessNonlinearity property of the same name;
+                % previously IIP3 was incorrectly written to OIP3.
                 if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IIP3')
-                    nonlinearityObject.OIP3 = obj.MemoryLessNonlinearityConfig.IIP3;
+                    nonlinearityObject.IIP3 = obj.MemoryLessNonlinearityConfig.IIP3;
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
                     nonlinearityObject.OIP3 = obj.MemoryLessNonlinearityConfig.OIP3;
                 elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IP1dB')
