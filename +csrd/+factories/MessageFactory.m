@@ -92,7 +92,7 @@
 %
 %   % Configure segment information
 %   segmentInfo = struct();
-%   segmentInfo.SegmentID = 'Seg001';
+%   segmentInfo.SegmentId = 'Seg001';
 %   segmentInfo.Message.Length = 1000;
 %   segmentInfo.Message.SeedValue = 12345;
 %
@@ -398,8 +398,18 @@ classdef MessageFactory < matlab.System
             % messageTypeID is the string key from Scenario.Transmitters.Segments.Message.TypeID,
             % e.g., "RandomBit"
 
+            % Accept either SegmentId (current) or SegmentID (legacy) for
+            % backwards compatibility while the codebase converges.
+            if isfield(segmentInfo, 'SegmentId')
+                segmentIdLabel = segmentInfo.SegmentId;
+            elseif isfield(segmentInfo, 'SegmentID')
+                segmentIdLabel = segmentInfo.SegmentID;
+            else
+                segmentIdLabel = '<unknown>';
+            end
+
             obj.logger.debug('Frame %d, SegID %s: MessageFactory step for TypeID: %s', ...
-                frameId, segmentInfo.SegmentID, messageTypeID);
+                frameId, segmentIdLabel, messageTypeID);
 
             if ~isfield(obj.factoryConfiguration.MessageTypes, messageTypeID)
                 error('MessageFactory:UnknownType', 'Message TypeID ''%s'' not found in factory configuration.', messageTypeID);
@@ -423,7 +433,7 @@ classdef MessageFactory < matlab.System
 
             if ~isKey(obj.cachedMessageBlocks, blockCacheKey)
                 obj.logger.debug('Frame %d, SegID %s: Creating new message block for TypeID: %s (handle: %s)', ...
-                    frameId, segmentInfo.SegmentID, messageTypeID, blockHandleStr);
+                    frameId, segmentIdLabel, messageTypeID, blockHandleStr);
 
                 try
                     % Instantiate with default config from MessageFactoryConfig

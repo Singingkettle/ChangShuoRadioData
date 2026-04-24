@@ -75,7 +75,9 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
                 comp = rxSignals.SignalComponents{compIdx};
                 sourceInfo = struct();
                 sourceInfo.TxID = comp.TxID;
-                sourceInfo.SegmentID = comp.SegmentID;
+                if isfield(comp, 'SegmentId')
+                    sourceInfo.SegmentId = comp.SegmentId;
+                end
 
                 sourceInfo.Realized = struct();
                 sourceInfo.Realized.FrequencyOffset = comp.FrequencyOffset;

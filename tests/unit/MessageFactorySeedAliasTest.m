@@ -36,11 +36,11 @@ classdef MessageFactorySeedAliasTest < matlab.unittest.TestCase
         function seedValueAliasMatchesNativeSeed(testCase)
             seedValue = 4242;
             seg = struct();
-            seg.SegmentID = 'aliased';
+            seg.SegmentId = 'aliased';
             seg.Message = struct('Length', 1024, 'SeedValue', seedValue);
             outAlias = MessageFactorySeedAliasTest.runFactoryOnce(seg);
 
-            seg.SegmentID = 'native';
+            seg.SegmentId = 'native';
             seg.Message = struct('Length', 1024, 'Seed', seedValue);
             outNative = MessageFactorySeedAliasTest.runFactoryOnce(seg);
 
@@ -50,11 +50,11 @@ classdef MessageFactorySeedAliasTest < matlab.unittest.TestCase
 
         function differentSeedsProduceDifferentSequences(testCase)
             seg = struct();
-            seg.SegmentID = 'A';
+            seg.SegmentId = 'A';
             seg.Message = struct('Length', 1024, 'Seed', 11);
             outA = MessageFactorySeedAliasTest.runFactoryOnce(seg);
 
-            seg.SegmentID = 'B';
+            seg.SegmentId = 'B';
             seg.Message = struct('Length', 1024, 'Seed', 22);
             outB = MessageFactorySeedAliasTest.runFactoryOnce(seg);
 
@@ -73,7 +73,7 @@ classdef MessageFactorySeedAliasTest < matlab.unittest.TestCase
             cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
             setup(factory);
 
-            seg = struct('SegmentID', 's', 'Message', struct('Length', 512, 'Seed', 100));
+            seg = struct('SegmentId', 's', 'Message', struct('Length', 512, 'Seed', 100));
             firstA = step(factory, 1, seg, 'RandomBit');
 
             seg.Message.Seed = 999;
