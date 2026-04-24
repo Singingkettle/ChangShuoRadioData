@@ -3,7 +3,7 @@ function test_bandwidth_consistency()
 
     fprintf('=== Bandwidth Consistency Test ===\n');
 
-    projectRoot = fileparts(mfilename('fullpath'));
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
     csrd.utils.logger.GlobalLogManager.reset();
     rng(1234);

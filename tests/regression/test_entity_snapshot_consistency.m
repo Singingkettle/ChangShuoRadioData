@@ -3,7 +3,7 @@ function test_entity_snapshot_consistency()
 
     fprintf('=== Entity Snapshot Consistency Test ===\n');
 
-    projectRoot = fileparts(mfilename('fullpath'));
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
     csrd.utils.logger.GlobalLogManager.reset();
 

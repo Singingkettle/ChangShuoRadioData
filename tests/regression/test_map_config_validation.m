@@ -3,7 +3,7 @@ function test_map_config_validation()
 
     fprintf('=== Map Config Validation Test ===\n');
 
-    projectRoot = fileparts(mfilename('fullpath'));
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
 
     masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');

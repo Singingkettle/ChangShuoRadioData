@@ -3,7 +3,7 @@ function test_empty_osm_raytracing()
 
     fprintf('=== Empty OSM RayTracing Regression Test ===\n');
 
-    projectRoot = fileparts(mfilename('fullpath'));
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
     csrd.utils.logger.GlobalLogManager.reset();
 

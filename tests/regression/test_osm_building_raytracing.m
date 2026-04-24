@@ -3,7 +3,7 @@ function test_osm_building_raytracing()
 
     fprintf('=== Building OSM RayTracing Smoke Test ===\n');
 
-    projectRoot = fileparts(mfilename('fullpath'));
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
     csrd.utils.logger.GlobalLogManager.reset();
 

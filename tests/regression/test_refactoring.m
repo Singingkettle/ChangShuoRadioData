@@ -9,9 +9,13 @@ function test_refactoring()
     %
     % Run from the project root directory:
     %   cd c:\Users\lenovo\ChangShuoRadioData
+    %   addpath(fullfile(pwd, 'tests', 'regression'))
     %   test_refactoring
 
     fprintf('=== CSRD Refactoring Comprehensive Test Suite ===\n\n');
+
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+    addpath(projectRoot);
 
     clear classes;
     csrd.utils.logger.GlobalLogManager.reset();
