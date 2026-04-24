@@ -79,7 +79,7 @@ classdef ChannelFactory < matlab.System
 
             if ~obj.isRayTracingSelected
                 obj.configureStatisticalBlock(currentChannelBlock, frameId, txIdStr, rxIdStr, ...
-                    txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_km, computedSNR_dB);
+                    txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB);
             end
 
             try
@@ -180,12 +180,13 @@ classdef ChannelFactory < matlab.System
             end
         end
 
-        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr)
-            if obj.isRayTracingModelName(modelName)
-                cacheKey = modelName;
-            else
-                cacheKey = sprintf('%s|Tx=%s|Rx=%s', modelName, char(txIdStr), char(rxIdStr));
-            end
+        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr) %#ok<INUSL>
+            % All channel models, including ray tracing, MUST be cached per
+            % Tx-Rx link. Sharing a single ray-tracing block across links
+            % causes per-link state (rays, channel filters, antenna sites,
+            % seed) to leak between transmitters/receivers and corrupts
+            % every link except the most recently configured one.
+            cacheKey = sprintf('%s|Tx=%s|Rx=%s', modelName, char(txIdStr), char(rxIdStr));
         end
 
         function tf = isRayTracingModelName(~, modelName)
@@ -254,22 +255,26 @@ classdef ChannelFactory < matlab.System
         end
 
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...
-                txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_km, computedSNR_dB)
+                txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB)
+            % NOTE: linkDistance_m is in METERS to match the documented
+            % BaseChannel.Distance unit. The previous signature used
+            % linkDistance_km but the body referenced linkDistance_m,
+            % which would crash with an undefined-variable error if the
+            % distance-based SNR branch was ever taken on a statistical
+            % channel.
 
             enableDistSNR = true;
             if isfield(obj.factoryConfig, 'LinkBudget') && isfield(obj.factoryConfig.LinkBudget, 'EnableDistanceBasedSNR')
                 enableDistSNR = obj.factoryConfig.LinkBudget.EnableDistanceBasedSNR;
             end
 
-            if enableDistSNR && linkDistance_km > 0
+            if enableDistSNR && linkDistance_m > 0
                 if isprop(currentChannelBlock, 'SNRdB')
                     currentChannelBlock.SNRdB = computedSNR_dB;
                 end
                 if isprop(currentChannelBlock, 'Distance')
                     try
                         % BaseChannel.Distance is documented in METERS.
-                        % Pass meters here so the path loss calculation
-                        % inside the channel block stays unit-consistent.
                         currentChannelBlock.Distance = max(linkDistance_m, 1);
                     catch ME_dist
                         obj.logger.warning('Could not update channel Distance: %s', ME_dist.message);
