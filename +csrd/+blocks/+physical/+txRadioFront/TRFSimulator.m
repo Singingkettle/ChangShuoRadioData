@@ -122,18 +122,15 @@ classdef TRFSimulator < matlab.System
         MemoryLessNonlinearityConfig struct
     end
 
-    properties (Access = protected)
-        % IQImbalance: Function handle for IQ imbalance simulation
-        % Generated during setup to apply configured amplitude and phase imbalance
-        IQImbalance
-
-        % PhaseNoise: System object for phase noise simulation
-        % Communications Toolbox phase noise object configured during setup
-        PhaseNoise
-
-        % MemoryLessNonlinearity: System object for nonlinearity simulation
-        % Communications Toolbox memoryless nonlinearity object for PA modeling
-        MemoryLessNonlinearity
+    properties (GetAccess = public, SetAccess = protected)
+        % Read-only handles to the impairment objects wired by setupImpl.
+        % Promoted to public read access (set access stays protected) so
+        % test harnesses and external consumers can introspect what the
+        % factory actually configured (e.g. that IIP3 was written to the
+        % IIP3 property and not to OIP3).
+        IQImbalance               % Function handle applying iqimbal
+        PhaseNoise                % comm.PhaseNoise instance
+        MemoryLessNonlinearity    % comm.MemorylessNonlinearity instance
 
         % Note: DUC-related properties removed in frequency translation upgrade
         % Legacy properties no longer needed:
