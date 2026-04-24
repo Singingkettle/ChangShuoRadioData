@@ -197,75 +197,48 @@ classdef AWGNChannel < matlab.System
 
         end
 
-        function noisySignal = stepImpl(obj, inputSignal)
-            % stepImpl - Add AWGN to input signal
-            %
-            % This method implements the core AWGN channel functionality by
-            % calculating appropriate noise variance based on signal power and
-            % SNR, then adding complex Gaussian noise to the input signal.
-            %
-            % Syntax:
-            %   noisySignal = stepImpl(obj, inputSignal)
-            %
-            % Input Arguments:
-            %   inputSignal - Clean input signal to be corrupted with noise
-            %                 Type: complex array
-            %
-            % Output Arguments:
-            %   noisySignal - Input signal with added AWGN
-            %                 Type: complex array (same size as input)
-            %
-            % Processing Steps:
-            %   1. Calculate average signal power from input samples
-            %   2. Compute noise variance based on SNR configuration
-            %   3. Generate complex Gaussian noise with proper scaling
-            %   4. Add noise to input signal preserving signal statistics
-            %
-            % Noise Variance Formula:
-            %   σ² = P_signal / (10^(SNR_dB/10))
-            %   where P_signal = E[|x(n)|²] is the average signal power
-            %
-            % Complex Noise Model:
-            %   n(t) = (σ/√2) × (n_I(t) + j×n_Q(t))
-            %   where n_I and n_Q are independent N(0,1) random variables
+        function output = stepImpl(obj, inputSignal)
+            % stepImpl - Add AWGN to input signal (supports struct or array input)
+
+            % Handle struct input (signal struct with .Signal field)
+            isStructInput = isstruct(inputSignal);
+            if isStructInput
+                signalData = inputSignal.Signal;
+            else
+                signalData = inputSignal;
+            end
 
             % Validate input signal
-            if isempty(inputSignal)
-                noisySignal = inputSignal;
+            if isempty(signalData)
+                output = inputSignal;
                 return;
             end
 
-            % Calculate average signal power (assuming complex baseband signal)
-            % For complex signals: P = E[|x|²] = E[x_real² + x_imag²]
-            signalPower = mean(abs(inputSignal(:)) .^ 2);
+            signalPower = mean(abs(signalData(:)) .^ 2);
 
-            % Handle zero-power signals (e.g., all-zero inputs)
             if signalPower == 0
-                % For zero-power signals, use unit noise variance
                 noiseVariance = 1;
-                warning('ChangShuoRadioData:AWGNChannel:ZeroSignalPower', ...
-                'Input signal has zero power. Using unit noise variance.');
             else
-                % Calculate noise variance from SNR specification
-                % SNR_linear = 10^(SNR_dB/10) = P_signal / P_noise
-                % Therefore: P_noise = P_signal / SNR_linear
                 snrLinear = 10 ^ (obj.SNRdB / 10);
                 noiseVariance = signalPower / snrLinear;
             end
 
-            % Generate complex white Gaussian noise
-            % For complex noise Z = X + jY where X,Y ~ N(0, σ²/2):
-            % - Var(X) = σ²/2, Var(Y) = σ²/2
-            % - Var(Z) = Var(X) + Var(Y) = σ²
-            % - X and Y are independent Gaussian random variables
             noiseStdDev = sqrt(noiseVariance / 2);
-
-            realNoise = noiseStdDev * randn(obj.pRandomStream, size(inputSignal));
-            imagNoise = noiseStdDev * randn(obj.pRandomStream, size(inputSignal));
+            realNoise = noiseStdDev * randn(obj.pRandomStream, size(signalData));
+            imagNoise = noiseStdDev * randn(obj.pRandomStream, size(signalData));
             complexNoise = complex(realNoise, imagNoise);
 
-            % Add noise to input signal
-            noisySignal = inputSignal + complexNoise;
+            noisySignal = signalData + complexNoise;
+
+            if isStructInput
+                output = inputSignal;
+                output.Signal = noisySignal;
+                output.AppliedSNRdB = obj.SNRdB;
+            else
+                output = struct();
+                output.Signal = noisySignal;
+                output.AppliedSNRdB = obj.SNRdB;
+            end
 
         end
 

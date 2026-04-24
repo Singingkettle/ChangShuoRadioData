@@ -6,58 +6,73 @@ function TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentT
     %
     % Inputs:
     %   FrameId - Global frame identifier
-    %   currentTxScenario - Current transmitter scenario configuration
+    %   currentTxScenario - Current transmitter scenario configuration (TxPlan format)
     %   currentTxId - Current transmitter ID
     %
     % Outputs:
     %   TxInfo - Configured transmitter information structure
 
-    % Get number of antennas
-    numAntennas = 2; % Default value
-
-    if isfield(currentTxScenario, 'Site') && isstruct(currentTxScenario.Site) && ...
-            isfield(currentTxScenario.Site, 'NumAntennas')
-        numAntennas = currentTxScenario.Site.NumAntennas;
-        obj.logger.debug("Frame %d, TxID %s: Using scenario NumAntennas: %d", ...
-            FrameId, string(currentTxId), numAntennas);
-    else
-        obj.logger.warning('Frame %d, TxID %s: Site configuration or NumAntennas missing. Using default value.', ...
-            FrameId, string(currentTxId));
-    end
-
-    % Create site configuration structure for backward compatibility
-    txSiteConfig = struct();
-    txSiteConfig.NumAntennas = numAntennas;
-    txSiteConfig.Name = sprintf('Tx_%d_%d', FrameId, currentTxId);
-    txSiteConfig.Position = [0, 0, 50]; % Default position
-    txSiteConfig.Antenna = struct('NumAntennas', numAntennas);
-
-    % Setup transmitter info structure
     TxInfo = struct();
     TxInfo.ID = currentTxId;
-    TxInfo.SiteConfig = txSiteConfig;
-    TxInfo.NumTransmitAntennas = numAntennas;
 
-    % Set impairment model type
-    if isfield(currentTxScenario, 'ImpairmentModelType')
-        TxInfo.ParentTransmitterType = currentTxScenario.ImpairmentModelType;
+    % Physical group
+    if isfield(currentTxScenario, 'Physical') && isfield(currentTxScenario.Physical, 'Position')
+        TxInfo.Position = currentTxScenario.Physical.Position;
     else
-        TxInfo.ParentTransmitterType = "Ideal";
-        obj.logger.debug("Frame %d, TxID %s: ImpairmentModelType not in scenario, defaulting to Ideal.", ...
-            FrameId, string(currentTxId));
+        TxInfo.Position = [0, 0, 50];
+    end
+    if isfield(currentTxScenario, 'Physical') && isfield(currentTxScenario.Physical, 'Velocity')
+        TxInfo.Velocity = currentTxScenario.Physical.Velocity;
+    else
+        TxInfo.Velocity = [0, 0, 0];
     end
 
-    % Add default frequency parameters if not set by ScenarioFactory
-    if ~isfield(TxInfo, 'CarrierFrequency')
-        TxInfo.CarrierFrequency = 100e6; % Default 100 MHz
+    % Hardware group
+    if isfield(currentTxScenario, 'Hardware')
+        hw = currentTxScenario.Hardware;
+        TxInfo.Type = getFieldOrDefault(hw, 'Type', 'Simulation');
+        TxInfo.Power = getFieldOrDefault(hw, 'Power', 20);
+        TxInfo.NumTransmitAntennas = getFieldOrDefault(hw, 'NumAntennas', 2);
+        TxInfo.AntennaGain = getFieldOrDefault(hw, 'AntennaGain', 3);
+    else
+        TxInfo.Type = 'Simulation';
+        TxInfo.Power = 20;
+        TxInfo.NumTransmitAntennas = 2;
+        TxInfo.AntennaGain = 3;
     end
 
-    if ~isfield(TxInfo, 'BandWidth')
-        TxInfo.BandWidth = 10e6; % Default 10 MHz
+    % Spectrum group
+    if isfield(currentTxScenario, 'Spectrum')
+        spec = currentTxScenario.Spectrum;
+        TxInfo.FrequencyOffset = getFieldOrDefault(spec, 'PlannedFreqOffset', 0);
+        TxInfo.Bandwidth = getFieldOrDefault(spec, 'PlannedBandwidth', 10e6);
+    else
+        TxInfo.FrequencyOffset = 0;
+        TxInfo.Bandwidth = 10e6;
     end
 
-    if ~isfield(TxInfo, 'SampleRate')
-        TxInfo.SampleRate = 25e6; % Default 25 MS/s
+    % Temporal group
+    if isfield(currentTxScenario, 'Temporal')
+        TxInfo.Temporal = currentTxScenario.Temporal;
     end
 
+    % Modulation and Message (pass through for downstream reference)
+    if isfield(currentTxScenario, 'Modulation')
+        TxInfo.Modulation = currentTxScenario.Modulation;
+    end
+    if isfield(currentTxScenario, 'Message')
+        TxInfo.Message = currentTxScenario.Message;
+    end
+
+    obj.logger.debug("Frame %d, TxID %s: TxInfo configured (Type: %s, Power: %.1f dBm)", ...
+        FrameId, string(currentTxId), TxInfo.Type, TxInfo.Power);
+
+end
+
+function val = getFieldOrDefault(s, fieldName, default)
+    if isfield(s, fieldName)
+        val = s.(fieldName);
+    else
+        val = default;
+    end
 end

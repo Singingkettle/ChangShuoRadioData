@@ -13,7 +13,11 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
     totalRequiredBW = 0;
 
     for i = 1:length(txConfigs)
-        totalRequiredBW = totalRequiredBW + txConfigs(i).RequiredBandwidth;
+        if iscell(txConfigs)
+            totalRequiredBW = totalRequiredBW + txConfigs{i}.Spectrum.PlannedBandwidth;
+        else
+            totalRequiredBW = totalRequiredBW + txConfigs(i).Spectrum.PlannedBandwidth;
+        end
     end
 
     % Calculate available bandwidth

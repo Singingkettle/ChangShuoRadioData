@@ -1,9 +1,8 @@
-function mobilityModel = assignMobilityModel(obj, entityType, entityID)
+function mobilityModel = assignMobilityModel(entityType)
     % assignMobilityModel - Assign appropriate mobility model to entity
     %
     % Input Arguments:
-    %   entityType - Type of entity
-    %   entityID - Unique identifier for the entity
+    %   entityType - Type of entity ('Transmitter' or 'Receiver')
     %
     % Output Arguments:
     %   mobilityModel - Assigned mobility model name

@@ -30,9 +30,6 @@ function [ScenarioData, ScenarioAnnotation] = stepImpl(obj, scenarioId)
 
     % Loop through frames in this scenario
     for frameInScenario = 1:framesPerScenario
-        % Calculate global frame ID
-        FrameId = (scenarioId - 1) * framesPerScenario + frameInScenario;
-
         obj.logger.debug("Scenario %d, Frame %d/%d: Processing frame.", ...
             scenarioId, frameInScenario, framesPerScenario);
 

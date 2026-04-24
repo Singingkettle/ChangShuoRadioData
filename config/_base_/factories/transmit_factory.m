@@ -1,92 +1,107 @@
 function config = transmit_factory()
     % transmit_factory - Transmitter factory configuration
     %
-    % Defines transmitter factory function and transmitter types with their configurations.
+    % Contains IMPLEMENTATION details for transmitter instantiation:
+    %   - Class handles for different transmitter types
+    %   - RF impairment model configurations (how to apply impairments)
+    %
+    % NOTE: Parameter RANGES (power, antennas, etc.) for scenario generation
+    %       are now defined in scenario_factory.m under CommunicationBehavior.
+    %
+    % Structure:
+    %   config.Factories.Transmit
+    %   ├── Types                        % Available transmitter types
+    %   ├── Simulation                   % Simulation-based transmitter
+    %   │   ├── handle                   % Class handle
+    %   │   ├── DCOffset                 % DC offset range
+    %   │   ├── IQImbalance              % IQ imbalance ranges
+    %   │   ├── PhaseNoise               % Phase noise ranges
+    %   │   └── Nonlinearity             % Nonlinearity model configurations
+    %   ├── Real                         % Real hardware (future placeholder)
+    %   ├── LogDetails
+    %   └── Description
 
-    % --- TRANSMITTER TYPES ---
+    %% ========== AVAILABLE TRANSMITTER TYPES ==========
+    config.Factories.Transmit.Types = {'Simulation'};
 
-    % Simulation-based Transmitter (comprehensive RF impairment modeling)
+    %% ========== SIMULATION TRANSMITTER ==========
     config.Factories.Transmit.Simulation.handle = 'csrd.blocks.physical.txRadioFront.TRFSimulator';
     config.Factories.Transmit.Simulation.Description = 'Simulation-based transmitter with configurable RF impairments';
 
-    % --- IMPAIRMENT MODEL CONFIGURATIONS FOR SIMULATION TRANSMITTER ---
-    % These are configuration parameters that will be used to configure the TRFSimulator instance
-    % Each model represents different RF impairment scenarios
+    % --- DCOffset: DC offset range ---
+    config.Factories.Transmit.Simulation.DCOffset = [-60, -40]; % dB
 
-    % Ideal Configuration (no impairments)
-    config.Factories.Transmit.Simulation.ImpairmentModels.Ideal.DCOffsetRange = [0, 0]; % No DC offset
-    config.Factories.Transmit.Simulation.ImpairmentModels.Ideal.IqImbalanceConfig.A = [0, 0]; % No amplitude imbalance
-    config.Factories.Transmit.Simulation.ImpairmentModels.Ideal.IqImbalanceConfig.P = [0, 0]; % No phase imbalance
-    config.Factories.Transmit.Simulation.ImpairmentModels.Ideal.PhaseNoiseConfig.Level = [-Inf, -Inf]; % No phase noise
-    config.Factories.Transmit.Simulation.ImpairmentModels.Ideal.PhaseNoiseConfig.FrequencyOffset = [10, 200]; % Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.Ideal.MemoryLessNonlinearityConfig.LinearGain = [0, 0]; % Unity gain
+    % --- IQImbalance: IQ imbalance ranges ---
+    config.Factories.Transmit.Simulation.IQImbalance.Amplitude = [0, 5]; % dB
+    config.Factories.Transmit.Simulation.IQImbalance.Phase = [0, 5];     % degrees
 
-    % Phase Noise Impairment Model
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.DCOffsetRange = [-60, -40]; % dB range
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.IqImbalanceConfig.A = [0, 1]; % dB
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.IqImbalanceConfig.P = [0, 1]; % degrees
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.PhaseNoiseConfig.Level = [-120, -100]; % dBc/Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.PhaseNoiseConfig.FrequencyOffset = [10, 200]; % Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.PhaseNoiseConfig.RandomStream = 'mt19937ar with seed';
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.PhaseNoiseConfig.Seed = 67;
-    config.Factories.Transmit.Simulation.ImpairmentModels.PhaseNoise.MemoryLessNonlinearityConfig.LinearGain = [0, 5];
+    % --- PhaseNoise: Phase noise configuration ---
+    % Multi-point specification at standard frequency offsets
+    % FrequencyOffset must be large enough relative to SampleRate to avoid
+    % enormous internal buffers in comm.PhaseNoise
+    config.Factories.Transmit.Simulation.PhaseNoise.Level = [-80, -130];              % dBc/Hz (range for randomization)
+    config.Factories.Transmit.Simulation.PhaseNoise.FrequencyOffsets = [1e3, 10e3, 100e3]; % Hz (fixed multi-point)
 
-    % Power Amplifier Impairment Model (comprehensive RF front-end simulation)
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.DCOffsetRange = [-60, -40]; % dB range
+    % --- Nonlinearity: Memory-less nonlinearity model configurations ---
+    config.Factories.Transmit.Simulation.Nonlinearity.Methods = { ...
+        'Cubic polynomial', 'Hyperbolic tangent', 'Saleh model', ...
+        'Ghorbani model', 'Modified Rapp model'};
 
-    % IQ Imbalance configuration
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.IqImbalanceConfig.A = [0, 5]; % dB
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.IqImbalanceConfig.P = [0, 5]; % degrees
+    % Cubic polynomial model
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.LinearGain = [0, 10];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.TOISpecification = { ...
+        'IIP3', 'OIP3', 'IP1dB', 'OP1dB', 'IPsat', 'OPsat'};
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.IIP3 = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.OIP3 = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.IP1dB = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.OP1dB = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.IPsat = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.OPsat = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.AMPMConversion = [10, 20];
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.PowerLowerLimit = 10;
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.PowerUpperLimit = Inf;
 
-    % Phase Noise configuration
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.PhaseNoiseConfig.Level = [-150, -100]; % dBc/Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.PhaseNoiseConfig.FrequencyOffset = [10, 200]; % Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.PhaseNoiseConfig.RandomStream = 'mt19937ar with seed';
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.PhaseNoiseConfig.Seed = 42;
+    % Hyperbolic tangent model
+    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.LinearGain = [0, 10];
+    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.IIP3 = [20, 40];
+    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.AMPMConversion = [10, 20];
+    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.PowerLowerLimit = 10;
+    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.PowerUpperLimit = Inf;
 
-    % Nonlinearity Models - Cubic Polynomial
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.Method = 'Cubic polynomial';
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.LinearGain = [0, 10];
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.TOISpecification = 'IIP3';
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.IIP3 = [20, 40];
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.AMPMConversion = [10, 20];
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.PowerLowerLimit = -Inf;
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.PowerUpperLimit = Inf;
-    config.Factories.Transmit.Simulation.ImpairmentModels.PowerAmplifier.MemoryLessNonlinearityConfig.ReferenceImpedance = 50;
+    % Saleh model
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.InputScaling = [-1, 1];
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMAMParametersLeft = [2.157, 2.159];
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMAMParametersRight = [1.151, 1.152];
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMPMParametersLeft = [4.003, 4.004];
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMPMParametersRight = [9.103, 9.105];
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.OutputScaling = [-1, 1];
 
-    % IQ Imbalance Only Model
-    config.Factories.Transmit.Simulation.ImpairmentModels.IQImbalance.DCOffsetRange = [-80, -60]; % dB range
-    config.Factories.Transmit.Simulation.ImpairmentModels.IQImbalance.IqImbalanceConfig.A = [2, 5]; % dB
-    config.Factories.Transmit.Simulation.ImpairmentModels.IQImbalance.IqImbalanceConfig.P = [3, 8]; % degrees
-    config.Factories.Transmit.Simulation.ImpairmentModels.IQImbalance.PhaseNoiseConfig.Level = [-Inf, -Inf]; % No phase noise
-    config.Factories.Transmit.Simulation.ImpairmentModels.IQImbalance.PhaseNoiseConfig.FrequencyOffset = [10, 200]; % Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.IQImbalance.MemoryLessNonlinearityConfig.LinearGain = [0, 2];
+    % Ghorbani model
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.InputScaling = [-1, 1];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersLeft1 = [8.1075, 8.1085];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersLeft2 = [1.541, 1.542];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersRight1 = [6.52, 6.521];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersRight2 = [-0.071, -0.072];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersLeft1 = [4.664, 4.665];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersLeft2 = [2.096, 2.097];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersRight1 = [10.8, 10.9];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersRight2 = [-0.002, -0.004];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.OutputScaling = [-1, 1];
 
-    % DC Offset Only Model
-    config.Factories.Transmit.Simulation.ImpairmentModels.DCOffset.DCOffsetRange = [-50, -30]; % dB range
-    config.Factories.Transmit.Simulation.ImpairmentModels.DCOffset.IqImbalanceConfig.A = [0, 0.5]; % dB
-    config.Factories.Transmit.Simulation.ImpairmentModels.DCOffset.IqImbalanceConfig.P = [0, 0.5]; % degrees
-    config.Factories.Transmit.Simulation.ImpairmentModels.DCOffset.PhaseNoiseConfig.Level = [-Inf, -Inf]; % No phase noise
-    config.Factories.Transmit.Simulation.ImpairmentModels.DCOffset.PhaseNoiseConfig.FrequencyOffset = [10, 200]; % Hz
-    config.Factories.Transmit.Simulation.ImpairmentModels.DCOffset.MemoryLessNonlinearityConfig.LinearGain = [0, 1];
+    % Modified Rapp model
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.LinearGain = [0, 10];
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.Smoothness = [0.4, 0.6];
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.PhaseGainRadian = [-0.45, 0];
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.PhaseSaturation = [0.8, 0.9];
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.PhaseSmoothness = [3.2, 3.6];
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.OutputSaturationLevel = [0.9, 1.1];
 
-    % --- PARAMETER RANGES FOR SCENARIO GENERATION ---
-    config.Factories.Transmit.Parameters.Antennas.Min = 1;
-    config.Factories.Transmit.Parameters.Antennas.Max = 4;
-    config.Factories.Transmit.Parameters.Power.Min = 10; % dBm
-    config.Factories.Transmit.Parameters.Power.Max = 30; % dBm
-    config.Factories.Transmit.Parameters.Height.Min = 10; % meters
-    config.Factories.Transmit.Parameters.Height.Max = 100; % meters
+    %% ========== REAL HARDWARE TRANSMITTER (FUTURE) ==========
+    config.Factories.Transmit.Real.SDR.handle = '';
+    config.Factories.Transmit.Real.SDR.Description = 'SDR-based transmitter (not implemented)';
+    config.Factories.Transmit.Real.SDR.Supported = false;
 
-    % Transmission behavior ranges
-    config.Factories.Transmit.Behavior.StartTime.Min = 0.0; % seconds
-    config.Factories.Transmit.Behavior.StartTime.Max = 0.1; % seconds
-    config.Factories.Transmit.Behavior.Duration.Min = 0.05; % seconds
-    config.Factories.Transmit.Behavior.Duration.Max = 0.2; % seconds
-    config.Factories.Transmit.Behavior.Bandwidth.Min = 100e3; % Hz
-    config.Factories.Transmit.Behavior.Bandwidth.Max = 1e6; % Hz
-
-    % Configuration metadata
+    %% ========== METADATA ==========
     config.Factories.Transmit.LogDetails = true;
-    config.Factories.Transmit.Description = 'Transmitter factory configuration with simulation-based RF modeling';
+    config.Factories.Transmit.Description = 'Transmitter factory configuration (RF impairment models)';
 end

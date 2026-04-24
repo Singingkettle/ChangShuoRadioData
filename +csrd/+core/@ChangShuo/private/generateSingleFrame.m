@@ -37,6 +37,17 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         % Step 2: Process scenario (using already instantiated ScenarioFactory)
         [instantiatedTxs, instantiatedRxs, globalLayout] = processScenarioInstantiation(obj, FrameId);
 
+        % Store scenario config for use by other processing methods
+        obj.ScenarioConfig = struct();
+        obj.ScenarioConfig.Transmitters = instantiatedTxs;
+        obj.ScenarioConfig.Receivers = instantiatedRxs;
+        obj.ScenarioConfig.Layout = globalLayout;
+        
+        % Store entities with Snapshots for downstream processing
+        if isfield(globalLayout, 'Entities')
+            obj.ScenarioConfig.Entities = globalLayout.Entities;
+        end
+
         numTxThisFrame = length(instantiatedTxs);
         numRxThisFrame = length(instantiatedRxs);
 
@@ -64,6 +75,11 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         obj.logger.debug("Scenario frame %d: Single frame generation completed successfully.", FrameId);
 
     catch ME
+        if contains(ME.identifier, 'SkipScenario') || ...
+                contains(ME.identifier, 'NoBuildingData') || ...
+                contains(ME.identifier, 'NoValidPaths')
+            rethrow(ME);
+        end
         obj.logger.error("Scenario frame %d: Error during frame generation: %s", FrameId, ME.message);
         obj.logger.error("Stack trace: %s", getReport(ME, 'extended', 'hyperlinks', 'off'));
         FrameData = {};

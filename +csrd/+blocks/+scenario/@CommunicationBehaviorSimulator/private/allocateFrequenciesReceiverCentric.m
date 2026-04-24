@@ -7,10 +7,15 @@ function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txC
 
     usedRanges = [];
     globalLayout.FrequencyAllocations = {};
+    isCellArray = iscell(txConfigs);
 
     for i = 1:length(txConfigs)
-        txConfig = txConfigs(i);
-        txBW = txConfig.RequiredBandwidth;
+        if isCellArray
+            txConfig = txConfigs{i};
+        else
+            txConfig = txConfigs(i);
+        end
+        txBW = txConfig.Spectrum.PlannedBandwidth;
 
         % Random placement within observable range
         minCenter = observableRange(1) + txBW / 2;
@@ -58,18 +63,20 @@ function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txC
         end
 
         % Apply frequency allocation to transmitter
-        txConfig.FrequencyAllocation = struct();
-        txConfig.FrequencyAllocation.CenterFrequency = centerFreq;
-        txConfig.FrequencyAllocation.Bandwidth = txBW;
-        txConfig.FrequencyAllocation.LowerBound = centerFreq - txBW / 2;
-        txConfig.FrequencyAllocation.UpperBound = centerFreq + txBW / 2;
+        txConfig.Spectrum.PlannedFreqOffset = centerFreq;
+        txConfig.Spectrum.LowerBound = centerFreq - txBW / 2;
+        txConfig.Spectrum.UpperBound = centerFreq + txBW / 2;
 
-        txConfigs(i) = txConfig;
+        if isCellArray
+            txConfigs{i} = txConfig;
+        else
+            txConfigs(i) = txConfig;
+        end
         globalLayout.FrequencyAllocations{i} = [centerFreq - txBW / 2, centerFreq + txBW / 2];
 
         obj.logger.debug('Allocated frequency [%.1f, %.1f] MHz to transmitter %s', ...
-            txConfig.FrequencyAllocation.LowerBound / 1e6, ...
-            txConfig.FrequencyAllocation.UpperBound / 1e6, txConfig.EntityID);
+            txConfig.Spectrum.LowerBound / 1e6, ...
+            txConfig.Spectrum.UpperBound / 1e6, txConfig.EntityID);
     end
 
 end

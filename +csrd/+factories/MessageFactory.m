@@ -362,6 +362,9 @@ classdef MessageFactory < matlab.System
 
     methods (Access = protected)
 
+        function validateInputsImpl(~, ~, ~, ~)
+        end
+
         function setupImpl(obj)
 
             if isempty(obj.Config) || ~isstruct(obj.Config) || ~isfield(obj.Config, 'MessageTypes')
@@ -393,7 +396,7 @@ classdef MessageFactory < matlab.System
         function messageData = stepImpl(obj, frameId, segmentInfo, messageTypeID)
             % segmentInfo is expected to contain per-segment details, like Message.Length
             % messageTypeID is the string key from Scenario.Transmitters.Segments.Message.TypeID,
-            % e.g., "RandomBits"
+            % e.g., "RandomBit"
 
             obj.logger.debug('Frame %d, SegID %s: MessageFactory step for TypeID: %s', ...
                 frameId, segmentInfo.SegmentID, messageTypeID);
@@ -488,31 +491,27 @@ classdef MessageFactory < matlab.System
 
             end
 
-            % Call the message block's step method.
-            % The signature of step() for message source blocks needs to be standardized.
-            % Common outputs: data, and potentially SampleRate if it's intrinsic (like an audio file).
-            % If the block just generates bits/symbols, it might only output data.
+            symbolRate = 100e3;
+            if isfield(segmentMessageParams, 'SymbolRate')
+                symbolRate = segmentMessageParams.SymbolRate;
+            end
+
+            if isfield(segmentMessageParams, 'Length') && segmentMessageParams.Length > 0
+                messageLength = segmentMessageParams.Length;
+            elseif isfield(segmentMessageParams, 'Duration') && isfield(segmentMessageParams, 'BitsPerSymbol')
+                messageLength = ceil(symbolRate * segmentMessageParams.BitsPerSymbol * segmentMessageParams.Duration * 1.1);
+                obj.logger.debug('Auto-calculated messageLength: %d from Duration=%.4f, BPS=%d, SymRate=%.0f', ...
+                    messageLength, segmentMessageParams.Duration, segmentMessageParams.BitsPerSymbol, symbolRate);
+            else
+                messageLength = 1024;
+                obj.logger.warning('No Length or Duration/BitsPerSymbol provided; using default messageLength=%d', messageLength);
+            end
+            
             try
-
-                if isa(currentMessageBlock, 'csrd.blocks.physical.message.RandomBit')
-                    % RandomBit.m step(obj) might use its MessageLength property internally
-                    messageData = step(currentMessageBlock);
-                elseif isa(currentMessageBlock, 'csrd.blocks.physical.message.Audio')
-                    % Audio.m step(obj) returns a struct {data, SampleRate, IsLastFrame}
-                    messageData = step(currentMessageBlock);
-                else
-                    % Generic call, assuming it needs a length parameter. This is a guess.
-                    % You MUST adapt this to your blocks' actual step signatures.
-                    if isfield(segmentMessageParams, 'Length')
-                        messageData = step(currentMessageBlock, segmentMessageParams.Length);
-                    else % Failsafe if Length is not provided, block might have internal default
-                        obj.logger.warning('Message length not specified in segmentInfo.Message for TypeID %s. Calling step without it.', messageTypeID);
-                        messageData = step(currentMessageBlock);
-                    end
-
-                end
-
-                obj.logger.debug('Message block %s for TypeID ''%s'' executed.', class(currentMessageBlock), messageTypeID);
+                % All message blocks use the same interface: step(messageLength, symbolRate)
+                messageData = step(currentMessageBlock, messageLength, symbolRate);
+                obj.logger.debug('Message block %s for TypeID ''%s'' executed (Length: %d, SymRate: %.2e).', ...
+                    class(currentMessageBlock), messageTypeID, messageLength, symbolRate);
             catch ME_step
                 obj.logger.error('Error during step method of message block %s for TypeID ''%s''. Error: %s', ...
                     class(currentMessageBlock), messageTypeID, ME_step.message);
@@ -528,7 +527,7 @@ classdef MessageFactory < matlab.System
             for i = 1:length(blockKeys)
                 block = obj.cachedMessageBlocks(blockKeys{i});
 
-                if isa(block, 'matlab.System') && islocked(block)
+                if isa(block, 'matlab.System') && isLocked(block)
                     release(block);
                 end
 

@@ -25,6 +25,9 @@ classdef ModulationFactory < matlab.System
 
     methods (Access = protected)
 
+        function validateInputsImpl(~, ~, ~, ~, ~, ~, ~)
+        end
+
         function setupImpl(obj)
 
             if isempty(obj.Config) || ~isstruct(obj.Config)
@@ -49,7 +52,12 @@ classdef ModulationFactory < matlab.System
             % segmentModulationConfig: struct from scenario, e.g., Scenario.Transmitters.Segments.Modulation
             % segmentPlacementConfig: struct from scenario, e.g., Scenario.Transmitters.Segments.Placement
 
-            modulatorTypeID = segmentModulationConfig.TypeID; % e.g.,"PSK", "QAM", "FM"
+            if ~isfield(segmentModulationConfig, 'TypeID') || isempty(segmentModulationConfig.TypeID)
+                error('ModulationFactory:MissingTypeID', ...
+                    'segmentModulationConfig.TypeID is missing or empty for Tx %s, Seg %d.', ...
+                    txIdStr, segmentId);
+            end
+            modulatorTypeID = segmentModulationConfig.TypeID;
             obj.logger.debug('Frame %d, Tx %s, Seg %d: ModulationFactory called for TypeID: %s.', ...
                 frameId, txIdStr, segmentId, modulatorTypeID);
 
@@ -164,8 +172,19 @@ classdef ModulationFactory < matlab.System
                         elseif isprop(currentModulator, 'ModulatorConfig') && isstruct(currentModulator.ModulatorConfig) && isfield(currentModulator.ModulatorConfig, propName)
                             currentModulator.ModulatorConfig.(propName) = modulatorDefaultBlockConfig.(propName);
                             obj.logger.debug('Set modulator ModulatorConfig sub-prop ''%s'' from factory default config', propName);
+                        elseif strcmp(propName, 'Config') && isprop(currentModulator, 'ModulatorConfig') && isstruct(modulatorDefaultBlockConfig.Config)
+                            currentModulator.ModulatorConfig = mergeStructs( ...
+                                currentModulator.ModulatorConfig, ...
+                                adaptModulatorConfig(modulatorDefaultBlockConfig.Config, modulatorTypeID));
+                            obj.logger.debug('Merged factory default Config into ModulatorConfig for %s.', class(currentModulator));
                         end
 
+                    end
+
+                    if isprop(currentModulator, 'ModulatorConfig')
+                        currentModulator.ModulatorConfig = mergeStructs( ...
+                            currentModulator.ModulatorConfig, ...
+                            adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID));
                     end
 
                     obj.logger.debug('Initial properties from factory config applied to %s.', class(currentModulator));
@@ -185,17 +204,67 @@ classdef ModulationFactory < matlab.System
             % --- Configure modulator properties based on segmentModulationConfig and segmentPlacementConfig ---
             obj.logger.debug('Configuring modulator block %s for segment...', class(currentModulator));
 
-            % Specific properties (prioritize scenario's segmentModulationConfig)
-            if isfield(segmentModulationConfig, 'SymbolRate') && isprop(currentModulator, 'SymbolRate')
-                currentModulator.SymbolRate = segmentModulationConfig.SymbolRate;
+            % Determine SymbolRate (used to compute SampleRate below)
+            symbolRate = [];
+            if isfield(segmentModulationConfig, 'SymbolRate')
+                symbolRate = segmentModulationConfig.SymbolRate;
+            elseif isfield(segmentPlacementConfig, 'TargetBandwidth')
+                rolloff = 0.35;
+                if isfield(segmentModulationConfig, 'RolloffFactor')
+                    rolloff = segmentModulationConfig.RolloffFactor;
+                end
+                symbolRate = segmentPlacementConfig.TargetBandwidth / (1 + rolloff);
+                obj.logger.debug('Auto-calculated SymbolRate from TargetBandwidth: %.2f Hz', symbolRate);
             end
 
-            if isfield(segmentModulationConfig, 'SamplePerSymbol') && isprop(currentModulator, 'SamplePerSymbol')
+            % Set SamplePerSymbol (scenario uses 'SamplesPerSymbol', modulator uses 'SamplePerSymbol')
+            if isfield(segmentModulationConfig, 'SamplesPerSymbol') && isprop(currentModulator, 'SamplePerSymbol')
+                currentModulator.SamplePerSymbol = segmentModulationConfig.SamplesPerSymbol;
+            elseif isfield(segmentModulationConfig, 'SamplePerSymbol') && isprop(currentModulator, 'SamplePerSymbol')
                 currentModulator.SamplePerSymbol = segmentModulationConfig.SamplePerSymbol;
             end
 
-            if isfield(segmentModulationConfig, 'Order') && isprop(currentModulator, 'ModulationOrder')
-                currentModulator.ModulationOrder = segmentModulationConfig.Order;
+            % Compute and set SampleRate = SymbolRate × SamplePerSymbol
+            if ~isempty(symbolRate) && isprop(currentModulator, 'SampleRate')
+                currentModulator.SampleRate = symbolRate * currentModulator.SamplePerSymbol;
+                obj.logger.debug('Set SampleRate = %.2f Hz (SymbolRate=%.2f × SPS=%d)', ...
+                    currentModulator.SampleRate, symbolRate, currentModulator.SamplePerSymbol);
+            end
+
+            % Set ModulationOrder with robust fallback
+            % Priority: 1) segmentModulationConfig.Order, 2) modulatorDefaultBlockConfig.Order
+            modulatorOrder = [];
+            if isfield(segmentModulationConfig, 'Order')
+                modulatorOrder = segmentModulationConfig.Order;
+                obj.logger.debug('ModulationOrder from segmentModulationConfig: %d', modulatorOrder);
+            elseif isfield(modulatorDefaultBlockConfig, 'Order')
+                modOrders = modulatorDefaultBlockConfig.Order;
+                if isscalar(modOrders)
+                    modulatorOrder = modOrders;
+                else
+                    modulatorOrder = modOrders(randi(length(modOrders)));
+                end
+                obj.logger.debug('ModulationOrder from factory config defaults: %d', modulatorOrder);
+            end
+            
+            % Ensure minimum order for digital modulations (PSK, QAM, FSK need >= 2)
+            digitalTypes = {'PSK', 'OQPSK', 'QAM', 'APSK', 'DVBSAPSK', 'ASK', 'FSK', 'CPFSK', 'GFSK', 'GMSK', 'MSK', 'OOK', 'Mill88QAM'};
+            if ismember(modulatorTypeID, digitalTypes) && (isempty(modulatorOrder) || modulatorOrder < 2)
+                modulatorOrder = 2;  % Default minimum for digital modulations
+                obj.logger.warning('ModulationOrder was < 2 for digital type %s, forcing to 2', modulatorTypeID);
+            end
+            
+            % Apply ModulatorOrder if we have a valid value
+            % Note: Property is 'ModulatorOrder' (not 'ModulationOrder') in BaseModulator
+            if ~isempty(modulatorOrder)
+                try
+                    currentModulator.ModulatorOrder = modulatorOrder;
+                    obj.logger.debug('Set ModulatorOrder to %d for %s', modulatorOrder, class(currentModulator));
+                catch ME_setOrder
+                    obj.logger.warning('Failed to set ModulatorOrder on %s: %s', class(currentModulator), ME_setOrder.message);
+                end
+            else
+                obj.logger.warning('No ModulatorOrder value available for %s', modulatorTypeID);
             end
 
             % NumTransmitAntennas might come from TxSite config, passed in segmentModulationConfig if needed by modulator
@@ -223,7 +292,7 @@ classdef ModulationFactory < matlab.System
             for i = 1:length(scenarioFields)
                 fName = scenarioFields{i};
                 % Avoid re-setting already handled specific props or the TypeID itself
-                if ~ismember(fName, {'TypeID', 'SymbolRate', 'SamplePerSymbol', 'Order', 'NumTransmitAntennas'})
+                if ~ismember(fName, {'TypeID', 'SymbolRate', 'SamplePerSymbol', 'SamplesPerSymbol', 'Order', 'NumTransmitAntennas', 'RolloffFactor', 'BitsPerSymbol', 'Type'})
 
                     if isprop(currentModulator, fName)
                         currentModulator.(fName) = segmentModulationConfig.(fName);
@@ -237,109 +306,179 @@ classdef ModulationFactory < matlab.System
 
             end
 
-            % --- Final setup and step ---
-            if isa(currentModulator, 'matlab.System') && ~isLocked(currentModulator) % Check if setup was already called
-
-                try
-                    setup(currentModulator, inputData); % Some modulators might need input spec for setup
-                    obj.logger.debug('Called setup() on modulator %s.', class(currentModulator));
-                catch ME_setup
-                    obj.logger.warning('Could not call setup(block, inputData) on modulator %s. Error: %s. Trying setup(block) if applicable.', class(currentModulator), ME_setup.message);
-
-                    try
-                        setup(currentModulator);
-                        obj.logger.debug('Called setup() on modulator %s (no args).', class(currentModulator));
-                    catch ME_setup_noargs
-                        obj.logger.warning('Could not call setup() on modulator %s (no args). Error: %s. Block may not require explicit setup or uses auto-setup.', class(currentModulator), ME_setup_noargs.message);
-                    end
-
-                end
-
-            end
+            % Setup is deferred to auto-setup when step() is called with struct input
+            % BaseModulator.validateInputsImpl requires struct, so manual setup
+            % with raw numeric data would fail validation
 
             try
-                % Prepare input for modulator block (assuming it expects a struct with a .data field)
                 inputToBlock.data = inputData;
-                % Pass other necessary info if the block expects it directly in the input struct
-                % e.g., inputToBlock.SampleRate = calculated_input_sample_rate_if_needed_by_block;
 
                 outputSignalStruct = step(currentModulator, inputToBlock);
                 obj.logger.debug('Frame %d, Tx %s, Seg %d: Modulation by %s successful.', ...
                     frameId, txIdStr, segmentId, class(currentModulator));
 
-                % --- Post-process and verify outputs (Bandwidth, SampleRate) ---
+                % --- Post-process: normalize Bandwidth to scalar Hz value ---
                 if ~isfield(outputSignalStruct, 'Bandwidth') || isempty(outputSignalStruct.Bandwidth)
                     obj.logger.warning('Modulator %s did not output Bandwidth. Attempting fallback.', class(currentModulator));
-
                     if isfield(segmentPlacementConfig, 'TargetBandwidth')
                         outputSignalStruct.Bandwidth = segmentPlacementConfig.TargetBandwidth;
-                    elseif isprop(currentModulator, 'SymbolRate'), outputSignalStruct.Bandwidth = currentModulator.SymbolRate;
-                    else , outputSignalStruct.Bandwidth = 0; end
-                    elseif isvector(outputSignalStruct.Bandwidth) && length(outputSignalStruct.Bandwidth) == 2 % [min_offset, max_offset]
-                        outputSignalStruct.Bandwidth = outputSignalStruct.Bandwidth(2) - outputSignalStruct.Bandwidth(1);
-                    elseif ~isscalar(outputSignalStruct.Bandwidth)
-                        obj.logger.warning('Modulator %s output Bandwidth in unexpected format. Using first element.', class(currentModulator));
-                        outputSignalStruct.Bandwidth = outputSignalStruct.Bandwidth(1);
+                    elseif isprop(currentModulator, 'SymbolRate')
+                        outputSignalStruct.Bandwidth = currentModulator.SymbolRate;
+                    else
+                        outputSignalStruct.Bandwidth = 0;
                     end
-
-                    if ~isfield(outputSignalStruct, 'SampleRate') || isempty(outputSignalStruct.SampleRate)
-                        obj.logger.warning('Modulator %s did not output SampleRate. Attempting fallback.', class(currentModulator));
-
-                        if isprop(currentModulator, 'SampleRate'), outputSignalStruct.SampleRate = currentModulator.SampleRate;
-                        elseif isprop(currentModulator, 'SymbolRate') && isprop(currentModulator, 'SamplePerSymbol')
-                            outputSignalStruct.SampleRate = currentModulator.SymbolRate * currentModulator.SamplePerSymbol;
-                        elseif outputSignalStruct.Bandwidth > 0, outputSignalStruct.SampleRate = 2 * outputSignalStruct.Bandwidth; % Nyquist guess
-                        else , outputSignalStruct.SampleRate = 0; end
-                        end
-
-                        outputSignalStruct.ModulationTypeID = modulatorTypeID; % Tag with TypeID for clarity downstream
-
-                        obj.logger.debug('Frame %d, Tx %s, Seg %d: ModFactory OUT - ActualBW: %g Hz, ActualFs: %g Hz for %s', ...
-                            frameId, txIdStr, segmentId, outputSignalStruct.Bandwidth, outputSignalStruct.SampleRate, class(currentModulator));
-
-                    catch ME_mod_step
-                        obj.logger.error('Frame %d, Tx %s, Seg %d: Error during step() of modulator %s. Error: %s', ...
-                            frameId, txIdStr, segmentId, class(currentModulator), ME_mod_step.message);
-                        obj.logger.error('Modulator State at Error: %s', jsonencode(currentModulator));
-                        obj.logger.error('Stack: %s', getReport(ME_mod_step, 'extended', 'hyperlinks', 'off'));
-                        outputSignalStruct = struct('Error', 'ModulatorBlockStepFailed', 'ModulatorClass', class(currentModulator), 'OriginalData', inputData);
-                    end
-
+                elseif isvector(outputSignalStruct.Bandwidth) && length(outputSignalStruct.Bandwidth) == 2
+                    outputSignalStruct.Bandwidth = outputSignalStruct.Bandwidth(2) - outputSignalStruct.Bandwidth(1);
+                elseif ~isscalar(outputSignalStruct.Bandwidth)
+                    obj.logger.warning('Modulator %s output Bandwidth in unexpected format. Using first element.', class(currentModulator));
+                    outputSignalStruct.Bandwidth = outputSignalStruct.Bandwidth(1);
                 end
 
-                function releaseImpl(obj)
-                    obj.logger.debug('ModulationFactory releaseImpl called.');
-                    blockKeys = keys(obj.modulatorCache);
-
-                    for i = 1:length(blockKeys)
-                        block = obj.modulatorCache(blockKeys{i});
-
-                        if isa(block, 'matlab.System') && islocked(block)
-                            release(block);
-                        end
-
+                % --- Post-process: ensure SampleRate is present ---
+                if ~isfield(outputSignalStruct, 'SampleRate') || isempty(outputSignalStruct.SampleRate)
+                    obj.logger.warning('Modulator %s did not output SampleRate. Attempting fallback.', class(currentModulator));
+                    if isprop(currentModulator, 'SampleRate')
+                        outputSignalStruct.SampleRate = currentModulator.SampleRate;
+                    elseif isprop(currentModulator, 'SymbolRate') && isprop(currentModulator, 'SamplePerSymbol')
+                        outputSignalStruct.SampleRate = currentModulator.SymbolRate * currentModulator.SamplePerSymbol;
+                    elseif outputSignalStruct.Bandwidth > 0
+                        outputSignalStruct.SampleRate = 2 * outputSignalStruct.Bandwidth;
+                    else
+                        outputSignalStruct.SampleRate = 0;
                     end
-
-                    remove(obj.modulatorCache, keys(obj.modulatorCache));
-                    obj.logger.debug('All cached modulator blocks released.');
                 end
 
-                function resetImpl(obj)
-                    obj.logger.debug('ModulationFactory resetImpl called.');
-                    blockKeys = keys(obj.modulatorCache);
+                outputSignalStruct.ModulationTypeID = modulatorTypeID;
 
-                    for i = 1:length(blockKeys)
-                        block = obj.modulatorCache(blockKeys{i});
+                obj.logger.debug('Frame %d, Tx %s, Seg %d: ModFactory OUT - ActualBW: %g Hz, ActualFs: %g Hz for %s', ...
+                    frameId, txIdStr, segmentId, outputSignalStruct.Bandwidth, outputSignalStruct.SampleRate, class(currentModulator));
 
-                        if isa(block, 'matlab.System')
-                            reset(block);
-                        end
+            catch ME_mod_step
+                obj.logger.error('Frame %d, Tx %s, Seg %d: Error during step() of modulator %s. Error: %s', ...
+                    frameId, txIdStr, segmentId, class(currentModulator), ME_mod_step.message);
+                obj.logger.error('Modulator State at Error: %s', jsonencode(currentModulator));
+                obj.logger.error('Stack: %s', getReport(ME_mod_step, 'extended', 'hyperlinks', 'off'));
+                outputSignalStruct = struct('Error', 'ModulatorBlockStepFailed', 'ModulatorClass', class(currentModulator), 'OriginalData', inputData);
+            end
 
-                    end
+        end
 
-                    obj.logger.debug('All cached modulator blocks reset.');
+        function releaseImpl(obj)
+            obj.logger.debug('ModulationFactory releaseImpl called.');
+            blockKeys = keys(obj.modulatorCache);
+
+            for i = 1:length(blockKeys)
+                block = obj.modulatorCache(blockKeys{i});
+
+                if isa(block, 'matlab.System') && isLocked(block)
+                    release(block);
                 end
 
             end
 
+            remove(obj.modulatorCache, keys(obj.modulatorCache));
+            obj.logger.debug('All cached modulator blocks released.');
         end
+
+        function resetImpl(obj)
+            obj.logger.debug('ModulationFactory resetImpl called.');
+            blockKeys = keys(obj.modulatorCache);
+
+            for i = 1:length(blockKeys)
+                block = obj.modulatorCache(blockKeys{i});
+
+                if isa(block, 'matlab.System')
+                    reset(block);
+                end
+
+            end
+
+            obj.logger.debug('All cached modulator blocks reset.');
+        end
+
+    end
+
+end
+
+function adaptedConfig = adaptModulatorConfig(rawConfig, modulatorTypeID)
+    adaptedConfig = struct();
+    if ~isstruct(rawConfig)
+        return;
+    end
+
+    adaptedConfig = rawConfig;
+
+    if isfield(rawConfig, 'RolloffFactor') && ~isfield(adaptedConfig, 'beta')
+        adaptedConfig.beta = rawConfig.RolloffFactor;
+    end
+
+    if isfield(rawConfig, 'FilterSpanInSymbols') && ~isfield(adaptedConfig, 'span')
+        adaptedConfig.span = rawConfig.FilterSpanInSymbols;
+    end
+
+    adaptedConfig = ensurePulseShapeDefaults(adaptedConfig, modulatorTypeID);
+end
+
+function adaptedConfig = adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID)
+    adaptedConfig = struct();
+    if ~isstruct(segmentModulationConfig)
+        return;
+    end
+
+    if isfield(segmentModulationConfig, 'RolloffFactor')
+        adaptedConfig.beta = segmentModulationConfig.RolloffFactor;
+    end
+
+    if isfield(segmentModulationConfig, 'FilterSpanInSymbols')
+        adaptedConfig.span = segmentModulationConfig.FilterSpanInSymbols;
+    end
+
+    adaptedConfig = ensurePulseShapeDefaults(adaptedConfig, modulatorTypeID);
+end
+
+function cfg = ensurePulseShapeDefaults(cfg, modulatorTypeID)
+    pulseShapedTypes = {'PSK', 'QAM', 'Mill88QAM', 'ASK', 'OOK', 'PAM'};
+    if ~ismember(char(string(modulatorTypeID)), pulseShapedTypes)
+        return;
+    end
+
+    if ~isfield(cfg, 'span') || isempty(cfg.span)
+        cfg.span = 10;
+    end
+
+    if any(strcmp(char(string(modulatorTypeID)), {'PSK', 'QAM', 'Mill88QAM'})) && ...
+            (~isfield(cfg, 'SymbolOrder') || isempty(cfg.SymbolOrder))
+        cfg.SymbolOrder = "gray";
+    end
+
+    if strcmp(char(string(modulatorTypeID)), 'PSK')
+        if ~isfield(cfg, 'Differential') || isempty(cfg.Differential)
+            cfg.Differential = false;
+        end
+        if ~isfield(cfg, 'PhaseOffset') || isempty(cfg.PhaseOffset)
+            cfg.PhaseOffset = 0;
+        end
+    end
+end
+
+function merged = mergeStructs(baseStruct, overrideStruct)
+    if ~isstruct(baseStruct) || isempty(fieldnames(baseStruct))
+        if isstruct(overrideStruct)
+            merged = overrideStruct;
+        else
+            merged = struct();
+        end
+        return;
+    end
+
+    merged = baseStruct;
+    if ~isstruct(overrideStruct)
+        return;
+    end
+
+    overrideFields = fieldnames(overrideStruct);
+    for idx = 1:numel(overrideFields)
+        fieldName = overrideFields{idx};
+        merged.(fieldName) = overrideStruct.(fieldName);
+    end
+end

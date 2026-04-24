@@ -13,11 +13,11 @@ classdef ScenarioFactory < matlab.System
     %
     % Methods:
     %   ScenarioFactory(varargin): Constructor
-    %   stepImpl(obj, frameId, scenarioConfig, factoryConfigs): Main scenario instantiation
+    %   stepImpl(obj, frameId): Main scenario instantiation
     %
     % Example:
-    %   factory = csrd.factories.ScenarioFactory('Config', scenarioConfig);
-    %   [txInstances, rxInstances, layout] = factory(frameId, scenarioParams, factories);
+    %   factory = csrd.factories.ScenarioFactory('Config', factoryConfigs);
+    %   [txInstances, rxInstances, layout] = factory(frameId);
 
     properties
         % Config: Struct containing scenario factory configuration
@@ -28,23 +28,19 @@ classdef ScenarioFactory < matlab.System
 
     properties (Access = private)
         logger
-        factoryConfig % Stores obj.Config.Factories.Scenario directly
-        cachedScenarioBlocks % Cache for instantiated scenario planning blocks
+        factoryConfig       % Scenario-specific configuration (ONLY this factory's config)
+        cachedScenarioBlocks
+        currentScenarioConfig  % Current frame's scenario configuration
 
-        % Simulator instances (initialized once per scenario)
+        % Simulator instances
         physicalEnvironmentSimulator
         communicationBehaviorSimulator
 
-        % Map type selection (determined at setup time)
+        % Map selection state
         selectedMapType char = ''
-
-        % OSM file selection (determined when OSM mode is selected)
         selectedOSMFile char = ''
 
-        % Scenario configuration for map type selection
-        currentScenarioConfig struct = struct()
-
-        % Initialization flags
+        % Initialization flag
         isSimulatorsInitialized logical = false
     end
 
@@ -69,118 +65,86 @@ classdef ScenarioFactory < matlab.System
 
     methods (Access = protected)
 
+        function validateInputsImpl(~, ~)
+        end
+
         function setupImpl(obj)
             % setupImpl - Initialize scenario factory components
             %
-            % This method validates configuration and initializes logging
+            % DESIGN PRINCIPLE:
+            %   ScenarioFactory receives ONLY its own config (scenario blueprint).
+            %   It does NOT need access to other factory configs.
+            %   All type lists and parameter ranges for scenario planning are
+            %   defined in scenario_factory.m.
 
             if isempty(obj.Config) || ~isstruct(obj.Config)
-                error('ScenarioFactory:ConfigError', ...
-                'Config property must be a valid struct.');
+                error('ScenarioFactory:ConfigError', 'Config must be a valid struct.');
             end
 
-            % Extract scenario factory configuration
-            if isfield(obj.Config, 'Factories') && isfield(obj.Config.Factories, 'Scenario')
-                obj.factoryConfig = obj.Config.Factories.Scenario;
-            else
-                obj.factoryConfig = obj.Config;
-            end
+            % Config should be scenario config directly (no nested 'Scenario' field)
+            obj.factoryConfig = obj.Config;
 
-            % Validate required dual-component configuration
+            % Validate dual-component configuration
             if ~isfield(obj.factoryConfig, 'PhysicalEnvironment')
-                error('ScenarioFactory:ConfigError', ...
-                'Config must contain PhysicalEnvironment configuration.');
+                error('ScenarioFactory:ConfigError', 'PhysicalEnvironment configuration required.');
             end
-
             if ~isfield(obj.factoryConfig, 'CommunicationBehavior')
-                error('ScenarioFactory:ConfigError', ...
-                'Config must contain CommunicationBehavior configuration.');
+                error('ScenarioFactory:ConfigError', 'CommunicationBehavior configuration required.');
             end
 
             obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
-
-            obj.logger.debug('ScenarioFactory setupImpl initializing with dual-component architecture.');
-            obj.logger.debug('Architecture: %s, Version: %s', ...
+            obj.validateMapConfiguration();
+            obj.logger.debug('ScenarioFactory initialized: %s v%s', ...
                 obj.factoryConfig.Architecture, obj.factoryConfig.Version);
-
-            % Validate PhysicalEnvironment configuration
-            if ~isfield(obj.factoryConfig.PhysicalEnvironment, 'Entities')
-                obj.logger.warning('PhysicalEnvironment.Entities not configured, using defaults');
-            end
-
-            % Validate CommunicationBehavior configuration
-            if ~isfield(obj.factoryConfig.CommunicationBehavior, 'FrequencyAllocation')
-                obj.logger.warning('CommunicationBehavior.FrequencyAllocation not configured, using defaults');
-            end
-
-            obj.logger.debug('ScenarioFactory setupImpl complete for dual-component scenario generation.');
         end
 
-        function [instantiatedTxs, instantiatedRxs, globalLayout] = stepImpl(obj, frameId, scenarioConfig, factoryConfigs)
-            % stepImpl - Instantiate a complete scenario using dual-component architecture
+        function [instantiatedTxs, instantiatedRxs, globalLayout] = stepImpl(obj, frameId)
+            % stepImpl - Generate scenario for a frame
             %
-            % This method implements the new dual-component scenario generation approach:
-            % 1. PhysicalEnvironmentSimulator - Models physical world, entity positions, mobility
-            % 2. CommunicationBehaviorSimulator - Models communication behaviors, frequencies, modulation
-            %
-            % Syntax:
-            %   [txs, rxs, layout] = stepImpl(obj, frameId, scenarioConfig, factoryConfigs)
-            %
-            % Inputs:
-            %   frameId - Current frame identifier
-            %   scenarioConfig - Scenario definition with parameter ranges
-            %   factoryConfigs - Factory configurations for components
-            %
-            % Outputs:
-            %   instantiatedTxs - Cell array of instantiated transmitter configurations
-            %   instantiatedRxs - Cell array of instantiated receiver configurations
-            %   globalLayout - Global scenario layout information
-
-            obj.logger.debug('Frame %d: ScenarioFactory stepImpl started for dual-component scenario generation.', frameId);
+            % Uses dual-component architecture:
+            % 1. PhysicalEnvironmentSimulator - Entity positions and mobility
+            % 2. CommunicationBehaviorSimulator - Frequencies, modulation, behaviors
 
             try
-                % Step 1: Generate frame Id
-                obj.logger.debug('Frame %d: Starting dual-component scenario generation', frameId);
-
-                % Step 2: Initialize dual-component simulators if not done
+                % Initialize simulators on first call
                 if ~obj.isSimulatorsInitialized
-                    obj.initializeSimulators(scenarioConfig, factoryConfigs);
+                    obj.initializeSimulators();
                     obj.isSimulatorsInitialized = true;
                 end
 
-                % Step 3: Update physical environment state
+                % Update physical environment
                 [entities, environment] = step(obj.physicalEnvironmentSimulator, frameId);
-                obj.logger.debug('Frame %d: Physical environment updated with %d entities', frameId, length(entities));
 
-                % Step 4: Update communication behavior
-                [txConfigs, rxConfigs, communicationLayout] = step(obj.communicationBehaviorSimulator, frameId, entities, factoryConfigs);
-                obj.logger.debug('Frame %d: Communication configurations generated - %d transmitters, %d receivers', ...
-                    frameId, length(txConfigs), length(rxConfigs));
+                % Generate communication configurations (no config parameter needed)
+                % The CommunicationBehaviorSimulator uses its obj.Config set during construction
+                [txConfigs, rxConfigs, communicationLayout] = ...
+                    step(obj.communicationBehaviorSimulator, frameId, entities);
 
-                % Step 5: Create output structures directly
+                % Build output
                 instantiatedTxs = txConfigs;
                 instantiatedRxs = rxConfigs;
                 globalLayout = communicationLayout;
                 globalLayout.FrameId = frameId;
                 globalLayout.Environment = environment;
+                if isfield(communicationLayout, 'Entities') && ~isempty(communicationLayout.Entities)
+                    globalLayout.Entities = communicationLayout.Entities;
+                else
+                    globalLayout.Entities = entities;  % Include entities with Snapshots
+                end
 
-                % Step 6: Store current state for next frame
                 obj.storeFrameState(frameId, entities, environment, txConfigs, rxConfigs);
-
-                obj.logger.debug('Frame %d: Scenario generation completed successfully', frameId);
+                obj.logger.debug('Frame %d: Generated %d Tx, %d Rx', frameId, length(txConfigs), length(rxConfigs));
 
             catch ME
-                obj.logger.error('Frame %d: Error during scenario generation. Error: %s', ...
-                    frameId, ME.message);
-                obj.logger.error('Stack trace: %s', getReport(ME, 'extended', 'hyperlinks', 'off'));
-
-                % Return empty results on error
+                if contains(ME.identifier, 'SkipScenario') || ...
+                        contains(ME.identifier, 'NoBuildingData')
+                    rethrow(ME);
+                end
+                obj.logger.error('Frame %d: Scenario generation failed: %s', frameId, ME.message);
                 instantiatedTxs = {};
                 instantiatedRxs = {};
-                globalLayout = struct('Error', ME.message, 'FrequencyRange', [0, 0], 'TimeRange', [0, 0]);
+                globalLayout = struct('Error', ME.message);
             end
-
-            obj.logger.debug('Frame %d: ScenarioFactory stepImpl finished.', frameId);
         end
 
         function releaseImpl(obj)
@@ -189,12 +153,12 @@ classdef ScenarioFactory < matlab.System
             obj.logger.debug('ScenarioFactory releaseImpl called.');
 
             % Release simulator instances
-            if ~isempty(obj.physicalEnvironmentSimulator) && islocked(obj.physicalEnvironmentSimulator)
+            if ~isempty(obj.physicalEnvironmentSimulator) && isLocked(obj.physicalEnvironmentSimulator)
                 release(obj.physicalEnvironmentSimulator);
                 obj.physicalEnvironmentSimulator = [];
             end
 
-            if ~isempty(obj.communicationBehaviorSimulator) && islocked(obj.communicationBehaviorSimulator)
+            if ~isempty(obj.communicationBehaviorSimulator) && isLocked(obj.communicationBehaviorSimulator)
                 release(obj.communicationBehaviorSimulator);
                 obj.communicationBehaviorSimulator = [];
             end
@@ -211,7 +175,7 @@ classdef ScenarioFactory < matlab.System
             for i = 1:length(blockKeys)
                 block = obj.cachedScenarioBlocks(blockKeys{i});
 
-                if isa(block, 'matlab.System') && islocked(block)
+                if isa(block, 'matlab.System') && isLocked(block)
                     release(block);
                 end
 
@@ -244,268 +208,161 @@ classdef ScenarioFactory < matlab.System
             obj.currentScenarioConfig = struct();
         end
 
-        % Simulator initialization methods
-        function initializeSimulators(obj, scenarioConfig, factoryConfigs)
+        function initializeSimulators(obj)
             % initializeSimulators - Initialize simulators once per scenario
-            %
-            % This method creates and sets up the physical environment and
-            % communication behavior simulators based on the scenario configuration.
-            % Simulators are initialized only once per scenario for efficiency.
 
-            obj.logger.debug('Initializing simulators for scenario...');
+            obj.logger.debug('Initializing scenario simulators...');
+
+            % Select map type and OSM file (if applicable)
+            obj.selectedMapType = obj.selectMapTypeByRatio();
+            if strcmp(obj.selectedMapType, 'OSM')
+                obj.selectedOSMFile = obj.selectRandomOSMFile();
+                if isempty(obj.selectedOSMFile)
+                    obj.logger.warning('No OSM files available for OSM scenario selection. Falling back to Statistical mode.');
+                    obj.selectedMapType = 'Statistical';
+                end
+            end
 
             % Initialize physical environment simulator
-            physicalEnvConfig = obj.getPhysicalEnvironmentConfig(scenarioConfig);
+            physicalEnvConfig = obj.getPhysicalEnvironmentConfig();
             obj.physicalEnvironmentSimulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physicalEnvConfig);
-            setup(obj.physicalEnvironmentSimulator);
 
-            % Map initialization is handled internally by PhysicalEnvironmentSimulator
+            try
+                setup(obj.physicalEnvironmentSimulator);
+            catch ME_phys
+                if contains(ME_phys.identifier, 'NoBuildingData')
+                    error('ScenarioFactory:SkipScenario', ...
+                        'OSM map has no building data, cannot run RayTracing. Skipping scenario. (%s)', ME_phys.message);
+                else
+                    rethrow(ME_phys);
+                end
+            end
 
             % Initialize communication behavior simulator
-            commBehaviorConfig = obj.getCommunicationBehaviorConfig(scenarioConfig);
+            commBehaviorConfig = obj.getCommunicationBehaviorConfig();
             obj.communicationBehaviorSimulator = csrd.blocks.scenario.CommunicationBehaviorSimulator('Config', commBehaviorConfig);
             setup(obj.communicationBehaviorSimulator);
 
-            obj.logger.debug('Simulators initialization completed');
+            obj.logger.debug('Simulators initialized');
         end
 
-        function mapType = selectMapTypeByRatio(obj, scenarioConfig)
-            % selectMapTypeByRatio - Select map type based on configured ratios
+        function mapType = selectMapTypeByRatio(obj)
+            % selectMapTypeByRatio - Select map/channel modeling type based on configured ratios
             %
-            % This method performs a "dice roll" to randomly select between
-            % Statistical and OSM map types based on the configured ratios.
-            %
-            % Input Arguments:
-            %   scenarioConfig - Scenario configuration containing map type ratios
-            %
-            % Output Arguments:
-            %   mapType - Selected map type ('Statistical' or 'OSM')
+            % Two approaches:
+            %   Statistical: Virtual scene + statistical channel models
+            %   OSM: Real OpenStreetMap + ray tracing channel models
 
-            % Default ratios if not configured
-            statisticalRatio = 1.0; % Default to 100 % Statistical
-            osmRatio = 0.0;
+            % Default: Statistical only
+            types = {'Statistical'};
+            ratios = [1.0];
 
-            % First priority: Factory configuration ratios
+            % Get types and ratios from Map config
             if isfield(obj.factoryConfig, 'PhysicalEnvironment') && ...
-                    isfield(obj.factoryConfig.PhysicalEnvironment, 'MapTypeRatio')
-
-                ratioConfig = obj.factoryConfig.PhysicalEnvironment.MapTypeRatio;
-                obj.logger.debug('Using map type ratios from factory PhysicalEnvironment configuration');
-
-                if isfield(ratioConfig, 'StatisticalRatio')
-                    statisticalRatio = ratioConfig.StatisticalRatio;
+                    isfield(obj.factoryConfig.PhysicalEnvironment, 'Map')
+                mapConfig = obj.factoryConfig.PhysicalEnvironment.Map;
+                
+                if isfield(mapConfig, 'Types') && ~isempty(mapConfig.Types)
+                    types = mapConfig.Types;
                 end
-
-                if isfield(ratioConfig, 'OSMRatio')
-                    osmRatio = ratioConfig.OSMRatio;
+                if isfield(mapConfig, 'Ratio') && ~isempty(mapConfig.Ratio)
+                    ratios = mapConfig.Ratio;
                 end
-
-                % Second priority: Scenario config PhysicalEnvironment structure
-            elseif isfield(scenarioConfig, 'PhysicalEnvironment') && ...
-                    isfield(scenarioConfig.PhysicalEnvironment, 'MapTypeRatio')
-
-                ratioConfig = scenarioConfig.PhysicalEnvironment.MapTypeRatio;
-                obj.logger.debug('Using map type ratios from scenario PhysicalEnvironment configuration');
-
-                if isfield(ratioConfig, 'StatisticalRatio')
-                    statisticalRatio = ratioConfig.StatisticalRatio;
-                end
-
-                if isfield(ratioConfig, 'OSMRatio')
-                    osmRatio = ratioConfig.OSMRatio;
-                end
-
-                % Third priority: Legacy Environment configuration
-            elseif isfield(scenarioConfig, 'Environment') && ...
-                    isfield(scenarioConfig.Environment, 'MapTypeRatio')
-
-                ratioConfig = scenarioConfig.Environment.MapTypeRatio;
-                obj.logger.debug('Using map type ratios from legacy Environment configuration');
-
-                if isfield(ratioConfig, 'StatisticalRatio')
-                    statisticalRatio = ratioConfig.StatisticalRatio;
-                end
-
-                if isfield(ratioConfig, 'OSMRatio')
-                    osmRatio = ratioConfig.OSMRatio;
-                end
-
             end
 
-            % Validate ratios
-            totalRatio = statisticalRatio + osmRatio;
+            % Normalize ratios
+            ratios = ratios / sum(ratios);
 
-            if abs(totalRatio - 1.0) > 0.01 % Allow small floating point errors
-                obj.logger.warning('Map type ratios do not sum to 1.0 (Total: %.3f). Normalizing...', totalRatio);
-
-                if totalRatio > 0
-                    statisticalRatio = statisticalRatio / totalRatio;
-                    osmRatio = osmRatio / totalRatio;
-                else
-                    % Fallback to 100% Statistical
-                    statisticalRatio = 1.0;
-                    osmRatio = 0.0;
-                end
-
+            % Random selection based on cumulative distribution
+            r = rand();
+            cumRatios = cumsum(ratios);
+            idx = find(r <= cumRatios, 1, 'first');
+            if isempty(idx)
+                idx = 1;
             end
-
-            % Perform random selection ("dice roll")
-            randomValue = rand(); % Generate random number between 0 and 1
-
-            if randomValue <= statisticalRatio
-                mapType = 'Statistical';
-                obj.logger.debug('Dice roll: %.3f <= %.3f -> Selected Statistical mode', randomValue, statisticalRatio);
-            else
-                mapType = 'OSM';
-                obj.logger.debug('Dice roll: %.3f > %.3f -> Selected OSM mode', randomValue, statisticalRatio);
-            end
-
-            obj.logger.debug('Map type selection: Statistical=%.1f%%, OSM=%.1f%%, Selected=%s', ...
-                statisticalRatio * 100, osmRatio * 100, mapType);
+            
+            mapType = types{idx};
         end
 
-        function osmFile = selectRandomOSMFile(obj, scenarioConfig)
-            % selectRandomOSMFile - Randomly select an OSM file from downloaded data
-            %
-            % This method scans the OSM data directory and randomly selects
-            % one OSM file to ensure scenario diversity.
-            %
-            % Input Arguments:
-            %   scenarioConfig - Scenario configuration containing OSM directory settings
-            %
-            % Output Arguments:
-            %   osmFile - Path to selected OSM file (empty if none found)
-
-            osmFile = '';
-
-            % Check if specific OSM file is configured (override)
-            % First priority: Factory configuration
-            if isfield(obj.factoryConfig, 'PhysicalEnvironment') && ...
-                    isfield(obj.factoryConfig.PhysicalEnvironment, 'OSMMapFile') && ...
-                    ~isempty(obj.factoryConfig.PhysicalEnvironment.OSMMapFile)
-
-                osmFile = obj.factoryConfig.PhysicalEnvironment.OSMMapFile;
-                obj.logger.debug('Using OSM file from factory PhysicalEnvironment configuration');
-
-                if isfile(osmFile)
-                    obj.logger.debug('Using specified OSM file: %s', osmFile);
-                    return;
-                else
-                    obj.logger.warning('Specified OSM file not found: %s. Using random selection.', osmFile);
-                end
-
-                % Second priority: Scenario PhysicalEnvironment configuration
-            elseif isfield(scenarioConfig, 'PhysicalEnvironment') && ...
-                    isfield(scenarioConfig.PhysicalEnvironment, 'OSMMapFile') && ...
-                    ~isempty(scenarioConfig.PhysicalEnvironment.OSMMapFile)
-
-                osmFile = scenarioConfig.PhysicalEnvironment.OSMMapFile;
-                obj.logger.debug('Using OSM file from scenario PhysicalEnvironment configuration');
-
-                if isfile(osmFile)
-                    obj.logger.debug('Using specified OSM file: %s', osmFile);
-                    return;
-                else
-                    obj.logger.warning('Specified OSM file not found: %s. Using random selection.', osmFile);
-                end
-
-                % Third priority: Legacy Environment configuration
-            elseif isfield(scenarioConfig, 'Environment') && ...
-                    isfield(scenarioConfig.Environment, 'OSMMapFile') && ...
-                    ~isempty(scenarioConfig.Environment.OSMMapFile)
-
-                osmFile = scenarioConfig.Environment.OSMMapFile;
-                obj.logger.debug('Using OSM file from legacy Environment configuration');
-
-                if isfile(osmFile)
-                    obj.logger.debug('Using specified OSM file: %s', osmFile);
-                    return;
-                else
-                    obj.logger.warning('Specified OSM file not found: %s. Using random selection.', osmFile);
-                end
-
-            end
-
-            % Get OSM data directory
-            % Get project root directory based on current file location
-            currentFilePath = fileparts(mfilename('fullpath'));
-            projectRoot = fileparts(fileparts(currentFilePath)); % Go up two levels from +csrd/+factories
-            osmDataDir = fullfile(projectRoot, 'data', 'map', 'osm'); % Default
-
-            % Check for OSM data directory configuration
-            % First priority: Factory configuration
-            if isfield(obj.factoryConfig, 'PhysicalEnvironment') && ...
-                    isfield(obj.factoryConfig.PhysicalEnvironment, 'OSMDataDirectory')
-                configuredDir = obj.factoryConfig.PhysicalEnvironment.OSMDataDirectory;
-                obj.logger.debug('Using OSM data directory from factory PhysicalEnvironment configuration');
-                % If configured directory is relative, make it relative to project root
-                if ~obj.isAbsolutePath(configuredDir)
-                    osmDataDir = fullfile(projectRoot, configuredDir);
-                else
-                    osmDataDir = configuredDir;
-                end
-
-                % Second priority: Scenario PhysicalEnvironment configuration
-            elseif isfield(scenarioConfig, 'PhysicalEnvironment') && ...
-                    isfield(scenarioConfig.PhysicalEnvironment, 'OSMDataDirectory')
-                configuredDir = scenarioConfig.PhysicalEnvironment.OSMDataDirectory;
-                obj.logger.debug('Using OSM data directory from scenario PhysicalEnvironment configuration');
-                % If configured directory is relative, make it relative to project root
-                if ~obj.isAbsolutePath(configuredDir)
-                    osmDataDir = fullfile(projectRoot, configuredDir);
-                else
-                    osmDataDir = configuredDir;
-                end
-
-                % Third priority: Legacy Environment configuration
-            elseif isfield(scenarioConfig, 'Environment') && ...
-                    isfield(scenarioConfig.Environment, 'OSMDataDirectory')
-                configuredDir = scenarioConfig.Environment.OSMDataDirectory;
-                obj.logger.debug('Using OSM data directory from legacy Environment configuration');
-                % If configured directory is relative, make it relative to project root
-                if ~obj.isAbsolutePath(configuredDir)
-                    osmDataDir = fullfile(projectRoot, configuredDir);
-                else
-                    osmDataDir = configuredDir;
-                end
-
-            end
-
-            % Get file pattern
-            filePattern = '*.osm'; % Default
-
-            % First priority: Factory configuration
-            if isfield(obj.factoryConfig, 'PhysicalEnvironment') && ...
-                    isfield(obj.factoryConfig.PhysicalEnvironment, 'OSMFilePattern')
-                filePattern = obj.factoryConfig.PhysicalEnvironment.OSMFilePattern;
-                obj.logger.debug('Using OSM file pattern from factory PhysicalEnvironment configuration: %s', filePattern);
-                % Second priority: Scenario PhysicalEnvironment configuration
-            elseif isfield(scenarioConfig, 'PhysicalEnvironment') && ...
-                    isfield(scenarioConfig.PhysicalEnvironment, 'OSMFilePattern')
-                filePattern = scenarioConfig.PhysicalEnvironment.OSMFilePattern;
-                obj.logger.debug('Using OSM file pattern from scenario PhysicalEnvironment configuration: %s', filePattern);
-                % Third priority: Legacy Environment configuration
-            elseif isfield(scenarioConfig, 'Environment') && ...
-                    isfield(scenarioConfig.Environment, 'OSMFilePattern')
-                filePattern = scenarioConfig.Environment.OSMFilePattern;
-                obj.logger.debug('Using OSM file pattern from legacy Environment configuration: %s', filePattern);
-            end
-
-            obj.logger.debug('Scanning for OSM files in: %s (pattern: %s)', osmDataDir, filePattern);
-
-            % Find all OSM files recursively
-            allmFiles = obj.findOSMFiles(osmDataDir, filePattern);
-
-            if isempty(allmFiles)
-                obj.logger.warning('No OSM files found in directory: %s', osmDataDir);
+        function validateMapConfiguration(obj)
+            if ~isfield(obj.factoryConfig, 'PhysicalEnvironment') || ...
+                    ~isfield(obj.factoryConfig.PhysicalEnvironment, 'Map')
                 return;
             end
 
-            % Randomly select one file
-            selectedIndex = randi(length(allmFiles));
-            osmFile = allmFiles{selectedIndex};
+            mapConfig = obj.factoryConfig.PhysicalEnvironment.Map;
+            if ~isfield(mapConfig, 'Types') || isempty(mapConfig.Types)
+                error('ScenarioFactory:ConfigError', 'PhysicalEnvironment.Map.Types must not be empty.');
+            end
 
-            obj.logger.debug('Found %d OSM files, selected: %s', length(allmFiles), osmFile);
+            if ~iscell(mapConfig.Types)
+                error('ScenarioFactory:ConfigError', 'PhysicalEnvironment.Map.Types must be a cell array.');
+            end
+
+            if isfield(mapConfig, 'Ratio') && ~isempty(mapConfig.Ratio)
+                ratios = mapConfig.Ratio;
+                if ~isnumeric(ratios) || numel(ratios) ~= numel(mapConfig.Types)
+                    error('ScenarioFactory:ConfigError', ...
+                        'PhysicalEnvironment.Map.Ratio must be numeric and match Map.Types length.');
+                end
+                if any(ratios < 0) || sum(ratios) <= 0
+                    error('ScenarioFactory:ConfigError', ...
+                        'PhysicalEnvironment.Map.Ratio must be non-negative and have positive sum.');
+                end
+            end
+        end
+
+        function osmFile = selectRandomOSMFile(obj)
+            % selectRandomOSMFile - Randomly select an OSM file
+            %
+            % Uses Map.OSM configuration:
+            %   Map.OSM.SpecificFile - If set, use this file directly
+            %   Map.OSM.DataDirectory - Directory containing OSM files
+            %   Map.OSM.FilePattern - Pattern for finding OSM files
+
+            osmFile = '';
+            
+            % Get OSM config from Map.OSM
+            osmConfig = struct();
+            if isfield(obj.factoryConfig, 'PhysicalEnvironment') && ...
+                    isfield(obj.factoryConfig.PhysicalEnvironment, 'Map') && ...
+                    isfield(obj.factoryConfig.PhysicalEnvironment.Map, 'OSM')
+                osmConfig = obj.factoryConfig.PhysicalEnvironment.Map.OSM;
+            end
+
+            % Check for specific OSM file override
+            if isfield(osmConfig, 'SpecificFile') && ~isempty(osmConfig.SpecificFile)
+                if isfile(osmConfig.SpecificFile)
+                    osmFile = osmConfig.SpecificFile;
+                    return;
+                end
+            end
+
+            % Determine OSM data directory
+            currentFilePath = fileparts(mfilename('fullpath'));
+            projectRoot = fileparts(fileparts(currentFilePath));
+            osmDataDir = fullfile(projectRoot, 'data', 'map', 'osm');
+
+            if isfield(osmConfig, 'DataDirectory') && ~isempty(osmConfig.DataDirectory)
+                configuredDir = osmConfig.DataDirectory;
+                if ~obj.isAbsolutePath(configuredDir)
+                    osmDataDir = fullfile(projectRoot, configuredDir);
+                else
+                    osmDataDir = configuredDir;
+                end
+            end
+
+            % Get file pattern
+            filePattern = '*.osm';
+            if isfield(osmConfig, 'FilePattern') && ~isempty(osmConfig.FilePattern)
+                filePattern = osmConfig.FilePattern;
+            end
+
+            % Find and select random OSM file
+            allFiles = obj.findOSMFiles(osmDataDir, filePattern);
+            if ~isempty(allFiles)
+                osmFile = allFiles{randi(length(allFiles))};
+            end
         end
 
         function osmFiles = findOSMFiles(obj, baseDir, pattern)
@@ -552,305 +409,102 @@ classdef ScenarioFactory < matlab.System
 
         end
 
-        % Supporting methods for dual-component architecture
-        function physicalEnvConfig = getPhysicalEnvironmentConfig(obj, scenarioConfig)
+        function physicalEnvConfig = getPhysicalEnvironmentConfig(obj)
             % getPhysicalEnvironmentConfig - Extract physical environment configuration
             %
-            % This method extracts and processes physical environment configuration
-            % from the factory configuration and scenario configuration, giving
-            % priority to the factory PhysicalEnvironment section while maintaining
-            % backward compatibility with legacy Environment configuration.
+            % Applies selected map type (Statistical or OSM) and configures
+            % appropriate boundaries and channel model settings.
 
-            physicalEnvConfig = struct();
+            % Start with configured PhysicalEnvironment
+            physicalEnvConfig = obj.factoryConfig.PhysicalEnvironment;
 
-            % Primary configuration source: factory PhysicalEnvironment configuration
-            if isfield(obj.factoryConfig, 'PhysicalEnvironment')
-                obj.logger.debug('Using PhysicalEnvironment configuration from factory configuration');
-
-                % Start with factory PhysicalEnvironment configuration
-                physicalEnvConfig = obj.factoryConfig.PhysicalEnvironment;
-
-                % Merge with scenario-specific PhysicalEnvironment configuration if available
-                if isfield(scenarioConfig, 'PhysicalEnvironment')
-                    obj.logger.debug('Merging with scenario PhysicalEnvironment configuration');
-                    physicalEnvConfig = obj.mergeConfigs(physicalEnvConfig, scenarioConfig.PhysicalEnvironment);
-                end
-
-                % Validate entity count configuration in Min/Max struct format
-                if isfield(physicalEnvConfig, 'Entities')
-                    % Keep transmitter count configuration in Min/Max struct format
-                    if isfield(physicalEnvConfig.Entities, 'Transmitters') && isfield(physicalEnvConfig.Entities.Transmitters, 'Count')
-                        txCount = physicalEnvConfig.Entities.Transmitters.Count;
-
-                        if isstruct(txCount) && isfield(txCount, 'Min') && isfield(txCount, 'Max')
-                            obj.logger.debug('Transmitter count configuration: Min=%d, Max=%d', txCount.Min, txCount.Max);
-                        end
-
-                    end
-
-                    % Keep receiver count configuration in Min/Max struct format
-                    if isfield(physicalEnvConfig.Entities, 'Receivers') && isfield(physicalEnvConfig.Entities.Receivers, 'Count')
-                        rxCount = physicalEnvConfig.Entities.Receivers.Count;
-
-                        if isstruct(rxCount) && isfield(rxCount, 'Min') && isfield(rxCount, 'Max')
-                            obj.logger.debug('Receiver count configuration: Min=%d, Max=%d', rxCount.Min, rxCount.Max);
-                        end
-
-                    end
-
-                end
-
-                % Set up Environment structure for simulator compatibility
-                if ~isfield(physicalEnvConfig, 'Environment')
-                    physicalEnvConfig.Environment = struct();
-                end
-
-                % Map boundaries from Map configuration if available
-                if isfield(physicalEnvConfig, 'Map') && isfield(physicalEnvConfig.Map, 'Boundaries')
-                    physicalEnvConfig.Environment.MapBoundaries = physicalEnvConfig.Map.Boundaries;
-                elseif ~isfield(physicalEnvConfig.Environment, 'MapBoundaries')
-                    physicalEnvConfig.Environment.MapBoundaries = [-2000, 2000, -2000, 2000]; % Default
-                end
-
-                % Override map type with the one selected by ratio-based selection
-                physicalEnvConfig.Environment.MapType = obj.selectedMapType;
-
-                % If OSM mode is selected, pass the randomly selected OSM file
-                if strcmp(obj.selectedMapType, 'OSM') && ~isempty(obj.selectedOSMFile)
-                    physicalEnvConfig.Environment.OSMMapFile = obj.selectedOSMFile;
-                    obj.logger.debug('Physical environment config: MapType=%s, OSMFile=%s (selected by ratio and random)', ...
-                        obj.selectedMapType, obj.selectedOSMFile);
-                else
-                    obj.logger.debug('Physical environment config: MapType=%s (selected by ratio)', obj.selectedMapType);
-                end
-
-                % Secondary configuration source: scenarioConfig.PhysicalEnvironment
-            elseif isfield(scenarioConfig, 'PhysicalEnvironment')
-                obj.logger.debug('Using PhysicalEnvironment configuration from scenario configuration');
-
-                % Direct copy of PhysicalEnvironment configuration
-                physicalEnvConfig = scenarioConfig.PhysicalEnvironment;
-
-                % Validate entity count configuration in Min/Max struct format
-                if isfield(physicalEnvConfig, 'Entities')
-                    % Keep transmitter count configuration in Min/Max struct format
-                    if isfield(physicalEnvConfig.Entities, 'Transmitters') && isfield(physicalEnvConfig.Entities.Transmitters, 'Count')
-                        txCount = physicalEnvConfig.Entities.Transmitters.Count;
-
-                        if isstruct(txCount) && isfield(txCount, 'Min') && isfield(txCount, 'Max')
-                            obj.logger.debug('Transmitter count configuration: Min=%d, Max=%d', txCount.Min, txCount.Max);
-                        end
-
-                    end
-
-                    % Keep receiver count configuration in Min/Max struct format
-                    if isfield(physicalEnvConfig.Entities, 'Receivers') && isfield(physicalEnvConfig.Entities.Receivers, 'Count')
-                        rxCount = physicalEnvConfig.Entities.Receivers.Count;
-
-                        if isstruct(rxCount) && isfield(rxCount, 'Min') && isfield(rxCount, 'Max')
-                            obj.logger.debug('Receiver count configuration: Min=%d, Max=%d', rxCount.Min, rxCount.Max);
-                        end
-
-                    end
-
-                end
-
-                % Set up Environment structure for simulator compatibility
-                if ~isfield(physicalEnvConfig, 'Environment')
-                    physicalEnvConfig.Environment = struct();
-                end
-
-                % Map boundaries from Map configuration if available
-                if isfield(physicalEnvConfig, 'Map') && isfield(physicalEnvConfig.Map, 'Boundaries')
-                    physicalEnvConfig.Environment.MapBoundaries = physicalEnvConfig.Map.Boundaries;
-                elseif ~isfield(physicalEnvConfig.Environment, 'MapBoundaries')
-                    physicalEnvConfig.Environment.MapBoundaries = [-2000, 2000, -2000, 2000]; % Default
-                end
-
-                % Override map type with the one selected by ratio-based selection
-                physicalEnvConfig.Environment.MapType = obj.selectedMapType;
-
-                % If OSM mode is selected, pass the randomly selected OSM file
-                if strcmp(obj.selectedMapType, 'OSM') && ~isempty(obj.selectedOSMFile)
-                    physicalEnvConfig.Environment.OSMMapFile = obj.selectedOSMFile;
-                    obj.logger.debug('Physical environment config: MapType=%s, OSMFile=%s (selected by ratio and random)', ...
-                        obj.selectedMapType, obj.selectedOSMFile);
-                else
-                    obj.logger.debug('Physical environment config: MapType=%s (selected by ratio)', obj.selectedMapType);
-                end
-
-            else
-                % Fallback: Legacy configuration support
-                obj.logger.debug('PhysicalEnvironment not found, using legacy Environment configuration');
-
-                % Map configuration from legacy Environment section
-                if isfield(scenarioConfig, 'Environment')
-                    physicalEnvConfig.Environment = scenarioConfig.Environment;
-                else
-                    % Default configuration
-                    physicalEnvConfig.Environment.MapBoundaries = [-2000, 2000, -2000, 2000];
-                    physicalEnvConfig.Environment.OSMMapFile = '';
-                end
-
-                % Override map type with the one selected by ratio-based selection
-                physicalEnvConfig.Environment.MapType = obj.selectedMapType;
-
-                % If OSM mode is selected, pass the randomly selected OSM file
-                if strcmp(obj.selectedMapType, 'OSM') && ~isempty(obj.selectedOSMFile)
-                    physicalEnvConfig.Environment.OSMMapFile = obj.selectedOSMFile;
-                end
-
-                % Entity configuration from legacy Transmitters/Receivers sections
-                if isfield(scenarioConfig, 'Transmitters') && isfield(scenarioConfig.Transmitters, 'Count')
-                    physicalEnvConfig.Entities.Transmitters.Count = scenarioConfig.Transmitters.Count;
-                else
-                    physicalEnvConfig.Entities.Transmitters.Count = struct('Min', 2, 'Max', 6); % Default
-                end
-
-                if isfield(scenarioConfig, 'Receivers') && isfield(scenarioConfig.Receivers, 'Count')
-                    physicalEnvConfig.Entities.Receivers.Count = scenarioConfig.Receivers.Count;
-                else
-                    physicalEnvConfig.Entities.Receivers.Count = struct('Min', 1, 'Max', 3); % Default
-                end
-
-                % Default mobility configuration
-                physicalEnvConfig.Mobility.DefaultModel = 'RandomWalk';
-                physicalEnvConfig.Mobility.EnableCollisionAvoidance = true;
-
-                % Default environmental factors
-                physicalEnvConfig.Environment.Weather.Enable = true;
+            % Ensure Environment struct exists
+            if ~isfield(physicalEnvConfig, 'Environment')
+                physicalEnvConfig.Environment = struct();
             end
 
-            % Legacy map configuration for backward compatibility
+            % Apply selected map type
+            physicalEnvConfig.Environment.MapType = obj.selectedMapType;
+            physicalEnvConfig.Map.Type = obj.selectedMapType;
+
+            % Configure based on selected map type
             if strcmp(obj.selectedMapType, 'OSM')
-                physicalEnvConfig.Map.Type = 'OSM';
+                % OSM mode: use ray tracing channel model
+                if ~isempty(obj.selectedOSMFile)
+                    physicalEnvConfig.Environment.OSMMapFile = obj.selectedOSMFile;
+                    physicalEnvConfig.Map.OSMFile = obj.selectedOSMFile;
+                end
+                
+                % Get channel model from OSM config
+                if isfield(physicalEnvConfig, 'Map') && ...
+                        isfield(physicalEnvConfig.Map, 'OSM') && ...
+                        isfield(physicalEnvConfig.Map.OSM, 'ChannelModel')
+                    physicalEnvConfig.Environment.ChannelModel = physicalEnvConfig.Map.OSM.ChannelModel;
+                else
+                    physicalEnvConfig.Environment.ChannelModel = 'RayTracing';
+                end
+                
+                % OSM boundaries are determined from the OSM file itself
+                physicalEnvConfig.Environment.MapBoundaries = [-2000, 2000, -2000, 2000];
+                
             else
-                physicalEnvConfig.Map.Type = 'Grid';
+                % Statistical mode: use statistical channel model
+                % Get boundaries from Statistical config
+                if isfield(physicalEnvConfig, 'Map') && ...
+                        isfield(physicalEnvConfig.Map, 'Statistical') && ...
+                        isfield(physicalEnvConfig.Map.Statistical, 'Boundaries')
+                    physicalEnvConfig.Environment.MapBoundaries = physicalEnvConfig.Map.Statistical.Boundaries;
+                else
+                    physicalEnvConfig.Environment.MapBoundaries = [-2000, 2000, -2000, 2000];
+                end
+                
+                % Get channel model from Statistical config
+                if isfield(physicalEnvConfig, 'Map') && ...
+                        isfield(physicalEnvConfig.Map, 'Statistical') && ...
+                        isfield(physicalEnvConfig.Map.Statistical, 'ChannelModel')
+                    physicalEnvConfig.Environment.ChannelModel = physicalEnvConfig.Map.Statistical.ChannelModel;
+                else
+                    physicalEnvConfig.Environment.ChannelModel = 'Statistical';
+                end
             end
 
+            % Set map boundaries for compatibility
             physicalEnvConfig.Map.Boundaries = physicalEnvConfig.Environment.MapBoundaries;
 
-            % Time resolution - prioritize from different configuration sources
-            if isfield(physicalEnvConfig, 'TimeResolution')
-                % Already set from PhysicalEnvironment configuration
-                obj.logger.debug('Using time resolution from PhysicalEnvironment: %.3f seconds', physicalEnvConfig.TimeResolution);
-            elseif isfield(scenarioConfig, 'Environment') && isfield(scenarioConfig.Environment, 'TimeResolution')
-                physicalEnvConfig.TimeResolution = scenarioConfig.Environment.TimeResolution;
-                obj.logger.debug('Using time resolution from legacy Environment: %.3f seconds', physicalEnvConfig.TimeResolution);
-            elseif isfield(scenarioConfig, 'Timing') && isfield(scenarioConfig.Timing, 'FrameResolution')
-                physicalEnvConfig.TimeResolution = scenarioConfig.Timing.FrameResolution;
-                obj.logger.debug('Using time resolution from Timing: %.3f seconds', physicalEnvConfig.TimeResolution);
-            else
-                physicalEnvConfig.TimeResolution = 0.1; % 0.1 second default
-                obj.logger.debug('Using default time resolution: %.3f seconds', physicalEnvConfig.TimeResolution);
+            % Time resolution
+            if ~isfield(physicalEnvConfig, 'TimeResolution')
+                physicalEnvConfig.TimeResolution = 0.1;
             end
-
         end
 
-        function commBehaviorConfig = getCommunicationBehaviorConfig(obj, scenarioConfig)
+        function commBehaviorConfig = getCommunicationBehaviorConfig(obj)
             % getCommunicationBehaviorConfig - Extract communication behavior configuration
-            %
-            % This method extracts and processes communication behavior configuration
-            % from the factory configuration and scenario configuration, giving
-            % priority to the factory CommunicationBehavior section while providing
-            % reasonable defaults for missing configuration elements.
 
-            commBehaviorConfig = struct();
+            % Use configured CommunicationBehavior directly
+            commBehaviorConfig = obj.factoryConfig.CommunicationBehavior;
 
-            % Primary configuration source: factory CommunicationBehavior configuration
-            if isfield(obj.factoryConfig, 'CommunicationBehavior')
-                obj.logger.debug('Using CommunicationBehavior configuration from factory configuration');
-
-                % Start with factory CommunicationBehavior configuration
-                commBehaviorConfig = obj.factoryConfig.CommunicationBehavior;
-
-                % Merge with scenario-specific CommunicationBehavior configuration if available
-                if isfield(scenarioConfig, 'CommunicationBehavior')
-                    obj.logger.debug('Merging with scenario CommunicationBehavior configuration');
-                    commBehaviorConfig = obj.mergeConfigs(commBehaviorConfig, scenarioConfig.CommunicationBehavior);
-                end
-
-                % Secondary configuration source: scenarioConfig.CommunicationBehavior
-            elseif isfield(scenarioConfig, 'CommunicationBehavior')
-                obj.logger.debug('Using CommunicationBehavior configuration from scenario configuration');
-
-                % Direct copy of CommunicationBehavior configuration
-                commBehaviorConfig = scenarioConfig.CommunicationBehavior;
-
-            else
-                obj.logger.debug('CommunicationBehavior not found, using default configuration');
-
-                % Default frequency allocation configuration
-                commBehaviorConfig.FrequencyAllocation.Strategy = 'ReceiverCentric';
-                commBehaviorConfig.FrequencyAllocation.MinSeparation = 100e3; % 100 kHz
-                commBehaviorConfig.FrequencyAllocation.MaxOverlap = 0.1; % 10 % overlap
-                commBehaviorConfig.FrequencyAllocation.GuardBands = 50e3; % 50 kHz
-                commBehaviorConfig.FrequencyAllocation.CollisionAvoidance = true;
-
-                % Default modulation selection configuration
-                commBehaviorConfig.ModulationSelection.Strategy = 'Random';
-                commBehaviorConfig.ModulationSelection.PreferredSchemes = {'PSK', 'QAM', 'OFDM'};
-                commBehaviorConfig.ModulationSelection.QualityThresholds.SNR = 15; % dB
-                commBehaviorConfig.ModulationSelection.QualityThresholds.Bandwidth = 1e6; % Hz
-
-                % Default transmission pattern configuration
-                commBehaviorConfig.TransmissionPattern.DefaultType = 'Continuous';
-                commBehaviorConfig.TransmissionPattern.TypeDistribution = [0.6, 0.3, 0.1]; % [Continuous, Burst, Scheduled]
-
-                % Default burst parameters
-                commBehaviorConfig.TransmissionPattern.Burst.DurationRange = [0.01, 0.1]; % seconds
-                commBehaviorConfig.TransmissionPattern.Burst.PeriodRange = [0.1, 1.0]; % seconds
-                commBehaviorConfig.TransmissionPattern.Burst.DutyCycleRange = [0.1, 0.8];
-
-                % Default scheduled parameters
-                commBehaviorConfig.TransmissionPattern.Scheduled.TimeSlotDuration = 0.01; % seconds
-                commBehaviorConfig.TransmissionPattern.Scheduled.FrameLength = 0.1; % seconds
-                commBehaviorConfig.TransmissionPattern.Scheduled.CoordinationStrategy = 'TDMA';
-
-                % Default power control configuration
-                commBehaviorConfig.PowerControl.Strategy = 'LinkBudget';
-                commBehaviorConfig.PowerControl.DefaultPower = 20; % dBm
-                commBehaviorConfig.PowerControl.PowerRange = [10, 30]; % dBm
-                commBehaviorConfig.PowerControl.MaxPower = 30; % dBm
-                commBehaviorConfig.PowerControl.TargetSNR = 15; % dB
-                commBehaviorConfig.PowerControl.Margin = 10; % dB
-
-                % Default interference management configuration
-                commBehaviorConfig.InterferenceManagement.EnableCollisionAvoidance = true;
-                commBehaviorConfig.InterferenceManagement.InterferenceThreshold = -80; % dBm
-                commBehaviorConfig.InterferenceManagement.CoordinationStrategy = 'Distributed';
-                commBehaviorConfig.InterferenceManagement.MaxIterations = 10;
-
-                % Default QoS configuration
-                commBehaviorConfig.QoS.PriorityLevels = 3;
-                commBehaviorConfig.QoS.DelayConstraints = [0.001, 0.01, 0.1]; % seconds
-                commBehaviorConfig.QoS.ThroughputRequirements = [1e6, 5e5, 1e5]; % bps
+            % Pass through global time parameters needed by CommBehaviorSim
+            if isfield(obj.factoryConfig, 'Global')
+                commBehaviorConfig.Global = obj.factoryConfig.Global;
             end
 
-            % Ensure all required fields are present with sensible defaults
-            if ~isfield(commBehaviorConfig, 'FrequencyAllocation') || ~isfield(commBehaviorConfig.FrequencyAllocation, 'Strategy')
+            % Ensure required defaults
+            if ~isfield(commBehaviorConfig, 'FrequencyAllocation')
+                commBehaviorConfig.FrequencyAllocation = struct();
+            end
+            if ~isfield(commBehaviorConfig.FrequencyAllocation, 'Strategy')
                 commBehaviorConfig.FrequencyAllocation.Strategy = 'ReceiverCentric';
             end
-
             if ~isfield(commBehaviorConfig.FrequencyAllocation, 'MinSeparation')
-                commBehaviorConfig.FrequencyAllocation.MinSeparation = 100e3; % 100 kHz
+                commBehaviorConfig.FrequencyAllocation.MinSeparation = 100e3;
             end
 
-            if ~isfield(commBehaviorConfig.FrequencyAllocation, 'MaxOverlap')
-                commBehaviorConfig.FrequencyAllocation.MaxOverlap = 0.1; % 10 % overlap
+            if ~isfield(commBehaviorConfig, 'PowerControl')
+                commBehaviorConfig.PowerControl = struct();
             end
-
-            if ~isfield(commBehaviorConfig, 'PowerControl') || ~isfield(commBehaviorConfig.PowerControl, 'MaxPower')
-
-                if ~isfield(commBehaviorConfig, 'PowerControl')
-                    commBehaviorConfig.PowerControl = struct();
-                end
-
-                commBehaviorConfig.PowerControl.MaxPower = 30; % dBm
+            if ~isfield(commBehaviorConfig.PowerControl, 'MaxPower')
+                commBehaviorConfig.PowerControl.MaxPower = 30;
             end
-
-            obj.logger.debug('Communication behavior configuration extracted with strategy: %s', ...
-                commBehaviorConfig.FrequencyAllocation.Strategy);
         end
 
         function storeFrameState(obj, frameId, entities, environment, txConfigs, rxConfigs)

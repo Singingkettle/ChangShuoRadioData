@@ -21,10 +21,20 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
     %   - Based on actual transmitted signal characteristics
     %   - Accounts for real pulse shaping, filtering, and modulation effects
 
-    symbolRate = modulationConfig.SymbolRate;
+    if isfield(modulationConfig, 'SymbolRate')
+        symbolRate = modulationConfig.SymbolRate;
+    else
+        symbolRate = 100e3;
+        obj.logger.warning('modulationConfig missing SymbolRate, defaulting to 100 kHz');
+    end
+
+    modType = 'Unknown';
+    if isfield(modulationConfig, 'Type')
+        modType = modulationConfig.Type;
+    end
 
     % Bandwidth calculation based on modulation type
-    switch modulationConfig.Type
+    switch modType
             % Linear digital modulation schemes
         case 'PSK'
             bandwidth = symbolRate * 1.2; % 20 % excess bandwidth for pulse shaping

@@ -365,10 +365,9 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             %   Path loss is applied as: signal_out = signal_in / (10^(PL_dB/20))
             %   where PL_dB is calculated by the BaseChannel class
 
-            % Validate input signal structure
-            if ~isstruct(inputSignal) || ~isfield(inputSignal, 'data')
+            if ~isstruct(inputSignal) || ~isfield(inputSignal, 'Signal')
                 error('ChangShuoRadioData:MIMO:InvalidInputStructure', ...
-                'Input must be a structure with at least a ''data'' field.');
+                'Input must be a structure with at least a ''Signal'' field.');
             end
 
             if ~isfield(inputSignal, 'SampleRate') || ~isfield(inputSignal, 'StartTime')
@@ -377,7 +376,7 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             end
 
             % Validate input signal dimensions
-            [numSamples, numTxAntennas] = size(inputSignal.data);
+            [numSamples, numTxAntennas] = size(inputSignal.Signal);
 
             if numTxAntennas ~= obj.NumTransmitAntennas
                 error('ChangShuoRadioData:MIMO:AntennaMismatch', ...
@@ -388,7 +387,7 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             % Apply path loss attenuation
             % Convert dB to linear scale: 10^(dB/20) for amplitude scaling
             pathLossLinear = 10 ^ (obj.PathLoss / 20);
-            attenuatedSignal = inputSignal.data / pathLossLinear;
+            attenuatedSignal = inputSignal.Signal / pathLossLinear;
 
             % Update channel with current sample rate (release and reconfigure if needed)
             if isLocked(obj.MultipathChannel) && ...
@@ -402,7 +401,7 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
 
             % Prepare comprehensive output structure
             outputSignal = inputSignal;
-            outputSignal.data = fadedSignal;
+            outputSignal.Signal = fadedSignal;
 
             % Add channel configuration information
             outputSignal.PathDelays = obj.PathDelays;
@@ -411,6 +410,8 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             outputSignal.FadingDistribution = obj.FadingDistribution;
             outputSignal.MaximumDopplerShift = obj.MaximumDopplerShift;
             outputSignal.mode = obj.mode;
+            outputSignal.AppliedPathLoss = obj.PathLoss;
+            outputSignal.Distance = obj.Distance;
 
             % Add Rician-specific parameters
             if strcmp(obj.FadingDistribution, 'Rician')
