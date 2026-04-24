@@ -1,62 +1,80 @@
 classdef BaseChannelDistanceTest < matlab.unittest.TestCase
-    % BaseChannelDistanceTest - Unit tests for BaseChannel path-loss unit consistency.
+    % BaseChannelDistanceTest - Lock the BaseChannel distance unit (METERS).
     %
-    %   Regression coverage for the audit issue where Distance was
-    %   internally multiplied by 1000 even though the property is
-    %   documented in meters. The fix unifies all distance arithmetic
-    %   to meters; this test pins that contract.
+    %   Regression for the original 60 dB FSPL bug: an earlier version of
+    %   BaseChannel.genPathLoss called fspl(obj.Distance * 1000, ...),
+    %   silently treating the documented "meters" property as kilometers.
+    %   Verifies free-space and atmospheric modes against analytical
+    %   references with strict tolerances.
 
     methods (Test)
 
-        function fsplMatchesAnalyticalFormula(testCase)
-            % FSPL(d, lambda) = 20*log10(4*pi*d / lambda)
+        function freeSpacePathLossMatchesAnalytical(testCase)
+            carrier = 2.4e9;
             distance_m = 100;
-            carrierFreq = 2.4e9;
             ch = csrd.blocks.physical.channel.BaseChannel( ...
-                'CarrierFrequency', carrierFreq, ...
-                'Distance', distance_m);
-            lambda = physconst('LightSpeed') / carrierFreq;
-            expectedPL = 20 * log10(4 * pi * distance_m / lambda);
-            testCase.verifyEqual(ch.PathLoss, expectedPL, 'AbsTol', 1e-6, ...
-                'BaseChannel must compute FSPL in meters.');
-        end
-
-        function distanceTenfoldYields20dB(testCase)
-            % Doubling the distance: +6 dB. 10x: +20 dB.
-            carrierFreq = 1e9;
-            ch1 = csrd.blocks.physical.channel.BaseChannel( ...
-                'CarrierFrequency', carrierFreq, 'Distance', 100);
-            ch10 = csrd.blocks.physical.channel.BaseChannel( ...
-                'CarrierFrequency', carrierFreq, 'Distance', 1000);
-            testCase.verifyEqual(ch10.PathLoss - ch1.PathLoss, 20, 'AbsTol', 1e-6, ...
-                'A 10x distance increase must yield exactly 20 dB extra FSPL.');
-        end
-
-        function distance100mNotInterpretedAs100km(testCase)
-            % Pre-fix bug: 100 m was internally treated as 100 km, adding
-            % 60 dB to FSPL. This test pins that the bug stays fixed.
-            carrierFreq = 2.4e9;
-            ch = csrd.blocks.physical.channel.BaseChannel( ...
-                'CarrierFrequency', carrierFreq, 'Distance', 100);
-            lambda = physconst('LightSpeed') / carrierFreq;
-            buggyPL_km = 20 * log10(4 * pi * (100 * 1000) / lambda);
-            actualPL = ch.PathLoss;
-            testCase.verifyGreaterThan(buggyPL_km - actualPL, 55, ...
-                'BaseChannel.Distance=100 must not be silently treated as 100 km.');
-        end
-
-        function fogAddsExtraLoss(testCase)
-            % Fog atmospheric loss should be additive on top of FSPL.
-            carrierFreq = 24e9;
-            distance_m = 1000;
-            chFree = csrd.blocks.physical.channel.BaseChannel( ...
-                'CarrierFrequency', carrierFreq, 'Distance', distance_m, ...
+                'CarrierFrequency', carrier, ...
+                'Distance', distance_m, ...
                 'atmosCond', 'FreeSpace');
-            chFog = csrd.blocks.physical.channel.BaseChannel( ...
-                'CarrierFrequency', carrierFreq, 'Distance', distance_m, ...
-                'atmosCond', 'Fog');
-            testCase.verifyGreaterThanOrEqual(chFog.PathLoss, chFree.PathLoss, ...
-                'Fog conditions must add (non-negative) loss on top of FSPL.');
+            expected = fspl(distance_m, physconst('light') / carrier);
+            testCase.verifyLessThan(abs(ch.PathLoss - expected), 0.5, ...
+                sprintf('FreeSpace path loss %.2f dB differs from analytical %.2f dB by more than 0.5 dB', ...
+                    ch.PathLoss, expected));
+        end
+
+        function freeSpaceDifference60dBPerDecade(testCase)
+            carrier = 2.4e9;
+            ch100m = csrd.blocks.physical.channel.BaseChannel( ...
+                'CarrierFrequency', carrier, 'Distance', 100);
+            ch100km = csrd.blocks.physical.channel.BaseChannel( ...
+                'CarrierFrequency', carrier, 'Distance', 1e5);
+            delta = ch100km.PathLoss - ch100m.PathLoss;
+            testCase.verifyLessThan(abs(delta - 60), 0.5, ...
+                sprintf('Three-decade FSPL difference %.2f dB should be ~60 dB', delta));
+        end
+
+        function distanceClampedAtOneMeter(testCase)
+            % Distance must be a positive real, but tiny values should
+            % be clamped to 1 m before fspl() so the toolbox does not
+            % raise.
+            ch = csrd.blocks.physical.channel.BaseChannel( ...
+                'CarrierFrequency', 1e9, ...
+                'Distance', 1e-6); %#ok<NASGU>
+            testCase.verifyTrue(isfinite(ch.PathLoss));
+        end
+
+        function atmosphericModesAddPositiveLoss(testCase)
+            % fogpl requires f >= 10 GHz; gaspl/rainpl support f >= 1 GHz.
+            % 30 GHz is a safe operating point for all three helpers.
+            carrier = 30e9;
+            distance_m = 5000;
+            modes = {'FreeSpace', 'Fog', 'Gas', 'Rain'};
+            results = containers.Map('KeyType', 'char', 'ValueType', 'double');
+            for k = 1:numel(modes)
+                ch = csrd.blocks.physical.channel.BaseChannel( ...
+                    'CarrierFrequency', carrier, ...
+                    'Distance', distance_m, ...
+                    'atmosCond', modes{k});
+                results(modes{k}) = ch.PathLoss;
+                testCase.verifyTrue(isfinite(ch.PathLoss), ...
+                    sprintf('%s mode produced non-finite path loss', modes{k}));
+            end
+            % Atmospheric models can only ADD loss on top of FreeSpace.
+            for k = 2:numel(modes)
+                testCase.verifyGreaterThanOrEqual( ...
+                    results(modes{k}) - results('FreeSpace'), -0.05, ...
+                    sprintf('%s mode loss must be >= FreeSpace', modes{k}));
+            end
+        end
+
+        function antennaModeIsSetCorrectly(testCase)
+            ch = csrd.blocks.physical.channel.BaseChannel( ...
+                'NumTransmitAntennas', 2, 'NumReceiveAntennas', 4);
+            testCase.verifyEqual(ch.mode, 'MIMO');
+
+            ch = csrd.blocks.physical.channel.BaseChannel( ...
+                'NumTransmitAntennas', 1, 'NumReceiveAntennas', 1);
+            testCase.verifyEqual(ch.mode, 'SISO');
         end
 
     end

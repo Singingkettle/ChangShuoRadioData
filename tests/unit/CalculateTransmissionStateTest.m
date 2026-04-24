@@ -1,77 +1,84 @@
 classdef CalculateTransmissionStateTest < matlab.unittest.TestCase
-    % CalculateTransmissionStateTest - Unit tests for transmission interval mapping.
+    % CalculateTransmissionStateTest - Decouple frameTime from a hardcoded
+    % NumFrames default.
     %
-    %   Pins the audit fix that decouples frame->time mapping from a
-    %   magic-number NumFrames=10 fallback.
+    %   Earlier versions of the helper assumed NumFrames = 10 when the field
+    %   was missing, which silently misaligned every Burst / Scheduled /
+    %   Random temporal pattern when the engine ran a different frame count.
+    %   These tests cover the modern csrd.utils.scenario.checkTransmissionInterval
+    %   contract: prefer FrameDuration, fall back to ObservationDuration /
+    %   NumFrames, never invent a magic number.
 
     methods (Test)
 
-        function frameDurationDrivesMapping(testCase)
-            % FrameDuration takes priority over NumFrames/ObservationDuration.
+        function frameDurationOverridesEverything(testCase)
             pattern = struct( ...
-                'Intervals', [0.10, 0.20; 0.40, 0.60], ...
-                'FrameDuration', 0.05, ...
-                'NumFrames', 20, ...
-                'ObservationDuration', 1.0);
-
-            % frameId=3 -> t=0.10 -> inside first interval [0.10, 0.20)
-            [isActive, idx, st, en] = csrd.utils.scenario.checkTransmissionInterval(3, pattern);
-            testCase.verifyTrue(isActive);
+                'Intervals', [0.5, 1.0; 1.5, 2.0], ...
+                'FrameDuration', 0.1, ...
+                'NumFrames', 100, ...           % stale planner value
+                'ObservationDuration', 5);      % stale planner value
+            % frame 6 -> t = 0.5s -> active in interval 1
+            [active, idx, s, e] = csrd.utils.scenario.checkTransmissionInterval(6, pattern);
+            testCase.verifyTrue(active);
             testCase.verifyEqual(idx, 1);
-            testCase.verifyEqual(st, 0.10, 'AbsTol', 1e-12);
-            testCase.verifyEqual(en, 0.20, 'AbsTol', 1e-12);
+            testCase.verifyEqual(s, 0.5);
+            testCase.verifyEqual(e, 1.0);
 
-            % frameId=5 -> t=0.20 -> outside (right-open)
-            [isActive5, ~, ~, ~] = csrd.utils.scenario.checkTransmissionInterval(5, pattern);
-            testCase.verifyFalse(isActive5, 'Right-open interval must exclude endpoint.');
+            % frame 11 -> t = 1.0s -> NOT in any interval (right-open)
+            [active, ~, ~, ~] = csrd.utils.scenario.checkTransmissionInterval(11, pattern);
+            testCase.verifyFalse(active);
 
-            % frameId=9 -> t=0.40 -> inside second interval
-            [isActive9, idx9, ~, ~] = csrd.utils.scenario.checkTransmissionInterval(9, pattern);
-            testCase.verifyTrue(isActive9);
-            testCase.verifyEqual(idx9, 2);
+            % frame 16 -> t = 1.5s -> active in interval 2
+            [active, idx, s, e] = csrd.utils.scenario.checkTransmissionInterval(16, pattern);
+            testCase.verifyTrue(active);
+            testCase.verifyEqual(idx, 2);
+            testCase.verifyEqual(s, 1.5);
+            testCase.verifyEqual(e, 2.0);
         end
 
-        function numFramesObservationFallback(testCase)
-            % Without FrameDuration we should derive it from NumFrames.
+        function fallbackUsesObservationDurationAndNumFrames(testCase)
             pattern = struct( ...
-                'Intervals', [0.0, 0.5], ...
-                'NumFrames', 10, ...
-                'ObservationDuration', 1.0);
-            [isActive_first, ~, ~, ~] = csrd.utils.scenario.checkTransmissionInterval(1, pattern);
-            testCase.verifyTrue(isActive_first);
-            [isActive_last, ~, ~, ~] = csrd.utils.scenario.checkTransmissionInterval(8, pattern);
-            testCase.verifyFalse(isActive_last, 'Frame 8 -> t=0.7 should fall outside [0,0.5).');
+                'Intervals', [0, 1.0; 2.0, 3.0], ...
+                'NumFrames', 30, ...
+                'ObservationDuration', 3);
+            % FrameDuration = 0.1s, frame 5 -> t = 0.4s -> active in interval 1
+            [active, idx] = csrd.utils.scenario.checkTransmissionInterval(5, pattern);
+            testCase.verifyTrue(active);
+            testCase.verifyEqual(idx, 1);
+
+            % frame 25 -> t = 2.4s -> active in interval 2
+            [active, idx] = csrd.utils.scenario.checkTransmissionInterval(25, pattern);
+            testCase.verifyTrue(active);
+            testCase.verifyEqual(idx, 2);
         end
 
-        function noMagicNumberFallback(testCase)
-            % Audit pin: when neither FrameDuration nor (NumFrames+ObservationDuration)
-            % are present, we must NOT silently use NumFrames=10. The function
-            % must return isActive=false and emit a warning identifier.
-            pattern = struct('Intervals', [0.0, 0.3]);
-            warnState = warning('off', 'CSRD:Scenario:MissingFrameTiming');
-            cleanupObj = onCleanup(@() warning(warnState)); %#ok<NASGU>
-
-            lastwarn('');
-            [isActive, ~, ~, ~] = csrd.utils.scenario.checkTransmissionInterval(2, pattern);
-            [~, lastId] = lastwarn();
-            testCase.verifyFalse(isActive);
-            testCase.verifyEqual(lastId, 'CSRD:Scenario:MissingFrameTiming', ...
-                'Missing timing fields must trigger CSRD:Scenario:MissingFrameTiming warning.');
+        function noTimingFieldsReturnsInactiveAndWarns(testCase)
+            pattern = struct('Intervals', [0, 1.0]); % no NumFrames or FrameDuration
+            warningState = warning('off', 'CSRD:Scenario:MissingFrameTiming');
+            cleanup = onCleanup(@() warning(warningState)); %#ok<NASGU>
+            [active, idx, s, e] = csrd.utils.scenario.checkTransmissionInterval(1, pattern);
+            testCase.verifyFalse(active, ...
+                'Without timing info the helper must NOT silently say "active".');
+            testCase.verifyEqual(idx, 0);
+            testCase.verifyEqual(s, 0);
+            testCase.verifyEqual(e, 0);
         end
 
-        function frameOutOfRangeWarns(testCase)
+        function emptyIntervalsReturnsInactive(testCase)
+            pattern = struct('Intervals', [], 'FrameDuration', 0.1);
+            [active, idx] = csrd.utils.scenario.checkTransmissionInterval(1, pattern);
+            testCase.verifyFalse(active);
+            testCase.verifyEqual(idx, 0);
+        end
+
+        function frameOutsideNumFramesIssuesWarning(testCase)
             pattern = struct( ...
-                'Intervals', [0.0, 1.0], ...
-                'NumFrames', 5, ...
-                'ObservationDuration', 1.0);
-            warnState = warning('off', 'CSRD:Scenario:FrameOutOfRange');
-            cleanupObj = onCleanup(@() warning(warnState)); %#ok<NASGU>
-
-            lastwarn('');
-            csrd.utils.scenario.checkTransmissionInterval(99, pattern);
-            [~, lastId] = lastwarn();
-            testCase.verifyEqual(lastId, 'CSRD:Scenario:FrameOutOfRange', ...
-                'Out-of-range frameId must surface a dedicated warning identifier.');
+                'Intervals', [0, 10], ...
+                'FrameDuration', 0.1, ...
+                'NumFrames', 5);
+            testCase.verifyWarning(@() ...
+                csrd.utils.scenario.checkTransmissionInterval(99, pattern), ...
+                'CSRD:Scenario:FrameOutOfRange');
         end
 
     end

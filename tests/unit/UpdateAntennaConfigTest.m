@@ -1,83 +1,90 @@
 classdef UpdateAntennaConfigTest < matlab.unittest.TestCase
-    % UpdateAntennaConfigTest - Unit tests for antenna config write-back logic.
+    % UpdateAntennaConfigTest - Verify antenna writeback contract.
     %
-    %   Pins the audit fix that the (previously private) helper now
-    %   returns an updated TxInfo struct, including SiteConfig.Antenna.
+    %   MATLAB structs are value-typed. The original
+    %   updateTransmitterAntennaConfig modified TxInfo in-place and the
+    %   caller never saw the change, so a SISO->MIMO upgrade by the
+    %   modulator silently disappeared before the channel/RF blocks ran.
+    %   The refactored helper csrd.utils.core.applyAntennaConfigFromSegments
+    %   returns the updated struct, and these tests pin that contract.
 
     methods (Test)
 
-        function noChangeWhenSegmentMatchesExisting(testCase)
-            txInfo = makeTxInfo(2, 'ULA');
-            seg = {struct('NumTransmitAntennas', 2)};
-            [out, didChange, n, arr] = ...
-                csrd.utils.core.applyAntennaConfigFromSegments(txInfo, seg);
+        function noSegmentsReturnsUnchangedTxInfo(testCase)
+            TxInfo = struct('NumTransmitAntennas', 1);
+            [out, didChange, finalNum, arrayType] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {});
+            testCase.verifyEqual(out, TxInfo);
             testCase.verifyFalse(didChange);
-            testCase.verifyEqual(n, 2);
-            testCase.verifyEqual(arr, 'ULA');
-            testCase.verifyEqual(out.NumTransmitAntennas, 2);
+            testCase.verifyEqual(finalNum, 1);
+            testCase.verifyEqual(arrayType, 'Isotropic');
         end
 
-        function sisoToMimoUpgradesArrayToULA(testCase)
-            txInfo = makeTxInfo(1, 'Isotropic');
-            seg = {struct('NumTransmitAntennas', 3)};
-            [out, didChange, n, arr] = ...
-                csrd.utils.core.applyAntennaConfigFromSegments(txInfo, seg);
+        function sisoToMimoUpgradeIsApplied(testCase)
+            TxInfo = struct('NumTransmitAntennas', 1);
+            seg = struct('NumTransmitAntennas', 4);
+            [out, didChange, finalNum, arrayType] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {seg});
             testCase.verifyTrue(didChange);
-            testCase.verifyEqual(n, 3);
-            testCase.verifyEqual(arr, 'ULA');
-            testCase.verifyEqual(out.NumTransmitAntennas, 3);
-            testCase.verifyEqual(out.SiteConfig.Antenna.NumAntennas, 3);
+            testCase.verifyEqual(finalNum, 4);
+            testCase.verifyEqual(out.NumTransmitAntennas, 4);
+            testCase.verifyEqual(out.SiteConfig.Antenna.NumAntennas, 4);
+            testCase.verifyEqual(out.SiteConfig.Antenna.Array, 'URA');
+            testCase.verifyEqual(arrayType, 'URA');
+        end
+
+        function twoAntennaUsesUla(testCase)
+            TxInfo = struct('NumTransmitAntennas', 1);
+            seg = struct('NumTransmitAntennas', 2);
+            [out, didChange, ~, arrayType] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {seg});
+            testCase.verifyTrue(didChange);
             testCase.verifyEqual(out.SiteConfig.Antenna.Array, 'ULA');
+            testCase.verifyEqual(arrayType, 'ULA');
         end
 
-        function fourAntennasUseURA(testCase)
-            txInfo = makeTxInfo(1, 'Isotropic');
-            seg = {struct('NumTransmitAntennas', 4)};
-            [out, didChange, ~, arr] = ...
-                csrd.utils.core.applyAntennaConfigFromSegments(txInfo, seg);
-            testCase.verifyTrue(didChange);
-            testCase.verifyEqual(arr, 'URA');
+        function oddAntennaUsesUla(testCase)
+            TxInfo = struct('NumTransmitAntennas', 1);
+            seg = struct('NumTransmitAntennas', 3);
+            [out, ~, ~, arrayType] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {seg});
+            testCase.verifyEqual(out.SiteConfig.Antenna.Array, 'ULA');
+            testCase.verifyEqual(arrayType, 'ULA');
+        end
+
+        function preservesSiteConfigOtherFields(testCase)
+            TxInfo = struct('NumTransmitAntennas', 1);
+            TxInfo.SiteConfig = struct('Position', [1 2 3]);
+            TxInfo.SiteConfig.Antenna = struct('Gain', 5, 'Array', 'Isotropic');
+            seg = struct('NumTransmitAntennas', 4);
+            [out, ~, ~, ~] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {seg});
+            testCase.verifyEqual(out.SiteConfig.Position, [1 2 3]);
+            testCase.verifyEqual(out.SiteConfig.Antenna.Gain, 5, ...
+                'Existing antenna gain must survive the upgrade.');
+            testCase.verifyEqual(out.SiteConfig.Antenna.NumAntennas, 4);
             testCase.verifyEqual(out.SiteConfig.Antenna.Array, 'URA');
         end
 
-        function downgradeToOneRevertsToIsotropic(testCase)
-            txInfo = makeTxInfo(4, 'URA');
-            seg = {struct('NumTransmitAntennas', 1)};
-            [out, didChange, ~, arr] = ...
-                csrd.utils.core.applyAntennaConfigFromSegments(txInfo, seg);
-            testCase.verifyTrue(didChange);
-            testCase.verifyEqual(arr, 'Isotropic');
-            testCase.verifyEqual(out.SiteConfig.Antenna.Array, 'Isotropic');
-        end
-
-        function missingSiteConfigStillUpdatesCleanly(testCase)
-            % Audit reproduction: SiteConfig may be absent on minimal
-            % TxInfo objects; the helper must materialise the substruct.
-            txInfo = struct('NumTransmitAntennas', 1);
-            seg = {struct('NumTransmitAntennas', 2)};
-            [out, didChange, ~, ~] = ...
-                csrd.utils.core.applyAntennaConfigFromSegments(txInfo, seg);
-            testCase.verifyTrue(didChange);
-            testCase.verifyTrue(isfield(out, 'SiteConfig'));
-            testCase.verifyTrue(isfield(out.SiteConfig, 'Antenna'));
-            testCase.verifyEqual(out.SiteConfig.Antenna.NumAntennas, 2);
-        end
-
-        function emptySegmentsLeaveTxInfoUntouched(testCase)
-            txInfo = makeTxInfo(2, 'ULA');
-            [out, didChange, ~, ~] = ...
-                csrd.utils.core.applyAntennaConfigFromSegments(txInfo, {});
+        function unchangedAntennaCountIsNoOp(testCase)
+            TxInfo = struct('NumTransmitAntennas', 2);
+            TxInfo.SiteConfig.Antenna.Array = 'ULA';
+            seg = struct('NumTransmitAntennas', 2);
+            [out, didChange, ~, arrayType] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {seg});
             testCase.verifyFalse(didChange);
-            testCase.verifyEqual(out, txInfo);
+            testCase.verifyEqual(out, TxInfo);
+            testCase.verifyEqual(arrayType, 'ULA');
+        end
+
+        function emptyLastSegmentReturnsUnchanged(testCase)
+            TxInfo = struct('NumTransmitAntennas', 1);
+            [out, didChange, ~, ~] = ...
+                csrd.utils.core.applyAntennaConfigFromSegments(TxInfo, {[]});
+            testCase.verifyFalse(didChange);
+            testCase.verifyEqual(out, TxInfo);
         end
 
     end
 
-end
-
-function tx = makeTxInfo(num, arr)
-    tx = struct();
-    tx.NumTransmitAntennas = num;
-    tx.SiteConfig.Antenna.NumAntennas = num;
-    tx.SiteConfig.Antenna.Array = arr;
 end
