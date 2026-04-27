@@ -1,23 +1,25 @@
 function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentTxScenario, currentTxId)
-    % processTransmitterSegments - Process all segments for a transmitter
+    %PROCESSTRANSMITTERSEGMENTS Phase 3 strict-construction segment fan-out.
     %
-    % This method handles message generation and modulation for all segments
-    % of a single transmitter.
+    %   Iterates every active segment of currentTxScenario and dispatches
+    %   to processSingleSegment. Phase 3 (audit §3.4 / §17.5 P3-6) removed
+    %   the previous catch-swallow that turned a per-segment failure into
+    %   `signalSegmentsPerTx{k} = []` and let the upstream loop continue
+    %   silently. Errors now propagate so a planner-side bug surfaces
+    %   instead of decaying into an empty annotation.
     %
-    % Inputs:
-    %   FrameId - Global frame identifier
-    %   currentTxScenario - Current transmitter scenario configuration
-    %   currentTxId - Current transmitter ID
-    %
-    % Outputs:
-    %   signalSegmentsPerTx - Cell array of processed signal segments
+    %   Scenario-skip identifiers (see
+    %   csrd.utils.scenario.isScenarioSkipException) are rethrown without
+    %   logging to keep the sweep log readable; everything else is logged
+    %   then rethrown for diagnostics.
 
-    % Determine which interval indices to process
-    if isfield(currentTxScenario, 'ActiveSegmentIndices')
-        activeIndices = currentTxScenario.ActiveSegmentIndices;
-    else
-        activeIndices = 1:currentTxScenario.NumSegments;
+    if ~isfield(currentTxScenario, 'ActiveSegmentIndices')
+        error('CSRD:Construction:MissingActiveSegmentIndices', ...
+            ['Frame %d, TxID %s: ActiveSegmentIndices is missing. ', ...
+             'processSingleTransmitter is the only valid source of ', ...
+             'segment fan-out after Phase 4.'], FrameId, string(currentTxId));
     end
+    activeIndices = currentTxScenario.ActiveSegmentIndices;
 
     signalSegmentsPerTx = cell(1, length(activeIndices));
 
@@ -27,11 +29,12 @@ function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentT
         try
             signalSegmentsPerTx{k} = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx);
         catch ME_seg
+            if csrd.utils.scenario.isScenarioSkipException(ME_seg)
+                rethrow(ME_seg);
+            end
             obj.logger.error('Frame %d, TxID %s, Seg %d: Error processing segment: %s', ...
                 FrameId, string(currentTxId), segIdx, ME_seg.message);
-            signalSegmentsPerTx{k} = [];
+            rethrow(ME_seg);
         end
-
     end
-
 end

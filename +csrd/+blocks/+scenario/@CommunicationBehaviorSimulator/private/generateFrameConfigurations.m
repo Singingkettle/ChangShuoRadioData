@@ -135,18 +135,14 @@ function entity = updateEntityTemporalSnapshot(obj, entity, frameId, txConfig)
     % Get or create snapshot for this frame
     snapshot = getOrCreateSnapshot(entity, frameId);
 
-    % Update temporal state with defensive access
-    if isfield(txConfig.TransmissionState, 'IsActive')
-        snapshot.Temporal.IsTransmitting = txConfig.TransmissionState.IsActive;
-    else
-        snapshot.Temporal.IsTransmitting = true;
-    end
-
-    if isfield(txConfig.TransmissionState, 'CurrentIntervalIdx')
-        snapshot.Temporal.CurrentIntervalIdx = txConfig.TransmissionState.CurrentIntervalIdx;
-    else
-        snapshot.Temporal.CurrentIntervalIdx = 1;
-    end
+    % v0.4 deep refactor: TransmissionState exposes IsActive +
+    % ActiveIntervalIndices + ActiveIntervals + FrameWindow only.
+    % These are required fields; the planner is responsible for them.
+    state = txConfig.TransmissionState;
+    snapshot.Temporal.IsTransmitting = state.IsActive;
+    snapshot.Temporal.ActiveIntervalIndices = double(state.ActiveIntervalIndices(:)');
+    snapshot.Temporal.ActiveIntervals = state.ActiveIntervals;
+    snapshot.Temporal.FrameWindow = state.FrameWindow;
 
     if isfield(txConfig, 'Temporal') && isfield(txConfig.Temporal, 'Type')
         snapshot.Temporal.PatternType = txConfig.Temporal.Type;

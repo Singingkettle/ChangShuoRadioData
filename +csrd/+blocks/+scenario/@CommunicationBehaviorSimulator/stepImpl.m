@@ -27,9 +27,39 @@ function [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities)
     obj.logger.debug('Frame %d: Processing communication behavior for %d entities', ...
         frameId, length(entities));
 
+    % Phase 1 / A4 fail-fast: if there are NO physical entities at all
+    % we cannot safely fabricate a communication behaviour. Raise a
+    % whitelisted scenario-skip exception so SimulationRunner skips this
+    % scenario instead of silently producing an empty frame.
+    if isempty(entities)
+        error('CSRD:Scenario:EmptyEntities', ...
+            ['Frame %d: No physical entities provided to ' ...
+             'CommunicationBehaviorSimulator.stepImpl. The scenario ' ...
+             'must be skipped rather than fabricated.'], frameId);
+    end
+
     workingEntities = synchronizeScenarioEntities(obj.scenarioEntities, entities, frameId);
     if isempty(workingEntities)
-        workingEntities = entities;
+        % Phase 1 / A4: previously we silently fell back to `entities`
+        % whenever synchronisation returned empty, masking real entity
+        % drift between the physical scenario layer and the cached
+        % scenarioEntities. The new behaviour distinguishes the two
+        % failure modes and raises a whitelisted scenario-skip error
+        % that SimulationRunner will translate into a "scenario
+        % skipped" record via isScenarioSkipException.
+        if ~isempty(obj.scenarioEntities)
+            error('CSRD:Scenario:EntityDriftDetected', ...
+                ['Frame %d: synchronizeScenarioEntities produced an ' ...
+                 'empty merge between %d cached scenarioEntities and ' ...
+                 '%d incoming entities. This indicates the physical ' ...
+                 'scenario layer changed entity IDs mid-scenario; ' ...
+                 'skipping rather than masking the drift.'], ...
+                frameId, numel(obj.scenarioEntities), numel(entities));
+        else
+            error('CSRD:Scenario:EmptyEntities', ...
+                ['Frame %d: synchronizeScenarioEntities produced an ' ...
+                 'empty result on the first frame; cannot proceed.'], frameId);
+        end
     end
 
     % Phase 1: Initialize scenario-level configurations on first frame

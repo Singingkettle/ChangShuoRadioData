@@ -17,7 +17,7 @@ classdef RRFSimulator < matlab.System
     properties
         StartTime (1, 1) {mustBeGreaterThanOrEqual(StartTime, 0), mustBeReal} = 0 % Start time of simulation in seconds
         DecimationFactor (1, 1) {mustBePositive, mustBeReal} = 1 % Decimation factor
-        NumReceiveAntennas (1, 1) {mustBePositive, mustBeReal} = 1 % Number of receive antennas
+        NumAntennas (1, 1) {mustBePositive, mustBeReal} = 1 % Number of receive antennas (canonical name; matches RxInfo.NumAntennas)
         BandWidth {mustBePositive, mustBeReal, mustBeInteger} = 20e6 % Receiver bandwidth in Hz (updated default)
         CenterFrequency (1, 1) {mustBeReal, mustBeInteger} = 0 % Center frequency in Hz (now allows 0 for baseband-centric)
         SampleRateOffset (1, 1) {mustBeReal} = 0 % ADC clock offset in parts per million (ppm)
@@ -54,86 +54,108 @@ classdef RRFSimulator < matlab.System
         end
 
         function LowerNoiseAmplifier = genLowerPowerAmplifier(obj)
-            % Generates and configures the nonlinear amplifier object
-            % Returns:
-            %   LowerNoiseAmplifier: Configured nonlinear amplifier object based on specified method
-            %                        Supports multiple nonlinearity models:
-            %                        - Cubic polynomial
-            %                        - Hyperbolic tangent
-            %                        - Saleh model
-            %                        - Ghorbani model
-            %                        - Modified Rapp model
-            %                        - Lookup table
+            %GENLOWERPOWERAMPLIFIER Build a comm.MemorylessNonlinearity
+            % System object for the LNA stage. The implementation follows
+            % the official MATLAB documentation Dependencies table for
+            % `comm.MemorylessNonlinearity`: each Method only has its
+            % declared properties set, in one shot via name=value, so the
+            % System object never sees off-Method writes. Unknown Methods
+            % fail fast — the v0.4 deep refactor removed the silent
+            % "default to Cubic polynomial" fallback.
 
-            if strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Cubic polynomial')
-                % Configure cubic polynomial model
-                LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
-                    Method = 'Cubic polynomial', ...
-                    LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
-                    TOISpecification = obj.MemoryLessNonlinearityConfig.TOISpecification);
-
-                % Set appropriate TOI specification parameter
-                if strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IIP3')
-                    LowerNoiseAmplifier.IIP3 = obj.MemoryLessNonlinearityConfig.IIP3;
-                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OIP3')
-                    LowerNoiseAmplifier.OIP3 = obj.MemoryLessNonlinearityConfig.OIP3;
-                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IP1dB')
-                    LowerNoiseAmplifier.IP1dB = obj.MemoryLessNonlinearityConfig.IP1dB;
-                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OP1dB')
-                    LowerNoiseAmplifier.OP1dB = obj.MemoryLessNonlinearityConfig.OP1dB;
-                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'IPsat')
-                    LowerNoiseAmplifier.IPsat = obj.MemoryLessNonlinearityConfig.IPsat;
-                elseif strcmp(obj.MemoryLessNonlinearityConfig.TOISpecification, 'OPsat')
-                    LowerNoiseAmplifier.OPsat = obj.MemoryLessNonlinearityConfig.OPsat;
-                end
-
-                % Set additional parameters for cubic polynomial model
-                LowerNoiseAmplifier.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
-                LowerNoiseAmplifier.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
-                LowerNoiseAmplifier.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
-
-            elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Hyperbolic tangent')
-                % Configure hyperbolic tangent model
-                LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
-                    Method = 'Hyperbolic tangent', ...
-                    LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
-                    IIP3 = obj.MemoryLessNonlinearityConfig.IIP3);
-                LowerNoiseAmplifier.AMPMConversion = obj.MemoryLessNonlinearityConfig.AMPMConversion;
-                LowerNoiseAmplifier.PowerLowerLimit = obj.MemoryLessNonlinearityConfig.PowerLowerLimit;
-                LowerNoiseAmplifier.PowerUpperLimit = obj.MemoryLessNonlinearityConfig.PowerUpperLimit;
-
-            elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Saleh model') || strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Ghorbani model')
-                % Configure Saleh or Ghorbani model
-                LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
-                    Method = obj.MemoryLessNonlinearityConfig.Method, ...
-                    InputScaling = obj.MemoryLessNonlinearityConfig.InputScaling, ...
-                    AMAMParameters = obj.MemoryLessNonlinearityConfig.AMAMParameters, ...
-                    AMPMParameters = obj.MemoryLessNonlinearityConfig.AMPMParameters, ...
-                    OutputScaling = obj.MemoryLessNonlinearityConfig.OutputScaling);
-            elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Modified Rapp model')
-                % Configure Modified Rapp model
-                LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
-                    Method = 'Modified Rapp model', ...
-                    LinearGain = obj.MemoryLessNonlinearityConfig.LinearGain, ...
-                    Smoothness = obj.MemoryLessNonlinearityConfig.Smoothness, ...
-                    PhaseGainRadian = obj.MemoryLessNonlinearityConfig.PhaseGainRadian, ...
-                    PhaseSaturation = obj.MemoryLessNonlinearityConfig.PhaseSaturation, ...
-                    PhaseSmoothness = obj.MemoryLessNonlinearityConfig.PhaseSmoothness, ...
-                    OutputSaturationLevel = obj.MemoryLessNonlinearityConfig.OutputSaturationLevel);
-            elseif strcmp(obj.MemoryLessNonlinearityConfig.Method, 'Lookup table')
-                % Configure Lookup table model
-                LowerNoiseAmplifier = comm.MemorylessNonlinearity( ...
-                    Method = 'Lookup table', ...
-                    Table = obj.MemoryLessNonlinearityConfig.Table);
-            else
-                warning('RRFSimulator:UnknownNonlinearityMethod', ...
-                    'Unknown nonlinearity method: %s. Using default Cubic polynomial.', ...
-                    obj.MemoryLessNonlinearityConfig.Method);
-                LowerNoiseAmplifier = comm.MemorylessNonlinearity(Method = 'Cubic polynomial');
+            cfg = obj.MemoryLessNonlinearityConfig;
+            if ~isstruct(cfg) || ~isfield(cfg, 'Method')
+                error('RRFSimulator:MissingNonlinearityConfig', ...
+                    'MemoryLessNonlinearityConfig must contain a Method field.');
             end
 
-            % Set reference impedance for all models
-            LowerNoiseAmplifier.ReferenceImpedance = obj.MemoryLessNonlinearityConfig.ReferenceImpedance;
+            method = cfg.Method;
+            switch method
+                case 'Cubic polynomial'
+                    args = obj.assembleCubicPolynomialArgs(cfg);
+                case 'Hyperbolic tangent'
+                    args = obj.assembleHyperbolicTangentArgs(cfg);
+                case 'Saleh model'
+                    args = obj.assembleSalehGhorbaniArgs(cfg, 'Saleh model');
+                case 'Ghorbani model'
+                    args = obj.assembleSalehGhorbaniArgs(cfg, 'Ghorbani model');
+                case 'Modified Rapp model'
+                    args = obj.assembleModifiedRappArgs(cfg);
+                case 'Lookup table'
+                    args = obj.assembleLookupTableArgs(cfg);
+                otherwise
+                    error('RRFSimulator:UnknownNonlinearityMethod', ...
+                        ['Unknown comm.MemorylessNonlinearity Method ' ...
+                         '"%s". Supported: Cubic polynomial, Hyperbolic ' ...
+                         'tangent, Saleh model, Ghorbani model, Modified ' ...
+                         'Rapp model, Lookup table.'], method);
+            end
+
+            if ~isfield(cfg, 'ReferenceImpedance') || isempty(cfg.ReferenceImpedance)
+                error('RRFSimulator:MissingReferenceImpedance', ...
+                    'MemoryLessNonlinearityConfig must contain ReferenceImpedance.');
+            end
+            args = [args, {'ReferenceImpedance', cfg.ReferenceImpedance}];
+
+            LowerNoiseAmplifier = comm.MemorylessNonlinearity(args{:});
+        end
+
+        function args = assembleCubicPolynomialArgs(~, cfg)
+            args = {'Method', 'Cubic polynomial', ...
+                'LinearGain', cfg.LinearGain, ...
+                'TOISpecification', cfg.TOISpecification};
+            switch cfg.TOISpecification
+                case 'IIP3',  args = [args, {'IIP3',  cfg.IIP3}];
+                case 'OIP3',  args = [args, {'OIP3',  cfg.OIP3}];
+                case 'IP1dB', args = [args, {'IP1dB', cfg.IP1dB}];
+                case 'OP1dB', args = [args, {'OP1dB', cfg.OP1dB}];
+                case 'IPsat', args = [args, {'IPsat', cfg.IPsat}];
+                case 'OPsat', args = [args, {'OPsat', cfg.OPsat}];
+                otherwise
+                    error('RRFSimulator:UnknownTOISpecification', ...
+                        'Unknown TOISpecification "%s".', cfg.TOISpecification);
+            end
+            args = [args, ...
+                {'AMPMConversion',  cfg.AMPMConversion, ...
+                 'PowerLowerLimit', cfg.PowerLowerLimit, ...
+                 'PowerUpperLimit', cfg.PowerUpperLimit}];
+        end
+
+        function args = assembleHyperbolicTangentArgs(~, cfg)
+            args = {'Method', 'Hyperbolic tangent', ...
+                'LinearGain',      cfg.LinearGain, ...
+                'IIP3',            cfg.IIP3, ...
+                'AMPMConversion',  cfg.AMPMConversion, ...
+                'PowerLowerLimit', cfg.PowerLowerLimit, ...
+                'PowerUpperLimit', cfg.PowerUpperLimit};
+        end
+
+        function args = assembleSalehGhorbaniArgs(~, cfg, methodName)
+            args = {'Method', methodName, ...
+                'InputScaling',  cfg.InputScaling, ...
+                'AMAMParameters', cfg.AMAMParameters, ...
+                'AMPMParameters', cfg.AMPMParameters, ...
+                'OutputScaling',  cfg.OutputScaling};
+        end
+
+        function args = assembleModifiedRappArgs(~, cfg)
+            args = {'Method', 'Modified Rapp model', ...
+                'LinearGain',            cfg.LinearGain, ...
+                'Smoothness',            cfg.Smoothness, ...
+                'PhaseGainRadian',       cfg.PhaseGainRadian, ...
+                'PhaseSaturation',       cfg.PhaseSaturation, ...
+                'PhaseSmoothness',       cfg.PhaseSmoothness, ...
+                'OutputSaturationLevel', cfg.OutputSaturationLevel};
+        end
+
+        function args = assembleLookupTableArgs(~, cfg)
+            if ~isfield(cfg, 'Table') || isempty(cfg.Table) || size(cfg.Table, 2) ~= 3
+                error('RRFSimulator:InvalidLookupTable', ...
+                    ['Lookup table requires an Nx3 [Pin_dBm, Pout_dBm, ' ...
+                     'dPhi_deg] matrix; the supplied Table is missing or ' ...
+                     'has the wrong shape.']);
+            end
+            args = {'Method', 'Lookup table', 'Table', cfg.Table};
         end
 
         function ThermalNoise = genThermalNoise(obj)

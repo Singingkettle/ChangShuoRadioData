@@ -1,0 +1,28 @@
+name: CSRD CI Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  matlab-smoke:
+    name: MATLAB Phase 5 Smoke
+    runs-on:
+      - self-hosted
+      - Windows
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run CSRD smoke gate
+        shell: powershell
+        run: >
+          matlab -batch
+          "addpath(pwd);
+          addpath(fullfile(pwd,'tools','ci'));
+          results = run_csrd_ci_smoke();
+          assert(results.Success);"

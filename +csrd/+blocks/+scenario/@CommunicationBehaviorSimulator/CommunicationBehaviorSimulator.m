@@ -53,7 +53,12 @@ classdef CommunicationBehaviorSimulator < matlab.System
         %
         % Configuration Structure:
         %   .FrequencyAllocation - Frequency planning configuration
-        %     .Strategy - Allocation strategy ('ReceiverCentric', 'Optimized', 'Random')
+        %     .Strategy - Allocation strategy. Phase 2 supports a single
+        %                 value: 'ReceiverCentric'. The historical
+        %                 'Optimized' and 'Random' values were thin
+        %                 wrappers around 'ReceiverCentric' and were
+        %                 removed in Phase 2 (see audit D7); any other
+        %                 value now throws CSRD:Scenario:UnsupportedFrequencyStrategy.
         %     .MinSeparation - Minimum frequency separation between signals (Hz)
         %     .MaxOverlap - Maximum allowed frequency overlap ratio
         %     .GuardBands - Guard band specifications for interference protection
@@ -143,6 +148,161 @@ classdef CommunicationBehaviorSimulator < matlab.System
         [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities)
     end
 
+    methods (Static, Hidden)
+        function rvs = projectReceiverViews(txSpectrum, rxConfigs, fallbackObservableRange)
+            % projectReceiverViews - Phase 3 ReceiverView projection algorithm
+            %
+            %   Given an emitter's placed Spectrum struct (PlannedFreqOffset
+            %   + PlannedBandwidth) and the array of receiver configs, returns
+            %   a struct array of canonical 5-field ReceiverView entries
+            %   (audit §3.1.ter A / phase-3-construction.md §3.1.A):
+            %     ReceiverId / ProjectedCenterOffsetHz / ProjectedLowerEdgeHz
+            %     / ProjectedUpperEdgeHz / IsVisible / VisibilityReason.
+            %
+            %   Inputs:
+            %     txSpectrum              - struct with fields PlannedBandwidth
+            %                                and PlannedFreqOffset (Hz)
+            %     rxConfigs               - cell array OR struct array of rx
+            %                                configs (each may carry EntityID
+            %                                and Observation.ObservableRange)
+            %     fallbackObservableRange - 2-vector used when an rx config
+            %                                does not carry its own
+            %                                ObservableRange (defaults to the
+            %                                unified observable range)
+            %
+            %   Phase 3 unified-receiver contract (§3.1.A): every Receiver
+            %   shares the same Observation.CenterFrequency, so the
+            %   ProjectedCenterOffsetHz equals txSpectrum.PlannedFreqOffset
+            %   for every (Tx, Rx) pair. Phase 4 will swap this for true
+            %   heterogeneous-rx CenterFrequency arithmetic without changing
+            %   the schema.
+            %
+            %   Hidden + Static so unit tests can drive the algorithm
+            %   without spinning up a full simulator pipeline.
+
+            if ~isstruct(txSpectrum) || ~isfield(txSpectrum, 'PlannedBandwidth') ...
+                    || ~isfield(txSpectrum, 'PlannedFreqOffset')
+                error('CSRD:Scenario:MissingSpectrum', ...
+                    ['projectReceiverViews: txSpectrum must contain ', ...
+                     'PlannedBandwidth and PlannedFreqOffset fields.']);
+            end
+
+            rxList = csrd.blocks.scenario.CommunicationBehaviorSimulator ...
+                .normalizeReceiverList(rxConfigs);
+
+            rvs = struct('ReceiverId',              {}, ...
+                          'ProjectedCenterOffsetHz', {}, ...
+                          'ProjectedLowerEdgeHz',    {}, ...
+                          'ProjectedUpperEdgeHz',    {}, ...
+                          'IsVisible',               {}, ...
+                          'VisibilityReason',        {});
+
+            halfBw = txSpectrum.PlannedBandwidth / 2;
+            placedOffset = txSpectrum.PlannedFreqOffset;
+            for m = 1:numel(rxList)
+                rxc = rxList{m};
+                rxId = '';
+                if isstruct(rxc) && isfield(rxc, 'EntityID') && ischar(rxc.EntityID)
+                    rxId = rxc.EntityID;
+                end
+                rxRange = csrd.blocks.scenario.CommunicationBehaviorSimulator ...
+                    .resolveObservableRange(rxc, fallbackObservableRange);
+                halfWin = (rxRange(2) - rxRange(1)) / 2;
+
+                % Phase 3 unified-rx case: identical CenterFrequency
+                % across every receiver, so the projection equals the
+                % placed offset.
+                projOffset = placedOffset;
+                lowerEdge  = projOffset - halfBw;
+                upperEdge  = projOffset + halfBw;
+
+                absCenter = abs(projOffset);
+                if absCenter + halfBw <= halfWin + 1
+                    isVis  = true;
+                    reason = 'InBand';
+                elseif absCenter - halfBw < halfWin
+                    isVis  = false;
+                    reason = 'EdgeClipped';
+                else
+                    isVis  = false;
+                    reason = 'OutOfBand';
+                end
+
+                rvs(end + 1) = struct( ...
+                    'ReceiverId',              rxId, ...
+                    'ProjectedCenterOffsetHz', projOffset, ...
+                    'ProjectedLowerEdgeHz',    lowerEdge, ...
+                    'ProjectedUpperEdgeHz',    upperEdge, ...
+                    'IsVisible',               isVis, ...
+                    'VisibilityReason',        reason); %#ok<AGROW>
+            end
+        end
+
+        function out = normalizeReceiverList(rxConfigs)
+            % normalizeReceiverList - Internal helper for projectReceiverViews.
+            if iscell(rxConfigs)
+                out = rxConfigs(:)';
+            elseif isstruct(rxConfigs)
+                out = arrayfun(@(k) rxConfigs(k), 1:numel(rxConfigs), ...
+                    'UniformOutput', false);
+            else
+                out = {};
+            end
+        end
+
+        function r = resolveObservableRange(rxc, fallbackRange)
+            % resolveObservableRange - Internal helper for projectReceiverViews.
+            r = fallbackRange;
+            if ~isstruct(rxc)
+                return;
+            end
+            if isfield(rxc, 'Observation') && isstruct(rxc.Observation) ...
+                    && isfield(rxc.Observation, 'ObservableRange') ...
+                    && isnumeric(rxc.Observation.ObservableRange) ...
+                    && numel(rxc.Observation.ObservableRange) == 2
+                r = rxc.Observation.ObservableRange;
+                return;
+            end
+            if isfield(rxc, 'ObservableRange') ...
+                    && isnumeric(rxc.ObservableRange) ...
+                    && numel(rxc.ObservableRange) == 2
+                r = rxc.ObservableRange;
+            end
+        end
+
+        function validateFrequencyAllocationStrategy(strategyName)
+            % validateFrequencyAllocationStrategy - Phase 2 (D7) strategy gate.
+            %
+            %   Phase 2 collapses FrequencyAllocation.Strategy down to the
+            %   single supported value 'ReceiverCentric'. The legacy
+            %   'Optimized' / 'Random' wrappers and the unknown-strategy
+            %   silent fallback in performScenarioFrequencyAllocation have
+            %   been removed (audit §3.5). Anything other than
+            %   'ReceiverCentric' must fail fast here so misconfigured
+            %   pipelines raise a deterministic, identifiable error
+            %   instead of silently degrading to ReceiverCentric.
+            %
+            %   Exposed as a Hidden static method so unit tests can drive
+            %   the gate without spinning up a full simulator pipeline.
+            isCharRow = ischar(strategyName) && (isempty(strategyName) || isrow(strategyName));
+            isStringScalar = isstring(strategyName) && isscalar(strategyName);
+            if ~(isCharRow || isStringScalar)
+                error('CSRD:Scenario:UnsupportedFrequencyStrategy', ...
+                    ['FrequencyAllocation.Strategy must be a char row or string scalar ', ...
+                     'equal to ''ReceiverCentric''; got class %s instead. ', ...
+                     '''Optimized'' / ''Random'' were thin wrappers and were removed in Phase 2.'], ...
+                    class(strategyName));
+            end
+            if ~strcmp(char(strategyName), 'ReceiverCentric')
+                error('CSRD:Scenario:UnsupportedFrequencyStrategy', ...
+                    ['FrequencyAllocation.Strategy=''%s'' is no longer supported. ', ...
+                     'Only ''ReceiverCentric'' is available; ''Optimized'' / ''Random'' ', ...
+                     'were thin wrappers and have been removed in Phase 2.'], ...
+                    char(strategyName));
+            end
+        end
+    end
+
     methods (Access = private)
         % Scenario-level configuration methods
         entities = initializeScenarioConfigurations(obj, entities)
@@ -155,10 +315,11 @@ classdef CommunicationBehaviorSimulator < matlab.System
         entities = updateEntityCommunicationState(obj, entities, txConfigs, rxConfigs)
 
         % Frequency allocation methods
-        [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, observableRange, globalLayout)
-        [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, observableRange, globalLayout)
-        [txConfigs, globalLayout] = allocateFrequenciesOptimized(obj, txConfigs, observableRange, globalLayout)
-        [txConfigs, globalLayout] = allocateFrequenciesRandom(obj, txConfigs, observableRange, globalLayout)
+        % Phase 2 (D7): single strategy only ('ReceiverCentric').
+        % Phase 3 (§3.1): rxConfigs threaded through so per-Rx
+        % ReceiverViews can be projected on top of the placed offset.
+        [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, rxConfigs, observableRange, globalLayout)
+        [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, rxConfigs, observableRange, globalLayout)
 
         % Transmission state methods
         transmissionState = calculateTransmissionState(obj, frameId, txConfig)

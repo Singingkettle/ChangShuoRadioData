@@ -1,0 +1,62 @@
+{
+  "SchemaVersion": "baseline-v04",
+  "GeneratedAt": "2026-04-27T14:33:08Z",
+  "GeneratedBy": "tests/regression/test_baseline_sweep_200.m@bc3abc4",
+  "MatlabVersion": "25.1.0.2943329 (R2025a)",
+  "OS": "win64",
+  "Mode": "full",
+  "SweepWallclockSec": 32.649335,
+  "RunRecovery": {
+    "Resume": true,
+    "NumRecoveredScenarios": 1000,
+    "AggregationWallclockSec": 32.649335,
+    "ScenarioWallclockSecSum": 33675.365512299992
+  },
+  "Recipe": {
+    "RecipeFile": "tests/regression/baseline_recipe_v0.m",
+    "RecipeSha": "07a5957018fd901e2331c98be301552f5ad4026592ea61c5c0a458ffcbf03ed8",
+    "NumScenarios": 1000,
+    "RngSeed": 2.0260424E+7,
+    "Counts": {
+      "x2p4GHz_RT_NoBuildings_OFDM": 95,
+      "x2p4GHz_RT_WithBuildings_OFDM": 190,
+      "AMBroadcast_AWGN": 48,
+      "FMBroadcast_AWGN": 48,
+      "HighSpeed_Aero_Doppler": 48,
+      "Sub3GHz_AWGN_PSKQAM": 191,
+      "Sub3GHz_RayleighMIMO_OFDM": 190,
+      "Sub3GHz_RicianMIMO_Mixed": 190
+    }
+  },
+  "ToolboxLevel": "minimal",
+  "LogPolicy": "Standard",
+  "Metrics": {
+    "BlueprintAcceptanceRate": 1,
+    "ChannelFactoryFailureRate": 0,
+    "WallclockSecPerScenarioP50": 31.505,
+    "WallclockSecPerScenarioP95": 66.285,
+    "LogLinesPerScenarioP50": 231,
+    "LogLinesPerScenarioP95": 303.5,
+    "AnnotationFileBytesP50": 12867,
+    "AnnotationFileBytesP95": 35591,
+    "ExecutionVsMeasuredBwAbsRelDiffP95": 0.022217530072084515,
+    "EmptySignalSegmentRatio": 0,
+    "BlueprintResamplesP50": 0,
+    "BlueprintResamplesP95": 0,
+    "BlueprintResamplesMax": 0,
+    "BlueprintProvenanceCoverage": 1,
+    "Diagnostics": {
+      "NumScenarioSkipped": 0,
+      "NumScenarioSkippedByReason": {},
+      "NumScenarioRayTracingNoBuildingDataHit": 0,
+      "JsonNanCount": 0,
+      "JsonInfinityCount": 0,
+      "SanitizeManifestSummary": {
+        "TotalEntries": 18241
+      },
+      "NumLowSnrExcludedFromBwMetric": 419,
+      "LowSnrFloorDb": 6,
+      "NumBwSamplesUsed": 3133
+    }
+  }
+}

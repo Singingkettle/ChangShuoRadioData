@@ -1,10 +1,13 @@
 function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, ...
-        observableRange, globalLayout)
+        rxConfigs, observableRange, globalLayout)
     % performScenarioFrequencyAllocation - Allocate fixed frequencies for scenario
     %
     % Performs intelligent frequency allocation within the receiver's
     % observable range using the configured allocation strategy. These
     % frequency allocations remain fixed throughout the entire scenario.
+    %
+    % Phase 3 (audit §3.1.ter A): rxConfigs is forwarded to the strategy
+    % function so that ReceiverViews can be projected onto every Receiver.
 
     obj.logger.debug('Scenario: Starting frequency allocation for %d transmitters', ...
         length(txConfigs));
@@ -47,23 +50,19 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
     globalLayout.ObservableRange = observableRange;
     globalLayout.TotalBandwidth = availableBW;
 
-    % Perform actual frequency allocation
-    switch obj.Config.FrequencyAllocation.Strategy
-        case 'ReceiverCentric'
-            [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, ...
-                observableRange, globalLayout);
-        case 'Optimized'
-            [txConfigs, globalLayout] = allocateFrequenciesOptimized(obj, txConfigs, ...
-                observableRange, globalLayout);
-        case 'Random'
-            [txConfigs, globalLayout] = allocateFrequenciesRandom(obj, txConfigs, ...
-                observableRange, globalLayout);
-        otherwise
-            obj.logger.warning('Unknown frequency allocation strategy: %s, using ReceiverCentric', ...
-                obj.Config.FrequencyAllocation.Strategy);
-            [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, ...
-                observableRange, globalLayout);
-    end
+    % Perform actual frequency allocation.
+    %
+    % Phase 2 (D7): only 'ReceiverCentric' is supported. The previous
+    % 'Optimized' and 'Random' strategies were thin wrappers that
+    % silently delegated to ReceiverCentric, and the otherwise branch
+    % silently fell back to ReceiverCentric with only a warning log.
+    % All silent fallbacks have been removed; any non-ReceiverCentric
+    % value now raises CSRD:Scenario:UnsupportedFrequencyStrategy via
+    % the Hidden static gate on the simulator class itself.
+    csrd.blocks.scenario.CommunicationBehaviorSimulator.validateFrequencyAllocationStrategy( ...
+        obj.Config.FrequencyAllocation.Strategy);
+    [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, ...
+        rxConfigs, observableRange, globalLayout);
 
     obj.logger.debug('Scenario: Frequency allocation completed using %s strategy', ...
         globalLayout.AllocationStrategy);

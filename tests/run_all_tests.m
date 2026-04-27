@@ -19,7 +19,8 @@ function results = run_all_tests(varargin)
 
     p = inputParser;
     addOptional(p, 'testType', 'regression', ...
-        @(x) any(validatestring(x, {'regression', 'unit', 'integration', 'all'})));
+        @(x) any(validatestring(x, {'regression', 'unit', 'integration', ...
+            'phase0', 'phase1', 'phase2', 'phase3', 'phase4', 'all'})));
     addParameter(p, 'verbose', false, @islogical);
     parse(p, varargin{:});
 
@@ -82,6 +83,51 @@ function selected = resolveSelectedSuites(testType)
             selected = {'unit'};
         case 'integration'
             selected = {'integration'};
+        case 'phase0'
+            % Phase 0 (audit §17.2) curated subset: the 6 unit tests
+            % covering validateRequiredToolboxes / LogPolicy /
+            % sanitizeForJson plus the 2 regression tests
+            % (startup_hooks, baseline_sweep). Used by Phase 0 freeze
+            % gate; faster than a full 'all' sweep.
+            selected = {'phase0'};
+        case 'phase1'
+            % Phase 1 (audit §17.3) curated subset: the 6 unit tests
+            % covering RxNumAntennasAlias / ChannelSeedBurstAware /
+            % MergeChannelOutputContract / SignalStructContract /
+            % ReceiveFactoryRxImpairments / EntitySyncFailFast /
+            % MultiBurstPerFrame, plus the dedicated regression smoke
+            % test. Faster than a full 'all' sweep; used by Phase 1
+            % freeze gate.
+            selected = {'phase1'};
+        case 'phase2'
+            % Phase 2 (audit §17.4) curated subset: BlueprintFeasibilityValidator
+            % + ValidationReport + ScenarioFactoryResampleLoop +
+            % AnnotationHeaderBlueprintProvenance + ProfileLoader +
+            % ComputeBlueprintHash + ChannelFactoryNoSilentFallback +
+            % FrequencyAllocationStrategy unit tests, plus the Phase 2
+            % dead-code regression. Faster than 'all'; used by Phase 2
+            % freeze gate.
+            selected = {'phase2'};
+        case 'phase3'
+            % Phase 3 (audit §17.5 / phase-3-construction.md §3.6)
+            % curated subset: the 7 Phase 3 unit tests
+            % (ReceiverViewProjection / ConstructionFailFast /
+            % ChannelPropagationFailFast / SetupReceiversFailFast /
+            % MobilityFromBlueprint / CatchSwallowRemoved /
+            % ProvenanceDataflow) plus 2 regressions
+            % (test_no_dead_code_phase3 + test_phase3_construction_smoke).
+            selected = {'phase3'};
+        case 'phase4'
+            % Phase 4 (audit §17.6 / phase-4-measurement.md §6) curated
+            % subset: the 6 Phase 4 unit tests pinning the measurement
+            % package + Doppler + v2 schema + ReceiverView persistence +
+            % MeasurementCompleteness hook contracts, plus 3 Phase 4
+            % regressions (no_dead_code, doppler high-speed deterministic,
+            % measured_truth_coverage). The 210-scenario baseline sweep
+            % is intentionally excluded; it runs separately via
+            % test_baseline_sweep_200(210, 'Mode', 'full') to gate the
+            % Phase 4 freeze on the 9 §6 exit conditions.
+            selected = {'phase4'};
         case 'all'
             selected = {'regression', 'unit', 'integration'};
         otherwise
@@ -93,6 +139,44 @@ end
 
 function records = runSuite(suite, testsDir, verbose)
     records = [];
+
+    if strcmp(suite, 'phase0')
+        % Phase 0 has no dedicated subfolder; it stitches together
+        % curated tests from tests/unit and tests/regression.
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase0Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase1')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase1Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase2')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase2Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase3')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase3Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase4')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase4Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
     suiteDir = fullfile(testsDir, suite);
     if ~isfolder(suiteDir)
         fprintf('-- Skipping suite "%s" (no folder %s)\n\n', suite, suiteDir);
@@ -108,6 +192,324 @@ function records = runSuite(suite, testsDir, verbose)
             records = runUnittestSuite(suite, suiteDir, verbose);
     end
     fprintf('\n');
+end
+
+
+function records = runPhase0Suite(testsDir, verbose)
+    % Phase 0 curated suite: 6 unit tests + the startup-hooks regression
+    % test + a smoke baseline sweep. Skips the canonical 200-scenario
+    % sweep because that one is operator-driven (see
+    % phase-0-baseline.md §3 / §9). Use
+    % `test_baseline_sweep_200(200, 'Mode', 'full')` directly to run
+    % the full canonical sweep.
+
+    suiteDir = fullfile(testsDir, 'unit');
+    addpath(suiteDir);
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase0Unit = { ...
+        'ValidateRequiredToolboxesTest', ...
+        'LogPolicyDevTest', ...
+        'LogPolicyLargeMCTest', ...
+        'SanitizeForJsonBasicTest', ...
+        'SanitizeForJsonRecursiveTest', ...
+        'SanitizeForJsonComplexAllowlistTest'};
+
+    for i = 1:numel(phase0Unit)
+        className = phase0Unit{i};
+        fprintf('  Running %s ... ', className);
+        testStart = tic;
+        try
+            r = runtests(className);
+            duration = toc(testStart);
+            allPassed = ~any([r.Failed]) && ~any([r.Incomplete]);
+            if allPassed
+                fprintf('PASS (%d cases, %.2fs)\n', numel(r), duration);
+                rec = buildRecord(className, 'phase0', true, duration, "");
+            else
+                failures = sum([r.Failed]) + sum([r.Incomplete]);
+                fprintf('FAIL (%d/%d, %.2fs)\n', failures, numel(r), duration);
+                rec = buildRecord(className, 'phase0', false, duration, ...
+                    sprintf('%d failed cases', failures));
+            end
+        catch ME
+            duration = toc(testStart);
+            fprintf('FAIL (%.2fs)\n', duration);
+            rec = buildRecord(className, 'phase0', false, duration, ...
+                string(ME.message));
+            if verbose
+                fprintf('%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            end
+        end
+        records = [records; rec]; %#ok<AGROW>
+    end
+
+    phase0Reg = { ...
+        'test_simulation_runner_startup_hooks', ...
+        'test_baseline_sweep_200'}; % default smoke mode (N=12)
+
+    for i = 1:numel(phase0Reg)
+        testName = phase0Reg{i};
+        fprintf('  Running %s ... ', testName);
+        testStart = tic;
+        try
+            feval(testName);
+            duration = toc(testStart);
+            fprintf('PASS (%.2fs)\n', duration);
+            rec = buildRecord(testName, 'phase0', true, duration, "");
+        catch ME
+            duration = toc(testStart);
+            fprintf('FAIL (%.2fs)\n', duration);
+            rec = buildRecord(testName, 'phase0', false, duration, ...
+                string(ME.message));
+            if verbose
+                fprintf('%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            else
+                fprintf('    %s\n', ME.message);
+            end
+        end
+        records = [records; rec]; %#ok<AGROW>
+    end
+end
+
+
+function records = runPhase1Suite(testsDir, verbose)
+    % Phase 1 curated suite: 7 unit tests (Phase 1 / A1 A2 A4 H13 H14
+    % C1) + 1 regression smoke test (test_phase1_dataflow_smoke). The
+    % 200-scenario baseline sweep is intentionally excluded here; it is
+    % run separately via test_baseline_sweep_200(200, 'Mode', 'full')
+    % to gate the Phase 1 freeze on the 7 exit criteria.
+
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase1Unit = { ...
+        'RxNumAntennasAliasTest', ...
+        'ChannelSeedBurstAwareTest', ...
+        'MergeChannelOutputContractTest', ...
+        'SignalStructContractTest', ...
+        'ReceiveFactoryRxImpairmentsTest', ...
+        'EntitySyncFailFastTest', ...
+        'MultiBurstPerFrameTest'};
+
+    for i = 1:numel(phase1Unit)
+        className = phase1Unit{i};
+        fprintf('  Running %s ... ', className);
+        testStart = tic;
+        try
+            r = runtests(className);
+            duration = toc(testStart);
+            allPassed = ~any([r.Failed]) && ~any([r.Incomplete]);
+            if allPassed
+                fprintf('PASS (%d cases, %.2fs)\n', numel(r), duration);
+                rec = buildRecord(className, 'phase1', true, duration, "");
+            else
+                failures = sum([r.Failed]) + sum([r.Incomplete]);
+                fprintf('FAIL (%d/%d, %.2fs)\n', failures, numel(r), duration);
+                rec = buildRecord(className, 'phase1', false, duration, ...
+                    sprintf('%d failed cases', failures));
+            end
+        catch ME
+            duration = toc(testStart);
+            fprintf('FAIL (%.2fs)\n', duration);
+            rec = buildRecord(className, 'phase1', false, duration, ...
+                string(ME.message));
+            if verbose
+                fprintf('%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            end
+        end
+        records = [records; rec]; %#ok<AGROW>
+    end
+
+    phase1Reg = { 'test_phase1_dataflow_smoke' };
+    for i = 1:numel(phase1Reg)
+        testName = phase1Reg{i};
+        fprintf('  Running %s ... ', testName);
+        testStart = tic;
+        try
+            feval(testName);
+            duration = toc(testStart);
+            fprintf('PASS (%.2fs)\n', duration);
+            rec = buildRecord(testName, 'phase1', true, duration, "");
+        catch ME
+            duration = toc(testStart);
+            fprintf('FAIL (%.2fs)\n', duration);
+            rec = buildRecord(testName, 'phase1', false, duration, ...
+                string(ME.message));
+            if verbose
+                fprintf('%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            else
+                fprintf('    %s\n', ME.message);
+            end
+        end
+        records = [records; rec]; %#ok<AGROW>
+    end
+end
+
+
+function records = runPhase2Suite(testsDir, verbose)
+    % Phase 2 (audit §17.4) curated suite: the 8 unit tests covering the
+    % BlueprintFeasibilityValidator + ValidationReport + ScenarioFactory
+    % resample loop + Header.Runtime provenance + Profile loader +
+    % BlueprintHash + ChannelFactory silent-fallback removal +
+    % FrequencyAllocation strategy gate, plus the Phase 2 dead-code
+    % regression. The 200-scenario baseline sweep is intentionally
+    % excluded; it runs separately via test_baseline_sweep_200(200, 'Mode', 'full')
+    % to gate the Phase 2 freeze.
+
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase2Unit = { ...
+        'BlueprintFeasibilityValidatorTest', ...
+        'ValidationReportTest', ...
+        'ScenarioFactoryResampleLoopTest', ...
+        'AnnotationHeaderBlueprintProvenanceTest', ...
+        'ProfileLoaderTest', ...
+        'ComputeBlueprintHashTest', ...
+        'ChannelFactoryNoSilentFallbackTest', ...
+        'FrequencyAllocationStrategyTest'};
+    records = appendUnittestClasses(records, phase2Unit, 'phase2', verbose);
+
+    phase2Reg = { 'test_no_dead_code_phase2' };
+    records = appendRegressionTests(records, phase2Reg, 'phase2', verbose);
+end
+
+
+function records = runPhase3Suite(testsDir, verbose)
+    % Phase 3 (audit §17.5 / phase-3-construction.md §3.6) curated suite:
+    % the 7 Phase 3 unit tests pinning the strict-construction +
+    % ReceiverViews + provenance dataflow contracts, plus 2 Phase 3
+    % regressions. The 200-scenario baseline sweep is intentionally
+    % excluded; it runs separately via test_baseline_sweep_200(200, 'Mode', 'full')
+    % to gate the Phase 3 freeze on the 9 §7 exit criteria.
+
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase3Unit = { ...
+        'ReceiverViewProjectionTest', ...
+        'ConstructionFailFastTest', ...
+        'ChannelPropagationFailFastTest', ...
+        'SetupReceiversFailFastTest', ...
+        'MobilityFromBlueprintTest', ...
+        'CatchSwallowRemovedTest', ...
+        'ProvenanceDataflowTest'};
+    records = appendUnittestClasses(records, phase3Unit, 'phase3', verbose);
+
+    phase3Reg = { ...
+        'test_no_dead_code_phase3', ...
+        'test_phase3_construction_smoke'};
+    records = appendRegressionTests(records, phase3Reg, 'phase3', verbose);
+end
+
+
+function records = runPhase4Suite(testsDir, verbose)
+    % Phase 4 (audit §17.6 / phase-4-measurement.md §6) curated suite.
+    %
+    %   Pins the Phase 4 measurement-layer + Doppler + Annotation v2
+    %   contracts via 6 unit tests + 3 regression tests. The
+    %   210-scenario baseline sweep is intentionally excluded here; it
+    %   is operator-driven via `test_baseline_sweep_200(210, 'Mode',
+    %   'full')` to gate the Phase 4 freeze on the 9 §6 exit
+    %   conditions.
+
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase4Unit = { ...
+        'MeasurementPackageTest', ...
+        'ApplyDopplerShiftTest', ...
+        'BuildSourceAnnotationV2Test', ...
+        'ReceiverViewPersistenceTest', ...
+        'MeasurementCompletenessHookTest', ...
+        'BlueprintFeasibilityValidatorTest'};
+    records = appendUnittestClasses(records, phase4Unit, 'phase4', verbose);
+
+    phase4Reg = { ...
+        'test_no_dead_code_phase4', ...
+        'test_doppler_high_speed', ...
+        'test_measured_truth_coverage'};
+    records = appendRegressionTests(records, phase4Reg, 'phase4', verbose);
+end
+
+
+function records = appendUnittestClasses(records, classNames, category, verbose)
+    %APPENDUNITTESTCLASSES Phase 2/3 curated-suite helper.
+    %
+    %   Runs each matlab.unittest class via runtests, prints PASS/FAIL,
+    %   and appends a record (one per class) into the running records
+    %   table. Uses the same exception handling shape as runPhase0Suite /
+    %   runPhase1Suite so curated-suite output stays consistent across
+    %   phases.
+    for i = 1:numel(classNames)
+        className = classNames{i};
+        fprintf('  Running %s ... ', className);
+        testStart = tic;
+        try
+            r = runtests(className);
+            duration = toc(testStart);
+            allPassed = ~any([r.Failed]) && ~any([r.Incomplete]);
+            if allPassed
+                fprintf('PASS (%d cases, %.2fs)\n', numel(r), duration);
+                rec = buildRecord(className, category, true, duration, "");
+            else
+                failures = sum([r.Failed]) + sum([r.Incomplete]);
+                fprintf('FAIL (%d/%d, %.2fs)\n', failures, numel(r), duration);
+                rec = buildRecord(className, category, false, duration, ...
+                    sprintf('%d failed cases', failures));
+                if verbose
+                    for k = 1:numel(r)
+                        if r(k).Failed || r(k).Incomplete
+                            fprintf('    - %s\n', r(k).Name);
+                        end
+                    end
+                end
+            end
+        catch ME
+            duration = toc(testStart);
+            fprintf('FAIL (%.2fs)\n', duration);
+            rec = buildRecord(className, category, false, duration, ...
+                string(ME.message));
+            if verbose
+                fprintf('%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            end
+        end
+        records = [records; rec]; %#ok<AGROW>
+    end
+end
+
+
+function records = appendRegressionTests(records, testNames, category, verbose)
+    %APPENDREGRESSIONTESTS Phase 2/3 curated-suite helper for regression
+    %tests (top-level functions named test_*).
+    for i = 1:numel(testNames)
+        testName = testNames{i};
+        fprintf('  Running %s ... ', testName);
+        testStart = tic;
+        try
+            feval(testName);
+            duration = toc(testStart);
+            fprintf('PASS (%.2fs)\n', duration);
+            rec = buildRecord(testName, category, true, duration, "");
+        catch ME
+            duration = toc(testStart);
+            fprintf('FAIL (%.2fs)\n', duration);
+            rec = buildRecord(testName, category, false, duration, ...
+                string(ME.message));
+            if verbose
+                fprintf('%s\n', getReport(ME, 'extended', 'hyperlinks', 'off'));
+            else
+                fprintf('    %s\n', ME.message);
+            end
+        end
+        records = [records; rec]; %#ok<AGROW>
+    end
 end
 
 

@@ -82,6 +82,18 @@ classdef SimulationRunner < matlab.System
         % Time tracking properties for progress monitoring
         workerStartTimes % Map to store start time for each worker
         workerScenarioCounts % Map to store total scenario count for each worker
+
+        % --- Phase 0 (audit §17.2 / phase-0-baseline.md §6) ---
+        % toolboxLevel: which toolbox tier was validated at startup
+        % ('minimal'|'standard'|'full'); defaults to 'standard' when
+        % RunnerConfig.Toolbox.Level is absent.
+        toolboxLevel
+
+        % logPolicyDescription: cached struct returned by
+        % csrd.utils.logger.policy.LogPolicy.describe(); appended to every
+        % annotation under Header.Runtime.LogPolicy so post-hoc analyses
+        % can tell which logging tier produced a given annotation file.
+        logPolicyDescription
     end
 
     methods
@@ -129,7 +141,19 @@ classdef SimulationRunner < matlab.System
             % Initialize logger from GlobalLogManager
             obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
 
+            % --- Phase 0 change #2: apply LogPolicy ---
+            % Order matters: apply BEFORE the first debug() so the very
+            % next line is already filtered correctly when running under
+            % LargeMC. See phase-0-baseline.md §6.2.
+            obj.applyLogPolicyFromConfig();
+
             obj.logger.debug('SimulationRunner setupImpl started. Initializing scenario-driven execution...');
+
+            % --- Phase 0 change #1: validate required toolboxes ---
+            % Fail-fast on missing toolboxes so a long sweep does not
+            % crash 4 hours in with a cryptic factory error. See
+            % phase-0-baseline.md §6.1.
+            obj.validateToolboxesFromConfig();
 
             % Get total number of scenarios from RunnerConfig
             if isfield(obj.RunnerConfig, 'NumScenarios') && isnumeric(obj.RunnerConfig.NumScenarios) && obj.RunnerConfig.NumScenarios > 0
@@ -285,8 +309,22 @@ classdef SimulationRunner < matlab.System
                 % ChangShuo determines frame count from scenario configuration internally
                 [scenarioData, scenarioAnnotation] = step(changShuoEngine, scenarioId);
 
+                % Phase 3 (audit §3.5 / §17.5 P3-7): capture blueprint
+                % provenance via the public read-only `LastGlobalLayout`
+                % property + `csrd.core.ChangShuo.extractProvenanceFromGlobalLayout`
+                % static helper. The legacy
+                % `getScenarioBlueprintProvenance` Hidden accessor + try/catch
+                % + ismethod ladder was removed in Phase 3 / S7. The helper
+                % returns a fully-populated three-key struct even on a fresh
+                % engine (LastGlobalLayout = struct()), so no defensive
+                % wrapping is needed here.
+                blueprintProvenance = ...
+                    csrd.core.ChangShuo.extractProvenanceFromGlobalLayout( ...
+                        changShuoEngine.LastGlobalLayout);
+
                 % Save scenario data and annotation
-                obj.saveScenarioData(scenarioData, scenarioAnnotation, scenarioId, workerId);
+                obj.saveScenarioData(scenarioData, scenarioAnnotation, ...
+                    scenarioId, workerId, blueprintProvenance);
 
                 obj.logger.debug('Worker %d, Scenario %d: Data saved successfully', workerId, scenarioId);
 
@@ -329,8 +367,24 @@ classdef SimulationRunner < matlab.System
             obj.logger.debug('ChangShuo engine configured for scenario %d', scenarioId);
         end
 
-        function saveScenarioData(obj, scenarioData, scenarioAnnotation, scenarioId, workerId)
+        function saveScenarioData(obj, scenarioData, scenarioAnnotation, ...
+                scenarioId, workerId, blueprintProvenance)
             % saveScenarioData - Save scenario data and annotation to files
+            %
+            % Phase 2 (audit C4) added the optional `blueprintProvenance`
+            % argument carrying BlueprintHash / BlueprintResamples /
+            % ValidatorVersion captured from the ScenarioFactory before
+            % the engine is torn down. Callers are responsible for
+            % materialising it; if absent we default to an empty struct
+            % so legacy paths continue to work during incremental
+            % rollouts (the annotation will then carry empty strings,
+            % not missing fields, satisfying the C4 schema invariant).
+            if nargin < 6 || ~isstruct(blueprintProvenance)
+                blueprintProvenance = struct( ...
+                    'BlueprintHash', '', ...
+                    'BlueprintResamples', 0, ...
+                    'ValidatorVersion', '');
+            end
 
             % Save scenario data
             scenarioDataPath = fullfile(obj.actualOutputDirectory, 'scenarios', ...
@@ -354,15 +408,37 @@ classdef SimulationRunner < matlab.System
             annotationPath = fullfile(obj.actualOutputDirectory, 'annotations', ...
                 sprintf('scenario_%06d_annotation.json', scenarioId));
 
-            try
-                % Add metadata to annotation
-                if isstruct(scenarioAnnotation)
-                    scenarioAnnotation.ScenarioId = scenarioId;
-                    scenarioAnnotation.ProcessedBy = sprintf('Worker_%d', workerId);
-                    scenarioAnnotation.SavedAt = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
-                end
+            % v0.4 deep refactor: scenario / processing / save metadata
+            % is the single responsibility of stampRuntimeHeader and
+            % lives exclusively under Header.Runtime. The transitional
+            % top-level ScenarioId / ProcessedBy / SavedAt mirror that
+            % Phase 0 carried for "v2 migration" has been dropped to
+            % keep the annotation schema unambiguous.
+            [cleanAnnotation, sanitizeManifest] = ...
+                csrd.utils.annotation.sanitizeForJson(scenarioAnnotation);
 
-                jsonString = jsonencode(scenarioAnnotation, 'PrettyPrint', true);
+            cleanAnnotation = obj.stampRuntimeHeader( ...
+                cleanAnnotation, sanitizeManifest, scenarioId, workerId, ...
+                blueprintProvenance);
+
+            % Phase 4 (audit §17.6 / §S7 / C4): annotation write-back
+            % hook. The static helper raises CSRD:Annotation:* if any
+            % SignalSources(k) is missing a v2 top-level key or any
+            % Truth.Measured.{SourcePlane,FramePlane} required scalar.
+            % We deliberately let it propagate OUT of saveScenarioData
+            % so the upstream `engineError` catch in `processScenario`
+            % can run it through `isScenarioSkipException` (Phase 4
+            % whitelisted the `CSRD:Annotation:` token) and demote the
+            % failure to a per-scenario skip instead of fatal-aborting
+            % the entire sweep. Wrapping it in a local try/catch here
+            % would silently swallow the contract violation, which is
+            % exactly the silent-fallback class of bug Phase 4 is
+            % designed to flush out -- so do NOT add try/catch around
+            % this call.
+            csrd.core.ChangShuo.validateMeasurementCompleteness(cleanAnnotation);
+
+            try
+                jsonString = jsonencode(cleanAnnotation, 'PrettyPrint', true);
                 fid = fopen(annotationPath, 'w');
 
                 if fid == -1
@@ -378,6 +454,114 @@ classdef SimulationRunner < matlab.System
                     scenarioId, saveError.message);
             end
 
+        end
+
+        function validateToolboxesFromConfig(obj)
+            % Phase 0: resolve tier from RunnerConfig.Toolbox.Level (or
+            % default to 'standard'), then call the shared validator.
+
+            obj.toolboxLevel = 'standard';
+            if isfield(obj.RunnerConfig, 'Toolbox') ...
+                    && isstruct(obj.RunnerConfig.Toolbox) ...
+                    && isfield(obj.RunnerConfig.Toolbox, 'Level') ...
+                    && ~isempty(obj.RunnerConfig.Toolbox.Level)
+                obj.toolboxLevel = lower(char(obj.RunnerConfig.Toolbox.Level));
+            end
+
+            try
+                report = csrd.utils.toolbox.validateRequiredToolboxes( ...
+                    obj.toolboxLevel);
+                obj.logger.info(['Toolbox validation passed at level ', ...
+                    '"%s" (%d toolboxes checked).'], ...
+                    obj.toolboxLevel, numel(report.Required));
+            catch toolboxErr
+                % Re-emit through logger before rethrow so the failure
+                % is visible in the rolling log file as well, not only
+                % on the console.
+                obj.logger.critical(['Toolbox validation FAILED at level ', ...
+                    '"%s": %s'], obj.toolboxLevel, toolboxErr.message);
+                rethrow(toolboxErr);
+            end
+        end
+
+        function applyLogPolicyFromConfig(obj)
+            % Phase 0: read RunnerConfig.Log.Policy (default 'Standard'),
+            % apply via LogPolicy, and cache the description for later
+            % stamping into annotations.
+
+            policyLevel = 'Standard';
+            if isfield(obj.RunnerConfig, 'Log') ...
+                    && isstruct(obj.RunnerConfig.Log) ...
+                    && isfield(obj.RunnerConfig.Log, 'Policy') ...
+                    && ~isempty(obj.RunnerConfig.Log.Policy)
+                policyLevel = char(obj.RunnerConfig.Log.Policy);
+            end
+
+            policy = csrd.utils.logger.policy.LogPolicy(policyLevel);
+            policy.apply();
+            obj.logPolicyDescription = policy.describe();
+        end
+
+        function annotation = stampRuntimeHeader( ...
+                obj, annotation, sanitizeManifest, scenarioId, workerId, ...
+                blueprintProvenance)
+            %STAMPRUNTIMEHEADER Wrap and stamp scenario annotation metadata.
+            %
+            %   The saved annotation JSON is always shaped as
+            %       {
+            %         "Header": { "Runtime": { ... mandatory keys ... } },
+            %         "Frames": <ChangShuo.stepImpl raw output>
+            %       }
+            %   with the following mandatory Header.Runtime keys (Phase 2):
+            %       LogPolicy / ToolboxLevel / ScenarioId / WorkerId /
+            %       SavedAt / SanitizeManifest /
+            %       BlueprintHash / BlueprintResamples / ValidatorVersion
+            %
+            %   The last three keys are the Phase 2 (audit C4) blueprint
+            %   provenance: they let downstream tooling (baseline sweep,
+            %   AI/ML data pipelines) reason about which canonical
+            %   blueprint produced this annotation and how many resample
+            %   attempts were needed before the BlueprintFeasibilityValidator
+            %   accepted it. They are always written; missing values
+            %   collapse to empty string / 0 so the schema is invariant.
+            %
+            %   ChangShuo.stepImpl always returns a cell array (per-frame,
+            %   per-receiver). To keep the on-disk schema uniform we wrap
+            %   any non-struct payload under `Frames`. When the upstream
+            %   payload is already a struct that contains a `Frames` field
+            %   we leave it as-is (it already follows the contract).
+
+            if nargin < 6 || ~isstruct(blueprintProvenance)
+                blueprintProvenance = struct( ...
+                    'BlueprintHash', '', ...
+                    'BlueprintResamples', 0, ...
+                    'ValidatorVersion', '');
+            end
+
+            if ~isstruct(annotation)
+                wrapped = struct();
+                wrapped.Frames = annotation;
+                annotation = wrapped;
+            elseif ~isfield(annotation, 'Frames')
+                payload = annotation;
+                annotation = struct();
+                annotation.Frames = payload;
+            end
+
+            annotation.Header = struct();
+            annotation.Header.Runtime = struct();
+            annotation.Header.Runtime.LogPolicy        = obj.logPolicyDescription;
+            annotation.Header.Runtime.ToolboxLevel     = obj.toolboxLevel;
+            annotation.Header.Runtime.ScenarioId       = scenarioId;
+            annotation.Header.Runtime.WorkerId         = workerId;
+            annotation.Header.Runtime.SavedAt          = char(datetime('now', ...
+                'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z''', 'TimeZone', 'UTC'));
+            annotation.Header.Runtime.SanitizeManifest = sanitizeManifest;
+
+            % Phase 2 (audit §3.4 / C4) blueprint provenance.
+            annotation.Header.Runtime = ...
+                csrd.SimulationRunner.injectBlueprintProvenance( ...
+                    annotation.Header.Runtime, blueprintProvenance);
         end
 
         function [startScenario, endScenario, scenarioCount] = calculateScenarioDistribution(obj, workerId, numWorkers)
@@ -602,6 +786,73 @@ classdef SimulationRunner < matlab.System
                 error('SimulationRunner:ConfigError', 'FactoryConfigs must be a struct.');
             end
 
+        end
+
+    end
+
+    methods (Static, Hidden)
+
+        function runtimeHeader = injectBlueprintProvenance(runtimeHeader, provenance)
+            % injectBlueprintProvenance - Phase 2 (audit C4) helper that
+            % stamps the BlueprintHash / BlueprintResamples /
+            % ValidatorVersion fields onto a Header.Runtime struct.
+            %
+            % Exposed as a Hidden static method so unit tests can
+            % exercise the schema invariant directly without spinning up
+            % a full SimulationRunner. Production code calls this from
+            % stampRuntimeHeader (the only legitimate writer).
+            %
+            % Schema invariant:
+            %   * BlueprintHash      -> char row, defaults to ''
+            %   * BlueprintResamples -> finite double, defaults to 0
+            %   * ValidatorVersion   -> char row, defaults to ''
+            % Non-finite, non-numeric, or otherwise malformed inputs
+            % collapse to the canonical defaults so JSON round-trip is
+            % deterministic and the schema is always present.
+            if ~isstruct(runtimeHeader)
+                runtimeHeader = struct();
+            end
+            if nargin < 2 || ~isstruct(provenance)
+                provenance = struct();
+            end
+
+            runtimeHeader.BlueprintHash = ...
+                csrd.SimulationRunner.coerceProvenanceString(provenance, 'BlueprintHash');
+            runtimeHeader.BlueprintResamples = ...
+                csrd.SimulationRunner.coerceProvenanceScalar(provenance, 'BlueprintResamples');
+            runtimeHeader.ValidatorVersion = ...
+                csrd.SimulationRunner.coerceProvenanceString(provenance, 'ValidatorVersion');
+        end
+
+        function s = coerceProvenanceString(provenance, key)
+            % Phase 2 helper: defensive string coercion so a malformed
+            % provenance struct cannot crash the annotation-save path.
+            % Char rows and string scalars survive; everything else
+            % collapses to ''.
+            s = '';
+            if isstruct(provenance) && isfield(provenance, key) ...
+                    && ~isempty(provenance.(key))
+                v = provenance.(key);
+                if ischar(v) && (isempty(v) || isrow(v))
+                    s = v;
+                elseif isstring(v) && isscalar(v)
+                    s = char(v);
+                end
+            end
+        end
+
+        function v = coerceProvenanceScalar(provenance, key)
+            % Phase 2 helper: defensive scalar coercion that always
+            % produces a finite double; non-finite or non-numeric values
+            % collapse to 0 so JSON round-trip is safe.
+            v = 0;
+            if isstruct(provenance) && isfield(provenance, key) ...
+                    && ~isempty(provenance.(key)) ...
+                    && isnumeric(provenance.(key)) ...
+                    && isscalar(provenance.(key)) ...
+                    && isfinite(provenance.(key))
+                v = double(provenance.(key));
+            end
         end
 
     end

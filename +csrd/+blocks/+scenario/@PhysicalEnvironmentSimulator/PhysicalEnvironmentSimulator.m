@@ -200,8 +200,10 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         initializeEnvironment(obj)
         initializeMobilityModels(obj)
 
-        % Utility methods
-        mobilityModel = assignMobilityModel(obj, entityType, entityID)
+        % Utility methods (Phase 3 note: assignMobilityModel was promoted
+        % to a Static, Hidden method below so it can be unit-tested
+        % without instantiating the full simulator. The legacy random
+        % fallback has been removed.)
         maxSpeed = getMaxSpeedForEntityType(obj, entityType)
         entityProperties = initializeEntityProperties(obj, entityType)
         constrainedPosition = applyBoundaryConstraints(obj, position)
@@ -225,6 +227,80 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         initializeOSMMap(obj)
         hasBuildings = checkOSMHasBuildings(obj, osmFile)
         initializeStatisticalMap(obj)
+    end
+
+    methods (Static, Hidden)
+
+        function mobilityModel = assignMobilityModel(entityType, entityConfig)
+            %ASSIGNMOBILITYMODEL Phase 3 strict-construction mobility resolver.
+            %
+            % In Phase 3 (audit §3.1.ter / §17.5 P3-followup) the per-entity
+            % mobility model MUST be supplied explicitly through the
+            % physical-environment configuration. The legacy fallback that
+            % randomly chose among `{'RandomWalk', 'Waypoint', 'Stationary'}`
+            % for transmitters has been removed because it silently
+            % destroyed run reproducibility and could not be tied back to
+            % any blueprint provenance.
+            %
+            % Inputs:
+            %   entityType   - 'Transmitter' or 'Receiver' (used for
+            %                  diagnostic messages).
+            %   entityConfig - Per-entity-type config slice. Accepts either
+            %                    entityConfig.Mobility.Model
+            %                       (canonical layout produced by
+            %                        config/_base_/factories/scenario_factory.m
+            %                        and ScenarioFactory.getPhysicalEnvironmentConfig)
+            %                  or
+            %                    entityConfig.MobilityModel
+            %                       (flat alternate kept for unit tests).
+            %
+            % Output:
+            %   mobilityModel - Resolved mobility model name (char vector).
+            %
+            % Errors:
+            %   CSRD:Construction:MissingMobilityModel - Raised when neither
+            %       supported field is present / non-empty / a valid string.
+            %       The identifier is on the scenario-skip whitelist
+            %       (+csrd/+utils/+scenario/isScenarioSkipException.m).
+
+            if nargin < 2
+                error('CSRD:Construction:MissingMobilityModel', ...
+                    ['assignMobilityModel: entityConfig is required ', ...
+                     '(Phase 3 removed the random fallback). Pass the ', ...
+                     'per-entity-type slice, e.g. ', ...
+                     'obj.Config.Entities.Transmitters.']);
+            end
+
+            if isstruct(entityConfig) && isfield(entityConfig, 'Mobility') ...
+                    && isstruct(entityConfig.Mobility) ...
+                    && isfield(entityConfig.Mobility, 'Model')
+                candidate = entityConfig.Mobility.Model;
+            elseif isstruct(entityConfig) && isfield(entityConfig, 'MobilityModel')
+                candidate = entityConfig.MobilityModel;
+            else
+                error('CSRD:Construction:MissingMobilityModel', ...
+                    ['assignMobilityModel: %s entity config lacks an ', ...
+                     'explicit Mobility.Model (or MobilityModel) field. ', ...
+                     'Phase 3 requires the mobility selection to be ', ...
+                     'carried in the blueprint; see ', ...
+                     'config/_base_/factories/scenario_factory.m for ', ...
+                     'the canonical layout.'], entityType);
+            end
+
+            if isstring(candidate)
+                candidate = char(candidate);
+            end
+
+            if ~ischar(candidate) || isempty(strtrim(candidate))
+                error('CSRD:Construction:MissingMobilityModel', ...
+                    ['assignMobilityModel: %s entity Mobility.Model must ', ...
+                     'be a non-empty char vector / string. Got %s.'], ...
+                    entityType, class(candidate));
+            end
+
+            mobilityModel = candidate;
+        end
+
     end
 
 end

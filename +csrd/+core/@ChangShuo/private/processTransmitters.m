@@ -1,35 +1,36 @@
 function [txsSignalSegments, TxInfos] = processTransmitters(obj, FrameId, numTxThisFrame)
-    % processTransmitters - Process all transmitters in the current frame
+    %PROCESSTRANSMITTERS Phase 3 strict-construction transmitter fan-out.
     %
-    % This method orchestrates the processing of all transmitters including
-    % message generation, modulation, and signal segment creation.
+    %   Iterates every transmitter scheduled for FrameId and dispatches to
+    %   processSingleTransmitter. Phase 3 (audit §3.4 / §17.5 P3-6) removed
+    %   the previous catch-swallow that turned any per-Tx exception into a
+    %   `Status='Error_TransmitterProcessing'` sentinel and an empty signal
+    %   segments cell. Errors now propagate to generateSingleFrame, which
+    %   routes scenario-skip identifiers (see
+    %   csrd.utils.scenario.isScenarioSkipException) up to SimulationRunner
+    %   and turns truly unexpected crashes into a hard frame-level failure.
     %
-    % Inputs:
-    %   FrameId - Global frame identifier
-    %   numTxThisFrame - Number of transmitters to process
-    %
-    % Outputs:
-    %   txsSignalSegments - Cell array of signal segments per transmitter
-    %   TxInfos - Cell array of transmitter information structures
+    %   The skip-vs-crash contract is intentionally identical to the one in
+    %   processTransmitterSegments / ReceiveFactory so a missing-config
+    %   bug in any layer surfaces consistently.
 
     obj.logger.debug("Frame %d: Processing %d transmitter(s).", FrameId, numTxThisFrame);
 
     txsSignalSegments = cell(1, numTxThisFrame);
     TxInfos = cell(1, numTxThisFrame);
 
-    % Loop through transmitters based on ScenarioConfig
     for txIdx = 1:numTxThisFrame
-
         try
             [txsSignalSegments{txIdx}, TxInfos{txIdx}] = ...
                 processSingleTransmitter(obj, FrameId, txIdx);
         catch ME_tx
+            if csrd.utils.scenario.isScenarioSkipException(ME_tx)
+                rethrow(ME_tx);
+            end
             obj.logger.error("Frame %d, Tx Index %d: Error processing transmitter: %s", ...
                 FrameId, txIdx, ME_tx.message);
-            txsSignalSegments{txIdx} = {};
-            TxInfos{txIdx} = struct('Status', 'Error_TransmitterProcessing', 'ErrorMessage', ME_tx.message);
+            rethrow(ME_tx);
         end
-
     end
 
     obj.logger.debug("Frame %d: Message generation and modulation complete.", FrameId);

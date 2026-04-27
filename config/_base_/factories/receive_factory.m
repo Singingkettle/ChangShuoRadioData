@@ -1,30 +1,49 @@
 function config = receive_factory()
-    % receive_factory - Receiver factory configuration
+    %RECEIVE_FACTORY Receiver factory configuration (v0.4 deep refactor).
     %
-    % DESIGN PRINCIPLE:
-    %   - Scenario config: Selects receiver TYPE and scenario-level params (SampleRate, NumAntennas)
-    %   - This config: Defines DETAILS for each type (RF impairments, hardware params)
+    %   Splits cleanly into:
+    %     * Available receiver TYPEs (the scenario layer picks one).
+    %     * Hardware DETAILs per type (RF impairment ranges, antenna config,
+    %       memoryless nonlinearity templates).
     %
-    % Structure:
-    %   config.Factories.Receive
-    %   ├── Types                        % Available receiver types
-    %   ├── Simulation                   % Simulation-based receiver
-    %   │   ├── handle                   % Class handle
-    %   │   ├── Parameters               % Hardware parameter ranges (NoiseFigure, etc.)
-    %   │   ├── Antenna                  % Antenna type configurations
-    %   │   ├── DCOffset                 % DC offset range
-    %   │   ├── IQImbalance              % IQ imbalance ranges
-    %   │   ├── ThermalNoise             % Thermal noise ranges
-    %   │   └── Nonlinearity             % Nonlinearity model configurations
-    %   ├── Real                         % Real hardware (future placeholder)
-    %   └── Description
+    %   The Nonlinearity section follows the official MATLAB
+    %   `comm.MemorylessNonlinearity` System object property contract
+    %   exactly. Each Method block lists ONLY the properties that the
+    %   System object actually accepts for that Method (per the
+    %   "Dependencies" section of the official docs):
+    %
+    %     Cubic polynomial   : LinearGain, TOISpecification + (the ONE
+    %                          intercept / saturation property required by
+    %                          TOISpecification: IIP3 | OIP3 | IP1dB |
+    %                          OP1dB | IPsat | OPsat),
+    %                          AMPMConversion, PowerLowerLimit,
+    %                          PowerUpperLimit
+    %     Hyperbolic tangent : LinearGain, IIP3, AMPMConversion,
+    %                          PowerLowerLimit, PowerUpperLimit
+    %     Saleh model        : InputScaling, AMAMParameters[1x2],
+    %                          AMPMParameters[1x2], OutputScaling
+    %     Ghorbani model     : InputScaling, AMAMParameters[1x4],
+    %                          AMPMParameters[1x4], OutputScaling
+    %     Modified Rapp model: LinearGain, Smoothness, PhaseGainRadian,
+    %                          PhaseSaturation, PhaseSmoothness,
+    %                          OutputSaturationLevel
+    %     Lookup table       : Table[Nx3] = [Pin_dBm, Pout_dBm, dPhi_deg]
+    %
+    %   For every Method, ReferenceImpedance is shared (set in
+    %   ReceiveFactory.configureNonlinearity, default 50 Ω).
+    %
+    %   For Cubic polynomial, the per-TOISpecification numeric range is
+    %   nested under the TOISpecification name so the random sampler picks
+    %   one TOISpec and ONLY draws the matching numeric range. This
+    %   removes the "draw every intercept then ignore most" anti-pattern
+    %   that earlier shipped in this config.
 
-    %% ========== AVAILABLE RECEIVER TYPES ==========
     config.Factories.Receive.Types = {'Simulation'};
 
-    %% ========== SIMULATION RECEIVER ==========
-    config.Factories.Receive.Simulation.handle = 'csrd.blocks.physical.rxRadioFront.RRFSimulator';
-    config.Factories.Receive.Simulation.Description = 'Simulation-based receiver with configurable RF impairments';
+    config.Factories.Receive.Simulation.handle = ...
+        'csrd.blocks.physical.rxRadioFront.RRFSimulator';
+    config.Factories.Receive.Simulation.Description = ...
+        'Simulation-based receiver with configurable RF impairments';
 
     % --- Hardware Parameters (Detail-level, not scenario-level) ---
     config.Factories.Receive.Simulation.Parameters.NoiseFigure.Min = 3;      % dB
@@ -34,7 +53,7 @@ function config = receive_factory()
     config.Factories.Receive.Simulation.Parameters.AntennaGain.Min = 0;      % dBi
     config.Factories.Receive.Simulation.Parameters.AntennaGain.Max = 20;     % dBi
 
-    % --- Antenna: Antenna type configurations ---
+    % --- Antenna types ---
     config.Factories.Receive.Simulation.Antenna.Types = {'Omni', 'Parabolic', 'Array'};
     config.Factories.Receive.Simulation.Antenna.Omni.Gain = [0, 6];
     config.Factories.Receive.Simulation.Antenna.Omni.Height = [5, 30];
@@ -45,76 +64,104 @@ function config = receive_factory()
     config.Factories.Receive.Simulation.Antenna.Array.ElementSpacing = [0.4, 0.6];
     config.Factories.Receive.Simulation.Antenna.Array.Geometry = {'ULA', 'URA'};
 
-    % --- DCOffset: DC offset range ---
+    % --- DCOffset (dB) ---
     config.Factories.Receive.Simulation.DCOffset = [-60, -40];
 
-    % --- IQImbalance: IQ imbalance ranges ---
-    config.Factories.Receive.Simulation.IQImbalance.Amplitude = [0, 5];
-    config.Factories.Receive.Simulation.IQImbalance.Phase = [0, 5];
+    % --- IQImbalance ---
+    config.Factories.Receive.Simulation.IQImbalance.Amplitude = [0, 5];   % dB
+    config.Factories.Receive.Simulation.IQImbalance.Phase = [0, 5];       % deg
 
-    % --- ThermalNoise: Thermal noise configuration ---
-    config.Factories.Receive.Simulation.ThermalNoise.NoiseFigure = [10, 20];
+    % --- ThermalNoise ---
+    config.Factories.Receive.Simulation.ThermalNoise.NoiseFigure = [10, 20]; % dB
 
-    % --- Nonlinearity: Memory-less nonlinearity model configurations ---
+    % --- Reference impedance (shared across all Methods) ---
+    config.Factories.Receive.Simulation.Nonlinearity.ReferenceImpedance = 50; % Ω
+
+    % --- Available Methods ---
     config.Factories.Receive.Simulation.Nonlinearity.Methods = { ...
         'Cubic polynomial', 'Hyperbolic tangent', 'Saleh model', ...
-        'Ghorbani model', 'Modified Rapp model'};
+        'Ghorbani model', 'Modified Rapp model', 'Lookup table' };
 
-    % Cubic polynomial model
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.LinearGain = [0, 10];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.TOISpecification = { ...
-        'IIP3', 'OIP3', 'IP1dB', 'OP1dB', 'IPsat', 'OPsat'};
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.IIP3 = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.OIP3 = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.IP1dB = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.OP1dB = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.IPsat = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.OPsat = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.AMPMConversion = [10, 20];
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.PowerLowerLimit = 10;
-    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial.PowerUpperLimit = Inf;
+    % --- Cubic polynomial ---------------------------------------------
+    cp = struct();
+    cp.LinearGain = [0, 10];                   % dB
+    cp.TOISpecifications = { ...                % Only one is used per draw
+        'IIP3', 'OIP3', 'IP1dB', 'OP1dB', 'IPsat', 'OPsat' };
+    cp.IIP3  = [20, 40];                       % dBm
+    cp.OIP3  = [20, 40];
+    cp.IP1dB = [20, 40];
+    cp.OP1dB = [20, 40];
+    cp.IPsat = [20, 40];
+    cp.OPsat = [20, 40];
+    cp.AMPMConversion  = [10, 20];             % deg/dB
+    cp.PowerLowerLimit = [-40, 10];            % dBm
+    cp.PowerUpperLimit = Inf;                  % dBm (Inf = unbounded)
+    config.Factories.Receive.Simulation.Nonlinearity.CubicPolynomial = cp;
 
-    % Hyperbolic tangent model
-    config.Factories.Receive.Simulation.Nonlinearity.HyperbolicTangent.LinearGain = [0, 10];
-    config.Factories.Receive.Simulation.Nonlinearity.HyperbolicTangent.IIP3 = [20, 40];
-    config.Factories.Receive.Simulation.Nonlinearity.HyperbolicTangent.AMPMConversion = [10, 20];
-    config.Factories.Receive.Simulation.Nonlinearity.HyperbolicTangent.PowerLowerLimit = 10;
-    config.Factories.Receive.Simulation.Nonlinearity.HyperbolicTangent.PowerUpperLimit = Inf;
+    % --- Hyperbolic tangent --------------------------------------------
+    ht = struct();
+    ht.LinearGain      = [0, 10];
+    ht.IIP3            = [20, 40];
+    ht.AMPMConversion  = [10, 20];
+    ht.PowerLowerLimit = [-40, 10];
+    ht.PowerUpperLimit = Inf;
+    config.Factories.Receive.Simulation.Nonlinearity.HyperbolicTangent = ht;
 
-    % Saleh model
-    config.Factories.Receive.Simulation.Nonlinearity.SalehModel.InputScaling = [-1, 1];
-    config.Factories.Receive.Simulation.Nonlinearity.SalehModel.AMAMParametersLeft = [2.157, 2.159];
-    config.Factories.Receive.Simulation.Nonlinearity.SalehModel.AMAMParametersRight = [1.151, 1.152];
-    config.Factories.Receive.Simulation.Nonlinearity.SalehModel.AMPMParametersLeft = [4.003, 4.004];
-    config.Factories.Receive.Simulation.Nonlinearity.SalehModel.AMPMParametersRight = [9.103, 9.105];
-    config.Factories.Receive.Simulation.Nonlinearity.SalehModel.OutputScaling = [-1, 1];
+    % --- Saleh model ---------------------------------------------------
+    sm = struct();
+    sm.InputScaling          = [-1, 1];        % dB
+    sm.AMAMParametersAlpha   = [2.157, 2.159]; % α_a
+    sm.AMAMParametersBeta    = [1.151, 1.152]; % β_a
+    sm.AMPMParametersAlpha   = [4.003, 4.004]; % α_φ
+    sm.AMPMParametersBeta    = [9.103, 9.105]; % β_φ
+    sm.OutputScaling         = [-1, 1];
+    config.Factories.Receive.Simulation.Nonlinearity.SalehModel = sm;
 
-    % Ghorbani model
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.InputScaling = [-1, 1];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersLeft1 = [8.1075, 8.1085];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersLeft2 = [1.541, 1.542];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersRight1 = [6.52, 6.521];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersRight2 = [-0.071, -0.072];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersLeft1 = [4.664, 4.665];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersLeft2 = [2.096, 2.097];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersRight1 = [10.8, 10.9];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersRight2 = [-0.002, -0.004];
-    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel.OutputScaling = [-1, 1];
+    % --- Ghorbani model ------------------------------------------------
+    gm = struct();
+    gm.InputScaling           = [-1, 1];
+    gm.AMAMParametersX1       = [8.1075, 8.1085];
+    gm.AMAMParametersX2       = [1.541,  1.542];
+    gm.AMAMParametersX3       = [6.520,  6.521];
+    gm.AMAMParametersX4       = [-0.072, -0.071];
+    gm.AMPMParametersY1       = [4.664,  4.665];
+    gm.AMPMParametersY2       = [2.096,  2.097];
+    gm.AMPMParametersY3       = [10.80, 10.90];
+    gm.AMPMParametersY4       = [-0.004, -0.002];
+    gm.OutputScaling          = [-1, 1];
+    config.Factories.Receive.Simulation.Nonlinearity.GhorbaniModel = gm;
 
-    % Modified Rapp model
-    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel.LinearGain = [0, 10];
-    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel.Smoothness = [0.4, 0.6];
-    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel.PhaseGainRadian = [-0.45, 0];
-    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel.PhaseSaturation = [0.8, 0.9];
-    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel.PhaseSmoothness = [3.2, 3.6];
-    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel.OutputSaturationLevel = [0.9, 1.1];
+    % --- Modified Rapp model -------------------------------------------
+    mr = struct();
+    mr.LinearGain            = [0, 10];
+    mr.Smoothness            = [0.4, 0.6];
+    mr.PhaseGainRadian       = [-0.45, 0];
+    mr.PhaseSaturation       = [0.8, 0.9];
+    mr.PhaseSmoothness       = [3.2, 3.6];
+    mr.OutputSaturationLevel = [0.9, 1.1];     % volts
+    config.Factories.Receive.Simulation.Nonlinearity.ModifiedRappModel = mr;
 
-    %% ========== REAL HARDWARE RECEIVER (FUTURE) ==========
+    % --- Lookup table --------------------------------------------------
+    % Default lookup table mirrors the System object's documented default
+    % characterisation curve. Override in derived configs if a measured
+    % PA characterisation is available.
+    lt = struct();
+    lt.Table = [ ...
+        -25,  5.16, -0.25;
+        -20, 10.11, -0.47;
+        -15, 15.11, -0.68;
+        -10, 20.05, -0.89;
+         -5, 24.79, -1.22;
+          0, 27.64,  5.59;
+          5, 28.49, 12.03 ];
+    config.Factories.Receive.Simulation.Nonlinearity.LookupTable = lt;
+
+    % --- Real hardware (placeholder) ----------------------------------
     config.Factories.Receive.Real.SDR.handle = '';
     config.Factories.Receive.Real.SDR.Description = 'SDR-based receiver (not implemented)';
     config.Factories.Receive.Real.SDR.Supported = false;
 
-    %% ========== METADATA ==========
     config.Factories.Receive.LogDetails = true;
-    config.Factories.Receive.Description = 'Receiver factory (class handles + hardware details)';
+    config.Factories.Receive.Description = ...
+        'Receiver factory (class handles + hardware details)';
 end

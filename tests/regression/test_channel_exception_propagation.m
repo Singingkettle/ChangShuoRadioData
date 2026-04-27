@@ -29,7 +29,7 @@ function results = test_channel_exception_propagation()
         'predicateRecognisesAllSkipTokens', @testPredicateRecognisesAllSkipTokens; ...
         'predicateIgnoresGenericIdentifiers', @testPredicateIgnoresGenericIdentifiers; ...
         'channelFactoryRethrowsNoValidPaths', @testChannelFactoryRethrowsNoValidPaths; ...
-        'channelFactorySwallowsTransientError', @testChannelFactorySwallowsTransientError; ...
+        'channelFactoryRethrowsTransientError', @testChannelFactoryRethrowsTransientError; ...
         'upstreamFilesUseSharedPredicate', @testUpstreamFilesUseSharedPredicate};
 
     for i = 1:size(tests, 1)
@@ -42,7 +42,7 @@ function results = test_channel_exception_propagation()
             fprintf('  [PASS] %s\n', name);
         catch ME
             results.Failed = results.Failed + 1;
-            results.Failures{end+1} = sprintf('%s: %s', name, ME.message); %#ok<AGROW>
+            results.Failures{end+1} = sprintf('%s: %s', name, ME.message);
             fprintf('  [FAIL] %s -- %s\n', name, ME.message);
         end
     end
@@ -82,7 +82,7 @@ end
 
 function testChannelFactoryRethrowsNoValidPaths()
     factory = makeFactoryWithStub('throwSkip');
-    cleanup = onCleanup(@() releaseFactory(factory)); %#ok<NASGU>
+    cleanup = onCleanup(@() releaseFactory(factory));
 
     inputSignal = makeInputSignal();
     txInfo = makeTxInfo();
@@ -103,12 +103,12 @@ function testChannelFactoryRethrowsNoValidPaths()
 end
 
 
-function testChannelFactorySwallowsTransientError()
-    % A non-scenario-level error must NOT bring down the whole pipeline,
-    % the factory should record it as ChannelBlockStepFailed and return
-    % a degraded receivedSignal struct.
+function testChannelFactoryRethrowsTransientError()
+    % Phase 5 removes the generic sentinel-output path. A non-scenario-level
+    % channel error is still a real construction failure and must not write
+    % ChannelBlockStepFailed into a partial annotation.
     factory = makeFactoryWithStub('throwGeneric');
-    cleanup = onCleanup(@() releaseFactory(factory)); %#ok<NASGU>
+    cleanup = onCleanup(@() releaseFactory(factory));
 
     inputSignal = makeInputSignal();
     txInfo = makeTxInfo();
@@ -117,10 +117,15 @@ function testChannelFactorySwallowsTransientError()
         'ChannelModel', 'Stub', ...
         'MapProfile', struct('Mode', 'FlatTerrain'));
 
-    out = step(factory, inputSignal, 1, txInfo, rxInfo, channelLinkInfo);
-    assert(isstruct(out), 'Factory must return a struct after generic errors.');
-    assert(isfield(out, 'Error') && strcmp(out.Error, 'ChannelBlockStepFailed'), ...
-        'Generic channel error should be tagged as ChannelBlockStepFailed.');
+    raised = false;
+    try
+        step(factory, inputSignal, 1, txInfo, rxInfo, channelLinkInfo);
+    catch ME
+        raised = true;
+        assert(strcmp(ME.identifier, 'CSRD:Test:GenericError'), ...
+            sprintf('Expected CSRD:Test:GenericError but got %s', ME.identifier));
+    end
+    assert(raised, 'ChannelFactory swallowed a generic channel exception.');
 end
 
 

@@ -1,107 +1,124 @@
 function config = transmit_factory()
-    % transmit_factory - Transmitter factory configuration
+    %TRANSMIT_FACTORY Transmitter factory configuration (v0.4 deep refactor).
     %
-    % Contains IMPLEMENTATION details for transmitter instantiation:
-    %   - Class handles for different transmitter types
-    %   - RF impairment model configurations (how to apply impairments)
+    %   Implementation details for transmitter instantiation:
+    %     * Class handles for different transmitter types
+    %     * RF impairment configuration (DCOffset, IQ, PhaseNoise, PA
+    %       memoryless nonlinearity).
     %
-    % NOTE: Parameter RANGES (power, antennas, etc.) for scenario generation
-    %       are now defined in scenario_factory.m under CommunicationBehavior.
+    %   The Nonlinearity section follows the official MATLAB
+    %   `comm.MemorylessNonlinearity` documentation: each Method block
+    %   lists ONLY the properties the System object accepts for that
+    %   Method (per the "Dependencies" section). The cubic polynomial
+    %   case lists every TOI specification choice in TOISpecifications;
+    %   only the matching numeric range is sampled at runtime.
     %
-    % Structure:
-    %   config.Factories.Transmit
-    %   ├── Types                        % Available transmitter types
-    %   ├── Simulation                   % Simulation-based transmitter
-    %   │   ├── handle                   % Class handle
-    %   │   ├── DCOffset                 % DC offset range
-    %   │   ├── IQImbalance              % IQ imbalance ranges
-    %   │   ├── PhaseNoise               % Phase noise ranges
-    %   │   └── Nonlinearity             % Nonlinearity model configurations
-    %   ├── Real                         % Real hardware (future placeholder)
-    %   ├── LogDetails
-    %   └── Description
+    %   NOTE: scenario-level parameter ranges (transmit power, antennas,
+    %   etc.) live in scenario_factory.m / CommunicationBehavior, not
+    %   here.
 
-    %% ========== AVAILABLE TRANSMITTER TYPES ==========
     config.Factories.Transmit.Types = {'Simulation'};
 
-    %% ========== SIMULATION TRANSMITTER ==========
-    config.Factories.Transmit.Simulation.handle = 'csrd.blocks.physical.txRadioFront.TRFSimulator';
-    config.Factories.Transmit.Simulation.Description = 'Simulation-based transmitter with configurable RF impairments';
+    config.Factories.Transmit.Simulation.handle = ...
+        'csrd.blocks.physical.txRadioFront.TRFSimulator';
+    config.Factories.Transmit.Simulation.Description = ...
+        'Simulation-based transmitter with configurable RF impairments';
 
-    % --- DCOffset: DC offset range ---
-    config.Factories.Transmit.Simulation.DCOffset = [-60, -40]; % dB
+    % --- DCOffset (dB) ---
+    config.Factories.Transmit.Simulation.DCOffset = [-60, -40];
 
-    % --- IQImbalance: IQ imbalance ranges ---
+    % --- IQImbalance ---
     config.Factories.Transmit.Simulation.IQImbalance.Amplitude = [0, 5]; % dB
-    config.Factories.Transmit.Simulation.IQImbalance.Phase = [0, 5];     % degrees
+    config.Factories.Transmit.Simulation.IQImbalance.Phase     = [0, 5]; % deg
 
-    % --- PhaseNoise: Phase noise configuration ---
-    % Multi-point specification at standard frequency offsets
-    % FrequencyOffset must be large enough relative to SampleRate to avoid
-    % enormous internal buffers in comm.PhaseNoise
-    config.Factories.Transmit.Simulation.PhaseNoise.Level = [-80, -130];              % dBc/Hz (range for randomization)
-    config.Factories.Transmit.Simulation.PhaseNoise.FrequencyOffsets = [1e3, 10e3, 100e3]; % Hz (fixed multi-point)
+    % --- PhaseNoise (multi-point spec) ---
+    config.Factories.Transmit.Simulation.PhaseNoise.Level            = [-130, -80]; % dBc/Hz
+    config.Factories.Transmit.Simulation.PhaseNoise.FrequencyOffsets = [1e3, 10e3, 100e3]; % Hz
 
-    % --- Nonlinearity: Memory-less nonlinearity model configurations ---
+    % --- Reference impedance (shared across all Methods) ---
+    config.Factories.Transmit.Simulation.Nonlinearity.ReferenceImpedance = 50; % Ω
+
+    % --- Available Methods ---
     config.Factories.Transmit.Simulation.Nonlinearity.Methods = { ...
         'Cubic polynomial', 'Hyperbolic tangent', 'Saleh model', ...
-        'Ghorbani model', 'Modified Rapp model'};
+        'Ghorbani model', 'Modified Rapp model', 'Lookup table' };
 
-    % Cubic polynomial model
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.LinearGain = [0, 10];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.TOISpecification = { ...
-        'IIP3', 'OIP3', 'IP1dB', 'OP1dB', 'IPsat', 'OPsat'};
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.IIP3 = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.OIP3 = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.IP1dB = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.OP1dB = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.IPsat = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.OPsat = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.AMPMConversion = [10, 20];
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.PowerLowerLimit = 10;
-    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial.PowerUpperLimit = Inf;
+    % --- Cubic polynomial -------------------------------------------
+    cp = struct();
+    cp.LinearGain = [0, 10];
+    cp.TOISpecifications = { ...
+        'IIP3', 'OIP3', 'IP1dB', 'OP1dB', 'IPsat', 'OPsat' };
+    cp.IIP3  = [20, 40];
+    cp.OIP3  = [20, 40];
+    cp.IP1dB = [20, 40];
+    cp.OP1dB = [20, 40];
+    cp.IPsat = [20, 40];
+    cp.OPsat = [20, 40];
+    cp.AMPMConversion  = [10, 20];
+    cp.PowerLowerLimit = [-40, 10];
+    cp.PowerUpperLimit = Inf;
+    config.Factories.Transmit.Simulation.Nonlinearity.CubicPolynomial = cp;
 
-    % Hyperbolic tangent model
-    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.LinearGain = [0, 10];
-    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.IIP3 = [20, 40];
-    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.AMPMConversion = [10, 20];
-    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.PowerLowerLimit = 10;
-    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent.PowerUpperLimit = Inf;
+    % --- Hyperbolic tangent -----------------------------------------
+    ht = struct();
+    ht.LinearGain      = [0, 10];
+    ht.IIP3            = [20, 40];
+    ht.AMPMConversion  = [10, 20];
+    ht.PowerLowerLimit = [-40, 10];
+    ht.PowerUpperLimit = Inf;
+    config.Factories.Transmit.Simulation.Nonlinearity.HyperbolicTangent = ht;
 
-    % Saleh model
-    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.InputScaling = [-1, 1];
-    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMAMParametersLeft = [2.157, 2.159];
-    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMAMParametersRight = [1.151, 1.152];
-    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMPMParametersLeft = [4.003, 4.004];
-    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.AMPMParametersRight = [9.103, 9.105];
-    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel.OutputScaling = [-1, 1];
+    % --- Saleh model ------------------------------------------------
+    sm = struct();
+    sm.InputScaling          = [-1, 1];
+    sm.AMAMParametersAlpha   = [2.157, 2.159];
+    sm.AMAMParametersBeta    = [1.151, 1.152];
+    sm.AMPMParametersAlpha   = [4.003, 4.004];
+    sm.AMPMParametersBeta    = [9.103, 9.105];
+    sm.OutputScaling         = [-1, 1];
+    config.Factories.Transmit.Simulation.Nonlinearity.SalehModel = sm;
 
-    % Ghorbani model
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.InputScaling = [-1, 1];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersLeft1 = [8.1075, 8.1085];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersLeft2 = [1.541, 1.542];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersRight1 = [6.52, 6.521];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMAMParametersRight2 = [-0.071, -0.072];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersLeft1 = [4.664, 4.665];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersLeft2 = [2.096, 2.097];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersRight1 = [10.8, 10.9];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.AMPMParametersRight2 = [-0.002, -0.004];
-    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel.OutputScaling = [-1, 1];
+    % --- Ghorbani model ---------------------------------------------
+    gm = struct();
+    gm.InputScaling          = [-1, 1];
+    gm.AMAMParametersX1      = [8.1075, 8.1085];
+    gm.AMAMParametersX2      = [1.541,  1.542];
+    gm.AMAMParametersX3      = [6.520,  6.521];
+    gm.AMAMParametersX4      = [-0.072, -0.071];
+    gm.AMPMParametersY1      = [4.664,  4.665];
+    gm.AMPMParametersY2      = [2.096,  2.097];
+    gm.AMPMParametersY3      = [10.80, 10.90];
+    gm.AMPMParametersY4      = [-0.004, -0.002];
+    gm.OutputScaling         = [-1, 1];
+    config.Factories.Transmit.Simulation.Nonlinearity.GhorbaniModel = gm;
 
-    % Modified Rapp model
-    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.LinearGain = [0, 10];
-    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.Smoothness = [0.4, 0.6];
-    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.PhaseGainRadian = [-0.45, 0];
-    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.PhaseSaturation = [0.8, 0.9];
-    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.PhaseSmoothness = [3.2, 3.6];
-    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel.OutputSaturationLevel = [0.9, 1.1];
+    % --- Modified Rapp model ----------------------------------------
+    mr = struct();
+    mr.LinearGain            = [0, 10];
+    mr.Smoothness            = [0.4, 0.6];
+    mr.PhaseGainRadian       = [-0.45, 0];
+    mr.PhaseSaturation       = [0.8, 0.9];
+    mr.PhaseSmoothness       = [3.2, 3.6];
+    mr.OutputSaturationLevel = [0.9, 1.1];
+    config.Factories.Transmit.Simulation.Nonlinearity.ModifiedRappModel = mr;
 
-    %% ========== REAL HARDWARE TRANSMITTER (FUTURE) ==========
+    % --- Lookup table -----------------------------------------------
+    lt = struct();
+    lt.Table = [ ...
+        -25,  5.16, -0.25;
+        -20, 10.11, -0.47;
+        -15, 15.11, -0.68;
+        -10, 20.05, -0.89;
+         -5, 24.79, -1.22;
+          0, 27.64,  5.59;
+          5, 28.49, 12.03 ];
+    config.Factories.Transmit.Simulation.Nonlinearity.LookupTable = lt;
+
     config.Factories.Transmit.Real.SDR.handle = '';
     config.Factories.Transmit.Real.SDR.Description = 'SDR-based transmitter (not implemented)';
     config.Factories.Transmit.Real.SDR.Supported = false;
 
-    %% ========== METADATA ==========
     config.Factories.Transmit.LogDetails = true;
-    config.Factories.Transmit.Description = 'Transmitter factory configuration (RF impairment models)';
+    config.Factories.Transmit.Description = ...
+        'Transmitter factory configuration (RF impairment models)';
 end

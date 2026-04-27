@@ -1,9 +1,22 @@
 function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, ...
-        observableRange, globalLayout)
-    % allocateFrequenciesReceiverCentric - Receiver-centric frequency allocation
+        rxConfigs, observableRange, globalLayout)
+    %allocateFrequenciesReceiverCentric Receiver-centric frequency allocation.
     %
-    % Allocates frequencies randomly within the receiver's observable range
-    % with collision avoidance based on minimum separation requirements.
+    %   Allocates an emitter-global PlannedFreqOffset per Tx inside the
+    %   unified observable range using random placement + collision
+    %   avoidance, then projects every Tx onto every Rx and writes the
+    %   per-pair `ReceiverViews` struct array (Phase 3, see
+    %   docs/audits/phases/phase-3-construction.md §3.1).
+    %
+    %   Phase 3 unified-receiver contract: every Receiver shares the
+    %   same `Observation.CenterFrequency` and `Observation.ObservableRange`
+    %   (see `CommunicationBehaviorSimulator.unifiedReceiverConfig`), so
+    %   the projected center offset for each (Tx, Rx) pair equals the
+    %   placed `Spectrum.PlannedFreqOffset`. Phase 4 will swap this for
+    %   true heterogeneous-receiver arithmetic without changing the
+    %   ReceiverView schema -- the projection logic itself lives on the
+    %   simulator class as a Hidden static helper
+    %   (`projectReceiverViews`) and only the inputs change.
 
     usedRanges = [];
     globalLayout.FrequencyAllocations = {};
@@ -67,6 +80,11 @@ function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txC
         txConfig.Spectrum.LowerBound = centerFreq - txBW / 2;
         txConfig.Spectrum.UpperBound = centerFreq + txBW / 2;
 
+        % Phase 3: project the placed spectrum onto every Receiver
+        txConfig.ReceiverViews = ...
+            csrd.blocks.scenario.CommunicationBehaviorSimulator.projectReceiverViews( ...
+            txConfig.Spectrum, rxConfigs, observableRange);
+
         if isCellArray
             txConfigs{i} = txConfig;
         else
@@ -74,9 +92,9 @@ function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txC
         end
         globalLayout.FrequencyAllocations{i} = [centerFreq - txBW / 2, centerFreq + txBW / 2];
 
-        obj.logger.debug('Allocated frequency [%.1f, %.1f] MHz to transmitter %s', ...
+        obj.logger.debug('Allocated frequency [%.1f, %.1f] MHz to transmitter %s (projected onto %d receivers)', ...
             txConfig.Spectrum.LowerBound / 1e6, ...
-            txConfig.Spectrum.UpperBound / 1e6, txConfig.EntityID);
+            txConfig.Spectrum.UpperBound / 1e6, txConfig.EntityID, numel(txConfig.ReceiverViews));
     end
 
 end

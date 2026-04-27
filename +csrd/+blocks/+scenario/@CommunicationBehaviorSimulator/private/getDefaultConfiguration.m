@@ -2,7 +2,11 @@ function config = getDefaultConfiguration(obj)
     % getDefaultConfiguration - Get default communication behavior configuration
     config = struct();
 
-    % Frequency allocation configuration
+    % Frequency allocation configuration.
+    % Phase 2 (D7): only 'ReceiverCentric' is supported. The legacy
+    % 'Optimized' / 'Random' strategies were thin wrappers and were
+    % removed; setting Strategy to anything else now throws
+    % CSRD:Scenario:UnsupportedFrequencyStrategy at execution time.
     config.FrequencyAllocation.Strategy = 'ReceiverCentric';
     config.FrequencyAllocation.MinSeparation = 100e3; % 100 kHz
     config.FrequencyAllocation.MaxOverlap = 0.1; % 10 % overlap allowed

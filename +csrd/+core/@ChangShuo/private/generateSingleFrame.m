@@ -20,9 +20,6 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
     %   FrameData - Generated signal data for this frame
     %   FrameAnnotation - Metadata and annotations for this frame
 
-    FrameData = {}; % Initialize output
-    FrameAnnotation = {}; % Initialize output
-
     obj.logger.debug("Scenario frame %d: Starting single frame generation.", FrameId);
 
     try
@@ -30,12 +27,19 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         if isempty(obj.FactoryConfigs) || ~isstruct(obj.FactoryConfigs) || ...
                 ~isfield(obj.FactoryConfigs, 'Scenario') || ~isstruct(obj.FactoryConfigs.Scenario)
             obj.logger.error("Scenario frame %d: Scenario configuration is missing or invalid in FactoryConfigs.", FrameId);
-            FrameAnnotation = {struct('FrameId', FrameId, 'Error', 'MissingScenarioConfig')};
-            return;
+            error('CSRD:Construction:MissingScenarioConfig', ...
+                'Scenario frame %d: FactoryConfigs.Scenario is missing or invalid.', FrameId);
         end
 
         % Step 2: Process scenario (using already instantiated ScenarioFactory)
         [instantiatedTxs, instantiatedRxs, globalLayout] = processScenarioInstantiation(obj, FrameId);
+
+        % Phase 3 (audit §3.5 / §17.5 P3-7): expose the freshly-built
+        % globalLayout as a public read-only property so SimulationRunner
+        % can stamp Header.Runtime.{BlueprintHash, BlueprintResamples,
+        % ValidatorVersion} via ChangShuo.extractProvenanceFromGlobalLayout
+        % without the legacy Hidden accessor + ismethod ladder.
+        obj.LastGlobalLayout = globalLayout;
 
         % Store scenario config for use by other processing methods
         obj.ScenarioConfig = struct();
@@ -80,8 +84,7 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         end
         obj.logger.error("Scenario frame %d: Error during frame generation: %s", FrameId, ME.message);
         obj.logger.error("Stack trace: %s", getReport(ME, 'extended', 'hyperlinks', 'off'));
-        FrameData = {};
-        FrameAnnotation = {struct('FrameId', FrameId, 'Error', 'FrameGenerationFailed', 'Message', ME.message)};
+        rethrow(ME);
     end
 
 end

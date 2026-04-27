@@ -124,19 +124,14 @@ classdef ChannelFactory < matlab.System
                     frameId, txIdStr, rxIdStr, class(currentChannelBlock), ME_step.message);
                 obj.logger.error('Stack: %s', getReport(ME_step, 'extended', 'hyperlinks', 'off'));
 
-                % Scenario-level identifiers (NoValidPaths, NoBuildingData,
-                % SkipScenario) MUST propagate up so that SimulationRunner
-                % can skip the offending scenario instead of writing a
-                % half-corrupted frame full of "ChannelBlockStepFailed"
-                % markers. Generic, transient errors are still swallowed
-                % so a single bad link does not abort the whole run.
+                % Scenario-level identifiers are still classified through
+                % the shared predicate, but Phase 5 removes the generic
+                % sentinel-output path as well: a failed channel block must
+                % not write a half-corrupted frame or partial annotation.
                 if csrd.utils.scenario.isScenarioSkipException(ME_step)
                     rethrow(ME_step);
                 end
-
-                receivedSignalStruct = inputSignalStruct;
-                if ~isfield(receivedSignalStruct, 'Signal'), receivedSignalStruct.Signal = []; end
-                receivedSignalStruct.Error = 'ChannelBlockStepFailed';
+                rethrow(ME_step);
             end
         end
 
@@ -166,46 +161,26 @@ classdef ChannelFactory < matlab.System
     methods (Access = private)
 
         function modelName = resolveChannelModelName(obj, channelLinkInfo)
+            % Thin instance-level adapter; the actual resolution policy
+            % lives in the Hidden static helper so unit tests can
+            % exercise every branch without spinning up matlab.System
+            % setupImpl. Phase 2 (audit D5 / §3.6) removed the
+            % `modelNames{1}` arbitrary-first-key silent fallback that
+            % used to live at the end of this method.
             requested = getStructField(channelLinkInfo, 'ChannelModel', '');
             mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
             mode = getStructField(mapProfile, 'Mode', '');
 
-            if isempty(requested) || strcmpi(requested, 'Statistical')
-                requested = obj.getDefaultModelForMode(mode);
-            end
-
-            if isfield(obj.factoryConfig.ChannelModels, requested)
-                modelName = requested;
-                return;
-            end
-
-            fallback = obj.getDefaultModelForMode(mode);
-            if isfield(obj.factoryConfig.ChannelModels, fallback)
-                modelName = fallback;
-                return;
-            end
-
-            if isfield(obj.factoryConfig.ChannelModels, 'AWGN')
-                modelName = 'AWGN';
-                return;
-            end
-
-            modelNames = fieldnames(obj.factoryConfig.ChannelModels);
-            modelName = modelNames{1};
+            modelName = csrd.factories.ChannelFactory.resolveChannelModelNameFromConfig( ...
+                requested, mode, obj.factoryConfig);
         end
 
         function defaultModel = getDefaultModelForMode(obj, mode)
-            defaultModel = 'AWGN';
-            if ~isfield(obj.factoryConfig, 'DefaultModels') || ~isstruct(obj.factoryConfig.DefaultModels)
-                return;
-            end
-
-            defaults = obj.factoryConfig.DefaultModels;
-            if ~isempty(mode) && isfield(defaults, mode)
-                defaultModel = defaults.(mode);
-            elseif isfield(defaults, 'Statistical')
-                defaultModel = defaults.Statistical;
-            end
+            % Phase 2 (D5): instance-level adapter. The actual policy is
+            % a Hidden static helper so unit tests can drive it without
+            % spinning up matlab.System.
+            defaultModel = csrd.factories.ChannelFactory.getDefaultModelForModeFromConfig( ...
+                mode, obj.factoryConfig);
         end
 
         function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr) %#ok<INUSL>
@@ -341,14 +316,145 @@ classdef ChannelFactory < matlab.System
 
             if isprop(currentChannelBlock, 'Seed')
                 try
-                    txHash = sum(double(char(txIdStr)));
-                    rxHash = sum(double(char(rxIdStr)));
-                    currentChannelBlock.Seed = mod(frameId * 10000 + txHash * 100 + rxHash, 2^31 - 1);
+                    % Phase 1 / H13: Channel Seed must be derived from
+                    % (TxId, RxId, BurstId) so the **same burst** keeps
+                    % the **same fading realisation** across frames, and
+                    % so different bursts on the same Tx-Rx link see
+                    % independent fading. The previous frameId-based
+                    % formula re-randomised the channel every frame and
+                    % collapsed two distinct bursts on the same Tx onto
+                    % the same seed within one frame, breaking physical
+                    % consistency.
+                    currentChannelBlock.Seed = obj.deriveChannelSeed( ...
+                        frameId, txIdStr, rxIdStr, channelLinkSpecificInfo);
                 catch ME_seed
                     obj.logger.warning('Could not update channel Seed: %s', ME_seed.message);
                 end
             end
         end
+
+    end
+
+    methods
+
+        function seedValue = deriveChannelSeed(~, frameId, txIdStr, rxIdStr, channelLinkInfo)
+            % deriveChannelSeed Compute a burst-aware deterministic seed
+            % for statistical channel blocks.
+            %
+            % This method is intentionally PUBLIC so unit tests and
+            % downstream consumers (e.g. annotation enrichers in later
+            % phases) can verify and reproduce the channel seed without
+            % running the full step() pipeline.
+            %
+            % Inputs:
+            %   frameId          : current observation frame id (used only
+            %                      as a Phase 1 fallback when BurstId is
+            %                      not yet plumbed through).
+            %   txIdStr, rxIdStr : transmitter / receiver identifier (char
+            %                      or string).
+            %   channelLinkInfo  : channelLinkSpecificInfo struct that
+            %                      MAY carry a BurstId field once Phase 2
+            %                      / Burst plumbing lands.
+            %
+            % Output:
+            %   seedValue : non-negative double in [1, 2^31 - 1].
+            %
+            % Formula:
+            %   key = "Tx=<txIdStr>|Rx=<rxIdStr>|Burst=<burstKey>"
+            %   seed = shortInt32Hash(key) (clamped to >= 1)
+            %
+            % burstKey selection:
+            %   - channelLinkInfo.BurstId when present and non-empty
+            %   - otherwise "frame_<frameId>" as a Phase 1 transitional
+            %     fallback. The fallback intentionally differs across
+            %     frames because, in the absence of a real BurstId, we
+            %     have no way to link a Tx burst across frames anyway.
+            burstKey = '';
+            if isstruct(channelLinkInfo) && isfield(channelLinkInfo, 'BurstId') && ...
+                    ~isempty(channelLinkInfo.BurstId)
+                burstKey = char(string(channelLinkInfo.BurstId));
+            end
+            if isempty(burstKey)
+                burstKey = sprintf('frame_%d', frameId);
+            end
+            key = sprintf('Tx=%s|Rx=%s|Burst=%s', ...
+                char(txIdStr), char(rxIdStr), burstKey);
+            seedValue = csrd.utils.hash.shortInt32Hash(key);
+            if seedValue <= 0
+                seedValue = 1;
+            end
+        end
+
+        function receivedSignalStruct = mergeChannelOutput(~, inputSignalStruct, channelBlockOutput)
+            % mergeChannelOutput Whitelist-based merge of a channel block
+            % output into the upstream signal struct.
+            %
+            % Phase 1 / H14 contract (see docs/audits/phases/phase-1-dataflow.md §3.5):
+            %
+            %   1. The upstream inputSignalStruct (which already carries
+            %      ID / TxId / BurstId / SegmentId / SubBurstId /
+            %      ModulatorConfig / Header / Planned / etc.) is the
+            %      base. Its fields are ALWAYS preserved unless they
+            %      appear in CHANNEL_OWNED_FIELDS below.
+            %   2. The channel block ONLY owns: 'Signal' plus the
+            %      channel-specific physics fields enumerated in
+            %      CHANNEL_OWNED_FIELDS. These overwrite the upstream
+            %      values when the channel actually produced them.
+            %   3. Any **new** field returned by the channel block that
+            %      is NOT present upstream is added (forward-compatible
+            %      injection of new physics metadata).
+            %   4. A non-struct channelBlockOutput is treated as a raw
+            %      Signal payload, attached to the upstream struct.
+            %
+            % This replaces the previous "if isfield(channelBlockOutput,
+            % 'Signal') return channelBlockOutput end" branch, which
+            % silently dropped every upstream field whenever the channel
+            % block returned a struct containing a Signal field
+            % (e.g. RayTracing).
+            %
+            % The method is intentionally public so unit tests can verify
+            % the whitelist contract directly.
+
+            CHANNEL_OWNED_FIELDS = { ...
+                'Signal', ...
+                'PathLoss', ...
+                'AppliedPathLoss', ...
+                'ChannelInfo', ...
+                'PathDelays', ...
+                'PathGains', ...
+                'NumValidPaths', ...
+                'RayInfo', ...
+                'AntennaConfig', ...
+                'ChannelImpulseResponse', ...
+                'PropagationDelay', ...
+                'NoiseRealization' ...
+            };
+
+            if ~isstruct(channelBlockOutput)
+                receivedSignalStruct = inputSignalStruct;
+                receivedSignalStruct.Signal = channelBlockOutput;
+                return;
+            end
+
+            receivedSignalStruct = inputSignalStruct;
+            outputFields = fieldnames(channelBlockOutput);
+            for idx = 1:numel(outputFields)
+                fieldName = outputFields{idx};
+                if any(strcmp(fieldName, CHANNEL_OWNED_FIELDS))
+                    receivedSignalStruct.(fieldName) = channelBlockOutput.(fieldName);
+                elseif ~isfield(receivedSignalStruct, fieldName)
+                    receivedSignalStruct.(fieldName) = channelBlockOutput.(fieldName);
+                else
+                    % Field exists upstream and is not channel-owned:
+                    % preserve the upstream value (e.g. ID, TxId,
+                    % BurstId, ModulatorConfig, Header, Planned, ...).
+                end
+            end
+        end
+
+    end
+
+    methods (Access = private)
 
         function [linkDistance_m, linkDistance_km] = computeLinkDistance(obj, txInfo, rxInfo, channelLinkInfo)
             linkDistance_m = 0;
@@ -450,21 +556,6 @@ classdef ChannelFactory < matlab.System
             snr_dB = txPower_dBm - pathLoss_dB - noisePower_dBm;
         end
 
-        function receivedSignalStruct = mergeChannelOutput(~, inputSignalStruct, channelBlockOutput)
-            if isstruct(channelBlockOutput) && isfield(channelBlockOutput, 'Signal')
-                receivedSignalStruct = channelBlockOutput;
-            elseif isstruct(channelBlockOutput)
-                receivedSignalStruct = inputSignalStruct;
-                outputFields = fieldnames(channelBlockOutput);
-                for idx = 1:numel(outputFields)
-                    receivedSignalStruct.(outputFields{idx}) = channelBlockOutput.(outputFields{idx});
-                end
-            else
-                receivedSignalStruct = inputSignalStruct;
-                receivedSignalStruct.Signal = channelBlockOutput;
-            end
-        end
-
         function releaseCachedBlocks(obj)
             if ~isa(obj.cachedChannelBlock, 'containers.Map')
                 return;
@@ -476,6 +567,97 @@ classdef ChannelFactory < matlab.System
                 if ~isempty(block) && isa(block, 'matlab.System') && isLocked(block)
                     release(block);
                 end
+            end
+        end
+
+    end
+
+    methods (Static, Hidden)
+
+        function modelName = resolveChannelModelNameFromConfig(requested, mode, factoryConfig)
+            % resolveChannelModelNameFromConfig - Phase 2 (D5) channel
+            % model resolution policy as a Hidden static helper.
+            %
+            % This is the single source of truth for "given a requested
+            % model name + a propagation mode + the factoryConfig
+            % registry, which channel model should we instantiate?".
+            % The instance method `resolveChannelModelName` is a thin
+            % adapter; tests target this static helper directly so they
+            % do not need to drive matlab.System.setupImpl.
+            %
+            % Resolution order:
+            %   1. Caller asked for an empty/Statistical placeholder
+            %      → resolve to the mode-default first.
+            %   2. Requested model is registered → return it.
+            %   3. Mode-default is registered → return it.
+            %   4. AWGN is registered → return it (declarative fallback).
+            %   5. Otherwise → throw CSRD:Blueprint:ChannelModelMismatch
+            %      (Phase 2: NO arbitrary `modelNames{1}` silent
+            %      fallback; the validator should have rejected this
+            %      blueprint upstream).
+            if ~isstruct(factoryConfig) || ~isfield(factoryConfig, 'ChannelModels') ...
+                    || ~isstruct(factoryConfig.ChannelModels)
+                error('CSRD:Blueprint:ChannelModelMismatch', ...
+                    ['Channel model resolution failed: factoryConfig.ChannelModels ', ...
+                     'is missing or not a struct (requested model=''%s''). The Phase 2 ', ...
+                     'BlueprintFeasibilityValidator.checkChannelModelInRegistry should ', ...
+                     'have rejected this blueprint upstream.'], char(string(requested)));
+            end
+
+            if isempty(requested) || (ischar(requested) && strcmpi(requested, 'Statistical')) ...
+                    || (isstring(requested) && strcmpi(string(requested), "Statistical"))
+                requested = csrd.factories.ChannelFactory.getDefaultModelForModeFromConfig( ...
+                    mode, factoryConfig);
+            end
+
+            requestedChar = char(string(requested));
+            if isfield(factoryConfig.ChannelModels, requestedChar)
+                modelName = requestedChar;
+                return;
+            end
+
+            fallback = csrd.factories.ChannelFactory.getDefaultModelForModeFromConfig( ...
+                mode, factoryConfig);
+            fallbackChar = char(string(fallback));
+            if isfield(factoryConfig.ChannelModels, fallbackChar)
+                modelName = fallbackChar;
+                return;
+            end
+
+            if isfield(factoryConfig.ChannelModels, 'AWGN')
+                modelName = 'AWGN';
+                return;
+            end
+
+            % Phase 2 (audit D5 / §3.6) — `modelNames{1}` arbitrary
+            % first-key silent fallback removed; fail fast instead.
+            error('CSRD:Blueprint:ChannelModelMismatch', ...
+                ['Channel model resolution failed: requested model=''%s'' / ', ...
+                 'mode=''%s'' has no matching entry in ', ...
+                 'factoryConfig.ChannelModels and the declarative AWGN ', ...
+                 'fallback is also missing. This blueprint should have ', ...
+                 'been rejected by BlueprintFeasibilityValidator.', ...
+                 'checkChannelModelInRegistry; reaching ChannelFactory ', ...
+                 'means the validator was bypassed.'], requestedChar, char(string(mode)));
+        end
+
+        function defaultModel = getDefaultModelForModeFromConfig(mode, factoryConfig)
+            % getDefaultModelForModeFromConfig - Phase 2 (D5) default
+            % model lookup as a Hidden static helper. Returns 'AWGN' if
+            % the registry does not declare an explicit default for the
+            % requested mode (and no Statistical fallback either).
+            defaultModel = 'AWGN';
+            if ~isstruct(factoryConfig) || ~isfield(factoryConfig, 'DefaultModels') ...
+                    || ~isstruct(factoryConfig.DefaultModels)
+                return;
+            end
+
+            defaults = factoryConfig.DefaultModels;
+            modeChar = char(string(mode));
+            if ~isempty(modeChar) && isfield(defaults, modeChar)
+                defaultModel = defaults.(modeChar);
+            elseif isfield(defaults, 'Statistical')
+                defaultModel = defaults.Statistical;
             end
         end
 

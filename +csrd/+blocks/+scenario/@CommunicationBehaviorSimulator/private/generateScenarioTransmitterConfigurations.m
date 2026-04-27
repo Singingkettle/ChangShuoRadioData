@@ -18,7 +18,12 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
     txConfigs = {};  % Use cell array to avoid struct field mismatch
 
-    % Initialize global layout
+    % Initialize global layout.
+    % Phase 2 (D7): only 'ReceiverCentric' is supported. The default
+    % is enforced here to keep globalLayout.Strategy populated even
+    % when the caller forgot to set it; any explicit non-ReceiverCentric
+    % value will be rejected later by performScenarioFrequencyAllocation
+    % (CSRD:Scenario:UnsupportedFrequencyStrategy).
     globalLayout = struct();
     if isfield(obj.Config, 'FrequencyAllocation') && isfield(obj.Config.FrequencyAllocation, 'Strategy')
         globalLayout.Strategy = obj.Config.FrequencyAllocation.Strategy;
@@ -90,7 +95,7 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
     % Perform frequency allocation for all transmitters
     [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, ...
-        observableRange, globalLayout);
+        rxConfigs, observableRange, globalLayout);
 end
 
 function params = getTransmitterParams(config)

@@ -94,6 +94,22 @@ classdef ChangShuo < matlab.System
         FactoryConfigs struct
     end
 
+    properties (SetAccess = private, GetAccess = public)
+        % LastGlobalLayout - Phase 3 (audit §3.5 / §17.5 P3-7) public
+        % read-only snapshot of the last globalLayout returned by
+        % processScenarioInstantiation. Mirrors the globalLayout that
+        % ScenarioFactory.stepImpl built for the most recent frame, so
+        % SimulationRunner can read provenance (BlueprintHash /
+        % NumBlueprintAttempts / ValidationReport.Provenance.ValidatorVersion)
+        % directly off the engine handle without the previous Hidden
+        % accessor + try/catch + ismethod ladder.
+        %
+        % Set in generateSingleFrame after every successful scenario
+        % instantiation. Resets to an empty struct when the engine is
+        % constructed; never set from outside the class.
+        LastGlobalLayout = struct();
+    end
+
     properties (Access = private)
         % logger - Logging framework instance
         logger
@@ -182,6 +198,34 @@ classdef ChangShuo < matlab.System
         RxInfos = setupReceivers(obj, FrameId, numRxThisFrame)
         signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalSegments, TxInfos, RxInfos)
         [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, signalsAtReceivers, RxInfos)
+    end
+
+    methods (Static, Hidden)
+        % Phase 3 (§3.2 / §3.5): the strict-construction validators and
+        % provenance helpers below are surfaced as Static / Hidden so unit
+        % tests can pin the fail-fast / provenance contract without
+        % standing up the whole engine. Production code (processSingleSegment,
+        % processTransmitImpairments, processChannelPropagation,
+        % SimulationRunner) calls them through the class name.
+
+        segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
+        assertSegmentSignalReadyForImpairments(segSignal, FrameId, txId, segIdx)
+        assertChannelOutputSampleRate(channelOutput, FrameId, txId, rxId, segIdx)
+        projectedOffset = lookupReceiverViewOffset(txScenarioConfig, rxInfo, rxIdx, channelOutput)
+        rvEntry = lookupReceiverViewEntry(txScenarioConfig, rxInfo, rxIdx)
+        RxInfo = validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx)
+        provenance = extractProvenanceFromGlobalLayout(globalLayout)
+        % Phase 4 (audit §17.6 / §S7 / C4): annotation write-back hook
+        % invoked from SimulationRunner.saveScenarioData after the
+        % sanitizeForJson + stampRuntimeHeader pipeline. Walks the
+        % annotation tree and asserts that every SignalSources(k) carries
+        % the v2 schema (TxID/SegmentId/BurstId/Truth/RFImpairments/
+        % ReceiverView) plus the Truth.Measured.{SourcePlane,FramePlane}
+        % required scalar keys. Throws CSRD:Annotation:* identifiers,
+        % which `csrd.utils.scenario.isScenarioSkipException` whitelists
+        % so a single bad scenario does not fatal-abort the 200+ baseline
+        % sweep.
+        validateMeasurementCompleteness(annotation)
     end
 
 end

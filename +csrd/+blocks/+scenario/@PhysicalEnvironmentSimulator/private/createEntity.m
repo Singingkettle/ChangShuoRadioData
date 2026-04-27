@@ -1,25 +1,39 @@
 function entity = createEntity(obj, entityType, entityID, frameId)
-    % createEntity - Create a single entity with Snapshot-based state management
+    %CREATEENTITY Phase 3 strict-construction entity factory.
     %
-    % Creates a comprehensive entity structure with Snapshot-based state
-    % management. Each Snapshot contains:
-    %   - Physical state (Position, Velocity, Orientation)
-    %   - Communication state (Frequency, Bandwidth, Modulation - set by CommunicationBehaviorSimulator)
-    %   - Temporal state (IsTransmitting, CurrentInterval - updated per frame)
+    % Creates a single entity (Tx or Rx) with the canonical Snapshot-based
+    % state container. Phase 3 (audit §3.1.ter / §17.5 P3-followup) removed
+    % the silent fallbacks for missing map boundaries and the hardcoded
+    % 100-frame pre-allocation cap; both are now driven explicitly from the
+    % validated PhysicalEnvironment config.
     %
-    % DESIGN PRINCIPLE:
+    % DESIGN PRINCIPLE
     %   Entity is a shared object between PhysicalEnvironmentSimulator and
-    %   CommunicationBehaviorSimulator. Each simulator manages its own state domain:
-    %   - PhysicalEnvironmentSimulator: Physical state (position, velocity)
-    %   - CommunicationBehaviorSimulator: Communication + Temporal state
+    %   CommunicationBehaviorSimulator. Each simulator manages its own
+    %   state domain:
+    %     - PhysicalEnvironmentSimulator : Physical state (position,
+    %       velocity, orientation).
+    %     - CommunicationBehaviorSimulator : Communication + Temporal
+    %       state.
     %
-    % Input Arguments:
-    %   entityType - 'Transmitter' or 'Receiver'
-    %   entityID - Unique identifier string (e.g., 'Tx1', 'Rx1')
-    %   frameId - Frame at which entity is created
+    % Inputs:
+    %   entityType - 'Transmitter' or 'Receiver'.
+    %   entityID   - Unique identifier string (e.g. 'Tx1', 'Rx1').
+    %   frameId    - Frame index at which the entity is created.
     %
-    % Output Arguments:
-    %   entity - Entity structure with Snapshots array
+    % Output:
+    %   entity - Struct with the Phase 3 canonical layout.
+    %
+    % Errors:
+    %   CSRD:Construction:MissingMapBoundaries
+    %       Raised when obj.mapData.Boundaries is missing/empty. The
+    %       upstream ScenarioFactory.getPhysicalEnvironmentConfig + the
+    %       Statistical/OSM map initializers are required to populate this
+    %       field; if it is absent we fail fast rather than fabricating a
+    %       random ±1000 m placement.
+    %   CSRD:Construction:MissingMobilityModel
+    %       Surfaced from assignMobilityModel when the per-entity Mobility
+    %       slice lacks an explicit Model name.
 
     entity = struct();
     entity.ID = entityID;
@@ -27,42 +41,35 @@ function entity = createEntity(obj, entityType, entityID, frameId)
     entity.CreationFrameId = frameId;
     entity.CreationTime = frameId * obj.timeResolution;
 
-    % Initialize Snapshots cell array (one per frame, dynamically expandable)
-    % Pre-allocate for expected frame count (will expand if needed)
-    entity.Snapshots = cell(1, 100);  % Pre-allocate for up to 100 frames
+    snapshotCapacity = resolveSnapshotCapacity(obj, frameId);
+    entity.Snapshots = cell(1, snapshotCapacity);
 
-    % Create initial snapshot for this frame
     initialSnapshot = createInitialSnapshot(obj, entityType, entityID, frameId);
     entity.Snapshots{frameId} = initialSnapshot;
 
-    % Store top-level position for backward compatibility and quick access
     entity.Position = initialSnapshot.Physical.Position;
     entity.Velocity = initialSnapshot.Physical.Velocity;
     entity.Orientation = initialSnapshot.Physical.Orientation;
     entity.AngularVelocity = initialSnapshot.Physical.AngularVelocity;
 
-    % Assign mobility model
-    entity.MobilityModel = assignMobilityModel(entityType);
+    entityConfig = resolveEntityConfig(obj, entityType);
+    entity.MobilityModel = csrd.blocks.scenario.PhysicalEnvironmentSimulator ...
+        .assignMobilityModel(entityType, entityConfig);
 
-    % Initialize physical properties
     entity.Properties = initializeEntityProperties(obj, entityType);
 
-    % Legacy fields for backward compatibility
     entity.FrameId = frameId;
     entity.StateHistory = [];
     entity.LastUpdateTime = entity.CreationTime;
 
-    obj.logger.debug('Created %s entity %s at position [%.1f, %.1f, %.1f] with Snapshot structure', ...
-        entityType, entityID, entity.Position);
+    obj.logger.debug('Created %s entity %s at position [%.1f, %.1f, %.1f] (mobility=%s, capacity=%d)', ...
+        entityType, entityID, entity.Position, entity.MobilityModel, snapshotCapacity);
 end
 
 function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
-    % createInitialSnapshot - Create the initial Snapshot structure for an entity
-    %
-    % The Snapshot structure organizes state into three domains:
-    %   1. Physical: Position, Velocity, Orientation (managed by PhysicalEnvSimulator)
-    %   2. Communication: Frequency, Bandwidth, Modulation (managed by CommBehaviorSimulator)
-    %   3. Temporal: IsTransmitting, CurrentInterval (updated per frame)
+    %CREATEINITIALSNAPSHOT Build the first Snapshot for a freshly created
+    % entity. Position must come from the validated map boundaries; the
+    % previous ±1000 m fallback was removed in Phase 3.
 
     snapshot = struct();
     snapshot.FrameId = frameId;
@@ -70,77 +77,163 @@ function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
     snapshot.EntityID = entityID;
     snapshot.EntityType = entityType;
 
-    % =========== PHYSICAL STATE ===========
-    % Managed by PhysicalEnvironmentSimulator
     snapshot.Physical = struct();
 
-    % Initialize position within map boundaries
-    if isfield(obj.mapData, 'Boundaries') && ~isempty(obj.mapData.Boundaries)
-        bounds = obj.mapData.Boundaries;
-
-        if isfield(bounds, 'MinLatitude')
-            % OSM-style boundaries
-            snapshot.Physical.Position = [
-                randomInRange(obj, bounds.MinLongitude, bounds.MaxLongitude), % X coordinate
-                randomInRange(obj, bounds.MinLatitude, bounds.MaxLatitude), % Y coordinate
-                randomInRange(obj, 10, 100) % Z coordinate (height)
-            ];
-        else
-            % Grid-style boundaries
-            snapshot.Physical.Position = [
-                randomInRange(obj, bounds(1), bounds(2)), % X coordinate
-                randomInRange(obj, bounds(3), bounds(4)), % Y coordinate
-                randomInRange(obj, 10, 100) % Z coordinate (height)
-            ];
-        end
-    else
-        % Use default boundaries if not set
-        obj.logger.warning('Map boundaries not set, using default boundaries for entity creation');
-        snapshot.Physical.Position = [
-            randomInRange(obj, -1000, 1000), % X coordinate
-            randomInRange(obj, -1000, 1000), % Y coordinate
-            randomInRange(obj, 10, 100) % Z coordinate (height)
-        ];
+    if ~isfield(obj.mapData, 'Boundaries') || isempty(obj.mapData.Boundaries)
+        error('CSRD:Construction:MissingMapBoundaries', ...
+            ['createEntity: obj.mapData.Boundaries is required (Phase 3 ', ...
+             'removed the ±1000 m fallback). The upstream ScenarioFactory ', ...
+             'must populate Map.Boundaries / Environment.MapBoundaries via ', ...
+             'getPhysicalEnvironmentConfig.']);
     end
 
-    % Initialize velocity and motion parameters
-    maxSpeed = getMaxSpeedForEntityType(obj, entityType);
+    bounds = obj.mapData.Boundaries;
+
+    if isstruct(bounds) && isfield(bounds, 'MinLatitude')
+        snapshot.Physical.Position = [
+            randomInRange(obj, bounds.MinLongitude, bounds.MaxLongitude), ...
+            randomInRange(obj, bounds.MinLatitude, bounds.MaxLatitude), ...
+            randomInRange(obj, 10, 100) ...
+        ];
+    elseif isnumeric(bounds) && numel(bounds) >= 4
+        snapshot.Physical.Position = [
+            randomInRange(obj, bounds(1), bounds(2)), ...
+            randomInRange(obj, bounds(3), bounds(4)), ...
+            randomInRange(obj, 10, 100) ...
+        ];
+    else
+        error('CSRD:Construction:MissingMapBoundaries', ...
+            ['createEntity: obj.mapData.Boundaries has unsupported ', ...
+             'shape (class=%s, numel=%d). Expected struct with ', ...
+             'Min/Max Lat-Lon or numeric [xmin xmax ymin ymax] vector.'], ...
+            class(bounds), numel(bounds));
+    end
+
+    cohortMaxSpeed = resolveCohortMaxSpeed(obj, entityType);
+    maxSpeed = getMaxSpeedForEntityType(obj, entityType, ...
+        'CohortMaxSpeedMps', cohortMaxSpeed);
     snapshot.Physical.Velocity = [
-        randomInRange(obj, -maxSpeed, maxSpeed), % X velocity (m/s)
-        randomInRange(obj, -maxSpeed, maxSpeed), % Y velocity (m/s)
-        0 % Z velocity (stationary altitude)
+        randomInRange(obj, -maxSpeed, maxSpeed), ...
+        randomInRange(obj, -maxSpeed, maxSpeed), ...
+        0 ...
     ];
 
-    % Initialize orientation (azimuth, elevation in degrees)
     snapshot.Physical.Orientation = [
-        randi([-180, 180]), % Azimuth
-        randi([-30, 30]) % Elevation
+        randi([-180, 180]), ...
+        randi([-30, 30]) ...
     ];
 
-    % Initialize angular velocity (deg/s)
     snapshot.Physical.AngularVelocity = [
-        randomInRange(obj, -10, 10), % Azimuth rate
-        randomInRange(obj, -5, 5) % Elevation rate
+        randomInRange(obj, -10, 10), ...
+        randomInRange(obj, -5, 5) ...
     ];
 
-    % =========== COMMUNICATION STATE ===========
-    % Managed by CommunicationBehaviorSimulator (set during scenario initialization)
-    % These are "temporal" properties - set once and don't change during scenario
     snapshot.Communication = struct();
-    snapshot.Communication.Frequency = 0;  % Center frequency offset (Hz)
-    snapshot.Communication.Bandwidth = 0;  % Signal bandwidth (Hz)
-    snapshot.Communication.ModulationType = '';  % e.g., 'PSK', 'QAM'
-    snapshot.Communication.ModulationOrder = 0;  % e.g., 4, 16, 64
-    snapshot.Communication.Power = 0;  % Transmit power (dBm)
-    snapshot.Communication.NumAntennas = 1;  % Number of antennas
-    snapshot.Communication.Initialized = false;  % Flag: true after CommBehavior sets values
+    snapshot.Communication.Frequency = 0;
+    snapshot.Communication.Bandwidth = 0;
+    snapshot.Communication.ModulationType = '';
+    snapshot.Communication.ModulationOrder = 0;
+    snapshot.Communication.Power = 0;
+    snapshot.Communication.NumAntennas = 1;
+    snapshot.Communication.Initialized = false;
 
-    % =========== TEMPORAL STATE ===========
-    % Updated every frame by CommunicationBehaviorSimulator
     snapshot.Temporal = struct();
-    snapshot.Temporal.IsTransmitting = false;  % Is entity currently transmitting?
-    snapshot.Temporal.CurrentIntervalIdx = 0;  % Current transmission interval index
-    snapshot.Temporal.PatternType = '';  % 'Continuous', 'Burst', 'Scheduled', 'Random'
-    snapshot.Temporal.StartTime = 0;  % Start time of current transmission
-    snapshot.Temporal.EndTime = 0;  % End time of current transmission
+    snapshot.Temporal.IsTransmitting = false;
+    snapshot.Temporal.PatternType = '';
+    snapshot.Temporal.ActiveIntervalIndices = [];
+    snapshot.Temporal.ActiveIntervals = zeros(0, 2);
+    snapshot.Temporal.FrameWindow = [0, 0];
+end
+
+function capacity = resolveSnapshotCapacity(obj, frameId)
+    %RESOLVESNAPSHOTCAPACITY Pre-allocation hint driven by config.
+    % Snapshots are dynamic-grow cells (writes past the end auto-expand),
+    % but we honor obj.Config.Global.NumFramesPerScenario when available so
+    % long scenarios do not pay repeated reallocation costs.
+
+    capacity = max(100, frameId);
+
+    if isfield(obj.Config, 'Global') && isstruct(obj.Config.Global) ...
+            && isfield(obj.Config.Global, 'NumFramesPerScenario') ...
+            && isnumeric(obj.Config.Global.NumFramesPerScenario) ...
+            && isscalar(obj.Config.Global.NumFramesPerScenario) ...
+            && obj.Config.Global.NumFramesPerScenario > 0
+        capacity = max(capacity, double(obj.Config.Global.NumFramesPerScenario));
+    end
+end
+
+function cohortMax = resolveCohortMaxSpeed(obj, entityType)
+    %RESOLVECOHORTMAXSPEED Phase 4 §3.8.A / §3.8.C cohort speed lookup.
+    %
+    %   Pulls `Mobility.MaxSpeedMps` (canonical) or the legacy flat
+    %   `MobilityModel.MaxSpeedMps` off the per-entity-type slice that
+    %   ScenarioFactory wrote into obj.Config based on the cohort
+    %   recipe. Returns [] when the cohort did not specify an override
+    %   (in which case getMaxSpeedForEntityType uses the historical
+    %   per-type defaults).
+    %
+    %   Accepting both `Mobility.MaxSpeedMps` and the flat alternate
+    %   mirrors the resolution order already used by
+    %   PhysicalEnvironmentSimulator.assignMobilityModel for the
+    %   `Model` field, so blueprints / unit tests do not have to
+    %   special-case Phase 4.
+    cohortMax = [];
+    try
+        entityConfig = resolveEntityConfig(obj, entityType);
+    catch
+        return;
+    end
+    if isstruct(entityConfig) && isfield(entityConfig, 'Mobility') ...
+            && isstruct(entityConfig.Mobility) ...
+            && isfield(entityConfig.Mobility, 'MaxSpeedMps') ...
+            && isnumeric(entityConfig.Mobility.MaxSpeedMps) ...
+            && isscalar(entityConfig.Mobility.MaxSpeedMps)
+        cohortMax = double(entityConfig.Mobility.MaxSpeedMps);
+        return;
+    end
+    if isstruct(entityConfig) && isfield(entityConfig, 'MobilityModel') ...
+            && isstruct(entityConfig.MobilityModel) ...
+            && isfield(entityConfig.MobilityModel, 'MaxSpeedMps') ...
+            && isnumeric(entityConfig.MobilityModel.MaxSpeedMps) ...
+            && isscalar(entityConfig.MobilityModel.MaxSpeedMps)
+        cohortMax = double(entityConfig.MobilityModel.MaxSpeedMps);
+    end
+end
+
+function entityConfig = resolveEntityConfig(obj, entityType)
+    %RESOLVEENTITYCONFIG Pull the per-entity-type subtree from obj.Config.
+    % Phase 3 mandates that mobility selection lives next to the entity
+    % count / height / initial-distribution settings. We accept either
+    %   obj.Config.Entities.Transmitters / Receivers  (canonical, used by
+    %       config/_base_/factories/scenario_factory.m)
+    % or
+    %   obj.Config.Transmitter / Receiver             (flat alternate, kept
+    %       so unit tests can wire a small struct without rebuilding the
+    %       whole factory tree).
+
+    switch entityType
+        case 'Transmitter'
+            pluralKey = 'Transmitters';
+            singularKey = 'Transmitter';
+        case 'Receiver'
+            pluralKey = 'Receivers';
+            singularKey = 'Receiver';
+        otherwise
+            error('CSRD:Construction:UnknownEntityType', ...
+                'createEntity: unsupported entityType "%s" (expected Transmitter or Receiver).', ...
+                entityType);
+    end
+
+    if isfield(obj.Config, 'Entities') && isstruct(obj.Config.Entities) ...
+            && isfield(obj.Config.Entities, pluralKey)
+        entityConfig = obj.Config.Entities.(pluralKey);
+    elseif isfield(obj.Config, singularKey)
+        entityConfig = obj.Config.(singularKey);
+    else
+        error('CSRD:Construction:MissingEntityConfig', ...
+            ['createEntity: obj.Config does not carry an Entities.%s ', ...
+             '(or top-level %s) struct. Phase 3 requires this slice so ', ...
+             'mobility / count / height settings are explicit.'], ...
+            pluralKey, singularKey);
+    end
 end

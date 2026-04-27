@@ -1,84 +1,53 @@
 function RxInfos = setupReceivers(obj, FrameId, numRxThisFrame)
-    % setupReceivers - Setup receiver configurations for current frame
+    %SETUPRECEIVERS Phase 3 strict-construction receiver setup.
     %
-    % Inputs:
-    %   FrameId - Frame identifier
-    %   numRxThisFrame - Number of receivers in this frame
+    %   RxInfos = setupReceivers(obj, FrameId, numRxThisFrame)
     %
-    % Outputs:
-    %   RxInfos - Cell array of receiver information structures
+    %   Phase 3 (audit §3.1.ter / §17.5 P3-5) removed every silent fallback
+    %   from this function. Per-receiver validation lives in the Static,
+    %   Hidden helper csrd.core.ChangShuo.validateRxPlanIntoRxInfo so the
+    %   fail-fast contract can be unit-tested without instantiating the
+    %   full engine. Errors propagate to SimulationRunner, which decides
+    %   per-scenario skip versus sweep abort via
+    %   csrd.utils.scenario.isScenarioSkipException.
+    %
+    %   Inputs:
+    %       FrameId         - Frame identifier (used for diagnostics).
+    %       numRxThisFrame  - Number of receivers expected this frame.
+    %
+    %   Output:
+    %       RxInfos         - 1 x numRxThisFrame cell array of validated
+    %                         receiver info structs.
+    %
+    %   Errors (added to isScenarioSkipException whitelist in S6):
+    %       CSRD:Construction:RxScenarioOutOfRange
+    %       CSRD:Construction:RxMissingPlan
+    %       CSRD:Construction:RxMissingPhysical
+    %       CSRD:Construction:RxMissingHardware
+    %       CSRD:Construction:RxMissingObservation
 
     obj.logger.debug("Frame %d: Setting up %d receiver(s).", FrameId, numRxThisFrame);
 
     RxInfos = cell(1, numRxThisFrame);
 
     for rxIdx = 1:numRxThisFrame
-        try
-            if rxIdx > length(obj.ScenarioConfig.Receivers)
-                obj.logger.warning('Frame %d, Rx Index %d: Receiver not defined in scenario.', FrameId, rxIdx);
-                RxInfos{rxIdx} = struct('Status', 'Error_MissingRxScenario');
-                continue;
-            end
-
-            rxPlan = obj.ScenarioConfig.Receivers{rxIdx};
-
-            RxInfo = struct();
-            RxInfo.ID = rxPlan.EntityID;
-            RxInfo.Status = 'Ready';
-
-            % Physical
-            if isfield(rxPlan, 'Physical') && isfield(rxPlan.Physical, 'Position')
-                RxInfo.Position = rxPlan.Physical.Position;
-            else
-                RxInfo.Position = [0, 0, 10];
-            end
-            if isfield(rxPlan, 'Physical') && isfield(rxPlan.Physical, 'Velocity')
-                RxInfo.Velocity = rxPlan.Physical.Velocity;
-            else
-                RxInfo.Velocity = [0, 0, 0];
-            end
-
-            % Hardware
-            if isfield(rxPlan, 'Hardware')
-                RxInfo.Type = getFieldOrDefault(rxPlan.Hardware, 'Type', 'Simulation');
-                RxInfo.NumAntennas = getFieldOrDefault(rxPlan.Hardware, 'NumAntennas', 1);
-            else
-                RxInfo.Type = 'Simulation';
-                RxInfo.NumAntennas = 1;
-            end
-
-            % Observation
-            if isfield(rxPlan, 'Observation')
-                RxInfo.SampleRate = getFieldOrDefault(rxPlan.Observation, 'SampleRate', 50e6);
-                RxInfo.ObservableRange = getFieldOrDefault(rxPlan.Observation, 'ObservableRange', [-25e6, 25e6]);
-                RxInfo.CenterFrequency = getFieldOrDefault(rxPlan.Observation, 'CenterFrequency', 0);
-                RxInfo.RealCarrierFrequency = getFieldOrDefault(rxPlan.Observation, 'RealCarrierFrequency', 2.4e9);
-            else
-                RxInfo.SampleRate = 50e6;
-                RxInfo.ObservableRange = [-25e6, 25e6];
-                RxInfo.CenterFrequency = 0;
-                RxInfo.RealCarrierFrequency = 2.4e9;
-            end
-
-            RxInfos{rxIdx} = RxInfo;
-
-            obj.logger.debug("Frame %d, RxID %s: Receiver configured (Type: %s, SampleRate: %.2f MHz).", ...
-                FrameId, string(RxInfo.ID), RxInfo.Type, RxInfo.SampleRate / 1e6);
-
-        catch ME_rx
-            obj.logger.error("Frame %d, Rx Index %d: Error setting up receiver: %s", ...
-                FrameId, rxIdx, ME_rx.message);
-            RxInfos{rxIdx} = struct('Status', 'Error_ReceiverSetup', 'ErrorMessage', ME_rx.message);
+        if rxIdx > length(obj.ScenarioConfig.Receivers)
+            error('CSRD:Construction:RxScenarioOutOfRange', ...
+                ['Frame %d, Rx %d: ScenarioConfig.Receivers only has %d ', ...
+                 'entries. Phase 3 removed the silent ', ...
+                 '''Error_MissingRxScenario'' fallback; the upstream ', ...
+                 'CommunicationBehaviorSimulator must publish one rxPlan ', ...
+                 'per receiver requested by stepImpl.'], ...
+                FrameId, rxIdx, length(obj.ScenarioConfig.Receivers));
         end
+
+        rxPlan = obj.ScenarioConfig.Receivers{rxIdx};
+        RxInfo = csrd.core.ChangShuo.validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx);
+        RxInfos{rxIdx} = RxInfo;
+
+        obj.logger.debug("Frame %d, RxID %s: Receiver configured (Type: %s, SampleRate: %.2f MHz).", ...
+            FrameId, string(RxInfo.ID), RxInfo.Type, RxInfo.SampleRate / 1e6);
     end
 
     obj.logger.debug("Frame %d: Receiver setup complete.", FrameId);
-end
-
-function val = getFieldOrDefault(s, fieldName, default)
-    if isfield(s, fieldName)
-        val = s.(fieldName);
-    else
-        val = default;
-    end
 end
