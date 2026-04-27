@@ -2,8 +2,8 @@
 
 | 字段 | 值 |
 |------|----|
-| 状态 | **Draft v0.3 / Executing**（2026-04-27：S1-S4 已完成；先回顾冻结契约，再进入发布硬化） |
-| 顶层 audit 引用 | `docs/audits/2026-04-spectrum-blueprint-construction-refactor.md` §18（待同步） |
+| 状态 | **Draft v0.5 / Executing**（2026-04-27：S1-S5 已完成；S5 回放修复 Design truth 传播断点） |
+| 顶层 audit 引用 | `docs/audits/2026-04-spectrum-blueprint-construction-refactor.md` §18 |
 | 关联条目 | v0.4 六阶段冻结证据 / Phase 5 backlog / annotation v2 下游工具链 / operator MC 性能诊断 |
 | 前置 | Phase 0 / 1 / 2 / 3 / 4 / 5 已 Frozen；commit `42e70d0` 已入库；final baseline `docs/baselines/2026-04-final-v04.json` |
 | 目标产出 | release readiness checklist / annotation v2 读取与导出工具 / COCO v2 converter 设计与实现 / 性能诊断报告 / CI 门禁收敛 |
@@ -100,6 +100,46 @@ COCO 或其他下游格式只能是 annotation v2 的派生产物。字段来源
 - 在 source 不可见时生成可见 bbox。
 - 缺字段时写空 label 继续。
 
+### 4.1 S5 COCO v2 最小映射
+
+当前 annotation v2 只持久化 `TimeOccupancy` 比例，没有持久化
+`detectBurstEnvelope` 内部的 `BurstStartSec/BurstStopSec`。因此 S5 的 COCO
+converter 不生成二维时频矩形，而采用保守的 **receiver-frequency canvas**：
+
+| COCO 字段 | 来源 | 规则 |
+|-----------|------|------|
+| `images[*].width` | converter 参数 `ImageWidth` | 默认 1024；表示 receiver observable frequency window |
+| `images[*].height` | 固定最小 canvas | 默认 1；不声明时域起止位置 |
+| `images[*].csrd.observable_range_hz` | `Frames[*].ObservableRange` 或 `SampleRate` | 优先使用显式 receiver observable range，否则用 `[-SampleRate/2, SampleRate/2]` |
+| `categories[*].name` | `Truth.Design.ModulationFamily` | design fact；不从 IQ 或 measured spectrum 推断 |
+| `annotations[*].bbox.x/width` | `ReceiverView.ProjectedCenterOffsetHz` + `Truth.Measured.SourcePlane.OccupiedBandwidthHz` | 以 projected center 定位，以 measured occupied bandwidth 定宽，并裁剪到 receiver observable range |
+| `annotations[*].bbox.y/height` | S5 最小 canvas | `[0, 1]`，时间信息只放入 `annotations[*].csrd.measured.source_plane.TimeOccupancy` |
+| `annotations[*].csrd.*` | `Truth.Design/Execution/Measured` + `ReceiverView` | 保留 source fields map，明确 design / execution / measured 来源 |
+
+若 `ReceiverView.IsVisible=false`，converter 必须跳过该 source 并在
+`csrd_export.skipped_sources` 中记录原因；不能生成可见 bbox。若 measured
+SourcePlane 带宽不是有限正数，必须 fail-fast，因为此时没有可审计的 bbox
+宽度。
+
+### 4.2 S5 真实样例回放发现：Design truth 传播断点
+
+S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
+`Truth.Design` 字段存在，但 `ModulationFamily` / `PlannedBandwidthHz` /
+`PayloadLengthBits` 等值为空。根因不是 COCO 映射，而是
+`processSingleSegment` 已构造的 `segmentSignal.Planned` 没有在
+`processChannelPropagation` 组装 receiver component 时继续传递给
+`buildSourceAnnotation`。
+
+修复原则：
+
+- `Truth.Design.*` 只能来自蓝图/segment planning 记录，不允许 converter
+  从 IQ、Execution 或文件名推断。
+- `processChannelPropagation` 必须把 `segmentSignal.Planned` 原样传到
+  `component.Planned`；若缺失则以 `CSRD:Construction:*` fail-fast，避免落
+  空 Design annotation。
+- `readAnnotationV2` 必须从“字段存在”升级到“Design 主字段非空/有限”校验，
+  这样下游工具不会接受半空 v2 annotation。
+
 ---
 
 ## 5. 初始实施顺序
@@ -110,7 +150,7 @@ COCO 或其他下游格式只能是 annotation v2 的派生产物。字段来源
 | S2 | 顶层 audit / README 同步 Phase 6 Draft | ✅ grep 无“下一阶段未知”类误述 |
 | S3 | 增加 release readiness 文档或脚本 | ✅ `tools/release/run_csrd_release_readiness.m` 可读取 final-v04 并输出关键门禁 |
 | S4 | 实现 annotation v2 reader + schema validation | ✅ `ReadAnnotationV2Test` + `run_all_tests('phase6')` PASS |
-| S5 | 实现 COCO v2 converter 最小可用路径 | converter unit + fixture regression PASS |
+| S5 | 实现 COCO v2 converter 最小可用路径 | ✅ converter unit + fixture regression PASS |
 | S6 | 增加 performance diagnostic report | 不改变 baseline correctness metric |
 | S7 | 本地 CI smoke + release readiness PASS | 30 min 内；不跑 full 1000 MC |
 | S8 | 根据结果修订本文，决定是否 Frozen | docs / tests / handover 更新 |
@@ -145,7 +185,7 @@ COCO 或其他下游格式只能是 annotation v2 的派生产物。字段来源
 
 ## 8. 实施快照
 
-### 8.1 S1-S4 已完成（2026-04-27）
+### 8.1 S1-S5 已完成（2026-04-27）
 
 | Step | 状态 | 落点 |
 |------|------|------|
@@ -153,15 +193,22 @@ COCO 或其他下游格式只能是 annotation v2 的派生产物。字段来源
 | S2 | ✅ | 顶层 audit 升 `Draft v0.5.0`，README 增 `v0.5 next track` |
 | S3 | ✅ | 新增 `tools/release/run_csrd_release_readiness.m`，只读校验 final-v04、Phase 0-6 文档、CI static gates 与可选 git clean |
 | S4 | ✅ | 新增 `+csrd/+utils/+annotation/readAnnotationV2.m`、`tests/unit/ReadAnnotationV2Test.m`、`tests/regression/test_phase6_release_readiness.m`；`tests/run_all_tests.m` 增 `phase6` selector |
+| S5 | ✅ | `tools/convert_csrd_to_coco.m` 改为 annotation v2-only minimal converter；采用 receiver-frequency canvas，不生成虚构时域 bbox；新增 `tests/unit/ConvertCsrdToCocoTest.m` 与 `tests/regression/test_phase6_coco_converter_fixture.m`；真实 smoke 回放发现并修复 `Truth.Design` 传播断点 |
 
-### 8.2 S3-S4 验证（2026-04-27）
+### 8.2 S3-S5 验证（2026-04-27）
 
 | 命令 | 结果 |
 |------|------|
 | targeted `checkcode(...,'-id')` on `tools/release/run_csrd_release_readiness.m` | PASS，0 issues |
 | `run_csrd_release_readiness()` | PASS，读取 `docs/baselines/2026-04-final-v04.json`；1000 scenarios；BW P95 diff = 0.022218 |
 | targeted `checkcode(...,'-id')` on Phase 6 reader/readiness/test files | PASS，0 issues |
-| `run_all_tests('phase6')` | PASS，2/2 suites（`ReadAnnotationV2Test` 5 cases + `test_phase6_release_readiness`），约 2.85 s |
+| `ConvertCsrdToCocoTest` | PASS，5 cases；覆盖可见 bbox、JSON 写盘、不可见 source skip、v1 顶层字段拒绝、缺 measured bandwidth fail-fast |
+| `test_phase6_coco_converter_fixture` | PASS；合成 annotation v2 fixture 写盘 JSON，验证 2 frames / 1 visible annotation / 1 skipped source |
+| `CatchSwallowRemovedTest` | PASS，13 cases；COCO 静态保护更新为“不读 v1 路径 + 必须调用 `readAnnotationV2`” |
+| `ReadAnnotationV2Test` | PASS，6 cases；新增空 `Truth.Design.ModulationFamily` 拒绝 |
+| `BuildSourceAnnotationV2Test` | PASS，6 cases；真实 1-scenario smoke 验证 `Truth.Design` 主字段非空/有限 |
+| new smoke annotation COCO replay | PASS；`images=1` / `annotations=3` / `skipped=0` |
+| `run_all_tests('phase6')` | PASS，4/4 suites（`ReadAnnotationV2Test` 6 cases + `ConvertCsrdToCocoTest` 5 cases + 2 regression），约 4.45 s |
 
 ---
 
@@ -172,3 +219,5 @@ COCO 或其他下游格式只能是 annotation v2 的派生产物。字段来源
 | v0.1 | 2026-04-27 | 初版 Draft：基于 Phase 0-5 回顾，定义 release hardening / performance diagnostics / annotation v2 toolchain 范围 |
 | v0.2 | 2026-04-27 | S1-S3 落地：顶层文档同步，新增 release readiness 只读脚本并通过 checkcode/readiness 验证 |
 | v0.3 | 2026-04-27 | S4 落地：annotation v2 reader + schema validation，新增 Phase 6 curated test selector |
+| v0.4 | 2026-04-27 | S5 落地：annotation v2-only COCO converter minimal path + converter unit / fixture regression |
+| v0.5 | 2026-04-27 | S5 回放修复：`segmentSignal.Planned` 传递到 receiver component，`PlannedSampleRate` 字段名回读，reader 拒绝空 Design 主字段 |

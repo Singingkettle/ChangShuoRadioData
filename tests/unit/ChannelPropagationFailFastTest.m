@@ -10,8 +10,8 @@ classdef ChannelPropagationFailFastTest < matlab.unittest.TestCase
     %     * SampleRate now MUST come from `channelOutput.SampleRate`;
     %       otherwise CSRD:Construction:ChannelMissingSampleRate is
     %       raised.
-    %     * `component.Planned` is only ever set by
-    %       processSingleSegment from the per-segment Placement; the
+    %     * `component.Planned` is copied only from the segmentSignal
+    %       record set by processSingleSegment; the
     %       channel block's Planned echo was deleted from
     %       processChannelPropagation, so any annotation
     %       Planned.{Bandwidth,FrequencyOffset} reflects the
@@ -86,6 +86,12 @@ classdef ChannelPropagationFailFastTest < matlab.unittest.TestCase
                 'private', 'processChannelPropagation.m');
             target = char(java.io.File(target).getCanonicalPath());
             text = fileread(target);
+            code = regexprep(text, '%[^\n\r]*', '');
+            testCase.verifyNotEmpty(regexp(code, ...
+                'component\.Planned\s*=\s*segmentSignal\.Planned', 'once'), ...
+                ['processChannelPropagation.m must pass the upstream ', ...
+                 'segmentSignal.Planned design truth to the receiver ', ...
+                 'component for annotation v2.']);
             % Forbidden patterns: any assignment of component.Planned
             % from channelOutput.Planned.
             forbidden = {'component.Planned = channelOutput.Planned', ...

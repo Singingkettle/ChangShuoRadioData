@@ -188,6 +188,9 @@ function design = buildDesignTruth(comp)
         design.PlannedBandwidthHz = getFieldOrDefault(plannedSrc, 'PlannedBandwidthHz', NaN);
     end
     design.PlannedSampleRate = getFieldOrDefault(plannedSrc, 'SampleRate', NaN);
+    if isnan(design.PlannedSampleRate)
+        design.PlannedSampleRate = getFieldOrDefault(plannedSrc, 'PlannedSampleRate', NaN);
+    end
     design.ModulationFamily  = getFieldOrEmpty(plannedSrc, 'ModulationFamily', '');
     design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
     design.PayloadLengthBits = getFieldOrDefault(plannedSrc, 'PayloadLengthBits', NaN);

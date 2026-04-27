@@ -55,6 +55,15 @@ classdef ReadAnnotationV2Test < matlab.unittest.TestCase
                 @() csrd.utils.annotation.readAnnotationV2(payload), ...
                 'CSRD:AnnotationV2:UnexpectedSemantics');
         end
+
+        function rejectsEmptyDesignTruth(testCase)
+            payload = localValidPayload();
+            payload.Frames{1}{1}.SignalSources.Truth.Design.ModulationFamily = '';
+
+            testCase.verifyError( ...
+                @() csrd.utils.annotation.readAnnotationV2(payload), ...
+                'CSRD:AnnotationV2:InvalidDesignValue');
+        end
     end
 end
 

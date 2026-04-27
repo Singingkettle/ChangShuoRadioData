@@ -53,7 +53,7 @@ Phase 5 outcome (from `docs/baselines/2026-04-final-v04.json`): 1000 scenarios, 
 
 ### 🧭 v0.5 next track — **Phase 6 Draft 2026-04-27**
 
-The next stage is release hardening, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and focuses on release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, and CI hardening. It explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
+The next stage is release hardening, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and focuses on release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, and CI hardening. S1-S5 are now landed: the v2 reader, release readiness gate, and minimal receiver-frequency COCO v2 converter are available. Phase 6 explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
 
 Phase 6 release readiness check:
 
@@ -62,7 +62,12 @@ addpath(fullfile(pwd, 'tools', 'release'))
 run_csrd_release_readiness()                % read-only final-v04 readiness gate
 
 addpath(fullfile(pwd, 'tests'))
-run_all_tests('phase6')                     % annotation v2 reader + readiness
+run_all_tests('phase6')                     % v2 reader + COCO converter + readiness
+
+addpath(fullfile(pwd, 'tools'))
+coco = convert_csrd_to_coco(annotationPath, outputJsonPath);
+% annotationPath must point to a CSRD annotation v2 JSON file with populated
+% Truth.Design and Truth.Measured.SourcePlane fields.
 ```
 
 Phase 0 quick start (no real simulation needed):

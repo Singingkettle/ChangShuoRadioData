@@ -466,10 +466,11 @@ function records = runPhase6Suite(testsDir, verbose)
     addpath(fullfile(projectRoot, 'tools', 'release'));
     records = [];
 
-    phase6Unit = {'ReadAnnotationV2Test'};
+    phase6Unit = {'ReadAnnotationV2Test', 'ConvertCsrdToCocoTest'};
     records = appendUnittestClasses(records, phase6Unit, 'phase6', verbose);
 
-    phase6Reg = {'test_phase6_release_readiness'};
+    phase6Reg = {'test_phase6_release_readiness', ...
+        'test_phase6_coco_converter_fixture'};
     records = appendRegressionTests(records, phase6Reg, 'phase6', verbose);
 end
 
