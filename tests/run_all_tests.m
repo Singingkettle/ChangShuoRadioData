@@ -20,7 +20,8 @@ function results = run_all_tests(varargin)
     p = inputParser;
     addOptional(p, 'testType', 'regression', ...
         @(x) any(validatestring(x, {'regression', 'unit', 'integration', ...
-            'phase0', 'phase1', 'phase2', 'phase3', 'phase4', 'all'})));
+            'phase0', 'phase1', 'phase2', 'phase3', 'phase4', ...
+            'phase6', 'all'})));
     addParameter(p, 'verbose', false, @islogical);
     parse(p, varargin{:});
 
@@ -128,6 +129,12 @@ function selected = resolveSelectedSuites(testType)
             % test_baseline_sweep_200(210, 'Mode', 'full') to gate the
             % Phase 4 freeze on the 9 §6 exit conditions.
             selected = {'phase4'};
+        case 'phase6'
+            % Phase 6 (audit §18 / phase-6-release-hardening.md) curated
+            % release-hardening subset: annotation v2 reader validation
+            % plus the read-only release readiness regression. This suite
+            % must not run a simulation or rewrite canonical baselines.
+            selected = {'phase6'};
         case 'all'
             selected = {'regression', 'unit', 'integration'};
         otherwise
@@ -173,6 +180,13 @@ function records = runSuite(suite, testsDir, verbose)
     if strcmp(suite, 'phase4')
         fprintf('-- Suite: %s (curated)\n', suite);
         records = runPhase4Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase6')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase6Suite(testsDir, verbose);
         fprintf('\n');
         return;
     end
@@ -436,6 +450,27 @@ function records = runPhase4Suite(testsDir, verbose)
         'test_doppler_high_speed', ...
         'test_measured_truth_coverage'};
     records = appendRegressionTests(records, phase4Reg, 'phase4', verbose);
+end
+
+
+function records = runPhase6Suite(testsDir, verbose)
+    % Phase 6 (audit §18 / phase-6-release-hardening.md) curated suite.
+    %
+    %   Pins the release-hardening layer without running a simulation:
+    %   annotation v2 reader validation plus release readiness checks over
+    %   the committed final-v04 baseline.
+
+    projectRoot = fileparts(testsDir);
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    addpath(fullfile(projectRoot, 'tools', 'release'));
+    records = [];
+
+    phase6Unit = {'ReadAnnotationV2Test'};
+    records = appendUnittestClasses(records, phase6Unit, 'phase6', verbose);
+
+    phase6Reg = {'test_phase6_release_readiness'};
+    records = appendRegressionTests(records, phase6Reg, 'phase6', verbose);
 end
 
 

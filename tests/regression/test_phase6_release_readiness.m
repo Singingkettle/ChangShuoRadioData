@@ -1,0 +1,19 @@
+function test_phase6_release_readiness()
+%TEST_PHASE6_RELEASE_READINESS Regression wrapper for Phase 6 readiness.
+
+projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+addpath(projectRoot);
+addpath(fullfile(projectRoot, 'tools', 'release'));
+
+results = run_csrd_release_readiness();
+
+assert(results.Success, ...
+    'CSRD:Phase6:ReadinessFailed', ...
+    'run_csrd_release_readiness did not report success.');
+assert(results.NumScenarios >= 1000, ...
+    'CSRD:Phase6:TooFewScenarios', ...
+    'final-v04 readiness baseline must contain at least 1000 scenarios.');
+assert(results.ExecutionVsMeasuredBwAbsRelDiffP95 < 0.03, ...
+    'CSRD:Phase6:BandwidthDriftHigh', ...
+    'final-v04 bandwidth drift gate regressed.');
+end
