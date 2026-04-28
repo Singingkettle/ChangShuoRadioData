@@ -1,6 +1,6 @@
 # 频谱感知仿真项目重构审计与实施计划
 
-**状态**: Draft v0.5.5（Phase 0 / 1 / 2 / 3 / 4 / 5 / 6 已 Frozen）
+**状态**: Draft v0.6.0（Phase 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 已 Frozen）
 **日期**: 2026-04-27
 **用途**: 作为后续重构实施、跨 AI 审核、测试设计和验收的统一依据
 
@@ -22,6 +22,7 @@
 | v0.5.3 | 2026-04-28 | **Phase 6 S6 落地**：新增 `tools/phase6/run_phase6_performance_diagnostics.m` 与 `docs/audits/reports/phase-6-performance-diagnostics.md`。诊断默认只读 final-v04 / baseline-v0 和源码热点，不跑仿真；P50/P95 wallclock 只标记为 diagnostic watch，不改变 `ExecutionVsMeasuredBwAbsRelDiffP95<0.03` 等 correctness gates；`run_all_tests('phase6')` 扩展为 5 suites 全过。 |
 | v0.5.4 | 2026-04-28 | **Phase 6 S7 落地**：新增 `tools/release/run_csrd_release_ci_readiness.m` 与 `docs/audits/reports/phase-6-ci-readiness.md`，聚合 release readiness、Phase 6 curated suite、performance diagnostics 与 local CI smoke；quick regression 显式记录 `RunCiSmoke=false` skip，完整 `run_csrd_release_ci_readiness()` PASS，CI smoke 933.55 s < 30 min，未跑 1000 MC。 |
 | v0.5.5 | 2026-04-28 | **Phase 6 Frozen**：S8 发布冻结判定完成，新增 `docs/audits/reports/phase-6-release-freeze.md`，`run_csrd_release_readiness()` 升级为文档内容门禁，README / HANDOVER / 顶层 audit / Phase 6 设计状态一致；不改变仿真链路、不重跑 1000 MC。 |
+| v0.6.0 | 2026-04-28 | **Phase 7 Frozen**：把 Phase 6 P6-6 的发布材料缺口拆成独立下游消费阶段；新增 annotation v2 schema 文档、downstream reader 示例、v0.5 release notes 草案、`examples/read_annotation_v2_downstream.m`、`run_csrd_downstream_docs_readiness()` 与 `run_all_tests('phase7')`；release readiness 聚合 downstream docs 门禁。 |
 
 > v0.4 不删除 v0.2/v0.3 任何原文，只在关键小节后继续追加"**v0.4 加强**"块。当 v0.4 与 v0.3/v0.2 出现冲突时（例如把某个字段从 emitter 全局字段改成 receiver-view 字段，或把总接收信号测量重新归类为 FramePlane），以 v0.4 加强块为准。
 
@@ -2232,3 +2233,14 @@ Phase 0 (底座)
 | 设计文档 | `docs/audits/phases/phase-6-release-hardening.md`（Frozen） |
 
 Phase 6 的第一条硬约束：任何工具链或性能改动都只能消费/保护 v0.4 已冻结的 truth contract，不能重新解释已生成 annotation。
+
+### 18.2 Phase 7 —— Downstream Release Materials
+
+| 项目 | 值 |
+|------|----|
+| 状态 | **Frozen**（2026-04-28：S1-S5 已完成；downstream docs readiness 已落地） |
+| 目标 | 补齐发布前下游消费材料：annotation v2 schema 文档、downstream reader 示例、v0.5 release notes 草案，并纳入机器门禁 |
+| Phase 0-6 回顾原则 | 不改 `Truth.Design / Truth.Execution / Truth.Measured`；不新增 v1 兼容；不重跑 final-v04；发布材料必须只描述已冻结事实 |
+| 主要范围 | `docs/annotation-v2-schema.md` / `docs/examples/annotation-v2-downstream.md` / `docs/release/RELEASE_NOTES_v0.5.0.md` / `examples/read_annotation_v2_downstream.m` / `tools/release/run_csrd_downstream_docs_readiness.m` / `run_all_tests('phase7')` |
+| 验证 | targeted `checkcode` PASS；`run_all_tests('phase7')` PASS，合成 annotation v2 fixture 执行 reader example 并写出 COCO JSON |
+| 设计文档 | `docs/audits/phases/phase-7-downstream-release.md`（Frozen） |

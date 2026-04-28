@@ -74,7 +74,20 @@ run_phase6_performance_diagnostics()        % read-only baseline + hotspot repor
 
 addpath(fullfile(pwd, 'tools', 'release'))
 run_csrd_release_ci_readiness()             % release readiness + phase6 + CI smoke
+
+addpath(fullfile(pwd, 'tools', 'release'))
+run_csrd_downstream_docs_readiness()        % schema docs + downstream example + release notes
+
+addpath(fullfile(pwd, 'tests'))
+run_all_tests('phase7')                     % downstream docs/example release regression
 ```
+
+Downstream documentation:
+
+- [`docs/annotation-v2-schema.md`](docs/annotation-v2-schema.md)
+- [`docs/examples/annotation-v2-downstream.md`](docs/examples/annotation-v2-downstream.md)
+- [`docs/release/RELEASE_NOTES_v0.5.0.md`](docs/release/RELEASE_NOTES_v0.5.0.md)
+- [`examples/read_annotation_v2_downstream.m`](examples/read_annotation_v2_downstream.m)
 
 Phase 0 quick start (no real simulation needed):
 

@@ -21,7 +21,7 @@ function results = run_all_tests(varargin)
     addOptional(p, 'testType', 'regression', ...
         @(x) any(validatestring(x, {'regression', 'unit', 'integration', ...
             'phase0', 'phase1', 'phase2', 'phase3', 'phase4', ...
-            'phase6', 'all'})));
+            'phase6', 'phase7', 'all'})));
     addParameter(p, 'verbose', false, @islogical);
     parse(p, varargin{:});
 
@@ -135,6 +135,12 @@ function selected = resolveSelectedSuites(testType)
             % plus the read-only release readiness regression. This suite
             % must not run a simulation or rewrite canonical baselines.
             selected = {'phase6'};
+        case 'phase7'
+            % Phase 7 (phase-7-downstream-release.md) curated subset:
+            % downstream schema docs, release notes, and executable
+            % annotation v2 reader example. This suite is read-only except
+            % for tempdir fixtures created by the regression itself.
+            selected = {'phase7'};
         case 'all'
             selected = {'regression', 'unit', 'integration'};
         otherwise
@@ -187,6 +193,13 @@ function records = runSuite(suite, testsDir, verbose)
     if strcmp(suite, 'phase6')
         fprintf('-- Suite: %s (curated)\n', suite);
         records = runPhase6Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase7')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase7Suite(testsDir, verbose);
         fprintf('\n');
         return;
     end
@@ -474,6 +487,20 @@ function records = runPhase6Suite(testsDir, verbose)
         'test_phase6_performance_diagnostics', ...
         'test_phase6_release_ci_readiness'};
     records = appendRegressionTests(records, phase6Reg, 'phase6', verbose);
+end
+
+
+function records = runPhase7Suite(testsDir, verbose)
+    % Phase 7 (phase-7-downstream-release.md) curated suite.
+    %
+    %   Pins downstream release documentation and the executable annotation
+    %   v2 reader example. No simulation or baseline rewrite is allowed.
+
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase7Reg = {'test_phase7_downstream_docs_readiness'};
+    records = appendRegressionTests(records, phase7Reg, 'phase7', verbose);
 end
 
 
