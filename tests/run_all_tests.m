@@ -470,7 +470,8 @@ function records = runPhase6Suite(testsDir, verbose)
     records = appendUnittestClasses(records, phase6Unit, 'phase6', verbose);
 
     phase6Reg = {'test_phase6_release_readiness', ...
-        'test_phase6_coco_converter_fixture'};
+        'test_phase6_coco_converter_fixture', ...
+        'test_phase6_performance_diagnostics'};
     records = appendRegressionTests(records, phase6Reg, 'phase6', verbose);
 end
 

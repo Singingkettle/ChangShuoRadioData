@@ -2,7 +2,7 @@
 
 | 字段 | 值 |
 |------|----|
-| 状态 | **Draft v0.5 / Executing**（2026-04-27：S1-S5 已完成；S5 回放修复 Design truth 传播断点） |
+| 状态 | **Draft v0.6 / Executing**（2026-04-28：S1-S6 已完成；performance diagnostics 已落地） |
 | 顶层 audit 引用 | `docs/audits/2026-04-spectrum-blueprint-construction-refactor.md` §18 |
 | 关联条目 | v0.4 六阶段冻结证据 / Phase 5 backlog / annotation v2 下游工具链 / operator MC 性能诊断 |
 | 前置 | Phase 0 / 1 / 2 / 3 / 4 / 5 已 Frozen；commit `42e70d0` 已入库；final baseline `docs/baselines/2026-04-final-v04.json` |
@@ -79,6 +79,20 @@ final-v04 关键指标：
 4. `obwActual` 的 `PeakRelativeDb=-3 dBc` 与 `SnrFloorDb=6` 是 Phase 4/5 证据支持的组合，Phase 6 只能诊断，不能静默调整。
 5. `run_csrd_ci_smoke()` 已在 1239.4 s 通过 30 min 门禁；CI hardening 应该稳定这个入口，而不是扩大普通 CI。
 
+### 3.1 S6 性能诊断边界
+
+S6 只建立诊断与报告入口，不做性能优化提交。诊断分三层：
+
+| 层级 | 输入 | 输出 | 不允许 |
+|------|------|------|--------|
+| baseline 对比 | `docs/baselines/2026-04-final-v04.json` + `docs/baselines/2026-04-baseline-v0.json` | wallclock / log / annotation 文件体积 / correctness metric 对比 | 不把 operator MC wallclock 变成新的 correctness gate |
+| 静态热点清单 | 源码文件 | `obwActual` 调用点、`pwelch` 依赖、FramePlane once-per-receiver 缓存、RRFSimulator step 内 release pattern | 不改 `obwActual` 阈值、不删 measurement、不改 System object 生命周期 |
+| 可选 microbench | 合成 deterministic IQ | measurement helper 粗粒度耗时 | 不设硬阈值，不作为 CI 失败条件 |
+
+S6 的报告必须明确：`ExecutionVsMeasuredBwAbsRelDiffP95 < 0.03`、
+`JsonNanCount=0`、`JsonInfinityCount=0`、`BlueprintProvenanceCoverage=1`
+仍是冻结契约；性能诊断不能绕开这些契约。
+
 ---
 
 ## 4. annotation v2 导出语义
@@ -151,7 +165,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | S3 | 增加 release readiness 文档或脚本 | ✅ `tools/release/run_csrd_release_readiness.m` 可读取 final-v04 并输出关键门禁 |
 | S4 | 实现 annotation v2 reader + schema validation | ✅ `ReadAnnotationV2Test` + `run_all_tests('phase6')` PASS |
 | S5 | 实现 COCO v2 converter 最小可用路径 | ✅ converter unit + fixture regression PASS |
-| S6 | 增加 performance diagnostic report | 不改变 baseline correctness metric |
+| S6 | 增加 performance diagnostic report | ✅ 只读 baseline + static hotspot + optional microbench；不改变 baseline correctness metric |
 | S7 | 本地 CI smoke + release readiness PASS | 30 min 内；不跑 full 1000 MC |
 | S8 | 根据结果修订本文，决定是否 Frozen | docs / tests / handover 更新 |
 
@@ -185,7 +199,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 
 ## 8. 实施快照
 
-### 8.1 S1-S5 已完成（2026-04-27）
+### 8.1 S1-S6 已完成（2026-04-28）
 
 | Step | 状态 | 落点 |
 |------|------|------|
@@ -194,8 +208,9 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | S3 | ✅ | 新增 `tools/release/run_csrd_release_readiness.m`，只读校验 final-v04、Phase 0-6 文档、CI static gates 与可选 git clean |
 | S4 | ✅ | 新增 `+csrd/+utils/+annotation/readAnnotationV2.m`、`tests/unit/ReadAnnotationV2Test.m`、`tests/regression/test_phase6_release_readiness.m`；`tests/run_all_tests.m` 增 `phase6` selector |
 | S5 | ✅ | `tools/convert_csrd_to_coco.m` 改为 annotation v2-only minimal converter；采用 receiver-frequency canvas，不生成虚构时域 bbox；新增 `tests/unit/ConvertCsrdToCocoTest.m` 与 `tests/regression/test_phase6_coco_converter_fixture.m`；真实 smoke 回放发现并修复 `Truth.Design` 传播断点 |
+| S6 | ✅ | 新增 `tools/phase6/run_phase6_performance_diagnostics.m` 与 `docs/audits/reports/phase-6-performance-diagnostics.md`；默认只读 baseline + static hotspot，不跑仿真；microbench 必须显式 opt-in |
 
-### 8.2 S3-S5 验证（2026-04-27）
+### 8.2 S3-S6 验证（2026-04-28）
 
 | 命令 | 结果 |
 |------|------|
@@ -208,7 +223,9 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | `ReadAnnotationV2Test` | PASS，6 cases；新增空 `Truth.Design.ModulationFamily` 拒绝 |
 | `BuildSourceAnnotationV2Test` | PASS，6 cases；真实 1-scenario smoke 验证 `Truth.Design` 主字段非空/有限 |
 | new smoke annotation COCO replay | PASS；`images=1` / `annotations=3` / `skipped=0` |
-| `run_all_tests('phase6')` | PASS，4/4 suites（`ReadAnnotationV2Test` 6 cases + `ConvertCsrdToCocoTest` 5 cases + 2 regression），约 4.45 s |
+| `run_phase6_performance_diagnostics()` | PASS；P50/P95 wallclock 标为 diagnostic watch，BW P95 diff = 0.022218，frozen contracts PASS，static hotspots PASS |
+| `run_phase6_performance_diagnostics('RunMicrobench',true,'NumMicrobenchRepeats',2)` | PASS；microbench 为 diagnostic-only-no-threshold |
+| `run_all_tests('phase6')` | PASS，5/5 suites（`ReadAnnotationV2Test` 6 cases + `ConvertCsrdToCocoTest` 5 cases + 3 regression），约 8.86 s |
 
 ---
 
@@ -221,3 +238,4 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | v0.3 | 2026-04-27 | S4 落地：annotation v2 reader + schema validation，新增 Phase 6 curated test selector |
 | v0.4 | 2026-04-27 | S5 落地：annotation v2-only COCO converter minimal path + converter unit / fixture regression |
 | v0.5 | 2026-04-27 | S5 回放修复：`segmentSignal.Planned` 传递到 receiver component，`PlannedSampleRate` 字段名回读，reader 拒绝空 Design 主字段 |
+| v0.6 | 2026-04-28 | S6 落地：只读 performance diagnostics 入口 + 报告；wallclock 只作 watch，不改变 correctness gates |
