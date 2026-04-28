@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Draft v0.2 / S6 implemented |
+| Status | Frozen / S6 implemented |
 | Date | 2026-04-28 |
 | Scope | Diagnostic only; no measurement threshold changes |
 | Canonical baseline | `docs/baselines/2026-04-final-v04.json` |

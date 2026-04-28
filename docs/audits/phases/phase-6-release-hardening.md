@@ -2,11 +2,11 @@
 
 | 字段 | 值 |
 |------|----|
-| 状态 | **Draft v0.7 / Executing**（2026-04-28：S1-S7 已完成；CI readiness 聚合已落地） |
+| 状态 | **Frozen**（2026-04-28：S1-S8 已完成；release readiness 内容门禁已落地） |
 | 顶层 audit 引用 | `docs/audits/2026-04-spectrum-blueprint-construction-refactor.md` §18 |
 | 关联条目 | v0.4 六阶段冻结证据 / Phase 5 backlog / annotation v2 下游工具链 / operator MC 性能诊断 |
 | 前置 | Phase 0 / 1 / 2 / 3 / 4 / 5 已 Frozen；commit `42e70d0` 已入库；final baseline `docs/baselines/2026-04-final-v04.json` |
-| 目标产出 | release readiness checklist / annotation v2 读取与导出工具 / COCO v2 converter 设计与实现 / 性能诊断报告 / CI 门禁收敛 |
+| 目标产出 | release readiness checklist / annotation v2 读取与导出工具 / COCO v2 converter 设计与实现 / 性能诊断报告 / CI 门禁收敛 / Phase 6 冻结交接 |
 | 非目标 | 不改变 Blueprint / Construction / Measurement truth contract；不回退 annotation v2；不为旧 v1 schema 做兼容层 |
 
 ---
@@ -112,6 +112,21 @@ S7 入口必须把“跳过长 CI smoke”和“完整 release CI smoke”区分
 `docs/baselines/2026-04-final-v04.smoke.json`；这属于 smoke baseline 工件，不得
 污染 canonical `2026-04-final-v04.json`。
 
+### 3.3 S8 冻结判定边界
+
+S8 只做发布收口，不改仿真语义。冻结判定必须同时满足三类证据：
+
+| 类别 | 判定 | 不允许 |
+|------|------|--------|
+| 文档状态 | Phase 6 设计、顶层 audit、README、HANDOVER 均说明 Phase 6 已完成并指向同一套 release/CI 入口 | 只改一处文档，留下“Draft/next track”漂移 |
+| 机器门禁 | `run_csrd_release_readiness()` 继续验证 final-v04 correctness、static gates、Phase 6 报告与冻结文档标记 | 只检查文件存在，不检查关键状态文本 |
+| CI 聚合 | `run_csrd_release_ci_readiness()` 保持 full smoke 可跑，quick regression 必须显式标记 long-check skip | 把 quick skip 冒充 full release gate |
+
+S8 不新增 1000-scenario MC，不改变 `Truth.Design / Truth.Execution /
+Truth.Measured` schema，不改 `obwActual` 阈值，也不把 operator wallclock
+转成 correctness gate。若 S8 文档门禁暴露前序文档或脚本状态漂移，先修订
+本文，再调整 release readiness 代码并重新运行 Phase 6 suite。
+
 ---
 
 ## 4. annotation v2 导出语义
@@ -186,7 +201,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | S5 | 实现 COCO v2 converter 最小可用路径 | ✅ converter unit + fixture regression PASS |
 | S6 | 增加 performance diagnostic report | ✅ 只读 baseline + static hotspot + optional microbench；不改变 baseline correctness metric |
 | S7 | 本地 CI smoke + release readiness PASS | ✅ 聚合入口 + quick regression + full smoke validation；30 min 内；不跑 full 1000 MC |
-| S8 | 根据结果修订本文，决定是否 Frozen | docs / tests / handover 更新 |
+| S8 | 根据结果修订本文，决定是否 Frozen | ✅ 文档状态一致性 + release readiness 内容门禁 + regression 验证 |
 
 ---
 
@@ -201,6 +216,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | C5 | performance diagnostics 只报告热点，不改变 measurement 阈值或 label 语义 |
 | C6 | `run_csrd_ci_smoke()` 或等价 local CI 仍在 30 min 内 PASS |
 | C7 | final-v04 baseline 仍可解析，核心指标未被工具链改动污染 |
+| C8 | Phase 6 冻结状态在 README / HANDOVER / 顶层 audit / Phase 6 设计中一致，并由 release readiness 内容门禁验证 |
 
 ---
 
@@ -223,14 +239,35 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | Step | 状态 | 落点 |
 |------|------|------|
 | S1 | ✅ | 新增本文件，明确 Phase 6 是 release hardening / performance diagnostics / annotation v2 toolchain，不是 truth contract 续改 |
-| S2 | ✅ | 顶层 audit 升 `Draft v0.5.0`，README 增 `v0.5 next track` |
+| S2 | ✅ | 顶层 audit 升 `Draft v0.5.0`，README 增 Phase 6 Draft 入口；S8 已统一改为 Frozen |
 | S3 | ✅ | 新增 `tools/release/run_csrd_release_readiness.m`，只读校验 final-v04、Phase 0-6 文档、CI static gates 与可选 git clean |
 | S4 | ✅ | 新增 `+csrd/+utils/+annotation/readAnnotationV2.m`、`tests/unit/ReadAnnotationV2Test.m`、`tests/regression/test_phase6_release_readiness.m`；`tests/run_all_tests.m` 增 `phase6` selector |
 | S5 | ✅ | `tools/convert_csrd_to_coco.m` 改为 annotation v2-only minimal converter；采用 receiver-frequency canvas，不生成虚构时域 bbox；新增 `tests/unit/ConvertCsrdToCocoTest.m` 与 `tests/regression/test_phase6_coco_converter_fixture.m`；真实 smoke 回放发现并修复 `Truth.Design` 传播断点 |
 | S6 | ✅ | 新增 `tools/phase6/run_phase6_performance_diagnostics.m` 与 `docs/audits/reports/phase-6-performance-diagnostics.md`；默认只读 baseline + static hotspot，不跑仿真；microbench 必须显式 opt-in |
 | S7 | ✅ | 新增 `tools/release/run_csrd_release_ci_readiness.m` 与 `docs/audits/reports/phase-6-ci-readiness.md`；聚合 release readiness、phase6 suite、performance diagnostics、CI smoke；quick regression 明确记录 long-check skip |
 
-### 8.2 S3-S7 验证（2026-04-28）
+### 8.2 S8 冻结候选设计（2026-04-28）
+
+S8 的变更顺序固定为：
+
+1. 先把本文记录为冻结候选，并定义 C8 文档一致性出口条件。
+2. 更新 release readiness，使它不只检查 release 文档存在，还检查 Phase 6
+   冻结状态、HANDOVER 状态与 S6/S7 报告关键标记。
+3. 更新 Phase 6 regression，使文档内容门禁成为 `run_all_tests('phase6')`
+   的一部分。
+4. 完成目标测试后，再把本文、README、HANDOVER、顶层 audit 从候选态改为
+   Frozen。
+
+S8 实施结果：
+
+| 项目 | 结果 |
+|------|------|
+| 文档收口 | README、顶层 audit、HANDOVER、Phase 6 设计、S6/S7/S8 报告均标记 Phase 6 Frozen |
+| 代码门禁 | `run_csrd_release_readiness()` 新增文档内容检查，不再只检查文件存在 |
+| 回归门禁 | `test_phase6_release_readiness` 断言 readiness 输出包含文档检查记录 |
+| 仿真语义 | 未改 Blueprint / Construction / Measurement，未改 measurement 阈值，未重跑 1000 MC |
+
+### 8.3 S3-S7 验证（2026-04-28）
 
 | 命令 | 结果 |
 |------|------|
@@ -250,6 +287,17 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | `run_csrd_release_ci_readiness()` | PASS；release readiness PASS；phase6 suite PASS；performance diagnostics PASS；CI smoke PASS `933.55 s < 1800 s`；未跑 1000 MC |
 | `docs/baselines/2026-04-final-v04.smoke.json` | 运行 full CI smoke 后无 tracked diff；本次 smoke 指标 `N=12` / `Mode=smoke` / `WallclockP95=36.9428 s` / `BW P95=0.029311` |
 
+### 8.4 S8 验证（2026-04-28）
+
+| 命令 | 结果 |
+|------|------|
+| targeted `checkcode(...,'-id')` on `tools/release/run_csrd_release_readiness.m` and `tests/regression/test_phase6_release_readiness.m` | PASS，0 issues |
+| `run_csrd_release_readiness()` | PASS；读取 final-v04；1000 scenarios；BW P95 diff = 0.022218；13 项 release 文档内容门禁全匹配 |
+| `run_all_tests('phase6')` | PASS，6/6 suites；约 6.73 s；覆盖 reader、COCO、release readiness、fixture、performance diagnostics、quick release CI aggregator |
+
+S8 没有重跑 full CI smoke，也没有重跑 1000-scenario MC；S7 的 full
+`run_csrd_release_ci_readiness()` 证据仍是 Phase 6 的长门禁快照。
+
 ---
 
 ## 9. 修订历史
@@ -263,3 +311,4 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | v0.5 | 2026-04-27 | S5 回放修复：`segmentSignal.Planned` 传递到 receiver component，`PlannedSampleRate` 字段名回读，reader 拒绝空 Design 主字段 |
 | v0.6 | 2026-04-28 | S6 落地：只读 performance diagnostics 入口 + 报告；wallclock 只作 watch，不改变 correctness gates |
 | v0.7 | 2026-04-28 | S7 落地：release/CI readiness 聚合入口 + quick regression + full CI smoke 验证，933.55 s 低于 30 min |
+| v0.8 | 2026-04-28 | S8 落地：Phase 6 Frozen；release readiness 增加 README / HANDOVER / 顶层 audit / Phase 6 报告内容门禁 |

@@ -61,12 +61,7 @@ localAssertScalar(payload.RunRecovery.NumRecoveredScenarios, ...
     'CSRD:Release:RecoveredScenarioMismatch', ...
     'RunRecovery.NumRecoveredScenarios must match Recipe.NumScenarios.');
 
-docs = localRequiredDocs(projectRoot);
-for k = 1:numel(docs)
-    assert(exist(docs{k}, 'file') == 2, ...
-        'CSRD:Release:MissingDocument', ...
-        'Required release document is missing: %s', docs{k});
-end
+documentation = localValidateRequiredDocs(projectRoot);
 
 run_csrd_static_gates();
 
@@ -86,6 +81,7 @@ results = struct( ...
     'JsonNanCount', double(diagnostics.JsonNanCount), ...
     'JsonInfinityCount', double(diagnostics.JsonInfinityCount), ...
     'RunRecovery', payload.RunRecovery, ...
+    'Documentation', documentation, ...
     'GitStatusShort', gitStatus);
 
 fprintf('=== CSRD release readiness PASSED ===\n');
@@ -105,18 +101,55 @@ end
 
 function docs = localRequiredDocs(projectRoot)
 phaseDir = fullfile(projectRoot, 'docs', 'audits', 'phases');
+reportDir = fullfile(projectRoot, 'docs', 'audits', 'reports');
 docs = {
-    fullfile(projectRoot, 'README.md')
+    fullfile(projectRoot, 'README.md'), ...
+        {'Phase 6 Frozen', 'run_csrd_release_ci_readiness'};
     fullfile(projectRoot, 'docs', 'audits', ...
-        '2026-04-spectrum-blueprint-construction-refactor.md')
-    fullfile(projectRoot, 'docs', 'audits', 'HANDOVER_2026-04-26.md')
-    fullfile(phaseDir, 'phase-0-baseline.md')
-    fullfile(phaseDir, 'phase-1-dataflow.md')
-    fullfile(phaseDir, 'phase-2-blueprint.md')
-    fullfile(phaseDir, 'phase-3-construction.md')
-    fullfile(phaseDir, 'phase-4-measurement.md')
-    fullfile(phaseDir, 'phase-5-mc-validation.md')
-    fullfile(phaseDir, 'phase-6-release-hardening.md')};
+        '2026-04-spectrum-blueprint-construction-refactor.md'), ...
+        {'Phase 6 Frozen', 'Draft v0.5.5'};
+    fullfile(projectRoot, 'docs', 'audits', 'HANDOVER_2026-04-26.md'), ...
+        {'Phase 0 / 1 / 2 / 3 / 4 / 5 / 6 已 Frozen', ...
+         'Phase 6 release hardening'};
+    fullfile(phaseDir, 'phase-0-baseline.md'), {'Frozen'};
+    fullfile(phaseDir, 'phase-1-dataflow.md'), {'Frozen'};
+    fullfile(phaseDir, 'phase-2-blueprint.md'), {'Frozen'};
+    fullfile(phaseDir, 'phase-3-construction.md'), {'Frozen'};
+    fullfile(phaseDir, 'phase-4-measurement.md'), {'Frozen'};
+    fullfile(phaseDir, 'phase-5-mc-validation.md'), {'Frozen'};
+    fullfile(phaseDir, 'phase-6-release-hardening.md'), ...
+        {'Frozen', 'S8'};
+    fullfile(reportDir, 'phase-6-performance-diagnostics.md'), ...
+        {'Frozen', 'diagnostic-only-no-threshold'};
+    fullfile(reportDir, 'phase-6-ci-readiness.md'), ...
+        {'Frozen', '933.55 s'};
+    fullfile(reportDir, 'phase-6-release-freeze.md'), ...
+        {'Frozen', 'run_csrd_release_readiness'}};
+end
+
+
+function checks = localValidateRequiredDocs(projectRoot)
+docs = localRequiredDocs(projectRoot);
+checks = repmat( ...
+    struct('Path', '', 'Needles', {{}}, 'Matched', false), ...
+    size(docs, 1), 1);
+for k = 1:size(docs, 1)
+    path = docs{k, 1};
+    needles = docs{k, 2};
+    assert(exist(path, 'file') == 2, ...
+        'CSRD:Release:MissingDocument', ...
+        'Required release document is missing: %s', path);
+    text = fileread(path);
+    for j = 1:numel(needles)
+        assert(contains(text, needles{j}), ...
+            'CSRD:Release:DocumentContentMismatch', ...
+            'Required release document %s does not contain "%s".', ...
+            path, needles{j});
+    end
+    checks(k).Path = path;
+    checks(k).Needles = needles;
+    checks(k).Matched = true;
+end
 end
 
 

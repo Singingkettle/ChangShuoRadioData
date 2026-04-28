@@ -51,9 +51,9 @@ The audit pass below (review/spectrum-sim-audit) finished v0.3 of the refactor. 
 
 Phase 5 outcome (from `docs/baselines/2026-04-final-v04.json`): 1000 scenarios, **BlueprintAcceptanceRate = 1.0**, **ChannelFactoryFailureRate = 0**, **ExecutionVsMeasuredBwAbsRelDiffP95 = 0.022217530072084515**, **JsonNanCount = 0**, **JsonInfinityCount = 0**. Operator MC wallclock is recorded as diagnostic metadata; CI smoke remains the hard runtime gate.
 
-### 🧭 v0.5 next track — **Phase 6 Draft 2026-04-27**
+### 🧭 v0.5 release hardening — **Phase 6 Frozen 2026-04-28**
 
-The next stage is release hardening, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and focuses on release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, and CI hardening. S1-S7 are now landed: the v2 reader, release readiness gate, minimal receiver-frequency COCO v2 converter, read-only performance diagnostics, and release/CI readiness aggregator are available. Phase 6 explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
+The release-hardening stage is now frozen, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and covers release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, CI hardening, and the final documentation consistency gate. The v2 reader, release readiness gate, minimal receiver-frequency COCO v2 converter, read-only performance diagnostics, release/CI readiness aggregator, and Phase 6 release freeze report are available. Phase 6 explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
 
 Phase 6 release readiness check:
 

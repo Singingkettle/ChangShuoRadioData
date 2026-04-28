@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Status | Draft v0.2 / S7 implemented |
+| Status | Frozen / S7 implemented |
 | Date | 2026-04-28 |
 | Scope | Release/CI gate aggregation |
 | Long-run policy | CI smoke only; no 1000-scenario MC |
