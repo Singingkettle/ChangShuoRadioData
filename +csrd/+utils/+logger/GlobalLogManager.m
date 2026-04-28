@@ -81,7 +81,8 @@ classdef GlobalLogManager < handle
 
             % Setup log directory
             if nargin < 2 || isempty(outputDirectory)
-                outputDirectory = fullfile(pwd, 'csrd_simulation_output');
+                outputDirectory = fullfile(pwd, 'artifacts', 'tests', ...
+                    'runs', 'global_logs');
             end
 
             % Create timestamped session directory
@@ -122,7 +123,7 @@ classdef GlobalLogManager < handle
                     mlogLevel = csrd.utils.logger.mlog.Level.INFO; % Default
                     % Use direct console output since logger isn't fully initialized yet
                     if logConfig.DisplayInConsole
-                        disp(sprintf('[GlobalLogManager] Unknown log level "%s", using INFO', logLevel));
+                        fprintf('[GlobalLogManager] Unknown log level "%s", using INFO\n', logLevel);
                     end
 
             end

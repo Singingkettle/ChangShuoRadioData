@@ -6,8 +6,8 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
     %     - File threshold    = DEBUG
     %     - debug() messages reach BOTH the command window and the file
     %
-    %   We use a temporary log directory so we don't pollute
-    %   csrd_simulation_output/.
+    %   We use a temporary log directory so we don't pollute the default
+    %   artifacts/tests/runs/ log area.
 
     properties (Access = private)
         TempDir
