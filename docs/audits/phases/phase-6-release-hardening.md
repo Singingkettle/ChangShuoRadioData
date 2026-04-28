@@ -2,7 +2,7 @@
 
 | 字段 | 值 |
 |------|----|
-| 状态 | **Draft v0.6 / Executing**（2026-04-28：S1-S6 已完成；performance diagnostics 已落地） |
+| 状态 | **Draft v0.7 / Executing**（2026-04-28：S1-S7 已完成；CI readiness 聚合已落地） |
 | 顶层 audit 引用 | `docs/audits/2026-04-spectrum-blueprint-construction-refactor.md` §18 |
 | 关联条目 | v0.4 六阶段冻结证据 / Phase 5 backlog / annotation v2 下游工具链 / operator MC 性能诊断 |
 | 前置 | Phase 0 / 1 / 2 / 3 / 4 / 5 已 Frozen；commit `42e70d0` 已入库；final baseline `docs/baselines/2026-04-final-v04.json` |
@@ -93,6 +93,25 @@ S6 的报告必须明确：`ExecutionVsMeasuredBwAbsRelDiffP95 < 0.03`、
 `JsonNanCount=0`、`JsonInfinityCount=0`、`BlueprintProvenanceCoverage=1`
 仍是冻结契约；性能诊断不能绕开这些契约。
 
+### 3.2 S7 CI readiness 聚合边界
+
+S7 的目标是给 release owner 一个单一入口，把 Phase 6 已有机器门禁串起来。
+它不是新的仿真模式，也不替代 1000-scenario operator MC。
+
+| 子门禁 | 默认策略 | 说明 |
+|--------|----------|------|
+| release readiness | 必跑 | 只读 final-v04，验证冻结 correctness metrics、文档、static gates |
+| Phase 6 curated suite | 必跑 | reader / COCO / diagnostics / readiness regression；不跑长 MC |
+| performance diagnostics | 必跑 | 只读 baseline + static hotspots；wallclock 只作 watch |
+| CI smoke | release 入口默认跑；测试中可显式 skip | 调用 `run_csrd_ci_smoke()`，使用 smoke-scale baseline，不跑 1000 MC |
+| git clean | 默认不强制 | owner 准备发布时可用 `EnforceGitClean=true` |
+
+S7 入口必须把“跳过长 CI smoke”和“完整 release CI smoke”区分记录到结果里，
+避免本地快速测试被误认为已完成 full release readiness。若运行 full CI smoke，
+`run_phase5_mc_validation(...,'Mode','smoke')` 可能重写
+`docs/baselines/2026-04-final-v04.smoke.json`；这属于 smoke baseline 工件，不得
+污染 canonical `2026-04-final-v04.json`。
+
 ---
 
 ## 4. annotation v2 导出语义
@@ -166,7 +185,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | S4 | 实现 annotation v2 reader + schema validation | ✅ `ReadAnnotationV2Test` + `run_all_tests('phase6')` PASS |
 | S5 | 实现 COCO v2 converter 最小可用路径 | ✅ converter unit + fixture regression PASS |
 | S6 | 增加 performance diagnostic report | ✅ 只读 baseline + static hotspot + optional microbench；不改变 baseline correctness metric |
-| S7 | 本地 CI smoke + release readiness PASS | 30 min 内；不跑 full 1000 MC |
+| S7 | 本地 CI smoke + release readiness PASS | ✅ 聚合入口 + quick regression + full smoke validation；30 min 内；不跑 full 1000 MC |
 | S8 | 根据结果修订本文，决定是否 Frozen | docs / tests / handover 更新 |
 
 ---
@@ -199,7 +218,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 
 ## 8. 实施快照
 
-### 8.1 S1-S6 已完成（2026-04-28）
+### 8.1 S1-S7 已完成（2026-04-28）
 
 | Step | 状态 | 落点 |
 |------|------|------|
@@ -209,8 +228,9 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | S4 | ✅ | 新增 `+csrd/+utils/+annotation/readAnnotationV2.m`、`tests/unit/ReadAnnotationV2Test.m`、`tests/regression/test_phase6_release_readiness.m`；`tests/run_all_tests.m` 增 `phase6` selector |
 | S5 | ✅ | `tools/convert_csrd_to_coco.m` 改为 annotation v2-only minimal converter；采用 receiver-frequency canvas，不生成虚构时域 bbox；新增 `tests/unit/ConvertCsrdToCocoTest.m` 与 `tests/regression/test_phase6_coco_converter_fixture.m`；真实 smoke 回放发现并修复 `Truth.Design` 传播断点 |
 | S6 | ✅ | 新增 `tools/phase6/run_phase6_performance_diagnostics.m` 与 `docs/audits/reports/phase-6-performance-diagnostics.md`；默认只读 baseline + static hotspot，不跑仿真；microbench 必须显式 opt-in |
+| S7 | ✅ | 新增 `tools/release/run_csrd_release_ci_readiness.m` 与 `docs/audits/reports/phase-6-ci-readiness.md`；聚合 release readiness、phase6 suite、performance diagnostics、CI smoke；quick regression 明确记录 long-check skip |
 
-### 8.2 S3-S6 验证（2026-04-28）
+### 8.2 S3-S7 验证（2026-04-28）
 
 | 命令 | 结果 |
 |------|------|
@@ -225,7 +245,10 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | new smoke annotation COCO replay | PASS；`images=1` / `annotations=3` / `skipped=0` |
 | `run_phase6_performance_diagnostics()` | PASS；P50/P95 wallclock 标为 diagnostic watch，BW P95 diff = 0.022218，frozen contracts PASS，static hotspots PASS |
 | `run_phase6_performance_diagnostics('RunMicrobench',true,'NumMicrobenchRepeats',2)` | PASS；microbench 为 diagnostic-only-no-threshold |
-| `run_all_tests('phase6')` | PASS，5/5 suites（`ReadAnnotationV2Test` 6 cases + `ConvertCsrdToCocoTest` 5 cases + 3 regression），约 8.86 s |
+| `run_csrd_release_ci_readiness('RunCiSmoke',false,'IncludePhase6Suite',false)` | PASS；quick aggregator regression，`CiSmokeSkipped=true` 明确记录 |
+| `run_all_tests('phase6')` | PASS，6/6 suites（`ReadAnnotationV2Test` 6 cases + `ConvertCsrdToCocoTest` 5 cases + 4 regression），约 5.18 s |
+| `run_csrd_release_ci_readiness()` | PASS；release readiness PASS；phase6 suite PASS；performance diagnostics PASS；CI smoke PASS `933.55 s < 1800 s`；未跑 1000 MC |
+| `docs/baselines/2026-04-final-v04.smoke.json` | 运行 full CI smoke 后无 tracked diff；本次 smoke 指标 `N=12` / `Mode=smoke` / `WallclockP95=36.9428 s` / `BW P95=0.029311` |
 
 ---
 
@@ -239,3 +262,4 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | v0.4 | 2026-04-27 | S5 落地：annotation v2-only COCO converter minimal path + converter unit / fixture regression |
 | v0.5 | 2026-04-27 | S5 回放修复：`segmentSignal.Planned` 传递到 receiver component，`PlannedSampleRate` 字段名回读，reader 拒绝空 Design 主字段 |
 | v0.6 | 2026-04-28 | S6 落地：只读 performance diagnostics 入口 + 报告；wallclock 只作 watch，不改变 correctness gates |
+| v0.7 | 2026-04-28 | S7 落地：release/CI readiness 聚合入口 + quick regression + full CI smoke 验证，933.55 s 低于 30 min |

@@ -1,6 +1,6 @@
 # 频谱感知仿真项目重构审计与实施计划
 
-**状态**: Draft v0.5.3（Phase 0 / 1 / 2 / 3 / 4 / 5 已 Frozen；Phase 6 Draft S1-S6）
+**状态**: Draft v0.5.4（Phase 0 / 1 / 2 / 3 / 4 / 5 已 Frozen；Phase 6 Draft S1-S7）
 **日期**: 2026-04-27
 **用途**: 作为后续重构实施、跨 AI 审核、测试设计和验收的统一依据
 
@@ -20,6 +20,7 @@
 | v0.5.1 | 2026-04-27 | **Phase 6 S5 落地**：`tools/convert_csrd_to_coco.m` 从 Phase 5 fail-fast stub 升级为 annotation v2-only minimal COCO converter，采用 receiver-frequency canvas，bbox 定位来自 `ReceiverView.ProjectedCenterOffsetHz`，bbox 宽度来自 `Truth.Measured.SourcePlane.OccupiedBandwidthHz`，设计类别来自 `Truth.Design.ModulationFamily`；不可见 source 只进入 `csrd_export.skipped_sources`，不生成可见 bbox。新增 `ConvertCsrdToCocoTest` 与 `test_phase6_coco_converter_fixture`，`run_all_tests('phase6')` 扩展为 4 suites 全过。 |
 | v0.5.2 | 2026-04-27 | **S5 回放修复**：用真实 smoke annotation 回放 COCO 时发现旧生成样例 `Truth.Design` 为空；修复 `processChannelPropagation` 将 `segmentSignal.Planned` 传递到 receiver component，并修复 `buildDesignTruth` 对 `PlannedSampleRate` 的字段名回读。`readAnnotationV2` 升级为拒绝空/非有限 Design 主字段，`BuildSourceAnnotationV2Test` 新增 Design 值完整性断言，新的 smoke annotation 已可转换为 COCO（1 image / 3 annotations / 0 skipped）。 |
 | v0.5.3 | 2026-04-28 | **Phase 6 S6 落地**：新增 `tools/phase6/run_phase6_performance_diagnostics.m` 与 `docs/audits/reports/phase-6-performance-diagnostics.md`。诊断默认只读 final-v04 / baseline-v0 和源码热点，不跑仿真；P50/P95 wallclock 只标记为 diagnostic watch，不改变 `ExecutionVsMeasuredBwAbsRelDiffP95<0.03` 等 correctness gates；`run_all_tests('phase6')` 扩展为 5 suites 全过。 |
+| v0.5.4 | 2026-04-28 | **Phase 6 S7 落地**：新增 `tools/release/run_csrd_release_ci_readiness.m` 与 `docs/audits/reports/phase-6-ci-readiness.md`，聚合 release readiness、Phase 6 curated suite、performance diagnostics 与 local CI smoke；quick regression 显式记录 `RunCiSmoke=false` skip，完整 `run_csrd_release_ci_readiness()` PASS，CI smoke 933.55 s < 30 min，未跑 1000 MC。 |
 
 > v0.4 不删除 v0.2/v0.3 任何原文，只在关键小节后继续追加"**v0.4 加强**"块。当 v0.4 与 v0.3/v0.2 出现冲突时（例如把某个字段从 emitter 全局字段改成 receiver-view 字段，或把总接收信号测量重新归类为 FramePlane），以 v0.4 加强块为准。
 
@@ -2222,11 +2223,11 @@ Phase 0 (底座)
 
 | 项目 | 值 |
 |------|----|
-| 状态 | **Draft v0.6 / Executing**（2026-04-28：S1-S6 已完成；performance diagnostics 已落地） |
+| 状态 | **Draft v0.7 / Executing**（2026-04-28：S1-S7 已完成；CI readiness 聚合已落地） |
 | 目标 | 将 v0.4 六阶段重构从“已冻结”推进到“可发布、可下游消费、可持续回归”：release readiness、annotation v2 reader/exporter、COCO v2 converter、性能诊断与 CI hardening |
 | Phase 0-5 回顾原则 | 保护 `Truth.Design / Truth.Execution / Truth.Measured` 三层语义；保护 fail-fast；保护 receiver-view；保护 `Resume=true` MC 聚合；不把 performance work 变成 label 语义改动 |
-| 主要范围 | release checklist（`tools/release/run_csrd_release_readiness.m` 已落地） / annotation v2 schema validation（`readAnnotationV2` 已落地） / COCO v2 converter（S5 已落地） / performance diagnostic report（S6 已落地） / local CI readiness |
+| 主要范围 | release checklist（`tools/release/run_csrd_release_readiness.m` 已落地） / annotation v2 schema validation（`readAnnotationV2` 已落地） / COCO v2 converter（S5 已落地） / performance diagnostic report（S6 已落地） / local CI readiness（S7 已落地） |
 | 明确不做 | v1 annotation 兼容或迁移；默认重跑 1000 MC；调宽 measurement 阈值；无 owner 授权的 tag/push |
-| 设计文档 | `docs/audits/phases/phase-6-release-hardening.md`（Draft v0.6） |
+| 设计文档 | `docs/audits/phases/phase-6-release-hardening.md`（Draft v0.7） |
 
 Phase 6 的第一条硬约束：任何工具链或性能改动都只能消费/保护 v0.4 已冻结的 truth contract，不能重新解释已生成 annotation。

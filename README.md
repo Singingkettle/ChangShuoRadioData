@@ -53,7 +53,7 @@ Phase 5 outcome (from `docs/baselines/2026-04-final-v04.json`): 1000 scenarios, 
 
 ### 🧭 v0.5 next track — **Phase 6 Draft 2026-04-27**
 
-The next stage is release hardening, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and focuses on release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, and CI hardening. S1-S6 are now landed: the v2 reader, release readiness gate, minimal receiver-frequency COCO v2 converter, and read-only performance diagnostics are available. Phase 6 explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
+The next stage is release hardening, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and focuses on release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, and CI hardening. S1-S7 are now landed: the v2 reader, release readiness gate, minimal receiver-frequency COCO v2 converter, read-only performance diagnostics, and release/CI readiness aggregator are available. Phase 6 explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
 
 Phase 6 release readiness check:
 
@@ -71,6 +71,9 @@ coco = convert_csrd_to_coco(annotationPath, outputJsonPath);
 
 addpath(fullfile(pwd, 'tools', 'phase6'))
 run_phase6_performance_diagnostics()        % read-only baseline + hotspot report
+
+addpath(fullfile(pwd, 'tools', 'release'))
+run_csrd_release_ci_readiness()             % release readiness + phase6 + CI smoke
 ```
 
 Phase 0 quick start (no real simulation needed):
