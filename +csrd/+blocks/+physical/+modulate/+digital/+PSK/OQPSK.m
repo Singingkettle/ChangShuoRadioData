@@ -63,6 +63,10 @@ classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
     %           csrd.blocks.physical.modulate.digital.PSK.PSK,
     %           csrd.blocks.physical.modulate.BaseModulator, comm.OQPSKModulator
 
+    properties (Access = protected)
+        pureModulator
+    end
+
     methods (Access = protected)
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
@@ -100,7 +104,7 @@ classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
             %   [signal, bw] = obj.baseModulator(bits);
 
             % Apply OQPSK modulation with offset quadrature timing
-            modulatedSignal = obj.baseModulator(inputSymbols);
+            modulatedSignal = obj.pureModulator(inputSymbols);
 
             % Calculate occupied bandwidth
             bandWidth = obw(modulatedSignal, obj.SampleRate);
@@ -181,7 +185,7 @@ classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
             obj.ostbc = obj.genOSTBC;
 
             % Ensure SamplePerSymbol is even for proper OQPSK offset implementation
-            obj.SamplePerSymbol = obj.SamplePerSymbol - mod(obj.SamplePerSymbol, 2);
+            obj.SamplePerSymbol = max(2, obj.SamplePerSymbol - mod(obj.SamplePerSymbol, 2));
             obj.pureModulator = csrd.blocks.physical.modulate.digital.PSK.BaseOQPSK( ...
                 PhaseOffset = obj.ModulatorConfig.PhaseOffset, ...
                 SymbolMapping = obj.ModulatorConfig.SymbolMapping, ...

@@ -31,6 +31,27 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         globalLayout.Strategy = 'ReceiverCentric';
     end
     globalLayout.FrequencyAllocations = {};
+    regulatoryEnabled = csrd.utils.spectrum.RegionSpectrumSelector.isEnabled(obj.Config);
+    regulatoryPlan = struct();
+    if regulatoryEnabled
+        if isempty(obj.scenarioRegulatoryPlan) || ...
+                ~isfield(obj.scenarioRegulatoryPlan, 'EmitterPlans')
+            error('CSRD:Spectrum:MissingScenarioRegulatoryPlan', ...
+                ['Regulatory planning is enabled but scenarioRegulatoryPlan ', ...
+                 'has not been initialized before transmitter generation.']);
+        end
+        regulatoryPlan = obj.scenarioRegulatoryPlan;
+        globalLayout.Strategy = 'RegulatoryCatalog';
+        globalLayout.Regulatory = struct( ...
+            'Enable', true, ...
+            'RegionId', regulatoryPlan.RegionId, ...
+            'RegionName', regulatoryPlan.RegionName, ...
+            'Authority', regulatoryPlan.Authority, ...
+            'ServiceTier', regulatoryPlan.ServiceTier, ...
+            'Receiver', regulatoryPlan.Receiver);
+    else
+        globalLayout.Regulatory = struct('Enable', false);
+    end
 
     if isempty(rxConfigs)
         obj.logger.warning('Scenario: No receivers available for transmitter configuration');
@@ -51,6 +72,15 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
     for i = 1:length(transmitters)
         transmitter = transmitters(i);
+        regulatoryEmitterPlan = struct();
+        if regulatoryEnabled
+            if i > numel(regulatoryPlan.EmitterPlans)
+                error('CSRD:Spectrum:MissingEmitterPlan', ...
+                    'Regulatory plan has %d emitter plans for %d transmitters.', ...
+                    numel(regulatoryPlan.EmitterPlans), length(transmitters));
+            end
+            regulatoryEmitterPlan = regulatoryPlan.EmitterPlans(i);
+        end
 
         txPlan = struct();
         txPlan.EntityID = transmitter.ID;
@@ -61,30 +91,56 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         % Hardware group
         txPlan.Hardware.Type = selectTransmitterType(txParams.Types);
         txPlan.Hardware.Power = randomInRange(obj, txParams.Power.Min, txParams.Power.Max);
-        txPlan.Hardware.NumAntennas = randi([txParams.NumAntennas.Min, txParams.NumAntennas.Max]);
+        if regulatoryEnabled
+            txPlan.Hardware.NumAntennas = selectNumAntennasForModulation( ...
+                txParams.NumAntennas, regulatoryEmitterPlan.ModulationFamily);
+        else
+            txPlan.Hardware.NumAntennas = randi([txParams.NumAntennas.Min, txParams.NumAntennas.Max]);
+        end
         txPlan.Hardware.AntennaGain = calculateAntennaGain(obj, txPlan.Hardware.NumAntennas);
 
         % ===== CALCULATION FLOW (Order matters!) =====
         
         % 1. First: Allocate BANDWIDTH based on receiver sample rate
-        maxBandwidth = obj.unifiedReceiverConfig.SampleRate * txParams.BandwidthRatio.Max;
-        minBandwidth = obj.unifiedReceiverConfig.SampleRate * txParams.BandwidthRatio.Min;
-        txPlan.Spectrum.PlannedBandwidth = randomInRange(obj, minBandwidth, maxBandwidth);
-        txPlan.Spectrum.PlannedFreqOffset = 0;
-        txPlan.Spectrum.LowerBound = 0;
-        txPlan.Spectrum.UpperBound = 0;
+        if regulatoryEnabled
+            txPlan.Spectrum.PlannedBandwidth = regulatoryEmitterPlan.BandwidthHz;
+            txPlan.Spectrum.PlannedFreqOffset = regulatoryEmitterPlan.CenterOffsetHz;
+            txPlan.Spectrum.LowerBound = regulatoryEmitterPlan.CenterOffsetHz - ...
+                regulatoryEmitterPlan.BandwidthHz / 2;
+            txPlan.Spectrum.UpperBound = regulatoryEmitterPlan.CenterOffsetHz + ...
+                regulatoryEmitterPlan.BandwidthHz / 2;
+            txPlan.Spectrum.AbsoluteCenterFrequencyHz = ...
+                regulatoryEmitterPlan.SelectedCenterFrequencyHz;
+            txPlan.Regulatory = regulatoryEmitterPlan.Regulatory;
+        else
+            maxBandwidth = obj.unifiedReceiverConfig.SampleRate * txParams.BandwidthRatio.Max;
+            minBandwidth = obj.unifiedReceiverConfig.SampleRate * txParams.BandwidthRatio.Min;
+            txPlan.Spectrum.PlannedBandwidth = randomInRange(obj, minBandwidth, maxBandwidth);
+            txPlan.Spectrum.PlannedFreqOffset = 0;
+            txPlan.Spectrum.LowerBound = 0;
+            txPlan.Spectrum.UpperBound = 0;
+        end
         txPlan.Spectrum.ReceiverSampleRate = obj.unifiedReceiverConfig.SampleRate;
 
         % 2. Second: Generate TEMPORAL PATTERN (need transmission duration)
         temporalPattern = generateTemporalPattern(obj, temporalParams);
+        if regulatoryEnabled && isfield(regulatoryEmitterPlan, 'TemporalPattern')
+            temporalPattern = applyRegulatoryTemporalPattern( ...
+                temporalPattern, regulatoryEmitterPlan.TemporalPattern);
+        end
         txPlan.Temporal = temporalPattern;
         
         % Calculate total transmission duration from intervals
         totalTxDuration = calculateTotalTransmissionDuration(txPlan.Temporal);
 
         % 3. Third: Generate MODULATION config (symbol rate derived from bandwidth)
-        txPlan.Modulation = generateModulationConfig(obj, ...
-            txPlan.Spectrum.PlannedBandwidth, modParams);
+        if regulatoryEnabled
+            txPlan.Modulation = generateRegulatoryModulationConfig(obj, ...
+                txPlan.Spectrum.PlannedBandwidth, modParams, regulatoryEmitterPlan);
+        else
+            txPlan.Modulation = generateModulationConfig(obj, ...
+                txPlan.Spectrum.PlannedBandwidth, modParams);
+        end
 
         % 4. Fourth: Generate MESSAGE config (length derived from symbol rate and duration)
         txPlan.Message = generateMessageConfig(obj, ...
@@ -154,6 +210,7 @@ function params = getModulationParams(config)
     params.DefaultOrders.FSK = [2, 4, 8];
     params.DefaultOrders.FM = 1;
     params.DefaultOrders.AM = 1;
+    params.MinimumModulatorSampleRateHz = 0;
     
     % Get from config
     if isfield(config, 'Modulation')
@@ -171,6 +228,14 @@ function params = getModulationParams(config)
         if isfield(modConfig, 'DefaultOrders')
             params.DefaultOrders = modConfig.DefaultOrders;
         end
+    end
+    if isfield(config, 'Regulatory') && isstruct(config.Regulatory) && ...
+            isfield(config.Regulatory, 'MinimumModulatorSampleRateHz') && ...
+            isnumeric(config.Regulatory.MinimumModulatorSampleRateHz) && ...
+            isscalar(config.Regulatory.MinimumModulatorSampleRateHz) && ...
+            config.Regulatory.MinimumModulatorSampleRateHz > 0
+        params.MinimumModulatorSampleRateHz = ...
+            config.Regulatory.MinimumModulatorSampleRateHz;
     end
 end
 
@@ -289,6 +354,65 @@ function selectedType = selectTransmitterType(types)
     end
 end
 
+function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulationFamily)
+    % selectNumAntennasForModulation - Keep hardware compatible with the
+    % Phase 8 service-driven modulation family before the blueprint
+    % validator sees it.
+    family = char(string(modulationFamily));
+    minAnt = numAntennaRange.Min;
+    maxAnt = numAntennaRange.Max;
+    analogOrCpm = {'FM','PM','AM','SSBAM','DSBAM','DSBSCAM','VSBAM', ...
+        'FSK','MSK','CPFSK','GFSK','GMSK'};
+    if ismember(family, analogOrCpm)
+        numAntennas = 1;
+        return;
+    end
+    if strcmp(family, 'OFDM')
+        if maxAnt >= 2
+            numAntennas = max(2, min(maxAnt, 2));
+        else
+            numAntennas = max(1, minAnt);
+        end
+        return;
+    end
+    maxAllowed = min(maxAnt, 4);
+    minAllowed = max(1, minAnt);
+    if minAllowed > maxAllowed
+        numAntennas = 1;
+    else
+        numAntennas = randi([minAllowed, maxAllowed]);
+    end
+end
+
+function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
+    recommended = char(string(temporalPattern));
+    if isempty(recommended) || strcmp(recommended, pattern.Type)
+        return;
+    end
+    obsDur = pattern.ObservationDuration;
+    pattern.Type = recommended;
+    switch recommended
+        case 'Continuous'
+            pattern.DutyCycle = 1.0;
+            pattern.StartTime = 0;
+            pattern.EndTime = obsDur;
+            pattern.Intervals = [0, obsDur];
+        case 'Burst'
+            onDuration = min(obsDur, max(obsDur * 0.3, min(0.01, obsDur)));
+            offDuration = max(obsDur - onDuration, 0);
+            pattern.OnDuration = onDuration;
+            pattern.OffDuration = offDuration;
+            pattern.DutyCycle = onDuration / max(onDuration + offDuration, eps);
+            pattern.InitialDelay = 0;
+            pattern.Intervals = [0, onDuration];
+        case 'Scheduled'
+            pattern.SlotDuration = obsDur;
+            pattern.NumSlots = 1;
+            pattern.AssignedSlot = 1;
+            pattern.Intervals = [0, obsDur];
+    end
+end
+
 function totalDuration = calculateTotalTransmissionDuration(transmissionPattern)
     % calculateTotalTransmissionDuration - Sum up all transmission intervals
     
@@ -320,9 +444,11 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
         selectedType = modTypes;
     end
     modConfig.Type = selectedType;
+    modConfig.Family = selectedType;
     
     % Get rolloff factor
     rolloffFactor = modParams.RolloffFactor;
+    modConfig.RolloffFactor = rolloffFactor;
     
     % Calculate symbol rate from bandwidth
     modConfig.SymbolRate = bandwidth / (1 + rolloffFactor);
@@ -335,6 +461,11 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     else
         modConfig.SamplesPerSymbol = modParams.SamplesPerSymbol;
     end
+    if isfield(modParams, 'MinimumModulatorSampleRateHz') && ...
+            modParams.MinimumModulatorSampleRateHz > 0
+        minSps = ceil(modParams.MinimumModulatorSampleRateHz / modConfig.SymbolRate);
+        modConfig.SamplesPerSymbol = max(modConfig.SamplesPerSymbol, minSps);
+    end
     
     % Select order based on modulation type (from scenario config defaults)
     modConfig.Order = selectModulationOrder(selectedType, modParams);
@@ -345,9 +476,118 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     else
         modConfig.BitsPerSymbol = 1;  % For analog modulations
     end
+    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth);
     
     obj.logger.debug('Scenario: Modulation %s, Order %d, SymbolRate %.2f kHz', ...
         modConfig.Type, modConfig.Order, modConfig.SymbolRate / 1e3);
+end
+
+function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
+    % generateRegulatoryModulationConfig - Generate modulation config from a
+    % regulatory service plan rather than from an unconstrained type list.
+    modConfig = struct();
+    modConfig.Type = char(string(emitterPlan.ModulationFamily));
+    modConfig.Family = modConfig.Type;
+    modConfig.Order = double(emitterPlan.ModulationOrder);
+    modConfig.RolloffFactor = modParams.RolloffFactor;
+    modConfig.SymbolRate = bandwidth / (1 + modParams.RolloffFactor);
+    if isstruct(modParams.SamplesPerSymbol)
+        spsMin = modParams.SamplesPerSymbol.Min;
+        spsMax = modParams.SamplesPerSymbol.Max;
+        modConfig.SamplesPerSymbol = randi([spsMin, spsMax]);
+    else
+        modConfig.SamplesPerSymbol = modParams.SamplesPerSymbol;
+    end
+    if isfield(modParams, 'MinimumModulatorSampleRateHz') && ...
+            modParams.MinimumModulatorSampleRateHz > 0
+        minSps = ceil(modParams.MinimumModulatorSampleRateHz / modConfig.SymbolRate);
+        modConfig.SamplesPerSymbol = max(modConfig.SamplesPerSymbol, minSps);
+    end
+    if modConfig.Order >= 2
+        modConfig.BitsPerSymbol = log2(modConfig.Order);
+    else
+        modConfig.BitsPerSymbol = 1;
+    end
+    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth);
+    obj.logger.debug(['Scenario: Regulatory modulation %s, Order %d, ', ...
+        'SymbolRate %.2f kHz, Band=%s'], modConfig.Type, ...
+        modConfig.Order, modConfig.SymbolRate / 1e3, emitterPlan.BandId);
+end
+
+function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
+    modulatorConfig = struct();
+    switch char(string(modConfig.Type))
+        case 'OFDM'
+            fftLength = 2048;
+            guard = 144;
+            usableBins = fftLength - 2 * guard;
+            subcarrierSpacing = max(15e3, ceil(bandwidth / usableBins / 1e3) * 1e3);
+
+            modulatorConfig.base.mode = "qam";
+            modulatorConfig.ofdm.FFTLength = fftLength;
+            modulatorConfig.ofdm.NumGuardBandCarriers = [guard; guard];
+            modulatorConfig.ofdm.InsertDCNull = true;
+            modulatorConfig.ofdm.CyclicPrefixLength = 144;
+            modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
+            modulatorConfig.ofdm.Windowing = false;
+        case 'OQPSK'
+            modulatorConfig.beta = modConfig.RolloffFactor;
+            modulatorConfig.span = 10;
+            modulatorConfig.SymbolMapping = "Gray";
+            modulatorConfig.PhaseOffset = 0;
+        otherwise
+            if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0
+                modulatorConfig.beta = modConfig.RolloffFactor;
+            end
+    end
+end
+
+function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
+    modulatorConfig = struct();
+    switch char(string(modConfig.Type))
+        case 'OFDM'
+            fftLength = 512;
+            guard = 32;
+            usableBins = fftLength - 2 * guard;
+            subcarrierSpacing = max(15e3, ceil(bandwidth / usableBins / 1e3) * 1e3);
+
+            modulatorConfig.base.mode = "qam";
+            modulatorConfig.ofdm.FFTLength = fftLength;
+            modulatorConfig.ofdm.NumGuardBandCarriers = [guard; guard];
+            modulatorConfig.ofdm.InsertDCNull = true;
+            modulatorConfig.ofdm.CyclicPrefixLength = 64;
+            modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
+            modulatorConfig.ofdm.Windowing = false;
+        case 'OTFS'
+            delayLength = 512;
+            subcarrierSpacing = max(15e3, ceil(bandwidth / max(1, delayLength - 8) / 1e3) * 1e3);
+
+            modulatorConfig.base.mode = "qam";
+            modulatorConfig.otfs.DelayLength = delayLength;
+            modulatorConfig.otfs.Subcarrierspacing = subcarrierSpacing;
+            modulatorConfig.otfs.padType = "CP";
+            modulatorConfig.otfs.padLen = 16;
+        case 'SCFDMA'
+            fftLength = 512;
+            dataSubcarriers = 300;
+            subcarrierSpacing = max(15e3, ceil(bandwidth / dataSubcarriers / 1e3) * 1e3);
+
+            modulatorConfig.base.mode = "qam";
+            modulatorConfig.scfdma.FFTLength = fftLength;
+            modulatorConfig.scfdma.CyclicPrefixLength = 64;
+            modulatorConfig.scfdma.Subcarrierspacing = subcarrierSpacing;
+            modulatorConfig.scfdma.SubcarrierMappingInterval = 1;
+            modulatorConfig.scfdma.NumDataSubcarriers = dataSubcarriers;
+        case 'OQPSK'
+            modulatorConfig.beta = modConfig.RolloffFactor;
+            modulatorConfig.span = 10;
+            modulatorConfig.SymbolMapping = "Gray";
+            modulatorConfig.PhaseOffset = 0;
+        otherwise
+            if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0
+                modulatorConfig.beta = modConfig.RolloffFactor;
+            end
+    end
 end
 
 function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgParams)

@@ -21,7 +21,7 @@ function results = run_all_tests(varargin)
     addOptional(p, 'testType', 'regression', ...
         @(x) any(validatestring(x, {'regression', 'unit', 'integration', ...
             'phase0', 'phase1', 'phase2', 'phase3', 'phase4', ...
-            'phase6', 'phase7', 'all'})));
+            'phase6', 'phase7', 'phase8', 'phase9', 'all'})));
     addParameter(p, 'verbose', false, @islogical);
     parse(p, varargin{:});
 
@@ -141,6 +141,16 @@ function selected = resolveSelectedSuites(testType)
             % annotation v2 reader example. This suite is read-only except
             % for tempdir fixtures created by the regression itself.
             selected = {'phase7'};
+        case 'phase8'
+            % Phase 8 regulatory spectrum planning subset: catalog,
+            % selector, validator, communication blueprint slice, and
+            % end-to-end regulatory annotation smoke.
+            selected = {'phase8'};
+        case 'phase9'
+            % Phase 9 public-entry coverage subset: every configured
+            % modulation factory path plus the quick tools/simulation.m
+            % multidimensional sweep.
+            selected = {'phase9'};
         case 'all'
             selected = {'regression', 'unit', 'integration'};
         otherwise
@@ -200,6 +210,20 @@ function records = runSuite(suite, testsDir, verbose)
     if strcmp(suite, 'phase7')
         fprintf('-- Suite: %s (curated)\n', suite);
         records = runPhase7Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase8')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase8Suite(testsDir, verbose);
+        fprintf('\n');
+        return;
+    end
+
+    if strcmp(suite, 'phase9')
+        fprintf('-- Suite: %s (curated)\n', suite);
+        records = runPhase9Suite(testsDir, verbose);
         fprintf('\n');
         return;
     end
@@ -452,6 +476,7 @@ function records = runPhase4Suite(testsDir, verbose)
     phase4Unit = { ...
         'MeasurementPackageTest', ...
         'ApplyDopplerShiftTest', ...
+        'ChannelPropagationFailFastTest', ...
         'BuildSourceAnnotationV2Test', ...
         'ReceiverViewPersistenceTest', ...
         'MeasurementCompletenessHookTest', ...
@@ -501,6 +526,45 @@ function records = runPhase7Suite(testsDir, verbose)
 
     phase7Reg = {'test_phase7_downstream_docs_readiness'};
     records = appendRegressionTests(records, phase7Reg, 'phase7', verbose);
+end
+
+
+function records = runPhase8Suite(testsDir, verbose)
+    % Phase 8 regulatory spectrum planning suite.
+
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase8Unit = { ...
+        'RegionSpectrumCatalogTest', ...
+        'RegulatoryValidatorTest', ...
+        'RegionSpectrumSelectorTest', ...
+        'ScenarioFactoryRegulatoryChinaTest', ...
+        'AllModulationFactorySmokeTest', ...
+        'BuildSourceAnnotationV2Test', ...
+        'ReadAnnotationV2Test'};
+    records = appendUnittestClasses(records, phase8Unit, 'phase8', verbose);
+
+    phase8Reg = {'test_phase8_regulatory_pipeline_smoke', ...
+        'test_phase8_regulatory_region_matrix_smoke', ...
+        'test_phase8_regulatory_unified_coverage_sweep'};
+    records = appendRegressionTests(records, phase8Reg, 'phase8', verbose);
+end
+
+
+function records = runPhase9Suite(testsDir, verbose)
+    % Phase 9 public simulation.m entrypoint coverage suite.
+
+    addpath(fullfile(testsDir, 'unit'));
+    addpath(fullfile(testsDir, 'regression'));
+    records = [];
+
+    phase9Unit = {'AllModulationFactorySmokeTest'};
+    records = appendUnittestClasses(records, phase9Unit, 'phase9', verbose);
+
+    phase9Reg = {'test_simulation_entrypoint_coverage_sweep'};
+    records = appendRegressionTests(records, phase9Reg, 'phase9', verbose);
 end
 
 

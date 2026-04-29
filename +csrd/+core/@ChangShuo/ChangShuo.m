@@ -214,6 +214,7 @@ classdef ChangShuo < matlab.System
         projectedOffset = lookupReceiverViewOffset(txScenarioConfig, rxInfo, rxIdx, channelOutput)
         rvEntry = lookupReceiverViewEntry(txScenarioConfig, rxInfo, rxIdx)
         RxInfo = validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx)
+        [relativeVelocityMps, txVelocityMps, rxVelocityMps] = resolveRelativeVelocityForDoppler(txInfo, rxInfo)
         provenance = extractProvenanceFromGlobalLayout(globalLayout)
         % Phase 4 (audit §17.6 / §S7 / C4): annotation write-back hook
         % invoked from SimulationRunner.saveScenarioData after the

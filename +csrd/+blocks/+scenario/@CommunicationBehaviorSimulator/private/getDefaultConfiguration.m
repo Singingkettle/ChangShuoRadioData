@@ -14,6 +14,17 @@ function config = getDefaultConfiguration(obj)
     % Modulation selection configuration
     config.ModulationSelection.Strategy = 'Random';
 
+    % Phase 8 regulatory spectrum planning defaults. The legacy random
+    % path remains available only when Enable=false is set explicitly.
+    config.Regulatory.Enable = true;
+    config.Regulatory.Region.Policy = 'Fixed';
+    config.Regulatory.Region.Fixed = 'CN';
+    config.Regulatory.ServiceTier = 'Tier1';
+    config.Regulatory.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
+    config.Regulatory.MonitoringBand.Selection = 'WeightedByRegion';
+    config.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
+    config.Regulatory.MinimumModulatorSampleRateHz = 250e3;
+
     % Transmission pattern configuration
     config.TransmissionPattern.DefaultType = 'Continuous';
 

@@ -50,6 +50,17 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
     globalLayout.ObservableRange = observableRange;
     globalLayout.TotalBandwidth = availableBW;
 
+    if isfield(globalLayout, 'Regulatory') && ...
+            isstruct(globalLayout.Regulatory) && ...
+            isfield(globalLayout.Regulatory, 'Enable') && ...
+            isequal(globalLayout.Regulatory.Enable, true)
+        globalLayout.AllocationStrategy = 'RegulatoryCatalog';
+        [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan( ...
+            obj, txConfigs, rxConfigs, observableRange, globalLayout);
+        obj.logger.debug('Scenario: Frequency allocation completed from regulatory catalog');
+        return;
+    end
+
     % Perform actual frequency allocation.
     %
     % Phase 2 (D7): only 'ReceiverCentric' is supported. The previous

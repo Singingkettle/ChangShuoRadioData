@@ -161,6 +161,25 @@ function cfg = localApplyCohort(masterCfg, cohort, runRoot, sid)
         cohort.PatternTypes;
     cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = ...
         cohort.PatternDistribution;
+
+    % Phase 8 made regulatory planning the default public path. This Phase 1
+    % smoke is a dataflow contract test, not a wideband IMT stress test, so
+    % keep it regulatory-backed but pin it to a narrow SRD band. Leaving the
+    % weighted catalog selector unconstrained can pick tens-of-MHz IMT bands
+    % and turn the historical 1-scenario smoke into a performance sweep.
+    if isfield(cfg.Factories.Scenario.CommunicationBehavior, 'Regulatory') && ...
+            isstruct(cfg.Factories.Scenario.CommunicationBehavior.Regulatory)
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.Enable = true;
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.Region.Policy = 'Fixed';
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.Region.Fixed = 'CN';
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.ServiceTier = 'Tier1';
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.MonitoringBand.FixedBandId = ...
+            'CN_SRD_433';
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.MonitoringBand.RestrictEmittersToFixedBand = true;
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.ExcludedServiceClasses = ...
+            {'Radar', 'Radiolocation', 'Radionavigation'};
+        cfg.Factories.Scenario.CommunicationBehavior.Regulatory.MaxBandwidthFractionOfSampleRate = 0.5;
+    end
 end
 
 

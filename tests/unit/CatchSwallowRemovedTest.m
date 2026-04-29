@@ -65,6 +65,17 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
                 'Phase 3 §3.4: ReceiveFactory step catch must rethrow.');
         end
 
+        function transmitFactoryHasNoBlockStepFailedFallback(testCase)
+            txt = CatchSwallowRemovedTest.readSrc('+csrd/+factories/TransmitFactory.m');
+            code = CatchSwallowRemovedTest.stripComments(txt);
+            testCase.verifyEmpty(regexp(code, 'Error''\s*,\s*''TransmitterBlockStepFailed''', 'once'), ...
+                'Phase 8: TransmitFactory must not stamp TransmitterBlockStepFailed sentinel outputs.');
+            testCase.verifyEmpty(regexp(code, '\.Error\s*=\s*''TransmitterBlockStepFailed''', 'once'), ...
+                'Phase 8: TransmitFactory must not return failed RF front-end signals as valid outputs.');
+            testCase.verifyTrue(contains(code, 'rethrow(ME_step)'), ...
+                'Phase 8: TransmitFactory step catch must rethrow RF front-end failures.');
+        end
+
         function channelFactoryHasNoChannelBlockStepFailedFallback(testCase)
             txt = CatchSwallowRemovedTest.readSrc('+csrd/+factories/ChannelFactory.m');
             code = CatchSwallowRemovedTest.stripComments(txt);

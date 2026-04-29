@@ -67,6 +67,23 @@ classdef ApplyDopplerShiftTest < matlab.unittest.TestCase
             testCase.verifyEqual(shifted, sig);
         end
 
+        function movingReceiverContributesToRelativeDoppler(testCase)
+            % Tx stationary, Rx at +x moving toward Tx at -10 m/s. The
+            % caller composes Tx-Rx velocity, so Doppler is still closing.
+            t = (0:1/1e6:0.001 - 1/1e6).';
+            sig = exp(1j * 2 * pi * 0 * t);
+            [relativeVel, ~, ~] = ...
+                csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
+                    struct('Velocity', [0, 0, 0]), ...
+                    struct('Velocity', [-10, 0, 0]));
+            [~, fd, vRad] = csrd.blocks.physical.channel.impairments ...
+                .applyDopplerShift(sig, 1e6, 1e9, ...
+                    [0, 0, 0], relativeVel, [100, 0, 0]);
+            expected = 10 * 1e9 / testCase.SpeedOfLight;
+            testCase.verifyEqual(vRad, 10, 'AbsTol', 1e-9);
+            testCase.verifyEqual(fd, expected, 'RelTol', 1e-9);
+        end
+
         function coincidentGeometryThrows(testCase)
             sig = (1:100).' + 1j * 0;
             f = @() csrd.blocks.physical.channel.impairments ...

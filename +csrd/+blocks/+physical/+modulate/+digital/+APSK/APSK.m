@@ -164,12 +164,22 @@ function x = randomSumAsSpecifiedValue(s, n, isInteger)
     %   x - Vector of n random values summing to s
 
     lb = 1; % lower bound
-    ub = s; % upper bound
-    x = randfixedsum(n, 1, s, lb, ub);
-
     if isInteger
-        e = ones(1, n);
-        x = round(minL1intlin(speye(n), x, 1:n, [], [], e, s, lb * e, ub * e));
+        total = max(n, round(s));
+        if n == 1
+            x = total;
+        else
+            cutPoints = sort(randperm(total - 1, n - 1));
+            x = diff([0, cutPoints, total]);
+        end
+        return;
     end
+
+    residual = max(0, s - n * lb);
+    weights = rand(1, n);
+    if sum(weights) <= eps
+        weights = ones(1, n);
+    end
+    x = lb + residual * weights / sum(weights);
 
 end

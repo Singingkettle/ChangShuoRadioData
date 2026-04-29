@@ -136,6 +136,25 @@ function config = scenario_factory()
     config.Factories.Scenario.CommunicationBehavior.Receiver.RealCarrierFrequency = 2.4e9;  % Hz
     config.Factories.Scenario.CommunicationBehavior.Receiver.NumAntennas = 1;  % unified
     % NOTE: NoiseFigure, Sensitivity, AntennaGain detail params are in receive_factory.m
+
+    % ===================== REGULATORY SPECTRUM PLANNING =====================
+    % Phase 8 replaces arbitrary frequency / bandwidth / modulation sampling
+    % with region-aware service planning. The physical scene is bound to a
+    % regulatory region first; then the monitoring receiver band and each
+    % transmitter's service, RF channel, bandwidth, and modulation family are
+    % selected from that region's spectrum catalog.
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.Enable = true;
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.Region.Policy = 'Fixed';
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.Region.Fixed = 'CN';
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.ServiceTier = 'Tier1';
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.ExcludedServiceClasses = ...
+        {'Radar', 'Radiolocation', 'Radionavigation'};
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.MonitoringBand.Selection = 'WeightedByRegion';
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
+    % Narrowband real-world services such as AM/land-mobile keep their
+    % realistic occupied bandwidth, but the synthetic waveform sample rate
+    % must still be high enough for the repository's Tx RF impairment chain.
+    config.Factories.Scenario.CommunicationBehavior.Regulatory.MinimumModulatorSampleRateHz = 250e3;
     
     % ===================== TRANSMITTER CONFIGURATION =====================
     % Scenario-level params: defines what the transmitter produces
@@ -178,7 +197,11 @@ function config = scenario_factory()
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Random.NumBursts.Min = 1;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Random.NumBursts.Max = 5;
     
-    % ===================== MODULATION (Type selection only) =====================
+    % ===================== MODULATION (Legacy explicit-random path) =====================
+    % In Phase 8 the default path is Regulatory.Enable=true, so modulation
+    % families come from the regional service catalog. This list is kept for
+    % tests or explicit legacy/random planning with Regulatory.Enable=false.
+    %
     % Scenario selects TYPE from this list
     % ModulationFactory looks up ORDER and DETAILS from modulation_factory.m
     %

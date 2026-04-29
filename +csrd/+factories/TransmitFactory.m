@@ -57,9 +57,9 @@ classdef TransmitFactory < matlab.System
             if ~isfield(obj.factoryConfig, transmitterType)
                 obj.logger.error('Frame %d, Tx %s: Transmitter type ''%s'' not found in config.', ...
                     frameId, txIdStr, transmitterType);
-                transmittedSignal = inputSignalStruct;
-                transmittedSignal.Error = 'TransmitterTypeNotFound';
-                return;
+                error('CSRD:TransmitFactory:TransmitterTypeNotFound', ...
+                    'Transmitter type "%s" not found in TransmitFactory config.', ...
+                    transmitterType);
             end
 
             typeConfig = obj.factoryConfig.(transmitterType);
@@ -67,9 +67,9 @@ classdef TransmitFactory < matlab.System
             if ~isfield(typeConfig, 'handle')
                 obj.logger.error('Frame %d, Tx %s: No handle found for transmitter type ''%s''.', ...
                     frameId, txIdStr, transmitterType);
-                transmittedSignal = inputSignalStruct;
-                transmittedSignal.Error = 'TransmitterTypeHandleNotFound';
-                return;
+                error('CSRD:TransmitFactory:TransmitterTypeHandleNotFound', ...
+                    'No handle configured for transmitter type "%s".', ...
+                    transmitterType);
             end
 
             blockHandleStr = typeConfig.handle;
@@ -91,9 +91,7 @@ classdef TransmitFactory < matlab.System
                 catch ME
                     obj.logger.error('Frame %d, Tx %s: Failed to create transmitter block. Error: %s', ...
                         frameId, txIdStr, ME.message);
-                    transmittedSignal = inputSignalStruct;
-                    transmittedSignal.Error = 'TransmitterBlockInstantiationFailed';
-                    return;
+                    rethrow(ME);
                 end
             end
 
@@ -140,8 +138,7 @@ classdef TransmitFactory < matlab.System
             catch ME_step
                 obj.logger.error('Frame %d, Tx %s: Error during step. Error: %s', ...
                     frameId, txIdStr, ME_step.message);
-                transmittedSignal = inputSignalStruct;
-                transmittedSignal.Error = 'TransmitterBlockStepFailed';
+                rethrow(ME_step);
             end
 
         end

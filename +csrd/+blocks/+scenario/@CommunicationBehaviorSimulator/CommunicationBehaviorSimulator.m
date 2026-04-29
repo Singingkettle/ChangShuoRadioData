@@ -110,6 +110,10 @@ classdef CommunicationBehaviorSimulator < matlab.System
         % scenarioGlobalLayout - Fixed global layout for the entire scenario
         scenarioGlobalLayout
 
+        % scenarioRegulatoryPlan - Phase 8 region/service-aware RF plan.
+        % Empty when CommunicationBehavior.Regulatory.Enable is false.
+        scenarioRegulatoryPlan struct = struct()
+
         % scenarioEntities - Reference to entities with Snapshots (shared with PhysicalEnv)
         scenarioEntities
 
@@ -320,6 +324,7 @@ classdef CommunicationBehaviorSimulator < matlab.System
         % ReceiverViews can be projected on top of the placed offset.
         [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, rxConfigs, observableRange, globalLayout)
         [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, rxConfigs, observableRange, globalLayout)
+        [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan(obj, txConfigs, rxConfigs, observableRange, globalLayout)
 
         % Transmission state methods
         transmissionState = calculateTransmissionState(obj, frameId, txConfig)

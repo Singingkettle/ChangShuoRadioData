@@ -184,7 +184,7 @@ classdef ModulationFactory < matlab.System
                     if isprop(currentModulator, 'ModulatorConfig')
                         currentModulator.ModulatorConfig = mergeStructs( ...
                             currentModulator.ModulatorConfig, ...
-                            adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID));
+                            adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID));
                     end
 
                     obj.logger.debug('Initial properties from factory config applied to %s.', class(currentModulator));
@@ -285,6 +285,12 @@ classdef ModulationFactory < matlab.System
                     frameId, txIdStr, segmentId, segmentPlacementConfig.TargetBandwidth, class(currentModulator));
             end
 
+            if isprop(currentModulator, 'ModulatorConfig')
+                currentModulator.ModulatorConfig = mergeStructs( ...
+                    currentModulator.ModulatorConfig, ...
+                    adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID));
+            end
+
             % Generic application of other parameters from segmentModulationConfig
             % This allows scenario to pass any other valid property for the chosen modulator block.
             scenarioFields = fieldnames(segmentModulationConfig);
@@ -292,7 +298,7 @@ classdef ModulationFactory < matlab.System
             for i = 1:length(scenarioFields)
                 fName = scenarioFields{i};
                 % Avoid re-setting already handled specific props or the TypeID itself
-                if ~ismember(fName, {'TypeID', 'SymbolRate', 'SamplePerSymbol', 'SamplesPerSymbol', 'Order', 'NumTransmitAntennas', 'RolloffFactor', 'BitsPerSymbol', 'Type'})
+                if ~ismember(fName, {'TypeID', 'SymbolRate', 'SamplePerSymbol', 'SamplesPerSymbol', 'Order', 'NumTransmitAntennas', 'RolloffFactor', 'BitsPerSymbol', 'Type', 'ModulatorConfig'})
 
                     if isprop(currentModulator, fName)
                         currentModulator.(fName) = segmentModulationConfig.(fName);
@@ -436,10 +442,31 @@ function adaptedConfig = adaptScenarioModulatorConfig(segmentModulationConfig, m
     adaptedConfig = ensurePulseShapeDefaults(adaptedConfig, modulatorTypeID);
 end
 
+function adaptedConfig = adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID)
+    adaptedConfig = struct();
+    if ~isstruct(segmentModulationConfig)
+        return;
+    end
+
+    if isfield(segmentModulationConfig, 'ModulatorConfig') && ...
+            isstruct(segmentModulationConfig.ModulatorConfig)
+        adaptedConfig = mergeStructs(adaptedConfig, ...
+            adaptModulatorConfig(segmentModulationConfig.ModulatorConfig, modulatorTypeID));
+    end
+
+    adaptedConfig = mergeStructs(adaptedConfig, ...
+        adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID));
+end
+
 function cfg = ensurePulseShapeDefaults(cfg, modulatorTypeID)
-    pulseShapedTypes = {'PSK', 'QAM', 'Mill88QAM', 'ASK', 'OOK', 'PAM'};
+    pulseShapedTypes = {'PSK', 'OQPSK', 'QAM', 'Mill88QAM', ...
+        'APSK', 'DVBSAPSK', 'ASK', 'OOK', 'PAM'};
     if ~ismember(char(string(modulatorTypeID)), pulseShapedTypes)
         return;
+    end
+
+    if ~isfield(cfg, 'beta') || isempty(cfg.beta)
+        cfg.beta = 0.25;
     end
 
     if ~isfield(cfg, 'span') || isempty(cfg.span)
@@ -454,6 +481,15 @@ function cfg = ensurePulseShapeDefaults(cfg, modulatorTypeID)
     if strcmp(char(string(modulatorTypeID)), 'PSK')
         if ~isfield(cfg, 'Differential') || isempty(cfg.Differential)
             cfg.Differential = false;
+        end
+        if ~isfield(cfg, 'PhaseOffset') || isempty(cfg.PhaseOffset)
+            cfg.PhaseOffset = 0;
+        end
+    end
+
+    if strcmp(char(string(modulatorTypeID)), 'OQPSK')
+        if ~isfield(cfg, 'SymbolMapping') || isempty(cfg.SymbolMapping)
+            cfg.SymbolMapping = "Gray";
         end
         if ~isfield(cfg, 'PhaseOffset') || isempty(cfg.PhaseOffset)
             cfg.PhaseOffset = 0;

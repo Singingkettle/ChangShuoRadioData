@@ -139,6 +139,7 @@ work_dirs/
 # scratch directory the sweep writes per-scenario data and rolling logs into.
 artifacts/tests/runs/baseline_v0/
 artifacts/tests/runs/
+artifacts/tests/generated_configs/
 
 # Smoke baseline lives next to the canonical one but is regenerated on
 # every run_all_tests('phase0') call; do not commit it.

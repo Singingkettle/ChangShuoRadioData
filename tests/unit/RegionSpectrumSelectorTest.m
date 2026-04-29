@@ -1,0 +1,94 @@
+classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
+    %REGIONSPECTRUMSELECTORTEST Phase 8 selector behavior tests.
+
+    methods (TestMethodSetup)
+        function resetRng(~)
+            rng(20260428, 'twister');
+        end
+    end
+
+    methods (Test)
+        function fixedSeedSelectionIsReproducible(testCase)
+            cfg = localRegConfig('CN');
+            rx = struct('SampleRate', 50e6);
+            rng(11, 'twister');
+            p1 = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 4);
+            rng(11, 'twister');
+            p2 = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 4);
+            testCase.verifyEqual([p1.EmitterPlans.SelectedCenterFrequencyHz], ...
+                [p2.EmitterPlans.SelectedCenterFrequencyHz]);
+            testCase.verifyEqual({p1.EmitterPlans.BandId}, {p2.EmitterPlans.BandId});
+            testCase.verifyEqual({p1.EmitterPlans.ModulationFamily}, ...
+                {p2.EmitterPlans.ModulationFamily});
+        end
+
+        function analogFmBandDoesNotSelectDigitalModulation(testCase)
+            cfg = localRegConfig('CN');
+            cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_FM_BROADCAST';
+            rx = struct('SampleRate', 20e6);
+            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 3);
+            for k = 1:numel(plan.EmitterPlans)
+                ep = plan.EmitterPlans(k);
+                testCase.verifyEqual(ep.BandId, 'CN_FM_BROADCAST');
+                testCase.verifyEqual(ep.ModulationFamily, 'FM');
+            end
+        end
+
+        function nrBandUsesOfdmOrQamApproximation(testCase)
+            cfg = localRegConfig('CN');
+            cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_NR_N78';
+            rx = struct('SampleRate', 100e6);
+            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 5);
+            allowed = {'OFDM','QAM'};
+            for k = 1:numel(plan.EmitterPlans)
+                ep = plan.EmitterPlans(k);
+                testCase.verifyEqual(ep.BandId, 'CN_NR_N78');
+                testCase.verifyTrue(ismember(ep.ModulationFamily, allowed));
+                testCase.verifyGreaterThanOrEqual(ep.SelectedCenterFrequencyHz - ep.BandwidthHz / 2, 3300e6);
+                testCase.verifyLessThanOrEqual(ep.SelectedCenterFrequencyHz + ep.BandwidthHz / 2, 3600e6);
+            end
+        end
+
+        function selectedCentersAreRasterAligned(testCase)
+            cfg = localRegConfig('CN');
+            cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_NR_N78';
+            rx = struct('SampleRate', 100e6);
+            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 8);
+            catalog = csrd.utils.spectrum.RegionSpectrumCatalog.load('CN');
+            band = catalog.Bands(strcmp({catalog.Bands.BandId}, 'CN_NR_N78'));
+            ref = band.FrequencyRangeHz(1);
+            raster = band.ChannelRasterHz;
+            for k = 1:numel(plan.EmitterPlans)
+                n = (plan.EmitterPlans(k).SelectedCenterFrequencyHz - ref) / raster;
+                testCase.verifyLessThan(abs(n - round(n)), 1e-6);
+            end
+        end
+
+        function fixedBandConstrainsEmittersInsideWideReceiverWindow(testCase)
+            cfg = localRegConfig('KR');
+            cfg.Regulatory.MonitoringBand.FixedBandId = 'KR_SRD_920';
+            rx = struct('SampleRate', 50e6);
+
+            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 5);
+
+            testCase.verifyEqual(plan.Receiver.MonitoringBandId, 'KR_SRD_920');
+            for k = 1:numel(plan.EmitterPlans)
+                ep = plan.EmitterPlans(k);
+                testCase.verifyEqual(ep.BandId, 'KR_SRD_920');
+                testCase.verifyEqual(ep.ServiceClass, 'ShortRangeDevice');
+            end
+        end
+    end
+end
+
+
+function cfg = localRegConfig(regionId)
+cfg = struct();
+cfg.Regulatory.Enable = true;
+cfg.Regulatory.Region.Policy = 'Fixed';
+cfg.Regulatory.Region.Fixed = regionId;
+cfg.Regulatory.ServiceTier = 'Tier1';
+cfg.Regulatory.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
+cfg.Regulatory.MonitoringBand.Selection = 'WeightedByRegion';
+cfg.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
+end

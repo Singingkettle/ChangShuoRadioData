@@ -59,7 +59,7 @@ classdef FSK < csrd.blocks.physical.modulate.BaseModulator
     %
     % See also: csrd.blocks.physical.modulate.BaseModulator, fskmod
 
-    properties (Access = private)
+    properties (Access = protected)
         % frequencySeparation - Frequency separation between symbols in Hz
         % Type: positive scalar
         frequencySeparation

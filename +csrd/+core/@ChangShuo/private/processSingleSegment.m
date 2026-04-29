@@ -92,6 +92,13 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         modulatedSignalSegment.Planned = struct();
         modulatedSignalSegment.Planned.Bandwidth = currentSegmentScenario.Placement.TargetBandwidth;
         modulatedSignalSegment.Planned.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
+        if isfield(currentTxScenario, 'Regulatory') && ...
+                isstruct(currentTxScenario.Regulatory)
+            modulatedSignalSegment.Planned.Regulatory = currentTxScenario.Regulatory;
+        else
+            modulatedSignalSegment.Planned.Regulatory = ...
+                csrd.utils.spectrum.RegulatoryValidator.emptyRegulatoryTruth();
+        end
 
         % Phase 4 (§5 Truth.Design): the v2 annotation Design block reads
         % `comp.Planned.{PlannedCenterFrequencyHz, PlannedBandwidthHz,

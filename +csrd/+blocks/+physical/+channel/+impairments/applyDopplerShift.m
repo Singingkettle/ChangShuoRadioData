@@ -17,9 +17,10 @@ function [shiftedSignal, dopplerHz, radialVelocityMps] = ...
 %
 %       shifted(n) = signal(n) * exp(1j * 2 * pi * f_d * t(n))
 %
-%   The Rx is assumed stationary in the LOS computation; if the calling
-%   code wants to model two-end mobility it should pre-compose the relative
-%   velocity (txVel - rxVel) before calling this function.
+%   The Rx is assumed stationary in the LOS computation; callers that model
+%   two-end mobility must pre-compose the relative velocity (txVel - rxVel)
+%   before calling this function. processChannelPropagation does that via
+%   csrd.core.ChangShuo.resolveRelativeVelocityForDoppler.
 %
 % Inputs:
 %   signal         : [N x M] complex baseband (M = number of antennas / streams)

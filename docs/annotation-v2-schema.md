@@ -104,6 +104,11 @@ It is not inferred from IQ.
 | `RadialVelocityMps` | m/s | Link radial velocity |
 | `GeometrySnapshot` | struct | Tx/Rx positions, velocities, and distance in meters |
 
+`GeometrySnapshot` contains `TxPositionM`, `TxVelocityMps`, `RxPositionM`,
+`RxVelocityMps`, and `LinkDistanceM`. `RadialVelocityMps` is computed from the
+relative velocity `TxVelocityMps - RxVelocityMps` projected onto the Tx-to-Rx
+line of sight, so receiver-only mobility is represented in both IQ and labels.
+
 ## Truth.Measured
 
 `Truth.Measured` contains `SourcePlane` and `FramePlane`.

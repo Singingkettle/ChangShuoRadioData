@@ -162,6 +162,32 @@ classdef ChannelPropagationFailFastTest < matlab.unittest.TestCase
             testCase.verifyError(f, 'CSRD:Construction:ReceiverViewIndexOutOfRange');
         end
 
+        function dopplerRelativeVelocityUsesReceiverMotion(testCase)
+            txInfo = struct('Velocity', [0, 0, 0]);
+            rxInfo = struct('Velocity', [-12, 0, 0]);
+
+            [relativeVel, txVel, rxVel] = ...
+                csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
+                    txInfo, rxInfo);
+
+            testCase.verifyEqual(txVel, [0, 0, 0]);
+            testCase.verifyEqual(rxVel, [-12, 0, 0]);
+            testCase.verifyEqual(relativeVel, [12, 0, 0], ...
+                ['A stationary Tx and receiver moving toward the Tx must ', ...
+                 'still produce closing relative velocity for Doppler.']);
+        end
+
+        function dopplerRelativeVelocityRejectsInvalidReceiverVelocity(testCase)
+            txInfo = struct('Velocity', [0, 0, 0]);
+            rxInfo = struct('Velocity', [1, 2]);
+
+            f = @() csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
+                txInfo, rxInfo);
+
+            testCase.verifyError(f, ...
+                'CSRD:Channel:DopplerInvalidGeometryVector');
+        end
+
     end
 
 end

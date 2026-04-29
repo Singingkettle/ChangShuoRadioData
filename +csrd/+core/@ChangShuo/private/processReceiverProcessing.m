@@ -195,6 +195,8 @@ function design = buildDesignTruth(comp)
     design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
     design.PayloadLengthBits = getFieldOrDefault(plannedSrc, 'PayloadLengthBits', NaN);
     design.NumTransmitAntennas = getFieldOrDefault(plannedSrc, 'NumTransmitAntennas', NaN);
+    design.Regulatory = getFieldOrDefault(plannedSrc, 'Regulatory', ...
+        csrd.utils.spectrum.RegulatoryValidator.emptyRegulatoryTruth());
 end
 
 function execution = buildExecutionTruth(comp)
@@ -231,6 +233,7 @@ function execution = buildExecutionTruth(comp)
     geom.TxPositionM   = getFieldOrDefault(comp, 'TxPosition', [NaN, NaN, NaN]);
     geom.TxVelocityMps = getFieldOrDefault(comp, 'TxVelocity', [NaN, NaN, NaN]);
     geom.RxPositionM   = getFieldOrDefault(comp, 'RxPosition', [NaN, NaN, NaN]);
+    geom.RxVelocityMps = getFieldOrDefault(comp, 'RxVelocity', [NaN, NaN, NaN]);
     geom.LinkDistanceM = getFieldOrDefault(comp, 'LinkDistance', NaN);
     execution.GeometrySnapshot = geom;
 end

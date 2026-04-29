@@ -210,9 +210,16 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     end
                     if isfield(txInfo, 'Velocity')
                         component.TxVelocity = txInfo.Velocity;
+                    else
+                        component.TxVelocity = [0, 0, 0];
                     end
                     if isfield(rxInfo, 'Position')
                         component.RxPosition = rxInfo.Position;
+                    end
+                    if isfield(rxInfo, 'Velocity')
+                        component.RxVelocity = rxInfo.Velocity;
+                    else
+                        component.RxVelocity = [0, 0, 0];
                     end
                     if isfield(channelOutput, 'LinkDistance')
                         component.LinkDistance = channelOutput.LinkDistance;
@@ -313,13 +320,10 @@ function [shiftedSignal, dopplerHz, radialVelMps] = ...
         return;
     end
 
-    if ~isfield(txInfo, 'Velocity') || isempty(txInfo.Velocity)
-        txVel = [0, 0, 0];
-    else
-        txVel = txInfo.Velocity;
-    end
+    relativeVel = csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
+        txInfo, rxInfo);
 
-    if isequal(txVel(:).', [0, 0, 0])
+    if all(relativeVel == 0)
         return;
     end
 
@@ -327,7 +331,7 @@ function [shiftedSignal, dopplerHz, radialVelMps] = ...
     [shiftedSignal, dopplerHz, radialVelMps] = ...
         csrd.blocks.physical.channel.impairments.applyDopplerShift( ...
             channelOutput.Signal, fs, rxInfo.RealCarrierFrequency, ...
-            txInfo.Position, txVel, rxInfo.Position);
+            txInfo.Position, relativeVel, rxInfo.Position);
 end
 
 function bwHz = measureModulatedBandwidth(segmentSignal)
