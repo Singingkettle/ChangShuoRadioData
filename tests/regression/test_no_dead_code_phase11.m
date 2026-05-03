@@ -1,0 +1,106 @@
+function test_no_dead_code_phase11()
+    %TEST_NO_DEAD_CODE_PHASE11 Phase 11 cleanup reverse-sample gate.
+
+    fprintf('=== Phase 11 config/dead-code cleanup gate ===\n');
+
+    projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+
+    transmitCfg = fullfile(projectRoot, 'config', '_base_', 'factories', ...
+        'transmit_factory.m');
+    receiveCfg = fullfile(projectRoot, 'config', '_base_', 'factories', ...
+        'receive_factory.m');
+    schedulerFile = fullfile(projectRoot, '+csrd', '+blocks', '+scenario', ...
+        '@CommunicationBehaviorSimulator', 'private', ...
+        'initializeTransmissionScheduler.m');
+    commSetupFile = fullfile(projectRoot, '+csrd', '+blocks', '+scenario', ...
+        '@CommunicationBehaviorSimulator', 'setupImpl.m');
+    txGenFile = fullfile(projectRoot, '+csrd', '+blocks', '+scenario', ...
+        '@CommunicationBehaviorSimulator', 'private', ...
+        'generateScenarioTransmitterConfigurations.m');
+    rxGenFile = fullfile(projectRoot, '+csrd', '+blocks', '+scenario', ...
+        '@CommunicationBehaviorSimulator', 'private', ...
+        'generateScenarioReceiverConfigurations.m');
+    rxValidatorFile = fullfile(projectRoot, '+csrd', '+core', ...
+        '@ChangShuo', 'validateRxPlanIntoRxInfo.m');
+    segmentBuilderFile = fullfile(projectRoot, '+csrd', '+core', ...
+        '@ChangShuo', 'buildSegmentConfigFromTxScenario.m');
+    ofdmFile = fullfile(projectRoot, '+csrd', '+blocks', '+physical', ...
+        '+modulate', '+digital', '+OFDM', 'OFDM.m');
+    refactoringTest = fullfile(projectRoot, 'tests', 'regression', ...
+        'test_refactoring.m');
+
+    assert(~contains(stripComments(fileread(transmitCfg)), 'Real.SDR'), ...
+        'Transmit factory must not expose the removed Real.SDR placeholder.');
+    assert(~contains(stripComments(fileread(receiveCfg)), 'Real.SDR'), ...
+        'Receive factory must not expose the removed Real.SDR placeholder.');
+
+    schedulerCode = stripComments(fileread(schedulerFile));
+    assert(~contains(schedulerCode, 'using default: Continuous'), ...
+        'TransmissionPattern.DefaultType must fail fast instead of warning and defaulting.');
+    assert(contains(schedulerCode, ...
+        'CSRD:Scenario:MissingTransmissionPatternDefaultType'), ...
+        'Missing TransmissionPattern.DefaultType must have an explicit error identifier.');
+
+    commSetupCode = stripComments(fileread(commSetupFile));
+    forbiddenReceiverRng = {'SampleRate.Min', 'SampleRate.Max', ...
+        'NumAntennas.Min', 'NumAntennas.Max'};
+    for k = 1:numel(forbiddenReceiverRng)
+        assert(~contains(commSetupCode, forbiddenReceiverRng{k}), ...
+            'Receiver unified config must not accept old Min/Max range fields: %s', ...
+            forbiddenReceiverRng{k});
+    end
+
+    txGenCode = stripComments(fileread(txGenFile));
+    rxGenCode = stripComments(fileread(rxGenFile));
+    assert(contains(txGenCode, 'txPlan.Physical.Velocity'), ...
+        'Transmitter plans must publish Physical.Velocity for Doppler truth.');
+    assert(contains(rxGenCode, 'rxPlan.Physical.Velocity'), ...
+        'Receiver plans must publish Physical.Velocity for Doppler truth.');
+    assert(contains(stripComments(fileread(rxValidatorFile)), ...
+        'rxPlan.Physical.{Position, Velocity}'), ...
+        'Rx construction must require velocity rather than defaulting it to zero.');
+    assert(contains(stripComments(fileread(segmentBuilderFile)), ...
+        'segmentConfig.Modulation.NumTransmitAntennas'), ...
+        'Segment modulation config must receive the Tx antenna count.');
+    assert(~contains(stripComments(fileread(ofdmFile)), ...
+        'obj.NumTransmitAntennas = 2'), ...
+        'OFDM must not override the planned Tx antenna count with a hard-coded value.');
+
+    refactorCode = stripComments(fileread(refactoringTest));
+    forbiddenV1Refs = {'src.Planned', 'src.Realized', 'src.Spatial', ...
+        'src.LinkBudget', 'src.Channel'};
+    for k = 1:numel(forbiddenV1Refs)
+        assert(~contains(refactorCode, forbiddenV1Refs{k}), ...
+            'test_refactoring must not inspect annotation v1 top-level field %s.', ...
+            forbiddenV1Refs{k});
+    end
+
+    fprintf('=== Phase 11 config/dead-code cleanup gate PASSED ===\n');
+end
+
+
+function code = stripComments(src)
+    lines = regexp(src, '\r?\n', 'split');
+    code = '';
+    for k = 1:numel(lines)
+        line = lines{k};
+        inString = false;
+        cutAt = numel(line) + 1;
+        c = 1;
+        while c <= numel(line)
+            ch = line(c);
+            if ch == ''''
+                if c < numel(line) && line(c + 1) == ''''
+                    c = c + 2;
+                    continue;
+                end
+                inString = ~inString;
+            elseif ch == '%' && ~inString
+                cutAt = c;
+                break;
+            end
+            c = c + 1;
+        end
+        code = [code, line(1:cutAt - 1), newline]; %#ok<AGROW>
+    end
+end

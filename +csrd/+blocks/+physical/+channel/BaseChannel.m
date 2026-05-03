@@ -1,5 +1,6 @@
 classdef BaseChannel < matlab.System
     % BaseChannel - Base class for wireless channel models
+    % 中文说明：提供 CSRD 生产链路中的 BaseChannel 实现。
     %
     % This class provides fundamental channel modeling capabilities including
     % path loss, atmospheric conditions, and antenna configurations for wireless
@@ -68,6 +69,9 @@ classdef BaseChannel < matlab.System
 
         function PathLoss = genPathLoss(obj)
             % genPathLoss - Calculate total path loss including atmospheric effects
+            % 中文说明：genPathLoss 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Returns:
             %   PathLoss - Total path loss in dB
@@ -115,6 +119,9 @@ classdef BaseChannel < matlab.System
 
         function out = addMultipathFading(obj, in, startTime)
             % addMultipathFading - Add Rician multipath fading effects
+            % 中文说明：addMultipathFading 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   out = addMultipathFading(obj, in, startTime)
@@ -141,6 +148,9 @@ classdef BaseChannel < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Reset the multipath channel state
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             reset(obj.MultipathChannel);
         end
 
@@ -150,6 +160,9 @@ classdef BaseChannel < matlab.System
 
         function obj = BaseChannel(varargin)
             % BaseChannel - Constructor for channel model
+            % 中文说明：BaseChannel 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   obj = BaseChannel()

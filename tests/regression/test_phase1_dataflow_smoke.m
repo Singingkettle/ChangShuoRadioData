@@ -36,8 +36,8 @@ function test_phase1_dataflow_smoke()
     addpath(projectRoot);
     addpath(fileparts(mfilename('fullpath')));
 
-    csrd.utils.logger.GlobalLogManager.reset();
-    csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+    csrd.runtime.logger.GlobalLogManager.reset();
+    csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
 
     runRoot = fullfile(projectRoot, 'artifacts', 'tests', 'runs', ...
         'phase1_smoke');
@@ -50,8 +50,8 @@ function test_phase1_dataflow_smoke()
         'Level', 'WARNING', ...
         'SaveToFile', true, ...
         'DisplayInConsole', false);
-    csrd.utils.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
-    policy = csrd.utils.logger.policy.LogPolicy('Standard');
+    csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
+    policy = csrd.runtime.logger.policy.LogPolicy('Standard');
     policy.apply();
 
     rng(20260424, 'twister');
@@ -60,7 +60,7 @@ function test_phase1_dataflow_smoke()
     cohorts = fullRecipe.Cohorts;
     cohort = cohorts(1);
 
-    masterCfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     sid = 1;
     scenarioCfg = localApplyCohort(masterCfg, cohort, runRoot, sid);
 
@@ -135,10 +135,8 @@ function cfg = localApplyCohort(masterCfg, cohort, runRoot, sid)
         sprintf('scenario_%06d', sid));
     cfg.Runner.Data.CompressData = false;
 
-    cfg.Factories.Scenario.Global.NumFramesPerScenario = ...
-        cohort.NumFramesPerScenario;
-    cfg.Factories.Scenario.Global.ObservationDuration = ...
-        cohort.ObservationDuration;
+    cfg = csrd.test_support.applyCanonicalFrameContract( ...
+        cfg, cohort.ObservationDuration, cohort.NumFramesPerScenario);
 
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = cohort.MapTypes;
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = cohort.MapRatio;

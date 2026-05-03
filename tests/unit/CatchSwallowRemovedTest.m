@@ -14,7 +14,7 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
     %        Error = 'ReceiverBlockStepFailed' silent annotation.
     %
     %   Plus the companion contract on
-    %   csrd.utils.scenario.isScenarioSkipException :
+    %   csrd.pipeline.scenario.isScenarioSkipException :
     %     - any CSRD:Construction:* identifier is considered a
     %       scenario-skip token (Q3 = A: throw + scenario skip).
     %     - the historical tokens (SkipScenario / NoBuildingData /
@@ -147,7 +147,7 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
             };
             for k = 1:numel(ids)
                 me = MException(ids{k}, 'phase3 contract probe');
-                tf = csrd.utils.scenario.isScenarioSkipException(me);
+                tf = csrd.pipeline.scenario.isScenarioSkipException(me);
                 testCase.verifyTrue(tf, sprintf( ...
                     'Phase 3 §3.4: %s must be on the scenario-skip whitelist.', ids{k}));
             end
@@ -163,7 +163,7 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
             };
             for k = 1:numel(ids)
                 me = MException(ids{k}, 'phase3 backwards-compat probe');
-                tf = csrd.utils.scenario.isScenarioSkipException(me);
+                tf = csrd.pipeline.scenario.isScenarioSkipException(me);
                 testCase.verifyTrue(tf, sprintf( ...
                     'Phase 3: legacy skip token %s must still match.', ids{k}));
             end
@@ -171,12 +171,12 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
 
         function arbitraryNonSkipIdentifierStillReturnsFalse(testCase)
             me = MException('CSRD:Foo:Bar', 'definitely not a scenario skip');
-            testCase.verifyFalse(csrd.utils.scenario.isScenarioSkipException(me));
+            testCase.verifyFalse(csrd.pipeline.scenario.isScenarioSkipException(me));
         end
 
         function emptyIdentifierIsNotScenarioSkip(testCase)
             me = MException('', 'no id');
-            testCase.verifyFalse(csrd.utils.scenario.isScenarioSkipException(me));
+            testCase.verifyFalse(csrd.pipeline.scenario.isScenarioSkipException(me));
         end
 
     end

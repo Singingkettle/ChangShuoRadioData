@@ -1,5 +1,6 @@
 function grid = createGridMap(obj)
     % createGridMap - Create grid-based map representation
+    % 中文说明：提供 CSRD 生产链路中的 createGridMap 实现。
     %
     % Output Arguments:
     %   grid - Grid map structure

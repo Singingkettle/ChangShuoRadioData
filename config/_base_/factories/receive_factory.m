@@ -1,5 +1,8 @@
 function config = receive_factory()
     %RECEIVE_FACTORY Receiver factory configuration (v0.4 deep refactor).
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 receive_factory 实现。
     %
     %   Splits cleanly into:
     %     * Available receiver TYPEs (the scenario layer picks one).
@@ -155,11 +158,6 @@ function config = receive_factory()
           0, 27.64,  5.59;
           5, 28.49, 12.03 ];
     config.Factories.Receive.Simulation.Nonlinearity.LookupTable = lt;
-
-    % --- Real hardware (placeholder) ----------------------------------
-    config.Factories.Receive.Real.SDR.handle = '';
-    config.Factories.Receive.Real.SDR.Description = 'SDR-based receiver (not implemented)';
-    config.Factories.Receive.Real.SDR.Supported = false;
 
     config.Factories.Receive.LogDetails = true;
     config.Factories.Receive.Description = ...

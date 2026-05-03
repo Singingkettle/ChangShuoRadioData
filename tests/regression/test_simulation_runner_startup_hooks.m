@@ -23,7 +23,7 @@ function test_simulation_runner_startup_hooks()
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
 
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
     tempRoot = tempname;
     mkdir(tempRoot);
@@ -32,7 +32,6 @@ function test_simulation_runner_startup_hooks()
     % --- Build the smallest legal RunnerConfig ----------------------------
     runnerCfg = struct();
     runnerCfg.NumScenarios     = 1;
-    runnerCfg.FixedFrameLength = 1024;
     runnerCfg.RandomSeed       = 42;
     runnerCfg.Data.OutputDirectory = fullfile(tempRoot, 'phase0_startup_out');
     runnerCfg.Data.CompressData    = false;
@@ -48,7 +47,7 @@ function test_simulation_runner_startup_hooks()
 
     % Initialise the global logger BEFORE constructing the runner so
     % LogPolicy.apply() has a concrete singleton to mutate.
-    csrd.utils.logger.GlobalLogManager.initialize( ...
+    csrd.runtime.logger.GlobalLogManager.initialize( ...
         runnerCfg.Log, fullfile(tempRoot, 'phase0_startup_logs'));
 
     runner = csrd.SimulationRunner( ...
@@ -58,8 +57,8 @@ function test_simulation_runner_startup_hooks()
     setup(runner);
 
     % --- Hook 2 verification: thresholds match Standard ------------------
-    import csrd.utils.logger.mlog.Level
-    logger = csrd.utils.logger.GlobalLogManager.getLogger();
+    import csrd.runtime.logger.mlog.Level
+    logger = csrd.runtime.logger.GlobalLogManager.getLogger();
     assert(logger.CommandWindowThreshold == Level.INFO, ...
         ['Standard policy must set CommandWindow threshold to INFO; ', ...
         'got %s'], char(logger.CommandWindowThreshold));
@@ -163,5 +162,5 @@ if isfolder(p)
         % best-effort cleanup; do not fail the test on rmdir error
     end
 end
-csrd.utils.logger.GlobalLogManager.reset();
+csrd.runtime.logger.GlobalLogManager.reset();
 end

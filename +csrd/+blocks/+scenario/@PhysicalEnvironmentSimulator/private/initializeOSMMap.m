@@ -1,5 +1,8 @@
 function initializeOSMMap(obj)
     % initializeOSMMap - Initialize OSM map for ray tracing
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 initializeOSMMap 实现。
     %
     % Loads OSM file and creates site viewer for ray tracing channel modeling
 
@@ -75,6 +78,7 @@ function initializeOSMMap(obj)
     flatTerrain = getFieldOrDefault(flatTerrainConfig, 'Terrain', 'none');
     flatTerrainMaterial = getFieldOrDefault(flatTerrainConfig, 'Material', 'seawater');
     flatMaxReflections = getFieldOrDefault(flatTerrainConfig, 'MaxNumReflections', 1);
+    channelModel = resolveOSMChannelModel(obj);
 
     try
 
@@ -89,11 +93,11 @@ function initializeOSMMap(obj)
             obj.Config.Map.HasBuildings = true;
 
             mapProfile = buildMapProfile('OSMBuildings', osmFile, true, ...
-                'gmted2010', 'auto', [], obj.mapData.Boundaries);
+                'gmted2010', 'auto', [], obj.mapData.Boundaries, channelModel);
             obj.mapData.MapProfile = mapProfile;
             obj.Config.Map.MapProfile = mapProfile;
             obj.Config.Environment.MapProfile = mapProfile;
-            obj.Config.Environment.ChannelModel = 'RayTracing';
+            obj.Config.Environment.ChannelModel = channelModel;
         else
             if ~strcmpi(emptyGeometryPolicy, 'FlatTerrain')
                 error('PhysicalEnvironmentSimulator:NoBuildingData', ...
@@ -110,11 +114,12 @@ function initializeOSMMap(obj)
             obj.Config.Map.HasBuildings = false;
 
             mapProfile = buildMapProfile('FlatTerrain', osmFile, false, ...
-                flatTerrain, flatTerrainMaterial, flatMaxReflections, obj.mapData.Boundaries);
+                flatTerrain, flatTerrainMaterial, flatMaxReflections, ...
+                obj.mapData.Boundaries, channelModel);
             obj.mapData.MapProfile = mapProfile;
             obj.Config.Map.MapProfile = mapProfile;
             obj.Config.Environment.MapProfile = mapProfile;
-            obj.Config.Environment.ChannelModel = 'RayTracing';
+            obj.Config.Environment.ChannelModel = channelModel;
         end
 
     catch ME_viewer
@@ -123,13 +128,43 @@ function initializeOSMMap(obj)
             rethrow(ME_viewer);
         end
 
-        obj.logger.error('Failed to create site viewer: %s. Using statistical mode.', ME_viewer.message);
+        if strcmpi(channelModel, 'RayTracing')
+            error('PhysicalEnvironmentSimulator:OSMBuildingRayTracingUnavailable', ...
+                ['Failed to create OSM building site viewer for RayTracing: %s. ', ...
+                 'This environment limitation must be handled as an explicit skip ', ...
+                 'or annotated fallback by the caller.'], ME_viewer.message);
+        end
+
+        obj.logger.error('Failed to create site viewer: %s. Using configured statistical mode.', ME_viewer.message);
         initializeStatisticalMap(obj);
     end
 
 end
 
+function channelModel = resolveOSMChannelModel(obj)
+    % resolveOSMChannelModel - Production declaration in CSRD.
+    % 中文说明：resolveOSMChannelModel 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    channelModel = 'RayTracing';
+    if isfield(obj.Config, 'Environment') && ...
+            isstruct(obj.Config.Environment) && ...
+            isfield(obj.Config.Environment, 'ChannelModel') && ...
+            ~isempty(obj.Config.Environment.ChannelModel)
+        channelModel = char(string(obj.Config.Environment.ChannelModel));
+    elseif isfield(obj.Config, 'Map') && isstruct(obj.Config.Map) && ...
+            isfield(obj.Config.Map, 'OSM') && isstruct(obj.Config.Map.OSM) && ...
+            isfield(obj.Config.Map.OSM, 'ChannelModel') && ...
+            ~isempty(obj.Config.Map.OSM.ChannelModel)
+        channelModel = char(string(obj.Config.Map.OSM.ChannelModel));
+    end
+end
+
 function osmConfig = getOSMConfig(obj)
+    % getOSMConfig - Production declaration in CSRD.
+    % 中文说明：getOSMConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     osmConfig = struct();
     if isfield(obj.Config, 'Map') && isfield(obj.Config.Map, 'OSM') && isstruct(obj.Config.Map.OSM)
         osmConfig = obj.Config.Map.OSM;
@@ -137,6 +172,10 @@ function osmConfig = getOSMConfig(obj)
 end
 
 function value = getFieldOrDefault(s, fieldName, defaultValue)
+    % getFieldOrDefault - Production declaration in CSRD.
+    % 中文说明：getFieldOrDefault 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -144,7 +183,12 @@ function value = getFieldOrDefault(s, fieldName, defaultValue)
     end
 end
 
-function mapProfile = buildMapProfile(mode, osmFile, hasBuildings, terrain, terrainMaterial, maxNumReflections, boundaries)
+function mapProfile = buildMapProfile(mode, osmFile, hasBuildings, ...
+        terrain, terrainMaterial, maxNumReflections, boundaries, channelModel)
+            % buildMapProfile - Production declaration in CSRD.
+            % 中文说明：buildMapProfile 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
     mapProfile = struct();
     mapProfile.Mode = mode;
     mapProfile.OSMFile = osmFile;
@@ -152,6 +196,6 @@ function mapProfile = buildMapProfile(mode, osmFile, hasBuildings, terrain, terr
     mapProfile.Terrain = terrain;
     mapProfile.TerrainMaterial = terrainMaterial;
     mapProfile.MaxNumReflections = maxNumReflections;
-    mapProfile.ChannelModel = 'RayTracing';
+    mapProfile.ChannelModel = channelModel;
     mapProfile.Boundaries = boundaries;
 end

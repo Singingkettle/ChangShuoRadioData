@@ -278,7 +278,7 @@ classdef MeasurementCompletenessHookTest < matlab.unittest.TestCase
             try
                 csrd.core.ChangShuo.validateMeasurementCompleteness(annotation);
             catch ME
-                isSkip = csrd.utils.scenario.isScenarioSkipException(ME);
+                isSkip = csrd.pipeline.scenario.isScenarioSkipException(ME);
             end
             testCase.verifyTrue(isSkip, ...
                 ['CSRD:Annotation:* identifiers must be whitelisted ', ...
@@ -292,7 +292,7 @@ classdef MeasurementCompletenessHookTest < matlab.unittest.TestCase
                 error('CSRD:Measurement:InvalidSignal', ...
                     'Synthetic measurement failure for predicate test.');
             catch ME
-                isSkip = csrd.utils.scenario.isScenarioSkipException(ME);
+                isSkip = csrd.pipeline.scenario.isScenarioSkipException(ME);
             end
             testCase.verifyTrue(isSkip, ...
                 ['CSRD:Measurement:* identifiers must be whitelisted ', ...

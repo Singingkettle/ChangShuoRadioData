@@ -15,7 +15,7 @@ classdef AnnotationHeaderBlueprintProvenanceTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function silenceLogger(~)
             try
-                csrd.utils.logger.GlobalLogManager.setLevel('error');
+                csrd.runtime.logger.GlobalLogManager.setLevel('error');
             catch
             end
         end

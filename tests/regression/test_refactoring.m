@@ -18,12 +18,12 @@ function test_refactoring()
     addpath(projectRoot);
 
     clear classes;
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
     % Load base configuration
     fprintf('Loading base configuration...\n');
     try
-        masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+        masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
         fprintf('  [OK] Configuration loaded.\n\n');
     catch ME
         fprintf('  [FAIL] Config loading failed: %s\n', ME.message);
@@ -32,7 +32,7 @@ function test_refactoring()
 
     % Initialize logging
     masterConfig.Log.Level = 'INFO';
-    csrd.utils.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
 
     totalPassed = 0;
     totalFailed = 0;
@@ -122,8 +122,8 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
 
     mc = baseMasterConfig;
     mc.Runner.NumScenarios = params.NumScenarios;
-    mc.Factories.Scenario.Global.NumFramesPerScenario = params.NumFrames;
-    mc.Factories.Scenario.Global.ObservationDuration = params.ObservationDuration;
+    mc = csrd.test_support.applyCanonicalFrameContract( ...
+        mc, params.ObservationDuration, params.NumFrames);
     mc.Factories.Scenario.PhysicalEnvironment.Map.Types = params.MapTypes;
     mc.Factories.Scenario.PhysicalEnvironment.Map.Ratio = params.MapRatio;
     mc.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = params.TxMin;
@@ -225,30 +225,43 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
                     end
                     if isfield(ann, 'SignalSources') && ~isempty(ann.SignalSources)
                         src = ann.SignalSources(1);
-                        if isfield(src, 'Planned') && isfield(src, 'Realized') && ...
-                                isstruct(src.Planned) && isstruct(src.Realized) && ...
-                                isfield(src.Planned, 'Bandwidth') && ...
-                                isfield(src.Realized, 'Bandwidth') && ...
-                                ~isempty(src.Planned.Bandwidth) && ~isempty(src.Realized.Bandwidth) && ...
-                                src.Planned.Bandwidth > 0 && src.Realized.Bandwidth > 0
-                            pBW = src.Planned.Bandwidth;
-                            rBW = src.Realized.Bandwidth;
-                            bwRatio = abs(pBW - rBW) / max(pBW, 1);
-                            fprintf(', PlannedBW=%.0f, RealizedBW=%.0f (diff=%.1f%%)', pBW, rBW, bwRatio*100);
+                        bannedV1 = {'Planned', 'Realized', 'Temporal', 'Spatial', 'LinkBudget', 'Channel'};
+                        for b = 1:numel(bannedV1)
+                            assert(~isfield(src, bannedV1{b}), ...
+                                'Frame %d, Rx %d: SignalSource carries forbidden v1 top-level field %s.', ...
+                                f, rxIdx, bannedV1{b});
+                        end
+                        if isfield(src, 'Truth') && isfield(src.Truth, 'Design') && ...
+                                isfield(src.Truth, 'Execution') && ...
+                                isfield(src.Truth, 'Measured') && ...
+                                isstruct(src.Truth.Design) && isstruct(src.Truth.Execution) && ...
+                                isstruct(src.Truth.Measured) && ...
+                                isfield(src.Truth.Design, 'PlannedBandwidthHz') && ...
+                                isfield(src.Truth.Execution, 'ModulatedBandwidthHz') && ...
+                                isfield(src.Truth.Measured, 'SourcePlane') && ...
+                                isfield(src.Truth.Measured.SourcePlane, 'OccupiedBandwidthHz') && ...
+                                ~isempty(src.Truth.Design.PlannedBandwidthHz) && ...
+                                ~isempty(src.Truth.Execution.ModulatedBandwidthHz) && ...
+                                ~isempty(src.Truth.Measured.SourcePlane.OccupiedBandwidthHz) && ...
+                                src.Truth.Design.PlannedBandwidthHz > 0 && ...
+                                src.Truth.Execution.ModulatedBandwidthHz > 0 && ...
+                                src.Truth.Measured.SourcePlane.OccupiedBandwidthHz > 0
+                            designBW = src.Truth.Design.PlannedBandwidthHz;
+                            execBW = src.Truth.Execution.ModulatedBandwidthHz;
+                            measuredBW = src.Truth.Measured.SourcePlane.OccupiedBandwidthHz;
+                            execMeasuredRatio = abs(execBW - measuredBW) / max(execBW, 1);
+                            fprintf(', DesignBW=%.0f, ExecBW=%.0f, MeasuredBW=%.0f (exec/meas diff=%.1f%%)', ...
+                                designBW, execBW, measuredBW, execMeasuredRatio*100);
 
-                            % Hard contract: realised bandwidth must be
-                            % within 50% of planned. The planner/executor
-                            % drift used to be flagged as a soft fprintf
-                            % warning, which made every dataset
-                            % regression invisible to CI. Tighter thresholds
-                            % (e.g. 20%) are enforced per-modulation in
-                            % dedicated unit tests; this regression test
-                            % only blocks catastrophic drift.
-                            assert(bwRatio <= 0.5, ...
-                                sprintf(['Frame %d, Rx %d: PlannedBW=%.0f Hz vs ', ...
-                                         'RealizedBW=%.0f Hz (drift %.1f%%) ', ...
+                            % Design bandwidth is a blueprint fact; measured
+                            % bandwidth may differ for real modulators and RF
+                            % processing. This smoke only blocks a broken
+                            % execution-to-measurement chain.
+                            assert(execMeasuredRatio <= 0.5, ...
+                                sprintf(['Frame %d, Rx %d: ExecBW=%.0f Hz vs ', ...
+                                         'MeasuredBW=%.0f Hz (drift %.1f%%) ', ...
                                          'exceeds 50%% tolerance.'], ...
-                                    f, rxIdx, pBW, rBW, bwRatio*100));
+                                    f, rxIdx, execBW, measuredBW, execMeasuredRatio*100));
                         end
                     end
                     fprintf('\n');
@@ -277,33 +290,27 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
             end
             for sIdx = 1:length(ann.SignalSources)
                 src = ann.SignalSources(sIdx);
-                if ~isfield(src, 'Spatial')
-                    fprintf('  [WARN] Frame %d, Rx %d, Src %d: Missing Spatial field.\n', f, rxIdx, sIdx);
+                if ~isfield(src, 'Truth') || ~isfield(src.Truth, 'Execution') || ...
+                        ~isfield(src.Truth.Execution, 'GeometrySnapshot')
+                    fprintf('  [WARN] Frame %d, Rx %d, Src %d: Missing Truth.Execution.GeometrySnapshot.\n', f, rxIdx, sIdx);
                     spatialValid = false;
                     continue;
                 end
-                sp = src.Spatial;
-                hasTxPos = isfield(sp, 'TxPosition') && ~isempty(sp.TxPosition);
-                hasRxPos = isfield(sp, 'RxPosition') && ~isempty(sp.RxPosition);
-                hasDist = isfield(sp, 'LinkDistance');
-                lb = struct();
-                if isfield(src, 'LinkBudget') && isstruct(src.LinkBudget)
-                    lb = src.LinkBudget;
-                end
-                if isfield(lb, 'AppliedPathLoss')
-                    pathLossDb = lb.AppliedPathLoss;
-                    hasPL = true;
-                elseif isfield(lb, 'AnalyticalPathLoss')
-                    pathLossDb = lb.AnalyticalPathLoss;
-                    hasPL = true;
+                sp = src.Truth.Execution.GeometrySnapshot;
+                hasTxPos = isfield(sp, 'TxPositionM') && ~isempty(sp.TxPositionM);
+                hasRxPos = isfield(sp, 'RxPositionM') && ~isempty(sp.RxPositionM);
+                hasDist = isfield(sp, 'LinkDistanceM');
+                hasPL = isfield(src.Truth.Execution, 'PathLossDB') && ...
+                    ~isempty(src.Truth.Execution.PathLossDB);
+                if hasPL
+                    pathLossDb = src.Truth.Execution.PathLossDB;
                 else
                     pathLossDb = NaN;
-                    hasPL = false;
                 end
                 if hasTxPos && hasRxPos && hasDist && hasPL
                     fprintf('  Frame %d, Rx %d, Src %d: TxPos=[%.1f,%.1f,%.1f], Dist=%.1fm, PL=%.1fdB\n', ...
-                        f, rxIdx, sIdx, sp.TxPosition(1), sp.TxPosition(2), sp.TxPosition(3), ...
-                        sp.LinkDistance, pathLossDb);
+                        f, rxIdx, sIdx, sp.TxPositionM(1), sp.TxPositionM(2), sp.TxPositionM(3), ...
+                        sp.LinkDistanceM, pathLossDb);
                 else
                     fprintf('  [WARN] Frame %d, Rx %d, Src %d: Incomplete spatial info.\n', f, rxIdx, sIdx);
                     spatialValid = false;
@@ -329,10 +336,14 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
             for sIdx = 1:min(length(ann1.SignalSources), length(annN.SignalSources))
                 src1 = ann1.SignalSources(sIdx);
                 srcN = annN.SignalSources(sIdx);
-                if isfield(src1, 'Spatial') && isfield(srcN, 'Spatial') && ...
-                   isfield(src1.Spatial, 'TxPosition') && isfield(srcN.Spatial, 'TxPosition')
-                    pos1 = src1.Spatial.TxPosition;
-                    posN = srcN.Spatial.TxPosition;
+                if isfield(src1, 'Truth') && isfield(srcN, 'Truth') && ...
+                   isfield(src1.Truth, 'Execution') && isfield(srcN.Truth, 'Execution') && ...
+                   isfield(src1.Truth.Execution, 'GeometrySnapshot') && ...
+                   isfield(srcN.Truth.Execution, 'GeometrySnapshot') && ...
+                   isfield(src1.Truth.Execution.GeometrySnapshot, 'TxPositionM') && ...
+                   isfield(srcN.Truth.Execution.GeometrySnapshot, 'TxPositionM')
+                    pos1 = src1.Truth.Execution.GeometrySnapshot.TxPositionM;
+                    posN = srcN.Truth.Execution.GeometrySnapshot.TxPositionM;
                     if norm(pos1 - posN) > 1e-6
                         posChanged = true;
                         fprintf('  [OK] TxID=%s position changed: Frame1=[%.1f,%.1f,%.1f] -> Frame%d=[%.1f,%.1f,%.1f]\n', ...

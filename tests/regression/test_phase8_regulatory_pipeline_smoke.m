@@ -12,39 +12,38 @@ function test_phase8_regulatory_pipeline_smoke()
     addpath(projectRoot);
     addpath(fileparts(mfilename('fullpath')));
 
-    csrd.utils.logger.GlobalLogManager.reset();
-    csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+    csrd.runtime.logger.GlobalLogManager.reset();
+    csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
 
     runRoot = fullfile(projectRoot, 'artifacts', 'tests', 'runs', ...
         'phase8_regulatory_smoke');
     if ~exist(runRoot, 'dir'); mkdir(runRoot); end
 
-    csrd.utils.logger.GlobalLogManager.initialize(struct( ...
+    csrd.runtime.logger.GlobalLogManager.initialize(struct( ...
         'Name', 'CSRD-Phase8-Regulatory-Smoke', ...
         'Level', 'WARNING', ...
         'SaveToFile', true, ...
         'DisplayInConsole', false), runRoot);
-    policy = csrd.utils.logger.policy.LogPolicy('Standard');
+    policy = csrd.runtime.logger.policy.LogPolicy('Standard');
     policy.apply();
 
     rng(20260428, 'twister');
-    cfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     cfg.Runner.NumScenarios = 1;
     cfg.Runner.RandomSeed = 20260428;
     cfg.Runner.Toolbox.Level = 'minimal';
     cfg.Runner.Data.OutputDirectory = runRoot;
     cfg.Runner.Data.CompressData = false;
-    cfg.Factories.Channel.PreferredType = 'AWGN';
 
-    cfg.Factories.Scenario.Global.NumFramesPerScenario = 1;
-    cfg.Factories.Scenario.Global.ObservationDuration = 0.005;
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = {'Statistical'};
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1.0;
+    cfg.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel = 'AWGN';
     cfg.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;
     cfg.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Max = 1;
     cfg.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Min = 1;
     cfg.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
     cfg.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate = 20e6;
+    cfg = csrd.test_support.applyCanonicalFrameContract(cfg, 0.005, 1);
     cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
     cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = 1;
     cfg.Factories.Scenario.CommunicationBehavior.Regulatory.Enable = true;
@@ -56,7 +55,7 @@ function test_phase8_regulatory_pipeline_smoke()
         {'Radar','Radiolocation','Radionavigation'};
 
     annotationPath = localRunOneScenario(cfg);
-    result = csrd.utils.annotation.readAnnotationV2(annotationPath, ...
+    result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
         'RequireSources', true, 'RequireRuntimeHeader', true);
 
     sources = result.Sources;

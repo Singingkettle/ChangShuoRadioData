@@ -1,5 +1,8 @@
 function initializeEnvironment(obj)
     % initializeEnvironment - Initialize environmental factors and conditions
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 initializeEnvironment 实现。
     %
     % Sets up the basic environmental structure including weather conditions
     % and obstacle initialization for the simulation.
@@ -37,6 +40,9 @@ end
 
 function value = getFieldOrDefault(structure, fieldName, defaultValue)
     % Helper function to get field value or return default
+    % 中文说明：getFieldOrDefault 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isfield(structure, fieldName)
         value = structure.(fieldName);
     else

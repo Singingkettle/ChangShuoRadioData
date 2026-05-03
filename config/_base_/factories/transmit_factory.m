@@ -1,5 +1,8 @@
 function config = transmit_factory()
     %TRANSMIT_FACTORY Transmitter factory configuration (v0.4 deep refactor).
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 transmit_factory 实现。
     %
     %   Implementation details for transmitter instantiation:
     %     * Class handles for different transmitter types
@@ -113,10 +116,6 @@ function config = transmit_factory()
           0, 27.64,  5.59;
           5, 28.49, 12.03 ];
     config.Factories.Transmit.Simulation.Nonlinearity.LookupTable = lt;
-
-    config.Factories.Transmit.Real.SDR.handle = '';
-    config.Factories.Transmit.Real.SDR.Description = 'SDR-based transmitter (not implemented)';
-    config.Factories.Transmit.Real.SDR.Supported = false;
 
     config.Factories.Transmit.LogDetails = true;
     config.Factories.Transmit.Description = ...

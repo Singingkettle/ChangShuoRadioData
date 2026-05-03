@@ -1,5 +1,8 @@
 function config = weather_example()
     % weather_example - Weather configuration example for PhysicalEnvironment
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 weather_example 实现。
     %
     % This example demonstrates how to configure weather conditions
     % for the PhysicalEnvironmentSimulator in CSRD2025.
@@ -17,7 +20,6 @@ function config = weather_example()
 
     % Runner configuration
     config.Runner.NumScenarios = 2;
-    config.Runner.FixedFrameLength = 1024;
     config.Runner.RandomSeed = 'shuffle';
     config.Runner.SimulationMode = 'Scenario-Driven';
     config.Runner.ValidationLevel = 'Moderate';

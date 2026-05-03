@@ -1,5 +1,6 @@
 classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
     % OQPSK - Offset Quadrature Phase Shift Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 OQPSK 实现。
     %
     % This class implements Offset Quadrature Phase Shift Keying (OQPSK) modulation
     % as a subclass of the APSK modulator. OQPSK is a variant of QPSK where the
@@ -71,6 +72,9 @@ classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core OQPSK modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs OQPSK modulation using the configured MATLAB
             % Communications Toolbox OQPSKModulator object, which handles the
@@ -122,6 +126,9 @@ classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured OQPSK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the OQPSK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

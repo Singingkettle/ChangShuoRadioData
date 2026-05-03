@@ -21,9 +21,12 @@ classdef ScenarioFactoryRegulatoryChinaTest < matlab.unittest.TestCase
             rx = rxConfigs{1};
             testCase.verifyEqual(rx.Observation.RealCarrierFrequency, ...
                 layout.Regulatory.Receiver.CenterFrequencyHz);
+            testCase.verifyEqual(rx.Physical.Velocity, [0, 0, 0]);
 
             for k = 1:numel(txConfigs)
                 tx = txConfigs{k};
+                testCase.verifyTrue(isfield(tx.Physical, 'Velocity'));
+                testCase.verifyEqual(tx.Physical.Velocity, [0, 0, 0]);
                 testCase.verifyTrue(isfield(tx, 'Regulatory'));
                 testCase.verifyEqual(tx.Regulatory.RegionId, 'CN');
                 testCase.verifyNotEmpty(tx.Regulatory.BandId);
@@ -35,6 +38,28 @@ classdef ScenarioFactoryRegulatoryChinaTest < matlab.unittest.TestCase
                 testCase.verifyTrue(ismember(tx.Modulation.Type, ...
                     tx.Regulatory.AllowedModulationFamilies));
             end
+        end
+
+        function missingTransmissionPatternDefaultTypeFailsFast(testCase)
+            cfg = localCommunicationConfig();
+            cfg = rmfield(cfg, 'TransmissionPattern');
+            sim = csrd.blocks.scenario.CommunicationBehaviorSimulator( ...
+                'Config', cfg);
+            cleanup = onCleanup(@() releaseIfLocked(sim)); %#ok<NASGU>
+
+            testCase.verifyError(@() setup(sim), ...
+                'CSRD:Scenario:MissingTransmissionPatternDefaultType');
+        end
+
+        function receiverRangeConfigFailsFast(testCase)
+            cfg = localCommunicationConfig();
+            cfg.Receiver.SampleRate = struct('Min', 10e6, 'Max', 20e6);
+            sim = csrd.blocks.scenario.CommunicationBehaviorSimulator( ...
+                'Config', cfg);
+            cleanup = onCleanup(@() releaseIfLocked(sim)); %#ok<NASGU>
+
+            testCase.verifyError(@() setup(sim), ...
+                'CSRD:Scenario:InvalidReceiverConfig');
         end
 
         function oqpskRegulatoryConfigModulatesWithFactoryDefaults(testCase)
@@ -116,6 +141,7 @@ cfg.FrequencyAllocation.Strategy = 'ReceiverCentric';
 cfg.FrequencyAllocation.MinSeparation = 50e3;
 cfg.FrequencyAllocation.AllowOverlap = true;
 cfg.FrequencyAllocation.MaxOverlap = 0.3;
+cfg.TransmissionPattern.DefaultType = 'Continuous';
 cfg.Regulatory.Enable = true;
 cfg.Regulatory.Region.Policy = 'Fixed';
 cfg.Regulatory.Region.Fixed = 'CN';
@@ -123,8 +149,11 @@ cfg.Regulatory.ServiceTier = 'Tier1';
 cfg.Regulatory.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
 cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_NR_N78';
 cfg.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
-cfg.Global.ObservationDuration = 0.01;
 cfg.Global.NumFramesPerScenario = 1;
+cfg.Global.FrameNumSamples = round(0.01 * cfg.Receiver.SampleRate);
+cfg.Global.FrameDuration = cfg.Global.FrameNumSamples / cfg.Receiver.SampleRate;
+cfg.Global.ObservationDuration = cfg.Global.FrameDuration * ...
+    cfg.Global.NumFramesPerScenario;
 end
 
 

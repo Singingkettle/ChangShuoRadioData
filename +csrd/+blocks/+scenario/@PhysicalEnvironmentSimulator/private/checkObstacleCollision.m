@@ -1,5 +1,6 @@
 function hasCollision = checkObstacleCollision(obj, position, environment)
     % checkObstacleCollision - Simple collision detection with static obstacles
+    % 中文说明：提供 CSRD 生产链路中的 checkObstacleCollision 实现。
     %
     % Input Arguments:
     %   position - Entity position vector [x, y, z]

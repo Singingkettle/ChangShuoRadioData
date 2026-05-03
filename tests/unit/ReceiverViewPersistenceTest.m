@@ -133,8 +133,8 @@ function [annotationCell, frameDataCell] = runSmoke(testCase)
     addpath(projectRoot);
     addpath(fullfile(projectRoot, 'tests', 'regression'));
 
-    csrd.utils.logger.GlobalLogManager.reset();
-    csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+    csrd.runtime.logger.GlobalLogManager.reset();
+    csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
 
     runRoot = fullfile(projectRoot, 'artifacts', 'tests', 'runs', ...
         'phase4_receiverview');
@@ -147,8 +147,8 @@ function [annotationCell, frameDataCell] = runSmoke(testCase)
         'Level', 'WARNING', ...
         'SaveToFile', true, ...
         'DisplayInConsole', false);
-    csrd.utils.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
-    policy = csrd.utils.logger.policy.LogPolicy('Standard');
+    csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
+    policy = csrd.runtime.logger.policy.LogPolicy('Standard');
     policy.apply();
 
     rng(20260425, 'twister');
@@ -157,7 +157,7 @@ function [annotationCell, frameDataCell] = runSmoke(testCase)
     cohort = fullRecipe.Cohorts(1);
     cohort.RxRange = [2, 2];
 
-    masterCfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     sid = 1;
     cfg = masterCfg;
     cfg.Runner.NumScenarios     = 1;
@@ -168,10 +168,8 @@ function [annotationCell, frameDataCell] = runSmoke(testCase)
         sprintf('scenario_%06d', sid));
     cfg.Runner.Data.CompressData = false;
 
-    cfg.Factories.Scenario.Global.NumFramesPerScenario = ...
-        cohort.NumFramesPerScenario;
-    cfg.Factories.Scenario.Global.ObservationDuration = ...
-        cohort.ObservationDuration;
+    cfg = csrd.test_support.applyCanonicalFrameContract( ...
+        cfg, cohort.ObservationDuration, cohort.NumFramesPerScenario);
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Types  = cohort.MapTypes;
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio  = cohort.MapRatio;
     cfg.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min ...

@@ -95,15 +95,15 @@ classdef ReceiverViewProjectionTest < matlab.unittest.TestCase
             testCase.verifyEqual({rvs.ReceiverId}, {'Rx1', 'Rx2'});
         end
 
-        function fallbackRangeUsedWhenRxLacksObservableRange(testCase)
-            % Receiver carries no Observation.ObservableRange; the
-            % algorithm must fall back to the supplied unified range.
+        function missingObservableRangeFailsFast(testCase)
+            % Receiver-view projection must use the receiver's own
+            % Observation.ObservableRange; the unified fallback hid
+            % configuration bugs.
             spectrum = makeSpectrum(8e6, 6e6);
             rxConfigs = {struct('EntityID', 'Rx1')};
-            rvs = csrd.blocks.scenario.CommunicationBehaviorSimulator ...
-                .projectReceiverViews(spectrum, rxConfigs, [-8e6, 8e6]);
-            testCase.verifyFalse(rvs(1).IsVisible);
-            testCase.verifyEqual(rvs(1).VisibilityReason, 'EdgeClipped');
+            testCase.verifyError(@() csrd.blocks.scenario.CommunicationBehaviorSimulator ...
+                .projectReceiverViews(spectrum, rxConfigs, [-8e6, 8e6]), ...
+                'CSRD:Scenario:MissingReceiverObservableRange');
         end
 
         function missingSpectrumFieldsThrows(testCase)

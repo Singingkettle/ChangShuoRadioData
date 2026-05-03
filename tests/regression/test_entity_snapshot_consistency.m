@@ -5,17 +5,17 @@ function test_entity_snapshot_consistency()
 
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
-    masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     masterConfig.Log.Level = 'ERROR';
     masterConfig.Log.SaveToFile = false;
     masterConfig.Log.DisplayInConsole = false;
-    csrd.utils.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
 
     scenarioConfig = masterConfig.Factories.Scenario;
-    scenarioConfig.Global.NumFramesPerScenario = 2;
-    scenarioConfig.Global.ObservationDuration = 0.01;
+    scenarioConfig = csrd.test_support.applyCanonicalFrameContract( ...
+        scenarioConfig, 0.01, 2);
     scenarioConfig.PhysicalEnvironment.Map.Types = {'Statistical'};
     scenarioConfig.PhysicalEnvironment.Map.Ratio = [1.0];
     scenarioConfig.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;

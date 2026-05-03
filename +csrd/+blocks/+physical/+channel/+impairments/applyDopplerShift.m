@@ -2,6 +2,9 @@ function [shiftedSignal, dopplerHz, radialVelocityMps] = ...
         applyDopplerShift(signal, sampleRate, carrierFreqHz, ...
                           txPositionM, txVelocityMps, rxPositionM, options)
 %APPLYDOPPLERSHIFT Apply physical Doppler frequency shift to a baseband signal.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 applyDopplerShift 实现。
 %
 %   [shifted, fd, vRadial] = applyDopplerShift(signal, fs, fc, ...
 %                                               txPos, txVel, rxPos)
@@ -109,6 +112,10 @@ end
 
 % =====================================================================
 function v = validateGeometryVector(v, name)
+    % validateGeometryVector - Production declaration in CSRD.
+    % 中文说明：validateGeometryVector 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isnumeric(v) || numel(v) ~= 3
         error('CSRD:Channel:DopplerInvalidGeometryVector', ...
             'applyDopplerShift: %s must be a 3-element numeric vector.', name);

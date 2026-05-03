@@ -1,5 +1,6 @@
 classdef RRFSimulator < matlab.System
     % RRFSimulator: Radio Receiver Front-end Simulator
+    % 中文说明：提供 CSRD 生产链路中的 RRFSimulator 实现。
     %
     % Models the receiver-side RF chain that is currently implemented.
     % Today the actively connected stages, in order, are:
@@ -45,6 +46,9 @@ classdef RRFSimulator < matlab.System
 
         function IQImbalance = genIqImbalance(obj)
             % Generates IQ imbalance function handle
+            % 中文说明：genIqImbalance 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % Returns:
             %   IQImbalance: Function handle that applies amplitude (A) and phase (P) imbalance
             %                to the input signal using the iqimbal function
@@ -55,6 +59,9 @@ classdef RRFSimulator < matlab.System
 
         function LowerNoiseAmplifier = genLowerPowerAmplifier(obj)
             %GENLOWERPOWERAMPLIFIER Build a comm.MemorylessNonlinearity
+            % 中文说明：genLowerPowerAmplifier 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % System object for the LNA stage. The implementation follows
             % the official MATLAB documentation Dependencies table for
             % `comm.MemorylessNonlinearity`: each Method only has its
@@ -101,6 +108,10 @@ classdef RRFSimulator < matlab.System
         end
 
         function args = assembleCubicPolynomialArgs(~, cfg)
+            % assembleCubicPolynomialArgs - Production declaration in CSRD.
+            % 中文说明：assembleCubicPolynomialArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', 'Cubic polynomial', ...
                 'LinearGain', cfg.LinearGain, ...
                 'TOISpecification', cfg.TOISpecification};
@@ -122,6 +133,10 @@ classdef RRFSimulator < matlab.System
         end
 
         function args = assembleHyperbolicTangentArgs(~, cfg)
+            % assembleHyperbolicTangentArgs - Production declaration in CSRD.
+            % 中文说明：assembleHyperbolicTangentArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', 'Hyperbolic tangent', ...
                 'LinearGain',      cfg.LinearGain, ...
                 'IIP3',            cfg.IIP3, ...
@@ -131,6 +146,10 @@ classdef RRFSimulator < matlab.System
         end
 
         function args = assembleSalehGhorbaniArgs(~, cfg, methodName)
+            % assembleSalehGhorbaniArgs - Production declaration in CSRD.
+            % 中文说明：assembleSalehGhorbaniArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', methodName, ...
                 'InputScaling',  cfg.InputScaling, ...
                 'AMAMParameters', cfg.AMAMParameters, ...
@@ -139,6 +158,10 @@ classdef RRFSimulator < matlab.System
         end
 
         function args = assembleModifiedRappArgs(~, cfg)
+            % assembleModifiedRappArgs - Production declaration in CSRD.
+            % 中文说明：assembleModifiedRappArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', 'Modified Rapp model', ...
                 'LinearGain',            cfg.LinearGain, ...
                 'Smoothness',            cfg.Smoothness, ...
@@ -149,6 +172,10 @@ classdef RRFSimulator < matlab.System
         end
 
         function args = assembleLookupTableArgs(~, cfg)
+            % assembleLookupTableArgs - Production declaration in CSRD.
+            % 中文说明：assembleLookupTableArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if ~isfield(cfg, 'Table') || isempty(cfg.Table) || size(cfg.Table, 2) ~= 3
                 error('RRFSimulator:InvalidLookupTable', ...
                     ['Lookup table requires an Nx3 [Pin_dBm, Pout_dBm, ' ...
@@ -160,6 +187,9 @@ classdef RRFSimulator < matlab.System
 
         function ThermalNoise = genThermalNoise(obj)
             % Generates thermal noise object with specified parameters
+            % 中文说明：genThermalNoise 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % Returns:
             %   ThermalNoise: Configured thermal noise generator object
             ThermalNoise = comm.ThermalNoise( ...
@@ -170,6 +200,9 @@ classdef RRFSimulator < matlab.System
 
         function SampleShifter = genSampleShifter(obj)
             % Generates the ADC sample-rate-offset object.
+            % 中文说明：genSampleShifter 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % Offset is in ppm (parts per million); 0 ppm is a no-op
             % (identity) and therefore safe to instantiate unconditionally.
             SampleShifter = comm.SampleRateOffset( ...
@@ -182,6 +215,9 @@ classdef RRFSimulator < matlab.System
 
         function obj = RRFSimulator(varargin)
             % Constructor for RRFSimulator
+            % 中文说明：RRFSimulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % Args:
             %   varargin: Name-value pairs for setting object properties
             setProperties(obj, nargin, varargin{:});
@@ -192,6 +228,10 @@ classdef RRFSimulator < matlab.System
     methods (Access = protected)
 
         function setupImpl(obj, ~)
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.LowerPowerAmplifier = obj.genLowerPowerAmplifier;
             obj.ThermalNoise = obj.genThermalNoise;
             obj.IQImbalance = obj.genIqImbalance;
@@ -200,6 +240,9 @@ classdef RRFSimulator < matlab.System
 
         function outputSignal = stepImpl(obj, inputSignal)
             % stepImpl - Apply receiver RF impairments to a pre-combined signal.
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Signal combination is performed upstream in
             % processReceiverProcessing. The active impairment chain is:

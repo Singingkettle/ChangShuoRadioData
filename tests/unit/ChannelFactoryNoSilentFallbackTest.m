@@ -7,9 +7,8 @@ classdef ChannelFactoryNoSilentFallbackTest < matlab.unittest.TestCase
     %
     %   Phase 2 removes the historical fallback that picked an arbitrary
     %   field of factoryConfig.ChannelModels whenever resolution could
-    %   not land on the requested model, the mode default, or AWGN. The
-    %   declarative AWGN fallback is intentionally kept; only the
-    %   "first key wins" mystery branch is deleted. After the deletion,
+    %   not land on the requested model or the explicit mode default. Phase
+    %   18 removes the declarative AWGN rescue as well. After the deletion,
     %   any blueprint that asks for a non-existent model AND lacks an
     %   AWGN registry entry must fail fast with
     %   CSRD:Blueprint:ChannelModelMismatch — the same identifier the
@@ -24,7 +23,7 @@ classdef ChannelFactoryNoSilentFallbackTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function silenceLogger(~)
             try
-                csrd.utils.logger.GlobalLogManager.setLevel('error');
+                csrd.runtime.logger.GlobalLogManager.setLevel('error');
             catch
             end
         end
@@ -47,12 +46,11 @@ classdef ChannelFactoryNoSilentFallbackTest < matlab.unittest.TestCase
             testCase.verifyEqual(modelName, 'AWGN');
         end
 
-        function unknownModelWithAwgnInRegistryFallsBackToAwgn(testCase)
-            % Declarative AWGN fallback is intentionally retained.
+        function unknownModelWithAwgnInRegistryFailsFast(testCase)
             cfg = makeRegistryWithRayTracingAndAWGN();
-            modelName = csrd.factories.ChannelFactory ...
-                .resolveChannelModelNameFromConfig('UnknownXYZ', '', cfg);
-            testCase.verifyEqual(modelName, 'AWGN');
+            testCase.verifyError(@() csrd.factories.ChannelFactory ...
+                .resolveChannelModelNameFromConfig('UnknownXYZ', '', cfg), ...
+                'CSRD:Blueprint:ChannelModelMismatch');
         end
 
         function unknownModelWithoutAwgnRaisesChannelModelMismatch(testCase)
@@ -90,7 +88,9 @@ classdef ChannelFactoryNoSilentFallbackTest < matlab.unittest.TestCase
         end
 
         function getDefaultModelForModeFromConfigUsesModeKey(testCase)
-            cfg = struct('ChannelModels', struct('AWGN', struct()), ...
+            cfg = struct('ChannelModels', struct('AWGN', struct(), ...
+                                                 'RayTracing', struct(), ...
+                                                 'Rician', struct()), ...
                         'DefaultModels', struct('RayTracing', 'RayTracing', 'Statistical', 'Rician'));
             testCase.verifyEqual( ...
                 csrd.factories.ChannelFactory ...
@@ -102,15 +102,11 @@ classdef ChannelFactoryNoSilentFallbackTest < matlab.unittest.TestCase
                 'Rician');
         end
 
-        function getDefaultModelForModeFromConfigFallsBackToAwgn(testCase)
-            % If neither the mode key nor a Statistical default exists,
-            % the static helper returns 'AWGN' as the last-ditch
-            % declarative default.
+        function getDefaultModelForModeFromConfigRequiresExplicitDefault(testCase)
             cfg = struct('ChannelModels', struct('AWGN', struct()));
-            testCase.verifyEqual( ...
-                csrd.factories.ChannelFactory ...
-                    .getDefaultModelForModeFromConfig('Whatever', cfg), ...
-                'AWGN');
+            testCase.verifyError(@() csrd.factories.ChannelFactory ...
+                .getDefaultModelForModeFromConfig('Whatever', cfg), ...
+                'CSRD:Blueprint:MissingChannelDefaultModel');
         end
 
     end
@@ -120,7 +116,7 @@ end
 function cfg = makeRegistryWithRayTracingAndAWGN()
     %MAKEREGISTRYWITHRAYTRACINGANDAWGN A minimal factoryConfig that has
     %both a RayTracing and an AWGN entry so the resolution helper can
-    %exercise the "requested model is registered" and "AWGN fallback"
+    %exercise the "requested model is registered" and explicit default
     %branches without actually instantiating any channel block.
     cfg = struct();
     cfg.ChannelModels = struct( ...

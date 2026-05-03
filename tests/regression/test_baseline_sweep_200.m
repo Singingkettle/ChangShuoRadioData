@@ -61,7 +61,7 @@ function test_baseline_sweep_200(varargin)
     addpath(fileparts(mfilename('fullpath')));
 
     % --- 1. setupBaseline ------------------------------------------------
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
     runRoot = fullfile(projectRoot, 'artifacts', 'tests', 'runs', ...
         runLabel);
@@ -70,7 +70,7 @@ function test_baseline_sweep_200(varargin)
     end
     checkpointPath = fullfile(runRoot, checkpointFilename);
 
-    csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+    csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
 
     sweepLogDir = fullfile(runRoot, 'sweep_logs');
     if ~exist(sweepLogDir, 'dir')
@@ -81,8 +81,8 @@ function test_baseline_sweep_200(varargin)
         'Level', 'DEBUG', ...
         'SaveToFile', true, ...
         'DisplayInConsole', false);
-    csrd.utils.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
-    policy = csrd.utils.logger.policy.LogPolicy('Standard');
+    csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
+    policy = csrd.runtime.logger.policy.LogPolicy('Standard');
     policy.apply();
 
     rng(20260424, 'twister');
@@ -94,7 +94,7 @@ function test_baseline_sweep_200(varargin)
         numel(fullRecipe.Cohorts), numel(plan));
 
     % --- 3. master config baseline --------------------------------------
-    masterCfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
     % --- 4. per-scenario sweep ------------------------------------------
     perScenario = repmat(struct( ...
@@ -178,7 +178,7 @@ function test_baseline_sweep_200(varargin)
             rec = localPopulateRecordFromAnnotation(rec, annotationPath, ...
                 annotationStruct, scenarioCfg.Runner.Data.OutputDirectory);
         catch sweepErr
-            if csrd.utils.scenario.isScenarioSkipException(sweepErr)
+            if csrd.pipeline.scenario.isScenarioSkipException(sweepErr)
                 rec.Skipped = true;
                 rec.SkipReason = localShortSkipReason(sweepErr);
             elseif contains(sweepErr.message, 'ChannelBlock', 'IgnoreCase', true) ...
@@ -231,7 +231,7 @@ function test_baseline_sweep_200(varargin)
         mode, numScenarios, plan, metrics, sweepDuration, ...
         schemaVersion, runRecovery);
 
-    [clean, ~] = csrd.utils.annotation.sanitizeForJson(payload);
+    [clean, ~] = csrd.pipeline.annotation.sanitizeForJson(payload);
     txt = jsonencode(clean, 'PrettyPrint', true);
     fid = fopen(baselinePath, 'w');
     assert(fid ~= -1, ...
@@ -310,10 +310,8 @@ cfg.Runner.Data.OutputDirectory = fullfile(runRoot, ...
     sprintf('scenario_%06d', sid));
 cfg.Runner.Data.CompressData = false;
 
-cfg.Factories.Scenario.Global.NumFramesPerScenario = ...
-    cohort.NumFramesPerScenario;
-cfg.Factories.Scenario.Global.ObservationDuration = ...
-    cohort.ObservationDuration;
+cfg = csrd.test_support.applyCanonicalFrameContract( ...
+    cfg, cohort.ObservationDuration, cohort.NumFramesPerScenario);
 
 cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = cohort.MapTypes;
 cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = cohort.MapRatio;
@@ -364,16 +362,20 @@ if isfield(cohort, 'CohortMaxSpeedMps') && cohort.CohortMaxSpeedMps > 0
         .Receivers.Mobility.MaxSpeedMps = cohortMaxSpeed;
 end
 
-% Phase 4 (audit §3.8.B): cohort-driven channel preference. When the
-% cohort pins a channel model (e.g. 'AWGN' for the high-speed cohort
-% so the wallclock budget isn't blown by ray tracing), broadcast it
-% to every Channel.Type slot. Empty preference = no override.
+% Phase 12: cohort-driven channel preference must use the existing
+% scenario map ChannelModel contract. The previous channel-factory
+% preference field was never consumed, so writing it here only made the
+% cohort name lie about the channel actually used.
 if isfield(cohort, 'ChannelPreference') && ~isempty(cohort.ChannelPreference)
     channelPref = char(cohort.ChannelPreference);
-    if ~isfield(cfg.Factories, 'Channel')
-        cfg.Factories.Channel = struct();
+    if any(strcmp(cohort.MapTypes, 'Statistical'))
+        cfg.Factories.Scenario.PhysicalEnvironment.Map ...
+            .Statistical.ChannelModel = channelPref;
     end
-    cfg.Factories.Channel.PreferredType = channelPref;
+    if any(strcmp(cohort.MapTypes, 'OSM'))
+        cfg.Factories.Scenario.PhysicalEnvironment.Map ...
+            .OSM.ChannelModel = channelPref;
+    end
 end
 end
 
@@ -388,7 +390,7 @@ function [annotationPath, annotationStruct] = localRunOneScenario(cfg, sid)
 % annotation), we reset the GlobalLogManager so each runner spins up a
 % fresh session directory, and we always read back the runner's
 % canonical `scenario_000001_annotation.json` filename.
-csrd.utils.logger.GlobalLogManager.reset();
+csrd.runtime.logger.GlobalLogManager.reset();
 bootstrapLog = struct( ...
     'Name', sprintf('CSRD-Phase0-Baseline-S%06d', sid), ...
     'Level', 'DEBUG', ...
@@ -400,8 +402,8 @@ bootstrapLog = struct( ...
 % Using the per-sid OutputDirectory (rather than the shared sweep_logs
 % root) guarantees no two scenarios collide on the 1-second timestamp.
 perScenarioDir = cfg.Runner.Data.OutputDirectory;
-csrd.utils.logger.GlobalLogManager.initialize(bootstrapLog, perScenarioDir);
-policy = csrd.utils.logger.policy.LogPolicy('Standard');
+csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, perScenarioDir);
+policy = csrd.runtime.logger.policy.LogPolicy('Standard');
 policy.apply();
 
 runner = csrd.SimulationRunner( ...
@@ -741,7 +743,7 @@ function rec = localScoreSource(rec, src)
 % AppliedSNRdB < SnrFloorDb are inherently unstable -- the noise floor
 % inside the receiver bandwidth dominates the in-band signal power, so
 % the peak-relative OBW estimator's threshold (-3 dBc, see
-% csrd.utils.measurement.obwActual) crosses the noise floor and cannot
+% csrd.pipeline.measurement.obwActual) crosses the noise floor and cannot
 % resolve the modulation edges reliably. Industry practice
 % (Keysight 89600 / R&S FSV operator
 % manuals) requires SNR >= 6 dB for the OBW reading to carry an

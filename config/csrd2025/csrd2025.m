@@ -1,5 +1,8 @@
 function config = csrd2025()
     % csrd2025 - CSRD2025 dataset configuration example
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 csrd2025 实现。
     %
     % This example shows how to create modular configuration
     % by inheriting from base configurations and overriding specific settings.
@@ -17,7 +20,6 @@ function config = csrd2025()
 
     % Runner configuration - matches initialize_csrd_configuration.m structure
     config.Runner.NumScenarios = 4; % Total number of scenarios to execute
-    config.Runner.FixedFrameLength = 1024; % Fixed length for all generated data frames
     config.Runner.RandomSeed = 'shuffle'; % Random seed for reproducibility
     config.Runner.SimulationMode = 'Scenario-Driven'; % Execution mode
     config.Runner.ValidationLevel = 'Moderate'; % Validation strictness

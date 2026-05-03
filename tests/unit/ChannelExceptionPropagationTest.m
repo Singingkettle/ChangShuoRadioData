@@ -51,7 +51,7 @@ classdef ChannelExceptionPropagationTest < matlab.unittest.TestCase
             try
                 error(identifier, '%s', message);
             catch ME_channel
-                if csrd.utils.scenario.isScenarioSkipException(ME_channel)
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_channel)
                     rethrow(ME_channel);
                 end
                 rethrow(ME_channel);

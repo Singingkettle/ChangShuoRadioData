@@ -23,21 +23,21 @@ function test_phase8_regulatory_region_matrix_smoke()
     if ~exist(runRoot, 'dir'); mkdir(runRoot); end
 
     for k = 1:numel(cases)
-        csrd.utils.logger.GlobalLogManager.reset();
+        csrd.runtime.logger.GlobalLogManager.reset();
         caseRoot = fullfile(runRoot, sprintf('%02d_%s', k, cases(k).RegionId));
         if ~exist(caseRoot, 'dir'); mkdir(caseRoot); end
-        csrd.utils.logger.GlobalLogManager.initialize(struct( ...
+        csrd.runtime.logger.GlobalLogManager.initialize(struct( ...
             'Name', sprintf('CSRD-Phase8-%s', cases(k).RegionId), ...
             'Level', 'WARNING', ...
             'SaveToFile', true, ...
             'DisplayInConsole', false), caseRoot);
-        policy = csrd.utils.logger.policy.LogPolicy('Standard');
+        policy = csrd.runtime.logger.policy.LogPolicy('Standard');
         policy.apply();
 
         rng(20260428 + k, 'twister');
         cfg = localConfig(projectRoot, caseRoot, cases(k), k);
         annotationPath = localRunOneScenario(cfg);
-        result = csrd.utils.annotation.readAnnotationV2(annotationPath, ...
+        result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
             'RequireSources', true, 'RequireRuntimeHeader', true);
         localAssertCase(result.Sources, cases(k));
     end
@@ -53,24 +53,23 @@ end
 
 
 function cfg = localConfig(~, outputRoot, c, idx)
-cfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 cfg.Runner.NumScenarios = 1;
 cfg.Runner.RandomSeed = 20260428 + idx;
 cfg.Runner.Toolbox.Level = 'minimal';
 cfg.Runner.Data.OutputDirectory = outputRoot;
 cfg.Runner.Data.CompressData = false;
-cfg.Factories.Channel.PreferredType = 'AWGN';
 
-cfg.Factories.Scenario.Global.NumFramesPerScenario = 1;
-cfg.Factories.Scenario.Global.ObservationDuration = 0.003;
 cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = {'Statistical'};
 cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1.0;
+cfg.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel = 'AWGN';
 cfg.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;
 cfg.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Max = 1;
 cfg.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Min = 1;
 cfg.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
 
 cfg.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate = 20e6;
+cfg = csrd.test_support.applyCanonicalFrameContract(cfg, 0.003, 1);
 cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
 cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = 1;
 cfg.Factories.Scenario.CommunicationBehavior.Regulatory.Enable = true;

@@ -560,10 +560,13 @@ function records = runPhase9Suite(testsDir, verbose)
     addpath(fullfile(testsDir, 'regression'));
     records = [];
 
-    phase9Unit = {'AllModulationFactorySmokeTest'};
+    phase9Unit = {'AllModulationFactorySmokeTest', ...
+        'RFPropagationCapabilitiesTest'};
     records = appendUnittestClasses(records, phase9Unit, 'phase9', verbose);
 
-    phase9Reg = {'test_simulation_entrypoint_coverage_sweep'};
+    phase9Reg = {'test_phase13_full_coverage_config_load', ...
+        'test_no_dead_code_phase15_architecture', ...
+        'test_simulation_entrypoint_coverage_sweep'};
     records = appendRegressionTests(records, phase9Reg, 'phase9', verbose);
 end
 

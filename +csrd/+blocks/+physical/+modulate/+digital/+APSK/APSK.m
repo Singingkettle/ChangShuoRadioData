@@ -1,5 +1,6 @@
 classdef APSK < csrd.blocks.physical.modulate.BaseModulator
     % APSK - Amplitude and Phase Shift Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 APSK 实现。
     %
     % This class implements APSK (Amplitude and Phase Shift Keying) modulation
     % with configurable parameters including multiple rings, phase offsets,
@@ -38,6 +39,9 @@ classdef APSK < csrd.blocks.physical.modulate.BaseModulator
 
         function [y, bw] = baseModulator(obj, x)
             % baseModulator - Implements APSK modulation with pulse shaping
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   [y, bw] = baseModulator(obj, x)
@@ -77,6 +81,9 @@ classdef APSK < csrd.blocks.physical.modulate.BaseModulator
 
         function filterCoeffs = genFilterCoeffs(obj)
             % genFilterCoeffs - Generates raised cosine filter coefficients
+            % 中文说明：genFilterCoeffs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   filterCoeffs = genFilterCoeffs(obj)
@@ -95,6 +102,9 @@ classdef APSK < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Configures and returns modulator function
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   modulatorHandle = genModulatorHandle(obj)
@@ -151,6 +161,9 @@ end
 
 function x = randomSumAsSpecifiedValue(s, n, isInteger)
     % randomSumAsSpecifiedValue - Generates random values summing to specified total
+    % 中文说明：randomSumAsSpecifiedValue 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Syntax:
     %   x = randomSumAsSpecifiedValue(s, n, isInteger)

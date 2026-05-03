@@ -43,8 +43,8 @@ function test_measured_truth_coverage(varargin)
     addpath(projectRoot);
     addpath(fileparts(mfilename('fullpath')));
 
-    csrd.utils.logger.GlobalLogManager.reset();
-    csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+    csrd.runtime.logger.GlobalLogManager.reset();
+    csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
 
     runRoot = fullfile(projectRoot, 'artifacts', 'tests', 'runs', ...
         'phase4_measured_truth_coverage');
@@ -58,15 +58,15 @@ function test_measured_truth_coverage(varargin)
         'Level', 'WARNING', ...
         'SaveToFile', true, ...
         'DisplayInConsole', false);
-    csrd.utils.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
-    policy = csrd.utils.logger.policy.LogPolicy('Standard');
+    csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, sweepLogDir);
+    policy = csrd.runtime.logger.policy.LogPolicy('Standard');
     policy.apply();
 
     rng(20260427, 'twister');
 
     fullRecipe = baseline_recipe_v0();
     plan = localExpandRecipe(fullRecipe, numScenarios);
-    masterCfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
     sourcePlaneFields = { ...
         'OccupiedBandwidthHz', 'SNRdB', 'TimeOccupancy', 'FrequencyOccupancy'};
@@ -302,10 +302,8 @@ function cfg = localApplyCohort(masterCfg, cohort, runRoot, sid)
         sprintf('scenario_%06d', sid));
     cfg.Runner.Data.CompressData = false;
 
-    cfg.Factories.Scenario.Global.NumFramesPerScenario = ...
-        cohort.NumFramesPerScenario;
-    cfg.Factories.Scenario.Global.ObservationDuration = ...
-        cohort.ObservationDuration;
+    cfg = csrd.test_support.applyCanonicalFrameContract( ...
+        cfg, cohort.ObservationDuration, cohort.NumFramesPerScenario);
 
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = cohort.MapTypes;
     cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = cohort.MapRatio;
@@ -342,10 +340,15 @@ function cfg = localApplyCohort(masterCfg, cohort, runRoot, sid)
     end
 
     if isfield(cohort, 'ChannelPreference') && ~isempty(cohort.ChannelPreference)
-        if ~isfield(cfg.Factories, 'Channel')
-            cfg.Factories.Channel = struct();
+        channelPref = char(cohort.ChannelPreference);
+        if any(strcmp(cohort.MapTypes, 'Statistical'))
+            cfg.Factories.Scenario.PhysicalEnvironment.Map ...
+                .Statistical.ChannelModel = channelPref;
         end
-        cfg.Factories.Channel.PreferredType = char(cohort.ChannelPreference);
+        if any(strcmp(cohort.MapTypes, 'OSM'))
+            cfg.Factories.Scenario.PhysicalEnvironment.Map ...
+                .OSM.ChannelModel = channelPref;
+        end
     end
 end
 

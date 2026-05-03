@@ -1,5 +1,8 @@
 function results = run_csrd_ci_smoke(varargin)
 %RUN_CSRD_CI_SMOKE Local entry point for the Phase 5 CI smoke gate.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 run_csrd_ci_smoke 实现。
 
 p = inputParser;
 addParameter(p, 'IncludePhase4', true, @islogical);

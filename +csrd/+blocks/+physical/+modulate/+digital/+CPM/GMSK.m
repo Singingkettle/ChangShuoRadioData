@@ -1,5 +1,6 @@
 classdef GMSK < csrd.blocks.physical.modulate.digital.FSK.FSK
     % GMSK - Gaussian Minimum Shift Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 GMSK 实现。
     %
     % This class implements Gaussian Minimum Shift Keying (GMSK) modulation as a
     % subclass of the FSK modulator. GMSK is a special case of Continuous Phase
@@ -86,6 +87,9 @@ classdef GMSK < csrd.blocks.physical.modulate.digital.FSK.FSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured GMSK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the GMSK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation

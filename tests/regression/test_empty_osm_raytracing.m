@@ -5,7 +5,7 @@ function test_empty_osm_raytracing()
 
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
     fixtureDir = fullfile(projectRoot, 'tmp_empty_osm_raytracing');
     if ~exist(fixtureDir, 'dir')
@@ -23,17 +23,17 @@ function test_empty_osm_raytracing()
     writeTextFile(buildingPartOsm, sprintf(['<?xml version="1.0" encoding="UTF-8"?>\n', ...
         '<osm version="0.6"><way id="2"><tag k="building:part" v="yes"/></way></osm>\n']));
 
-    assert(~csrd.utils.osmHasBuildings(emptyOsm), 'Empty OSM should not report buildings.');
-    assert(csrd.utils.osmHasBuildings(buildingOsm), 'OSM building tag should be detected.');
-    assert(csrd.utils.osmHasBuildings(buildingPartOsm), 'OSM building:part tag should be detected.');
-    assert(~csrd.utils.osmHasBuildings(fullfile(fixtureDir, 'missing.osm')), 'Missing OSM should return false.');
+    assert(~csrd.runtime.map.osmHasBuildings(emptyOsm), 'Empty OSM should not report buildings.');
+    assert(csrd.runtime.map.osmHasBuildings(buildingOsm), 'OSM building tag should be detected.');
+    assert(csrd.runtime.map.osmHasBuildings(buildingPartOsm), 'OSM building:part tag should be detected.');
+    assert(~csrd.runtime.map.osmHasBuildings(fullfile(fixtureDir, 'missing.osm')), 'Missing OSM should return false.');
     fprintf('  [OK] OSM building detection.\n');
 
-    masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     masterConfig.Log.Level = 'ERROR';
     masterConfig.Log.SaveToFile = false;
     masterConfig.Log.DisplayInConsole = false;
-    csrd.utils.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
 
     physConfig = masterConfig.Factories.Scenario.PhysicalEnvironment;
     physConfig.Environment.MapType = 'OSM';
@@ -60,8 +60,7 @@ function test_empty_osm_raytracing()
 
     mc = masterConfig;
     mc.Runner.NumScenarios = 1;
-    mc.Factories.Scenario.Global.NumFramesPerScenario = 1;
-    mc.Factories.Scenario.Global.ObservationDuration = 0.005;
+    mc = csrd.test_support.applyCanonicalFrameContract(mc, 0.005, 1);
     mc.Factories.Scenario.PhysicalEnvironment.Map.Types = {'OSM'};
     mc.Factories.Scenario.PhysicalEnvironment.Map.Ratio = [1.0];
     mc.Factories.Scenario.PhysicalEnvironment.Map.OSM.SpecificFile = emptyOsm;

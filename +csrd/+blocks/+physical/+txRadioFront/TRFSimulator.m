@@ -1,5 +1,6 @@
 classdef TRFSimulator < matlab.System
     % TRFSimulator - Advanced Transmitter Radio Front-End Simulator
+    % 中文说明：提供 CSRD 生产链路中的 TRFSimulator 实现。
     %
     % This class implements a comprehensive transmitter radio front-end simulation
     % featuring advanced complex exponential frequency translation to replace traditional
@@ -8,14 +9,14 @@ classdef TRFSimulator < matlab.System
     % optimized signal generation.
     %
     % Key Features:
-    %   - Complex exponential frequency translation (replaces DUC)
+    %   - Target-rate complex exponential frequency translation (replaces DUC)
     %   - Configurable RF impairments (IQ imbalance, phase noise, nonlinearity)
     %   - Multi-antenna support with identical frequency translation
     %   - Flexible sample rate conversion only when needed
     %   - Power scaling and DC offset modeling
     %   - Receiver-centric target sample rate configuration
     %
-    % Technical References:
+    % References / 参考资料:
     %   - MATLAB Communications Toolbox QAM with RF Impairments example
     %   - USRP zero-IF design architecture (https://kb.ettus.com/UHD)
     %   - ORACLE paper: "Optimized Radio clAssification through Convolutional neuraL nEtworks"
@@ -87,8 +88,8 @@ classdef TRFSimulator < matlab.System
         BandWidth (1, 1) {mustBeReal} = 20e6
 
         % SampleRate: Input baseband sample rate in Hz
-        % Sample rate of the input baseband signal before frequency translation.
-        % Used for time vector generation in frequency translation.
+        % Sample rate of the modulator output before receiver-rate resampling.
+        % Frequency translation is performed after resampling to TargetSampleRate.
         % Default: 20 MHz (matching target sample rate for no resampling)
         SampleRate (1, 1) {mustBeReal} = 20e6
 
@@ -144,6 +145,9 @@ classdef TRFSimulator < matlab.System
 
         function iqImbalanceHandle = genIqImbalance(obj)
             % genIqImbalance - Generate IQ imbalance function handle
+            % 中文说明：genIqImbalance 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates a function handle that applies amplitude and phase imbalance
             % to simulate real-world quadrature demodulator imperfections. The
@@ -171,6 +175,9 @@ classdef TRFSimulator < matlab.System
 
         function phaseNoiseObject = genPhaseNoise(obj)
             % genPhaseNoise - Generate phase noise system object
+            % 中文说明：genPhaseNoise 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates and configures a Communications Toolbox phase noise system object
             % to model oscillator phase noise in the transmitter. The phase noise
@@ -214,6 +221,9 @@ classdef TRFSimulator < matlab.System
 
         function nonlinearityObject = genMemoryLessNonlinearity(obj)
             %GENMEMORYLESSNONLINEARITY Build a comm.MemorylessNonlinearity
+            % 中文说明：genMemoryLessNonlinearity 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % System object for the PA stage. The implementation follows
             % the official MATLAB documentation Dependencies table for
             % `comm.MemorylessNonlinearity`: only the property set declared
@@ -263,6 +273,10 @@ classdef TRFSimulator < matlab.System
         end
 
         function args = assembleCubicPolynomialArgs(~, cfg)
+            % assembleCubicPolynomialArgs - Production declaration in CSRD.
+            % 中文说明：assembleCubicPolynomialArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', 'Cubic polynomial', ...
                 'LinearGain', cfg.LinearGain, ...
                 'TOISpecification', cfg.TOISpecification};
@@ -284,6 +298,10 @@ classdef TRFSimulator < matlab.System
         end
 
         function args = assembleHyperbolicTangentArgs(~, cfg)
+            % assembleHyperbolicTangentArgs - Production declaration in CSRD.
+            % 中文说明：assembleHyperbolicTangentArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', 'Hyperbolic tangent', ...
                 'LinearGain',      cfg.LinearGain, ...
                 'IIP3',            cfg.IIP3, ...
@@ -293,6 +311,10 @@ classdef TRFSimulator < matlab.System
         end
 
         function args = assembleSalehGhorbaniArgs(~, cfg, methodName)
+            % assembleSalehGhorbaniArgs - Production declaration in CSRD.
+            % 中文说明：assembleSalehGhorbaniArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', methodName, ...
                 'InputScaling',  cfg.InputScaling, ...
                 'AMAMParameters', cfg.AMAMParameters, ...
@@ -301,6 +323,10 @@ classdef TRFSimulator < matlab.System
         end
 
         function args = assembleModifiedRappArgs(~, cfg)
+            % assembleModifiedRappArgs - Production declaration in CSRD.
+            % 中文说明：assembleModifiedRappArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             args = {'Method', 'Modified Rapp model', ...
                 'LinearGain',            cfg.LinearGain, ...
                 'Smoothness',            cfg.Smoothness, ...
@@ -311,6 +337,10 @@ classdef TRFSimulator < matlab.System
         end
 
         function args = assembleLookupTableArgs(~, cfg)
+            % assembleLookupTableArgs - Production declaration in CSRD.
+            % 中文说明：assembleLookupTableArgs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if ~isfield(cfg, 'Table') || isempty(cfg.Table) || size(cfg.Table, 2) ~= 3
                 error('TRFSimulator:InvalidLookupTable', ...
                     ['Lookup table requires an Nx3 [Pin_dBm, Pout_dBm, ' ...
@@ -322,6 +352,9 @@ classdef TRFSimulator < matlab.System
 
         function setupImpl(obj, ~)
             % setupImpl - Initialize transmitter radio front-end system components
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Sets up all necessary RF impairment models and system objects for
             % the transmitter chain. This method is called automatically when
@@ -338,6 +371,9 @@ classdef TRFSimulator < matlab.System
 
         function translatedSignal = frequencyTranslate(obj, inputSignal, targetFrequency, signalSampleRate)
             % frequencyTranslate - Apply complex exponential frequency translation
+            % 中文说明：frequencyTranslate 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Performs frequency translation using complex exponential multiplication
             % to replace traditional DUC interpolation. This approach provides clean
@@ -394,6 +430,9 @@ classdef TRFSimulator < matlab.System
 
         function resampledSignal = resampleToTarget(obj, inputSignal, inputSampleRate)
             % resampleToTarget - Resample signal to target sample rate when needed
+            % 中文说明：resampleToTarget 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Performs sample rate conversion to match the target sample rate only
             % when necessary. If the input sample rate already matches the target,
@@ -410,38 +449,51 @@ classdef TRFSimulator < matlab.System
             %   resampledSignal - Signal resampled to target sample rate [samples x antennas]
             %
             % Resampling Method:
-            %   Uses rational resampling with optimized P/Q ratio calculation
-            %   for efficient sample rate conversion. Multi-antenna signals
-            %   are resampled column-wise to maintain antenna relationships.
+            %   Uses rational resampling only when the resolved P/Q reaches
+            %   the target rate within the runtime truth tolerance. A failed
+            %   conversion is a hard error because the downstream time grid
+            %   and annotations are defined at TargetSampleRate.
             %
             % Performance Optimization:
             %   - No resampling when input rate equals target rate
             %   - Efficient rational resampling using resample() function
             %   - Column-wise processing for multi-antenna signals
 
-            if inputSampleRate == obj.TargetSampleRate
+            if ~isnumeric(inputSampleRate) || ~isscalar(inputSampleRate) || ...
+                    ~isfinite(inputSampleRate) || inputSampleRate <= 0
+                error('CSRD:TRF:InvalidInputSampleRate', ...
+                    'inputSampleRate must be a positive finite scalar.');
+            end
+            targetSampleRate = obj.TargetSampleRate;
+            if ~isnumeric(targetSampleRate) || ~isscalar(targetSampleRate) || ...
+                    ~isfinite(targetSampleRate) || targetSampleRate <= 0
+                error('CSRD:TRF:InvalidTargetSampleRate', ...
+                    'TargetSampleRate must be a positive finite scalar.');
+            end
+
+            relRateDelta = abs(inputSampleRate - targetSampleRate) / targetSampleRate;
+            if relRateDelta <= 1e-12
                 resampledSignal = inputSignal;
             else
-                % Use moderate tolerance to keep P/Q factors manageable
-                [upsampleFactor, downsampleFactor] = rat(obj.TargetSampleRate / inputSampleRate, 0.001);
-
-                % Cap P/Q to avoid extremely long FIR filters in resample()
-                maxFactor = 500;
-                if upsampleFactor > maxFactor || downsampleFactor > maxFactor
-                    scaleFactor = max(upsampleFactor, downsampleFactor) / maxFactor;
-                    upsampleFactor = max(1, round(upsampleFactor / scaleFactor));
-                    downsampleFactor = max(1, round(downsampleFactor / scaleFactor));
+                conversionRatio = targetSampleRate / inputSampleRate;
+                [upsampleFactor, downsampleFactor] = rat(conversionRatio, 1e-12);
+                actualOutputRate = inputSampleRate * upsampleFactor / downsampleFactor;
+                rateError = abs(actualOutputRate - targetSampleRate) / targetSampleRate;
+                if rateError > 1e-9
+                    error('CSRD:TRF:ResampleRatioError', ...
+                        ['Resolved resample P/Q=%d/%d gives %.12g Hz vs target ', ...
+                         '%.12g Hz (relative error %.3g).'], ...
+                        upsampleFactor, downsampleFactor, actualOutputRate, ...
+                        targetSampleRate, rateError);
                 end
 
-                % Ensure P/Q != 0 and recalculate actual output rate for validation
-                upsampleFactor = max(1, upsampleFactor);
-                downsampleFactor = max(1, downsampleFactor);
-                actualOutputRate = inputSampleRate * upsampleFactor / downsampleFactor;
-                rateError = abs(actualOutputRate - obj.TargetSampleRate) / obj.TargetSampleRate;
-                if rateError > 0.05
-                    warning('TRFSimulator:ResampleError', ...
-                        'Resample P/Q=%d/%d gives %.0f Hz vs target %.0f Hz (%.1f%% error)', ...
-                        upsampleFactor, downsampleFactor, actualOutputRate, obj.TargetSampleRate, rateError*100);
+                maxFactor = 50000;
+                if upsampleFactor > maxFactor || downsampleFactor > maxFactor
+                    error('CSRD:TRF:UnsupportedResampleRatio', ...
+                        ['Exact resample ratio %d/%d exceeds the supported ', ...
+                         'rational factor limit %d. Use an explicit upstream ', ...
+                         'sample-rate plan with a tractable rational ratio.'], ...
+                        upsampleFactor, downsampleFactor, maxFactor);
                 end
 
                 if size(inputSignal, 2) == 1
@@ -463,10 +515,13 @@ classdef TRFSimulator < matlab.System
 
         function outputSignal = stepImpl(obj, inputSignal)
             % stepImpl - Process input signal through complete transmitter RF chain
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Executes the complete transmitter radio front-end processing chain
-            % including RF impairments, complex exponential frequency translation,
-            % and sample rate conversion. This is the main processing method called
+            % including RF impairments, sample rate conversion, and complex
+            % exponential frequency translation. This is the main processing method called
             % when the system object is used as a function.
             %
             % Processing Chain:
@@ -474,8 +529,8 @@ classdef TRFSimulator < matlab.System
             %   2. Add DC offset to model transmitter bias and LO leakage
             %   3. Apply phase noise to simulate oscillator phase noise
             %   4. Apply memoryless nonlinearity to model power amplifier characteristics
-            %   5. Perform complex exponential frequency translation
-            %   6. Resample to target sample rate if needed
+            %   5. Resample to target sample rate if needed
+            %   6. Perform complex exponential frequency translation
             %   7. Apply final power scaling
             %
             % Syntax:
@@ -522,15 +577,18 @@ classdef TRFSimulator < matlab.System
             % Step 4: Apply memoryless nonlinearity to model power amplifier characteristics
             processedSignal = obj.MemoryLessNonlinearity(processedSignal);
 
-            % Step 5: Perform complex exponential frequency translation
-            frequencyTranslatedSignal = obj.frequencyTranslate(processedSignal, carrierFreq, inputSampleRate);
+            % Step 5: Resample to the receiver observation rate first.
+            % 中文说明：先升采样到接收机观测采样率，避免高频点在调制器低采样率下混叠。
+            resampledSignal = obj.resampleToTarget(processedSignal, inputSampleRate);
 
-            % Step 6: Resample to target sample rate if needed
-            resampledSignal = obj.resampleToTarget(frequencyTranslatedSignal, inputSampleRate);
+            % Step 6: Translate on the target-rate grid used by ReceiverView.
+            % 中文说明：频移必须在 TargetSampleRate 网格上执行，才能与标注中的频点一致。
+            frequencyTranslatedSignal = obj.frequencyTranslate( ...
+                resampledSignal, carrierFreq, obj.TargetSampleRate);
 
             % Step 7: Apply final power scaling to achieve desired transmission power
-            signalDuration = size(resampledSignal, 1) / obj.TargetSampleRate;
-            signalPower = mean(abs(resampledSignal(:)) .^ 2);
+            signalDuration = size(frequencyTranslatedSignal, 1) / obj.TargetSampleRate;
+            signalPower = mean(abs(frequencyTranslatedSignal(:)) .^ 2);
 
             % Convert dBm to linear power (Watts) and calculate scaling factor
             targetPowerWatts = 10 ^ (obj.TxPowerDb / 10) / 1000; % Convert dBm to Watts
@@ -539,7 +597,7 @@ classdef TRFSimulator < matlab.System
             else
                 scalingFactor = 1;
             end
-            finalSignal = resampledSignal * scalingFactor;
+            finalSignal = frequencyTranslatedSignal * scalingFactor;
 
             outputSignal = finalSignal;
 
@@ -551,6 +609,9 @@ classdef TRFSimulator < matlab.System
 
         function obj = TRFSimulator(varargin)
             % TRFSimulator - Constructor for transmitter radio front-end simulator
+            % 中文说明：TRFSimulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates a new TRFSimulator instance with configurable properties.
             % The constructor accepts name-value pairs for setting object properties

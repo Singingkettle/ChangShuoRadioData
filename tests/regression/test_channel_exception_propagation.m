@@ -6,7 +6,7 @@ function results = test_channel_exception_propagation()
 %     1. Channel block raises ``RayTracing:NoValidPaths`` (or any
 %        identifier containing the magic tokens).
 %     2. ``csrd.factories.ChannelFactory.stepImpl`` rethrows when
-%        ``csrd.utils.scenario.isScenarioSkipException`` matches.
+%        ``csrd.pipeline.scenario.isScenarioSkipException`` matches.
 %     3. ``processChannelPropagation`` rethrows.
 %     4. ``generateSingleFrame`` rethrows.
 %     5. ``SimulationRunner.runScenario`` catches and skips the scenario.
@@ -61,7 +61,7 @@ function testPredicateRecognisesAllSkipTokens()
         'CSRD:Map:NoBuildingData'};
     for k = 1:numel(skipIds)
         ME = MException(skipIds{k}, 'simulated %s', skipIds{k});
-        assert(csrd.utils.scenario.isScenarioSkipException(ME), ...
+        assert(csrd.pipeline.scenario.isScenarioSkipException(ME), ...
             sprintf('Predicate must accept %s', skipIds{k}));
     end
 end
@@ -74,7 +74,7 @@ function testPredicateIgnoresGenericIdentifiers()
         'CSRD:Whatever:Other'};
     for k = 1:numel(nonSkipIds)
         ME = MException(nonSkipIds{k}, 'msg');
-        assert(~csrd.utils.scenario.isScenarioSkipException(ME), ...
+        assert(~csrd.pipeline.scenario.isScenarioSkipException(ME), ...
             sprintf('Predicate must reject %s', nonSkipIds{k}));
     end
 end
@@ -141,7 +141,7 @@ function testUpstreamFilesUseSharedPredicate()
         fullfile(repoRoot, '+csrd', 'SimulationRunner.m'); ...
         fullfile(repoRoot, '+csrd', '+factories', 'ScenarioFactory.m')};
 
-    needle = 'csrd.utils.scenario.isScenarioSkipException';
+    needle = 'csrd.pipeline.scenario.isScenarioSkipException';
     for k = 1:numel(upstream)
         text = fileread(upstream{k});
         assert(contains(text, needle), ...
@@ -153,8 +153,8 @@ end
 % --- helpers --------------------------------------------------------------
 
 function factory = makeFactoryWithStub(mode)
-    csrd.utils.logger.GlobalLogManager.reset();
-    csrd.utils.logger.GlobalLogManager.initialize(struct( ...
+    csrd.runtime.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.initialize(struct( ...
         'Level', 'CRITICAL', ...
         'SaveToFile', false, ...
         'DisplayInConsole', false));
@@ -175,7 +175,7 @@ function releaseFactory(factory)
         release(factory);
     catch
     end
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 end
 
 

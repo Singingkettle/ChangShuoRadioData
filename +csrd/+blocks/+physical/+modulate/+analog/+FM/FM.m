@@ -1,5 +1,6 @@
 classdef FM < csrd.blocks.physical.modulate.BaseModulator
     % FM - Frequency Modulation Modulator
+    % 中文说明：提供 CSRD 生产链路中的 FM 实现。
     %
     % This class implements Frequency Modulation (FM) as a subclass of the BaseModulator.
     % FM is an analog modulation technique where the instantaneous frequency of the
@@ -47,6 +48,10 @@ classdef FM < csrd.blocks.physical.modulate.BaseModulator
     %   % Modulate the signal
     %   modulatedSignal = fmMod.step(audioSignal);
     %
+    % References / 参考资料:
+    %   - MathWorks obw occupied bandwidth documentation:
+    %     https://www.mathworks.com/help/signal/ref/obw.html
+    %
     % See also: csrd.blocks.physical.modulate.analog.PM.PM,
     %           csrd.blocks.physical.modulate.BaseModulator
 
@@ -54,6 +59,9 @@ classdef FM < csrd.blocks.physical.modulate.BaseModulator
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core FM modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs frequency modulation by integrating the message
             % signal and using it to modulate the instantaneous frequency of a
@@ -112,6 +120,9 @@ classdef FM < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured FM modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the FM modulator with default parameters if not
             % specified and returns a function handle for the complete modulation

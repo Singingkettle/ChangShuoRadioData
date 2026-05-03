@@ -65,6 +65,14 @@ classdef SetupReceiversFailFastTest < matlab.unittest.TestCase
             testCase.verifyError(f, 'CSRD:Construction:RxMissingPhysical');
         end
 
+        function missingVelocityRaisesRxMissingPhysical(testCase)
+            rx = SetupReceiversFailFastTest.makeMinimalRxPlan();
+            rx.Physical = rmfield(rx.Physical, 'Velocity');
+            f = @() csrd.core.ChangShuo.validateRxPlanIntoRxInfo( ...
+                rx, testCase.FRAME_ID, testCase.RX_IDX);
+            testCase.verifyError(f, 'CSRD:Construction:RxMissingPhysical');
+        end
+
         % ---------- Sad paths : Hardware -------------------------------
 
         function missingHardwareRaisesRxMissingHardware(testCase)
@@ -174,7 +182,8 @@ classdef SetupReceiversFailFastTest < matlab.unittest.TestCase
             % The smallest rxPlan that should pass Phase 3 validation.
             rx = struct();
             rx.EntityID = 'Rx1';
-            rx.Physical = struct('Position', [10, 20, 30]);
+            rx.Physical = struct('Position', [10, 20, 30], ...
+                'Velocity', [0, 0, 0]);
             rx.Hardware = struct('Type', 'Simulation', 'NumAntennas', 1);
             rx.Observation = struct( ...
                 'SampleRate', 40e6, ...

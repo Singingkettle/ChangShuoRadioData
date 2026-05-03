@@ -14,12 +14,12 @@ classdef RRFSimulatorTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
 
         function configureLogging(~)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             logCfg = struct( ...
                 'Level', 'ERROR', ...
                 'SaveToFile', false, ...
                 'DisplayInConsole', false);
-            csrd.utils.logger.GlobalLogManager.initialize(logCfg);
+            csrd.runtime.logger.GlobalLogManager.initialize(logCfg);
         end
 
     end
@@ -27,7 +27,7 @@ classdef RRFSimulatorTest < matlab.unittest.TestCase
     methods (TestMethodTeardown)
 
         function teardown(~)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
         end
 
     end

@@ -43,11 +43,11 @@ function summary = test_simulation_entrypoint_coverage_sweep(varargin)
         end
 
         configPath = localWriteConfig(generatedConfigRoot, projectRoot, mode, c, idx);
-        csrd.utils.logger.GlobalLogManager.reset();
+        csrd.runtime.logger.GlobalLogManager.reset();
         try
             simulation(1, 1, configPath);
         catch ME
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             if c.AllowEnvironmentSkip && localIsEnvironmentLimitation(ME)
                 fprintf('  [SKIP] %s: environment limitation: %s\n', ...
                     c.Name, ME.message);
@@ -56,10 +56,10 @@ function summary = test_simulation_entrypoint_coverage_sweep(varargin)
             end
             rethrow(ME);
         end
-        csrd.utils.logger.GlobalLogManager.reset();
+        csrd.runtime.logger.GlobalLogManager.reset();
 
         annotationPath = localFindAnnotation(projectRoot, mode, c);
-        result = csrd.utils.annotation.readAnnotationV2(annotationPath, ...
+        result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
             'RequireSources', true, 'RequireRuntimeHeader', true);
         caseCoverage = localAssertCaseResult(result, c);
         coverage = localMergeCoverage(coverage, caseCoverage);
@@ -155,8 +155,12 @@ if includeBuildingOSM && strcmp(mode, 'extended')
     c.SampleRateHz = 20e6;
     if isempty(c.OSMFile)
         c.SkipReason = 'no selected building OSM file found';
-    elseif exist('siteviewer', 'file') ~= 2 || exist('txsite', 'file') ~= 2
-        c.SkipReason = 'local MATLAB runtime lacks RF propagation site functions';
+    else
+        rfCaps = csrd.runtime.capabilities.rfPropagationCapabilities( ...
+            'OsmFile', c.OSMFile, 'RunSmoke', false);
+        if ~rfCaps.CanUseBuildingOsmRayTracing
+            c.SkipReason = rfCaps.SkipReason;
+        end
     end
     cases(end + 1) = c;
 end
@@ -275,8 +279,15 @@ fprintf(fid, 'config.Log.Level = ''ERROR'';\n');
 fprintf(fid, 'config.Log.SaveToFile = true;\n');
 fprintf(fid, 'config.Log.DisplayInConsole = false;\n\n');
 
+frameSamples = round(0.0015 * c.SampleRateHz);
+frameDuration = frameSamples / c.SampleRateHz;
 fprintf(fid, 'config.Factories.Scenario.Global.NumFramesPerScenario = 1;\n');
-fprintf(fid, 'config.Factories.Scenario.Global.ObservationDuration = 0.0015;\n');
+fprintf(fid, 'config.Factories.Scenario.Global.ObservationDuration = %.17g;\n', ...
+    frameDuration);
+fprintf(fid, 'config.Factories.Scenario.Global.FrameNumSamples = %d;\n', ...
+    frameSamples);
+fprintf(fid, 'config.Factories.Scenario.Global.FrameDuration = %.17g;\n', ...
+    frameDuration);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Types = {''%s''};\n', c.MapType);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1.0;\n');
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = %d;\n', c.TxCount);
@@ -428,7 +439,7 @@ assert(strcmp(char(reg.BandId), c.BandId), ...
     'Case %s expected BandId %s, got %s.', ...
     c.Name, c.BandId, char(reg.BandId));
 
-catalog = csrd.utils.spectrum.RegionSpectrumCatalog.load(c.RegionId);
+catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load(c.RegionId);
 bandIdx = find(strcmp({catalog.Bands.BandId}, c.BandId), 1, 'first');
 assert(~isempty(bandIdx), 'Catalog band not found: %s/%s.', c.RegionId, c.BandId);
 band = catalog.Bands(bandIdx);
@@ -516,7 +527,7 @@ end
 
 function types = localAllModulationTypes(projectRoot)
 addpath(projectRoot);
-cfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 types = {};
 categories = {'digital', 'analog'};
 for c = 1:numel(categories)

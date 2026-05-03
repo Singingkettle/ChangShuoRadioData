@@ -5,17 +5,17 @@ function test_osm_building_raytracing()
 
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
     buildingFiles = dir(fullfile(projectRoot, 'data', 'map', 'osm', 'Dense_Urban_Mid_Rise', '*.osm'));
     assert(~isempty(buildingFiles), 'No Dense_Urban_Mid_Rise OSM files found for smoke test.');
     buildingOsm = fullfile(buildingFiles(1).folder, buildingFiles(1).name);
 
-    masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     masterConfig.Log.Level = 'ERROR';
     masterConfig.Log.SaveToFile = false;
     masterConfig.Log.DisplayInConsole = false;
-    csrd.utils.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
 
     physConfig = masterConfig.Factories.Scenario.PhysicalEnvironment;
     physConfig.Environment.MapType = 'OSM';
@@ -38,8 +38,7 @@ function test_osm_building_raytracing()
 
     mc = masterConfig;
     mc.Runner.NumScenarios = 1;
-    mc.Factories.Scenario.Global.NumFramesPerScenario = 1;
-    mc.Factories.Scenario.Global.ObservationDuration = 0.005;
+    mc = csrd.test_support.applyCanonicalFrameContract(mc, 0.005, 1);
     mc.Factories.Scenario.PhysicalEnvironment.Map.Types = {'OSM'};
     mc.Factories.Scenario.PhysicalEnvironment.Map.Ratio = [1.0];
     mc.Factories.Scenario.PhysicalEnvironment.Map.OSM.SpecificFile = buildingOsm;

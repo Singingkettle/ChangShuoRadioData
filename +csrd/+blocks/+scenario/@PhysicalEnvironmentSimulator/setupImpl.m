@@ -1,11 +1,14 @@
 function setupImpl(obj)
     % setupImpl - Initialize physical environment and supporting systems
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 setupImpl 实现。
     %
     % Initializes the complete physical environment simulation including
     % geographical mapping, entity registry, mobility models, and
     % environmental factors for realistic scenario modeling.
 
-    obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+    obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
     obj.logger.debug('PhysicalEnvironmentSimulator setup starting...');
 
     % Initialize default configuration if not provided
@@ -18,8 +21,8 @@ function setupImpl(obj)
         obj.timeResolution = obj.Config.TimeResolution;
         obj.logger.debug('Time resolution set from config: %.3f seconds', obj.timeResolution);
     else
-        obj.timeResolution = 0.1; % Default fallback
-        obj.logger.debug('Using default time resolution: %.3f seconds', obj.timeResolution);
+        error('CSRD:PhysicalEnvironment:MissingTimeResolution', ...
+            'PhysicalEnvironmentSimulator.Config.TimeResolution is required.');
     end
 
     % Initialize core components
