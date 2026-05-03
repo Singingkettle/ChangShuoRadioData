@@ -1,5 +1,8 @@
 function config = channel_factory()
     % channel_factory - Channel factory configuration
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 channel_factory 实现。
     %
     % Channel propagation models for CSRD framework.
 
@@ -44,18 +47,8 @@ function config = channel_factory()
     config.Factories.Channel.ChannelModels.MultiPath.Config.AveragePathGains = [0, -3, -6, -9]; % dB
     config.Factories.Channel.ChannelModels.MultiPath.Config.Seed = 73;
 
-    % --- PARAMETER RANGES FOR SCENARIO GENERATION ---
-
-    % Available channel types for scenario selection
-    config.Factories.Channel.Types = {'AWGN', 'Rayleigh', 'Rician', 'RayTracing', 'MultiPath'};
-
-    % SNR parameter ranges
-    config.Factories.Channel.SNR.Min = 0; % dB
-    config.Factories.Channel.SNR.Max = 30; % dB
-
     % --- PATH LOSS & LINK BUDGET PARAMETERS ---
     % Used by ChannelFactory to compute distance-based path loss and SNR
-    config.Factories.Channel.LinkBudget.CarrierFrequency = 2.4e9;   % Hz (default carrier)
     config.Factories.Channel.LinkBudget.NoiseBandwidth = 50e6;       % Hz (receiver bandwidth)
     config.Factories.Channel.LinkBudget.NoiseFigure = 6;             % dB (receiver noise figure)
     config.Factories.Channel.LinkBudget.ThermalNoisePSD = -174;      % dBm/Hz (kTB at 290K)
@@ -67,8 +60,4 @@ function config = channel_factory()
     config.Factories.Channel.DefaultModels.OSMBuildings = 'RayTracing';
     config.Factories.Channel.DefaultModels.FlatTerrain = 'RayTracing';
     config.Factories.Channel.NoValidPathFallback = 'FreeSpaceAttenuation';
-
-    % Configuration metadata
-    config.Factories.Channel.LogDetails = true;
-    config.Factories.Channel.Description = 'Channel propagation factory configuration with multiple channel models';
 end

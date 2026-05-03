@@ -13,7 +13,7 @@ classdef ScenarioFactoryResampleLoopTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function silenceLogger(~)
             try
-                csrd.utils.logger.GlobalLogManager.setLevel('error');
+                csrd.runtime.logger.GlobalLogManager.setLevel('error');
             catch
             end
         end
@@ -107,7 +107,7 @@ classdef ScenarioFactoryResampleLoopTest < matlab.unittest.TestCase
             env    = struct('MapType', 'Statistical');
 
             bp = f.assembleBlueprint(1, txConfigs, rxConfigs, layout, env);
-            report = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(bp);
+            report = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(bp);
             testCase.verifyTrue(report.IsFeasible, sprintf( ...
                 'golden-path blueprint should be feasible, but got %d failed checks', ...
                 report.NumChecksFailed));

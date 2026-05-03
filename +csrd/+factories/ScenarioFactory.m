@@ -1,5 +1,6 @@
 classdef ScenarioFactory < matlab.System
     % ScenarioFactory - Scenario instantiation and layout planning factory
+    % 中文说明：提供 CSRD 生产链路中的 ScenarioFactory 实现。
     %
     % This factory is responsible for instantiating specific scenarios based on
     % dual-component architecture: PhysicalEnvironment and CommunicationBehavior.
@@ -57,6 +58,9 @@ classdef ScenarioFactory < matlab.System
 
         function obj = ScenarioFactory(varargin)
             % ScenarioFactory - Constructor for scenario factory
+            % 中文说明：ScenarioFactory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   obj = ScenarioFactory()
@@ -75,10 +79,17 @@ classdef ScenarioFactory < matlab.System
     methods (Access = protected)
 
         function validateInputsImpl(~, ~)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
             % setupImpl - Initialize scenario factory components
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % DESIGN PRINCIPLE:
             %   ScenarioFactory receives ONLY its own config (scenario blueprint).
@@ -101,7 +112,7 @@ classdef ScenarioFactory < matlab.System
                 error('ScenarioFactory:ConfigError', 'CommunicationBehavior configuration required.');
             end
 
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             obj.validateMapConfiguration();
             obj.logger.debug('ScenarioFactory initialized: %s v%s', ...
                 obj.factoryConfig.Architecture, obj.factoryConfig.Version);
@@ -109,6 +120,9 @@ classdef ScenarioFactory < matlab.System
 
         function [instantiatedTxs, instantiatedRxs, globalLayout] = stepImpl(obj, frameId)
             % stepImpl - Generate scenario for a frame
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Phase 2 (audit §16.7 / phase-2-blueprint.md §3.4.6):
             %   1. Initialize physical environment + communication behaviour
@@ -148,8 +162,8 @@ classdef ScenarioFactory < matlab.System
             attempt = 0;
             lastReport = struct('IsFeasible', true, 'BlueprintHash', '', ...
                 'NumChecksRun', 0, 'NumChecksPassed', 0, 'NumChecksFailed', 0, ...
-                'FailedChecks', csrd.utils.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
-                'WarnChecks', csrd.utils.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
+                'FailedChecks', csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
+                'WarnChecks', csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
                 'Provenance', struct('ValidatorVersion', 'p2-disabled', 'Timestamp', ''));
 
             while true
@@ -164,7 +178,7 @@ classdef ScenarioFactory < matlab.System
 
                 blueprint = obj.assembleBlueprint(frameId, txConfigs, rxConfigs, ...
                     communicationLayout, environment);
-                lastReport = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(blueprint);
+                lastReport = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(blueprint);
 
                 if lastReport.IsFeasible
                     break;
@@ -226,6 +240,9 @@ classdef ScenarioFactory < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Release cached scenario planning blocks and simulators
+            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             obj.logger.debug('ScenarioFactory releaseImpl called.');
 
@@ -264,6 +281,9 @@ classdef ScenarioFactory < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Reset cached scenario planning blocks
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             obj.logger.debug('ScenarioFactory resetImpl called.');
             blockKeys = keys(obj.cachedScenarioBlocks);
@@ -287,6 +307,9 @@ classdef ScenarioFactory < matlab.System
 
         function initializeSimulators(obj)
             % initializeSimulators - Initialize simulators once per scenario
+            % 中文说明：initializeSimulators 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             obj.logger.debug('Initializing scenario simulators...');
 
@@ -295,8 +318,9 @@ classdef ScenarioFactory < matlab.System
             if strcmp(obj.selectedMapType, 'OSM')
                 obj.selectedOSMFile = obj.selectRandomOSMFile();
                 if isempty(obj.selectedOSMFile)
-                    obj.logger.warning('No OSM files available for OSM scenario selection. Falling back to Statistical mode.');
-                    obj.selectedMapType = 'Statistical';
+                    error('CSRD:Scenario:MissingOSMFile', ...
+                        ['Map type OSM was selected but no OSM file was found. ', ...
+                         'Provide Map.OSM.SpecificFile/DataDirectory or remove OSM from Map.Types.']);
                 end
             end
 
@@ -315,8 +339,8 @@ classdef ScenarioFactory < matlab.System
                 % already in the whitelist, so the legacy translation only
                 % obscured the original error provenance. We now rethrow as-is
                 % and let SimulationRunner / generateSingleFrame route via
-                % csrd.utils.scenario.isScenarioSkipException uniformly.
-                if csrd.utils.scenario.isScenarioSkipException(ME_phys)
+                % csrd.pipeline.scenario.isScenarioSkipException uniformly.
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_phys)
                     rethrow(ME_phys);
                 end
                 obj.logger.error('PhysicalEnvironment setup failed unexpectedly: %s (%s)', ...
@@ -334,6 +358,9 @@ classdef ScenarioFactory < matlab.System
 
         function mapType = selectMapTypeByRatio(obj)
             % selectMapTypeByRatio - Select map/channel modeling type based on configured ratios
+            % 中文说明：selectMapTypeByRatio 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Two approaches:
             %   Statistical: Virtual scene + statistical channel models
@@ -371,6 +398,10 @@ classdef ScenarioFactory < matlab.System
         end
 
         function validateMapConfiguration(obj)
+            % validateMapConfiguration - Production declaration in CSRD.
+            % 中文说明：validateMapConfiguration 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if ~isfield(obj.factoryConfig, 'PhysicalEnvironment') || ...
                     ~isfield(obj.factoryConfig.PhysicalEnvironment, 'Map')
                 return;
@@ -400,6 +431,9 @@ classdef ScenarioFactory < matlab.System
 
         function osmFile = selectRandomOSMFile(obj)
             % selectRandomOSMFile - Randomly select an OSM file
+            % 中文说明：selectRandomOSMFile 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Uses Map.OSM configuration:
             %   Map.OSM.SpecificFile - If set, use this file directly
@@ -453,6 +487,9 @@ classdef ScenarioFactory < matlab.System
 
         function osmFiles = findOSMFiles(obj, baseDir, pattern)
             % findOSMFiles - Recursively find OSM files in directory
+            % 中文说明：findOSMFiles 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Input Arguments:
             %   baseDir - Base directory to search
@@ -497,6 +534,9 @@ classdef ScenarioFactory < matlab.System
 
         function physicalEnvConfig = getPhysicalEnvironmentConfig(obj)
             % getPhysicalEnvironmentConfig - Extract physical environment configuration
+            % 中文说明：getPhysicalEnvironmentConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Applies selected map type (Statistical or OSM) and configures
             % appropriate boundaries and channel model settings.
@@ -572,6 +612,9 @@ classdef ScenarioFactory < matlab.System
 
         function commBehaviorConfig = getCommunicationBehaviorConfig(obj)
             % getCommunicationBehaviorConfig - Extract communication behavior configuration
+            % 中文说明：getCommunicationBehaviorConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             % Use configured CommunicationBehavior directly
             commBehaviorConfig = obj.factoryConfig.CommunicationBehavior;
@@ -602,6 +645,9 @@ classdef ScenarioFactory < matlab.System
 
         function storeFrameState(obj, frameId, entities, environment, txConfigs, rxConfigs)
             % storeFrameState - Store current frame state for next frame continuity
+            % 中文说明：storeFrameState 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             frameState = struct();
             frameState.entities = entities;
@@ -633,6 +679,9 @@ classdef ScenarioFactory < matlab.System
 
         function mergedConfig = mergeConfigs(obj, baseConfig, overrideConfig)
             % mergeConfigs - Merge two configuration structures
+            % 中文说明：mergeConfigs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method recursively merges configuration structures, with
             % overrideConfig taking precedence over baseConfig.
@@ -674,6 +723,10 @@ classdef ScenarioFactory < matlab.System
         % Phase 3 may demote these to (Access = protected) once integration
         % tests cover the full stepImpl path end-to-end.
         function [maxResamples, validatorEnabled] = getValidatorConfig(obj)
+            % getValidatorConfig - Production declaration in CSRD.
+            % 中文说明：getValidatorConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             maxResamples     = 50;
             validatorEnabled = true;
             if isfield(obj.factoryConfig, 'Validator')
@@ -689,6 +742,9 @@ classdef ScenarioFactory < matlab.System
 
         function applyTestConfig(obj, configStruct)
             % Test-only setter that bypasses the matlab.System
+            % 中文说明：applyTestConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % once-locked-property restriction. Used by unit tests to
             % drive the resample loop without spinning up the full
             % simulator stack.
@@ -698,6 +754,9 @@ classdef ScenarioFactory < matlab.System
         function blueprint = assembleBlueprint(obj, frameId, txConfigs, rxConfigs, ...
                 communicationLayout, environment)
             % assembleBlueprint - Phase 2 transitional schema (§3.4.3).
+            % 中文说明：assembleBlueprint 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % The struct is intentionally minimal: every field is OPTIONAL
             % from the Validator's perspective, and missing fields cause
@@ -747,6 +806,9 @@ classdef ScenarioFactory < matlab.System
 
         function isAbsolute = isAbsolutePath(pathStr)
             % isAbsolutePath - Check if a path is absolute
+            % 中文说明：isAbsolutePath 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This is a helper function to determine if a given path string
             % represents an absolute path, handling both Windows and Unix-style paths.

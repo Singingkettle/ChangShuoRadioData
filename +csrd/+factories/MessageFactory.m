@@ -1,4 +1,5 @@
 % MessageFactory - Advanced Message Generation Factory for Radio Communication Systems
+% 中文说明：提供 CSRD 生产链路中的 MessageFactory 实现。
 %
 % This class implements a sophisticated factory pattern for generating diverse
 % message types in radio communication simulations. The MessageFactory provides
@@ -94,7 +95,8 @@
 %   segmentInfo = struct();
 %   segmentInfo.SegmentId = 'Seg001';
 %   segmentInfo.Message.Length = 1000;
-%   segmentInfo.Message.SeedValue = 12345;
+%   segmentInfo.Message.SymbolRate = 100e3;
+%   segmentInfo.Message.Seed = 12345;
 %
 %   % Generate random bit message
 %   frameId = 1;
@@ -168,9 +170,11 @@
 %
 % See also: csrd.blocks.message.RandomBit, csrd.blocks.message.AudioSignal,
 %           csrd.core.ChangShuo, csrd.factories.ModulationFactory,
-%           csrd.utils.logger.Log
+%           csrd.runtime.logger.Log
 
 classdef MessageFactory < matlab.System
+    % MessageFactory - Production declaration in CSRD.
+    % 中文说明：MessageFactory 在 CSRD 生产链路中执行对应处理。
 
     properties
         % Config - Comprehensive message factory configuration structure
@@ -241,14 +245,14 @@ classdef MessageFactory < matlab.System
         % Replacement Approach:
         %   Instead of pre-configuring MessageInfos, pass parameters directly:
         %   segmentInfo.Message.Length = 1000;
-        %   segmentInfo.Message.SeedValue = 12345;
+        %   segmentInfo.Message.Seed = 12345;
         %   messageData = factory(frameId, segmentInfo, messageTypeID);
         % MessageInfos % Temporarily commented out during migration
     end
 
     properties (Access = private)
         % logger - Hierarchical logging framework instance
-        % Type: csrd.utils.logger.Log object
+        % Type: csrd.runtime.logger.Log object
         %
         % Provides comprehensive logging capabilities for message factory operations
         % including configuration validation, block instantiation, parameter management,
@@ -289,6 +293,9 @@ classdef MessageFactory < matlab.System
 
         function obj = MessageFactory(varargin)
             % MessageFactory - Constructor for advanced message generation factory
+            % 中文说明：MessageFactory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates a new MessageFactory instance with configurable message types,
             % caching strategies, and operational parameters. The constructor accepts
@@ -363,9 +370,17 @@ classdef MessageFactory < matlab.System
     methods (Access = protected)
 
         function validateInputsImpl(~, ~, ~, ~)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if isempty(obj.Config) || ~isstruct(obj.Config) || ~isfield(obj.Config, 'MessageTypes')
                 error('MessageFactory:ConfigError', 'Config property must be a valid struct with a MessageTypes field.');
@@ -373,7 +388,7 @@ classdef MessageFactory < matlab.System
 
             obj.factoryConfiguration = obj.Config; % The passed-in struct is the factory's config
 
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             obj.logger.debug('MessageFactory setupImpl initializing with directly passed config struct.');
 
@@ -395,17 +410,21 @@ classdef MessageFactory < matlab.System
 
         function messageData = stepImpl(obj, frameId, segmentInfo, messageTypeID)
             % segmentInfo is expected to contain per-segment details, like Message.Length
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % messageTypeID is the string key from Scenario.Transmitters.Segments.Message.TypeID,
             % e.g., "RandomBit"
 
-            % Accept either SegmentId (current) or SegmentID (legacy) for
-            % backwards compatibility while the codebase converges.
             if isfield(segmentInfo, 'SegmentId')
                 segmentIdLabel = segmentInfo.SegmentId;
             elseif isfield(segmentInfo, 'SegmentID')
-                segmentIdLabel = segmentInfo.SegmentID;
+                error('CSRD:Message:DeprecatedSegmentIDAlias', ...
+                    ['segmentInfo.SegmentID is forbidden after Phase 17. ', ...
+                     'Use segmentInfo.SegmentId.']);
             else
-                segmentIdLabel = '<unknown>';
+                error('CSRD:Message:MissingSegmentId', ...
+                    'segmentInfo.SegmentId is required.');
             end
 
             obj.logger.debug('Frame %d, SegID %s: MessageFactory step for TypeID: %s', ...
@@ -482,16 +501,15 @@ classdef MessageFactory < matlab.System
             % Simplistic approach: if block has properties matching fields in segmentMessageParams, set them.
             % This is generic. Specific blocks might have dedicated methods or a single struct input for step.
             %
-            % Reproducibility note: scenarios historically refer to the
-            % per-segment seed as ``SeedValue`` while message blocks
-            % (e.g. csrd.blocks.physical.message.RandomBit) expose the
-            % property as ``Seed``. The previous generic isprop loop
-            % silently dropped the value, breaking deterministic replay.
-            % We resolve aliases here so that scenario-defined seeds
-            % actually drive the underlying RNG. Reset-sensitive
-            % properties (like Seed) trigger a release/setup cycle so the
-            % new value actually re-initialises the random stream.
-            propAliases = struct('SeedValue', 'Seed');
+            if isfield(segmentMessageParams, 'SeedValue')
+                error('CSRD:Message:DeprecatedSeedValueAlias', ...
+                    ['Message.SeedValue is forbidden after Phase 17. ', ...
+                     'Use Message.Seed.']);
+            end
+
+            % Reset-sensitive properties (like Seed) trigger a
+            % release/setup cycle so the new value actually
+            % re-initialises the random stream.
             resetSensitiveProps = {'Seed', 'BitProbability'};
 
             propNames = fieldnames(segmentMessageParams);
@@ -502,12 +520,6 @@ classdef MessageFactory < matlab.System
                 value = segmentMessageParams.(propName);
 
                 targetName = propName;
-                if isfield(propAliases, propName) && ~isprop(currentMessageBlock, propName) ...
-                        && isprop(currentMessageBlock, propAliases.(propName))
-                    targetName = propAliases.(propName);
-                    obj.logger.debug('Mapping scenario field ''%s'' to block property ''%s'' on %s.', ...
-                        propName, targetName, class(currentMessageBlock));
-                end
 
                 if ~isprop(currentMessageBlock, targetName)
                     continue;
@@ -571,20 +583,26 @@ classdef MessageFactory < matlab.System
                 end
             end
 
-            symbolRate = 100e3;
-            if isfield(segmentMessageParams, 'SymbolRate')
+            if isfield(segmentMessageParams, 'SymbolRate') && ...
+                    isnumeric(segmentMessageParams.SymbolRate) && ...
+                    isscalar(segmentMessageParams.SymbolRate) && ...
+                    isfinite(segmentMessageParams.SymbolRate) && ...
+                    segmentMessageParams.SymbolRate > 0
                 symbolRate = segmentMessageParams.SymbolRate;
+            else
+                error('CSRD:Message:MissingSymbolRate', ...
+                    'Message.SymbolRate is required and must be a positive scalar.');
             end
 
-            if isfield(segmentMessageParams, 'Length') && segmentMessageParams.Length > 0
+            if isfield(segmentMessageParams, 'Length') && ...
+                    isnumeric(segmentMessageParams.Length) && ...
+                    isscalar(segmentMessageParams.Length) && ...
+                    isfinite(segmentMessageParams.Length) && ...
+                    segmentMessageParams.Length > 0
                 messageLength = segmentMessageParams.Length;
-            elseif isfield(segmentMessageParams, 'Duration') && isfield(segmentMessageParams, 'BitsPerSymbol')
-                messageLength = ceil(symbolRate * segmentMessageParams.BitsPerSymbol * segmentMessageParams.Duration * 1.1);
-                obj.logger.debug('Auto-calculated messageLength: %d from Duration=%.4f, BPS=%d, SymRate=%.0f', ...
-                    messageLength, segmentMessageParams.Duration, segmentMessageParams.BitsPerSymbol, symbolRate);
             else
-                messageLength = 1024;
-                obj.logger.warning('No Length or Duration/BitsPerSymbol provided; using default messageLength=%d', messageLength);
+                error('CSRD:Message:MissingLength', ...
+                    'Message.Length is required and must be a positive scalar.');
             end
             
             try
@@ -601,6 +619,10 @@ classdef MessageFactory < matlab.System
         end
 
         function releaseImpl(obj)
+            % releaseImpl - Production declaration in CSRD.
+            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('MessageFactory releaseImpl called.');
             blockKeys = keys(obj.cachedMessageBlocks);
 
@@ -618,6 +640,10 @@ classdef MessageFactory < matlab.System
         end
 
         function resetImpl(obj)
+            % resetImpl - Production declaration in CSRD.
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('MessageFactory resetImpl called.');
             blockKeys = keys(obj.cachedMessageBlocks);
 

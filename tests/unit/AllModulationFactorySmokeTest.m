@@ -6,15 +6,15 @@ classdef AllModulationFactorySmokeTest < matlab.unittest.TestCase
             projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
             addpath(projectRoot);
 
-            csrd.utils.logger.GlobalLogManager.reset();
-            cleanup = onCleanup(@() csrd.utils.logger.GlobalLogManager.reset()); %#ok<NASGU>
-            csrd.utils.logger.GlobalLogManager.initialize(struct( ...
+            csrd.runtime.logger.GlobalLogManager.reset();
+            cleanup = onCleanup(@() csrd.runtime.logger.GlobalLogManager.reset()); %#ok<NASGU>
+            csrd.runtime.logger.GlobalLogManager.initialize(struct( ...
                 'Name', 'CSRD-AllModulationFactorySmoke', ...
                 'Level', 'ERROR', ...
                 'SaveToFile', false, ...
                 'DisplayInConsole', false));
 
-            cfg = csrd.utils.config_loader('csrd2025/csrd2025.m');
+            cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
             modulationTypes = localConfiguredModulationTypes(cfg.Factories.Modulation);
             testCase.verifyGreaterThanOrEqual(numel(modulationTypes), 20, ...
                 'Expected the configured modulation catalog to remain broad.');

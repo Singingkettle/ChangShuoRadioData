@@ -1,5 +1,8 @@
 function config = scenario_factory()
     % scenario_factory - Scenario factory configuration (Blueprint)
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 scenario_factory 实现。
     %
     % This is the "blueprint" configuration that defines SCENARIO-LEVEL parameters.
     % 
@@ -35,10 +38,11 @@ function config = scenario_factory()
     %%                    GLOBAL TIME DOMAIN PARAMETERS
     %% ═══════════════════════════════════════════════════════════════════════
     
-    config.Factories.Scenario.Global.ObservationDuration = 1.0;      % seconds
+    config.Factories.Scenario.Global.ObservationDuration = 0.0002048; % seconds (10 frames * 1024 samples / 50 MHz)
     config.Factories.Scenario.Global.NumFramesPerScenario = 10;
     config.Factories.Scenario.Global.TimeResolution = 0.001;         % seconds
-    config.Factories.Scenario.Global.FrameLength = 1024;             % samples
+    config.Factories.Scenario.Global.FrameNumSamples = 1024;         % samples per receiver frame
+    config.Factories.Scenario.Global.FrameDuration = 2.048e-5;       % seconds per receiver frame
     
     %% ═══════════════════════════════════════════════════════════════════════
     %%                    PHYSICAL ENVIRONMENT (SPATIAL)
@@ -185,8 +189,6 @@ function config = scenario_factory()
     
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Scheduled.SlotDuration.Min = 0.005;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Scheduled.SlotDuration.Max = 0.02;
-    config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Scheduled.FrameLength.Min = 0.05;
-    config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Scheduled.FrameLength.Max = 0.2;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Scheduled.SlotsPerFrame.Min = 4;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Scheduled.SlotsPerFrame.Max = 16;
     
@@ -196,6 +198,10 @@ function config = scenario_factory()
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Random.DurationRatio.Max = 0.9;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Random.NumBursts.Min = 1;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Random.NumBursts.Max = 5;
+    % Explicit intervals are seconds inside the observation window. Use an
+    % Nx2 matrix for all transmitters or a cell array with one Nx2 matrix
+    % per transmitter. Empty means the Explicit mode is disabled.
+    config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Explicit.Intervals = [];
     
     % ===================== MODULATION (Legacy explicit-random path) =====================
     % In Phase 8 the default path is Regulatory.Enable=true, so modulation
@@ -211,6 +217,13 @@ function config = scenario_factory()
     % Symbol rate calculation parameters (used for bandwidth planning)
     config.Factories.Scenario.CommunicationBehavior.Modulation.RolloffFactor = 0.25;
     config.Factories.Scenario.CommunicationBehavior.Modulation.SamplesPerSymbol = 4;
+    % OFDM multi-antenna abstraction:
+    %   OSTBC keeps the historical spatial-diversity path;
+    %   SpatialMultiplexing uses comm.OFDMModulator's transmit-stream
+    %   dimension directly when validation needs independent antenna streams.
+    % OFDM 多天线抽象：OSTBC 保留历史空时分集路径；SpatialMultiplexing
+    % 直接使用 comm.OFDMModulator 的发射流维度，适合验证独立天线流。
+    config.Factories.Scenario.CommunicationBehavior.Modulation.OFDMMimoMode = 'OSTBC';
     
     % ===================== MESSAGE (Type selection only) =====================
     % Scenario selects TYPE from this list

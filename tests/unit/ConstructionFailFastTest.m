@@ -36,10 +36,29 @@ classdef ConstructionFailFastTest < matlab.unittest.TestCase
             testCase.verifyEqual(seg.Message.TypeID, 'RandomBit');
             testCase.verifyEqual(seg.Modulation.TypeID, 'PSK');
             testCase.verifyEqual(seg.Modulation.SymbolRate, 100e3);
+            testCase.verifyEqual(seg.Modulation.NumTransmitAntennas, 1);
             testCase.verifyEqual(seg.Placement.FrequencyOffset, -1.5e6);
             testCase.verifyEqual(seg.Placement.TargetBandwidth, 200e3);
             testCase.verifyEqual(seg.Placement.StartTime, 0);
             testCase.verifyGreaterThan(seg.Placement.Duration, 0);
+        end
+
+        function segmentMessageLengthUsesClippedDuration(testCase)
+            tx = ConstructionFailFastTest.makeMinimalTxScenario();
+            tx.Temporal.Intervals = [0.00, 0.50];
+            tx.TransmissionState.ActiveIntervalIndices = uint32(1);
+            tx.TransmissionState.ActiveIntervals = [0.10, 0.20];
+            tx.TransmissionState.FrameWindow = [0.10, 0.30];
+            tx.Message.Length = 999;
+            tx.Message.LengthMin = 64;
+            tx.Message.LengthMax = 50000;
+
+            seg = csrd.core.ChangShuo.buildSegmentConfigFromTxScenario(tx, 1);
+
+            testCase.verifyEqual(seg.Placement.StartTime, 0.10, 'AbsTol', 1e-12);
+            testCase.verifyEqual(seg.Placement.EndTime, 0.20, 'AbsTol', 1e-12);
+            testCase.verifyEqual(seg.Message.Length, 22000);
+            testCase.verifyEqual(seg.Message.LengthDerivation, 'PerSegmentDuration');
         end
 
         % ---------- buildSegmentConfigFromTxScenario : Message ---------
@@ -100,6 +119,13 @@ classdef ConstructionFailFastTest < matlab.unittest.TestCase
             tx.Modulation.SymbolRate = -1;
             f = @() csrd.core.ChangShuo.buildSegmentConfigFromTxScenario(tx, 1);
             testCase.verifyError(f, 'CSRD:Construction:MissingModulationSymbolRate');
+        end
+
+        function missingTxNumAntennasRaisesMissingTxNumAntennas(testCase)
+            tx = ConstructionFailFastTest.makeMinimalTxScenario();
+            tx.Hardware = rmfield(tx.Hardware, 'NumAntennas');
+            f = @() csrd.core.ChangShuo.buildSegmentConfigFromTxScenario(tx, 1);
+            testCase.verifyError(f, 'CSRD:Construction:MissingTxNumAntennas');
         end
 
         % ---------- buildSegmentConfigFromTxScenario : ReceiverViews ---
@@ -190,6 +216,7 @@ classdef ConstructionFailFastTest < matlab.unittest.TestCase
             tx.EntityID = 'Tx1';
             tx.Temporal = struct('Intervals', [0, 0.05]);
             tx.Message = struct('Type', 'RandomBit', 'Length', 1024);
+            tx.Hardware = struct('NumAntennas', 1);
             tx.Modulation = struct( ...
                 'Type', 'PSK', 'Order', 4, 'SymbolRate', 100e3, ...
                 'SamplesPerSymbol', 4, 'BitsPerSymbol', 2);

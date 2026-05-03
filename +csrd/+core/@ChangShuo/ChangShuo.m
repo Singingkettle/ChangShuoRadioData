@@ -1,5 +1,6 @@
 classdef ChangShuo < matlab.System
     % ChangShuo - Advanced Radio Communication Simulation Engine Core
+    % 中文说明：提供 CSRD 生产链路中的 ChangShuo 实现。
     %
     % This class implements the core simulation engine for the ChangShuoRadioData
     % (CSRD) framework, providing comprehensive radio communication system modeling
@@ -76,7 +77,7 @@ classdef ChangShuo < matlab.System
     %
     % See also: csrd.SimulationRunner, csrd.blocks.scenario.ParameterDrivenPlanner,
     %           csrd.factories.MessageFactory, csrd.factories.ModulationFactory,
-    %           csrd.utils.logger.Log
+    %           csrd.runtime.logger.Log
 
     properties
         % FactoryConfigs - Unified factory configuration structure
@@ -127,6 +128,9 @@ classdef ChangShuo < matlab.System
 
         function obj = ChangShuo(varargin)
             % ChangShuo - Constructor for radio communication simulation engine
+            % 中文说明：ChangShuo 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This constructor initializes the ChangShuo simulation engine with
             % optional property-value pairs for configuration. It sets up the
@@ -146,7 +150,7 @@ classdef ChangShuo < matlab.System
             %       .Receive    - Receiver RF impairments
 
             % Initialize integrated logging framework
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             obj.logger.debug('ChangShuo Engine Core Initializing...');
 
             % Set properties from name-value pairs
@@ -189,7 +193,6 @@ classdef ChangShuo < matlab.System
         % Message and modulation processing methods
         rawMessageStruct = generateSegmentMessage(obj, FrameId, currentTxId, segIdx, currentSegmentScenario)
         modulatedSignalSegment = modulateSegmentMessage(obj, FrameId, currentTxId, segIdx, currentSegmentScenario, rawMessageStruct)
-        updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo)
 
         % Impairment processing methods
         txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalSegments, TxInfos)
@@ -223,7 +226,7 @@ classdef ChangShuo < matlab.System
         % the v2 schema (TxID/SegmentId/BurstId/Truth/RFImpairments/
         % ReceiverView) plus the Truth.Measured.{SourcePlane,FramePlane}
         % required scalar keys. Throws CSRD:Annotation:* identifiers,
-        % which `csrd.utils.scenario.isScenarioSkipException` whitelists
+        % which `csrd.pipeline.scenario.isScenarioSkipException` whitelists
         % so a single bad scenario does not fatal-abort the 200+ baseline
         % sweep.
         validateMeasurementCompleteness(annotation)
