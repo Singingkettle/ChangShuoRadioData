@@ -5,14 +5,14 @@ function test_bandwidth_consistency()
 
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
     rng(1234);
 
-    masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     masterConfig.Log.Level = 'ERROR';
     masterConfig.Log.SaveToFile = false;
     masterConfig.Log.DisplayInConsole = false;
-    csrd.utils.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
 
     factory = csrd.factories.ModulationFactory('Config', masterConfig.Factories.Modulation);
     cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
@@ -20,14 +20,17 @@ function test_bandwidth_consistency()
 
     inputBits = repmat([0; 1; 1; 0; 1; 0; 0; 1], 6000, 1);
     placement.TargetBandwidth = 4e6;
-    expectedSampleRate = placement.TargetBandwidth / 1.25 * 4;
+    symbolRate = placement.TargetBandwidth / 1.25;
+    expectedSampleRate = symbolRate * 4;
 
     pskConfig = struct( ...
         'TypeID', 'PSK', ...
         'Type', 'PSK', ...
         'Order', 4, ...
+        'SymbolRate', symbolRate, ...
         'RolloffFactor', 0.25, ...
-        'SamplesPerSymbol', 4);
+        'SamplesPerSymbol', 4, ...
+        'NumTransmitAntennas', 1);
     pskOut = step(factory, inputBits, 1, "TxBW", 1, pskConfig, placement);
     assert(abs(pskOut.SampleRate - expectedSampleRate) < 1, ...
         'PSK sample rate should reflect target bandwidth and SPS.');
@@ -45,8 +48,11 @@ function test_bandwidth_consistency()
         'TypeID', 'QAM', ...
         'Type', 'QAM', ...
         'Order', 16, ...
+        'SymbolRate', symbolRate, ...
         'RolloffFactor', 0.25, ...
-        'SamplesPerSymbol', 4);
+        'SamplesPerSymbol', 4, ...
+        'NumTransmitAntennas', 1, ...
+        'ModulatorConfig', struct('beta', 0.25, 'ostbcSymbolRate', 1));
     qamOut = step(factory, inputBits, 1, "TxBW", 2, qamConfig, placement);
     assert(abs(qamOut.SampleRate - expectedSampleRate) < 1, ...
         'QAM sample rate should reflect target bandwidth and SPS.');
@@ -57,6 +63,8 @@ function test_bandwidth_consistency()
         'QAM pulse-shaping span should be deterministically initialized.');
     assert(strcmp(string(qamOut.ModulatorConfig.SymbolOrder), "gray"), ...
         'QAM symbol order should be deterministically initialized.');
+    assert(qamOut.ModulatorConfig.ostbcSymbolRate == 1, ...
+        'QAM nested ModulatorConfig fields should be preserved during adaptation.');
     assert(qamOut.Bandwidth > 0, 'QAM modulation should report positive occupied bandwidth.');
     fprintf('  [OK] QAM modulation config propagated (BW=%.0f Hz).\n', qamOut.Bandwidth);
 

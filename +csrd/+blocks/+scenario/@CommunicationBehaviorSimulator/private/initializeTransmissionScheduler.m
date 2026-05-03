@@ -1,14 +1,23 @@
 function initializeTransmissionScheduler(obj)
     % initializeTransmissionScheduler - Initialize transmission scheduling engine
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 initializeTransmissionScheduler 实现。
     obj.transmissionScheduler = struct();
 
-    % Set default type with fallback
-    if isfield(obj.Config, 'TransmissionPattern') && isfield(obj.Config.TransmissionPattern, 'DefaultType')
-        obj.transmissionScheduler.defaultType = obj.Config.TransmissionPattern.DefaultType;
-    else
-        obj.logger.warning('TransmissionPattern.DefaultType not found in config, using default: Continuous');
-        obj.transmissionScheduler.defaultType = 'Continuous';
+    if ~isfield(obj.Config, 'TransmissionPattern') || ...
+            ~isstruct(obj.Config.TransmissionPattern) || ...
+            ~isfield(obj.Config.TransmissionPattern, 'DefaultType') || ...
+            isempty(obj.Config.TransmissionPattern.DefaultType)
+        error('CSRD:Scenario:MissingTransmissionPatternDefaultType', ...
+            ['CommunicationBehaviorSimulator requires ', ...
+             'Config.TransmissionPattern.DefaultType. The base ', ...
+             'scenario_factory and getDefaultConfiguration provide it; ', ...
+             'minimal tests or custom configs must set it explicitly.']);
     end
+
+    obj.transmissionScheduler.defaultType = ...
+        obj.Config.TransmissionPattern.DefaultType;
 
     obj.logger.debug('Transmission scheduler initialized with default type: %s', ...
         obj.transmissionScheduler.defaultType);

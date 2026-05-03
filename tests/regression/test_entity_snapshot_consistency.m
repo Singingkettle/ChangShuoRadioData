@@ -5,17 +5,17 @@ function test_entity_snapshot_consistency()
 
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 
-    masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     masterConfig.Log.Level = 'ERROR';
     masterConfig.Log.SaveToFile = false;
     masterConfig.Log.DisplayInConsole = false;
-    csrd.utils.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
 
     scenarioConfig = masterConfig.Factories.Scenario;
-    scenarioConfig.Global.NumFramesPerScenario = 2;
-    scenarioConfig.Global.ObservationDuration = 0.01;
+    scenarioConfig = csrd.test_support.applyCanonicalFrameContract( ...
+        scenarioConfig, 0.01, 2);
     scenarioConfig.PhysicalEnvironment.Map.Types = {'Statistical'};
     scenarioConfig.PhysicalEnvironment.Map.Ratio = [1.0];
     scenarioConfig.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;
@@ -62,8 +62,12 @@ function test_entity_snapshot_consistency()
     txSnap2 = txEntity2.Snapshots{2};
     assert(txSnap2.Temporal.IsTransmitting == txFrame2{1}.TransmissionState.IsActive, ...
         'Frame 2 temporal snapshot should reflect frame activity.');
-    assert(txSnap2.Temporal.CurrentIntervalIdx == txFrame2{1}.TransmissionState.CurrentIntervalIdx, ...
-        'Frame 2 temporal snapshot should track interval index.');
+    expectedActive = double(txFrame2{1}.TransmissionState.ActiveIntervalIndices(:)');
+    assert(isequal(txSnap2.Temporal.ActiveIntervalIndices, expectedActive), ...
+        'Frame 2 temporal snapshot should track ActiveIntervalIndices array.');
+    assert(isequal(txSnap2.Temporal.ActiveIntervals, ...
+        txFrame2{1}.TransmissionState.ActiveIntervals), ...
+        'Frame 2 temporal snapshot should track ActiveIntervals matrix.');
     assert(all(abs(txSnap2.Physical.Position - txEntity2.Position) < 1e-9), ...
         'Frame 2 physical snapshot should match entity position.');
     fprintf('  [OK] Snapshot state persists across frames.\n');

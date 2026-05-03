@@ -1,5 +1,6 @@
 function config = getDefaultConfiguration(obj)
     % getDefaultConfiguration - Get default physical environment configuration
+    % 中文说明：提供 CSRD 生产链路中的 getDefaultConfiguration 实现。
     %
     % Returns a default configuration structure for the physical environment
     % simulator with reasonable default values for all required fields.
@@ -16,7 +17,14 @@ function config = getDefaultConfiguration(obj)
     config.Entities.Receivers.Count = [1, 3];
     config.Entities.InitialDistribution = 'Random';
 
-    % Mobility configuration
+    % Mobility configuration. Phase 3 (audit §3.1.ter / §17.5 P3-followup)
+    % requires the per-entity-type mobility model to be carried explicitly
+    % on the Entities subtree so assignMobilityModel never has to fall
+    % back to a random selection. The values mirror the canonical layout
+    % defined in config/_base_/factories/scenario_factory.m.
+    config.Entities.Transmitters.Mobility.Model = 'RandomWalk';
+    config.Entities.Receivers.Mobility.Model = 'Stationary';
+
     config.Mobility.DefaultModel = 'RandomWalk';
     config.Mobility.EnableCollisionAvoidance = true;
 

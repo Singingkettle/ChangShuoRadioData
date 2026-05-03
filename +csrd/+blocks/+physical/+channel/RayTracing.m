@@ -1,4 +1,5 @@
 classdef RayTracing < matlab.System
+% 中文说明：提供 CSRD 生产链路中的 RayTracing 实现。
 
     properties
         MapFilename char = ''
@@ -22,6 +23,10 @@ classdef RayTracing < matlab.System
     methods
 
         function obj = RayTracing(varargin)
+            % RayTracing - Production declaration in CSRD.
+            % 中文说明：RayTracing 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
         end
 
@@ -30,14 +35,26 @@ classdef RayTracing < matlab.System
     methods (Access = protected)
 
         function setupImpl(obj, varargin) %#ok<INUSD>
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             obj.PropagationModelConfig = normalizePropagationConfig(obj.PropagationModelConfig);
         end
 
         function validateInputsImpl(~, ~, ~, ~, ~)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
         end
 
         function out = stepImpl(obj, x, txInfo, rxInfo, channelLinkInfo)
+            % stepImpl - Production declaration in CSRD.
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if nargin < 5 || ~isstruct(channelLinkInfo)
                 channelLinkInfo = struct();
             end
@@ -88,6 +105,10 @@ classdef RayTracing < matlab.System
         end
 
         function releaseImpl(obj)
+            % releaseImpl - Production declaration in CSRD.
+            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             tryDeleteSiteViewer(obj.siteViewerCache);
             obj.siteViewerCache = [];
             obj.siteViewerKey = '';
@@ -98,13 +119,17 @@ classdef RayTracing < matlab.System
     methods (Access = private)
 
         function mapProfile = resolveMapProfile(obj, channelLinkInfo)
+            % resolveMapProfile - Production declaration in CSRD.
+            % 中文说明：resolveMapProfile 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
             if ~isempty(fieldnames(mapProfile))
                 return;
             end
 
             hasBuildings = ~isempty(obj.MapFilename) && isfile(obj.MapFilename) && ...
-                csrd.utils.osmHasBuildings(obj.MapFilename);
+                csrd.runtime.map.osmHasBuildings(obj.MapFilename);
 
             mapProfile = struct();
             if hasBuildings
@@ -125,6 +150,10 @@ classdef RayTracing < matlab.System
         end
 
         function carrierFrequency = resolveCarrierFrequency(obj, txInfo, rxInfo, channelLinkInfo)
+            % resolveCarrierFrequency - Production declaration in CSRD.
+            % 中文说明：resolveCarrierFrequency 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             carrierFrequency = obj.CarrierFrequency;
             rxScenarioConfig = getStructField(channelLinkInfo, 'RxScenarioConfig', struct());
 
@@ -138,6 +167,10 @@ classdef RayTracing < matlab.System
         end
 
         function sampleRate = resolveSampleRate(obj, x, rxInfo)
+            % resolveSampleRate - Production declaration in CSRD.
+            % 中文说明：resolveSampleRate 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             sampleRate = obj.SampleRate;
             if isfield(x, 'SampleRate') && ~isempty(x.SampleRate) && x.SampleRate > 0
                 sampleRate = x.SampleRate;
@@ -147,6 +180,10 @@ classdef RayTracing < matlab.System
         end
 
         function [txSite, rxSite] = createSites(~, txInfo, rxInfo, carrierFrequency)
+            % createSites - Production declaration in CSRD.
+            % 中文说明：createSites 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             txPos = getStructField(txInfo, 'Position', [0, 0, 30]);
             rxPos = getStructField(rxInfo, 'Position', [0, 0, 10]);
 
@@ -180,6 +217,10 @@ classdef RayTracing < matlab.System
         end
 
         function pm = createPropagationModel(obj, mapProfile)
+            % createPropagationModel - Production declaration in CSRD.
+            % 中文说明：createPropagationModel 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             cfg = normalizePropagationConfig(obj.PropagationModelConfig);
             mode = getStructField(mapProfile, 'Mode', '');
 
@@ -205,6 +246,10 @@ classdef RayTracing < matlab.System
         end
 
         function [raySet, rayCount, pathLoss] = computeRays(obj, txSite, rxSite, pm, mapProfile)
+            % computeRays - Production declaration in CSRD.
+            % 中文说明：computeRays 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             raySet = [];
             rayCount = 0;
             pathLoss = [];
@@ -230,6 +275,10 @@ classdef RayTracing < matlab.System
         end
 
         function mapArg = resolveMapArgument(obj, mapProfile)
+            % resolveMapArgument - Production declaration in CSRD.
+            % 中文说明：resolveMapArgument 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             mapArg = [];
             mode = getStructField(mapProfile, 'Mode', '');
             osmFile = getStructField(mapProfile, 'OSMFile', obj.MapFilename);
@@ -252,12 +301,20 @@ classdef RayTracing < matlab.System
         end
 
         function tf = shouldFallback(obj, mapProfile, channelLinkInfo)
+            % shouldFallback - Production declaration in CSRD.
+            % 中文说明：shouldFallback 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             fallbackPolicy = getStructField(channelLinkInfo, 'NoValidPathFallback', obj.NoValidPathFallback);
             mode = getStructField(mapProfile, 'Mode', '');
             tf = strcmpi(fallbackPolicy, 'FreeSpaceAttenuation') || strcmpi(mode, 'FlatTerrain');
         end
 
         function out = applyNoPathFallback(obj, out, txInfo, rxInfo, channelLinkInfo, mapProfile, carrierFrequency, errorMessage)
+            % applyNoPathFallback - Production declaration in CSRD.
+            % 中文说明：applyNoPathFallback 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             fallbackPolicy = getStructField(channelLinkInfo, 'NoValidPathFallback', obj.NoValidPathFallback);
             if ~strcmpi(fallbackPolicy, 'FreeSpaceAttenuation') && ~strcmpi(getStructField(mapProfile, 'Mode', ''), 'FlatTerrain')
                 error('RayTracing:NoValidPaths', 'Ray tracing returned no valid paths.');
@@ -287,6 +344,10 @@ classdef RayTracing < matlab.System
         end
 
         function channelInfo = buildChannelInfo(~, mapProfile, carrierFrequency, rayCount, pathLoss, fallback)
+            % buildChannelInfo - Production declaration in CSRD.
+            % 中文说明：buildChannelInfo 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             channelInfo = struct();
             channelInfo.Model = 'RayTracing';
             channelInfo.MapProfile = mapProfile;
@@ -297,6 +358,10 @@ classdef RayTracing < matlab.System
         end
 
         function ok = setPropagationProperty(obj, pm, propName, value)
+            % setPropagationProperty - Production declaration in CSRD.
+            % 中文说明：setPropagationProperty 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             ok = false;
             try
                 pm.(propName) = value;
@@ -312,6 +377,10 @@ classdef RayTracing < matlab.System
 end
 
 function tryDeleteSiteViewer(viewerHandle)
+    % tryDeleteSiteViewer - Production declaration in CSRD.
+    % 中文说明：tryDeleteSiteViewer 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isempty(viewerHandle)
         return;
     end
@@ -324,6 +393,10 @@ function tryDeleteSiteViewer(viewerHandle)
 end
 
 function cfg = normalizePropagationConfig(cfg)
+    % normalizePropagationConfig - Production declaration in CSRD.
+    % 中文说明：normalizePropagationConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isstruct(cfg)
         cfg = struct();
     end
@@ -339,6 +412,10 @@ function cfg = normalizePropagationConfig(cfg)
 end
 
 function value = getStructField(s, fieldName, defaultValue)
+    % getStructField - Production declaration in CSRD.
+    % 中文说明：getStructField 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -347,6 +424,10 @@ function value = getStructField(s, fieldName, defaultValue)
 end
 
 function value = getPositionComponent(position, idx, defaultValue)
+    % getPositionComponent - Production declaration in CSRD.
+    % 中文说明：getPositionComponent 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isnumeric(position) && numel(position) >= idx
         value = position(idx);
     else
@@ -355,6 +436,10 @@ function value = getPositionComponent(position, idx, defaultValue)
 end
 
 function pathLoss = extractMinimumPathLoss(raySet)
+    % extractMinimumPathLoss - Production declaration in CSRD.
+    % 中文说明：extractMinimumPathLoss 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     pathLoss = [];
     try
         losses = [raySet.PathLoss];
@@ -367,6 +452,10 @@ function pathLoss = extractMinimumPathLoss(raySet)
 end
 
 function txt = valueToText(value)
+    % valueToText - Production declaration in CSRD.
+    % 中文说明：valueToText 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ischar(value)
         txt = value;
     elseif isstring(value)
@@ -379,6 +468,10 @@ function txt = valueToText(value)
 end
 
 function distance_m = geographicDistance(txPos, rxPos)
+    % geographicDistance - Production declaration in CSRD.
+    % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
     lat1 = deg2rad(txPos(2));
     lon1 = deg2rad(txPos(1));

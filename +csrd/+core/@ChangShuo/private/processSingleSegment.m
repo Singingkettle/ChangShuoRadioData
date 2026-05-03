@@ -1,5 +1,8 @@
 function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx)
     % processSingleSegment - Process a single segment for message generation and modulation
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processSingleSegment 实现。
     %
     % This method handles the complete processing of one segment including
     % message generation and modulation.
@@ -16,8 +19,14 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
     % Outputs:
     %   modulatedSignalSegment - Modulated signal segment
 
-    % Build segment config from transmitter config (new structure adaptation)
-    currentSegmentScenario = buildSegmentConfig(currentTxScenario, segIdx);
+    % Phase 3 (§3.2.A): the segment builder lives on the class as a
+    % Static, Hidden method so unit tests can pin the fail-fast
+    % contract without standing up the engine. Returning [] is
+    % reserved for benign control-flow (no Temporal.Intervals or
+    % segIdx past the last interval); planner-side errors raise
+    % CSRD:Construction:Missing* identifiers and propagate up.
+    currentSegmentScenario = csrd.core.ChangShuo.buildSegmentConfigFromTxScenario( ...
+        currentTxScenario, segIdx);
 
     if isempty(currentSegmentScenario)
         obj.logger.warning('Frame %d, TxID %s, Segment %d: Failed to build segment config.', ...
@@ -61,9 +70,20 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         currentSegmentScenario, rawMessageStruct);
 
     if ~isempty(modulatedSignalSegment)
-        modulatedSignalSegment.SegmentId = segIdx;
+        segmentId = sprintf('%s.Seg%03d', char(string(currentTxId)), segIdx);
+        burstId = sprintf('%s.Burst%03d', char(string(currentTxId)), segIdx);
+        modulatedSignalSegment.ID = segmentId;
+        modulatedSignalSegment.TxId = currentTxId;
+        modulatedSignalSegment.SegmentId = segmentId;
+        modulatedSignalSegment.BurstId = burstId;
         modulatedSignalSegment.StartTime = currentSegmentScenario.Placement.StartTime;
         modulatedSignalSegment.Duration = currentSegmentScenario.Placement.Duration;
+        modulatedSignalSegment.EndTime = currentSegmentScenario.Placement.EndTime;
+        modulatedSignalSegment.FrameWindow = currentSegmentScenario.Placement.FrameWindow;
+        modulatedSignalSegment.FrameRelativeStartTime = ...
+            currentSegmentScenario.Placement.FrameRelativeStartTime;
+        modulatedSignalSegment.FrameRelativeEndTime = ...
+            currentSegmentScenario.Placement.FrameRelativeEndTime;
         modulatedSignalSegment.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
 
         % Modulators are required to set SampleRate explicitly. The
@@ -83,88 +103,104 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
                 FrameId, string(currentTxId), segIdx);
         end
 
+        modulatedSignalSegment = csrd.pipeline.signal.gateToDuration( ...
+            modulatedSignalSegment, ...
+            currentSegmentScenario.Placement.FrameRelativeEndTime - ...
+                currentSegmentScenario.Placement.FrameRelativeStartTime, ...
+            'ModulatorOutput');
+
         modulatedSignalSegment.Planned = struct();
         modulatedSignalSegment.Planned.Bandwidth = currentSegmentScenario.Placement.TargetBandwidth;
         modulatedSignalSegment.Planned.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
-    end
-end
-
-function segmentConfig = buildSegmentConfig(txScenario, segIdx)
-    % buildSegmentConfig - Build segment configuration from TxPlan
-    %
-    % Adapts the TxPlan structure to the segment execution format
-
-    segmentConfig = struct();
-
-    % Check if we have temporal pattern with intervals
-    if ~isfield(txScenario, 'Temporal') || ~isfield(txScenario.Temporal, 'Intervals')
-        segmentConfig = [];
-        return;
-    end
-
-    intervals = txScenario.Temporal.Intervals;
-    if segIdx > size(intervals, 1)
-        segmentConfig = [];
-        return;
-    end
-
-    % Get timing for this segment
-    startTime = intervals(segIdx, 1);
-    endTime = intervals(segIdx, 2);
-    duration = endTime - startTime;
-
-    % Build Message config
-    segmentConfig.Message = struct();
-    if isfield(txScenario, 'Message') && isstruct(txScenario.Message)
-        segmentConfig.Message = txScenario.Message;
-        if isfield(txScenario.Message, 'Type')
-            segmentConfig.Message.TypeID = txScenario.Message.Type;
-        elseif isfield(txScenario.Message, 'TypeID')
-            segmentConfig.Message.TypeID = txScenario.Message.TypeID;
+        if isfield(currentTxScenario, 'Regulatory') && ...
+                isstruct(currentTxScenario.Regulatory)
+            modulatedSignalSegment.Planned.Regulatory = currentTxScenario.Regulatory;
         else
-            segmentConfig.Message.TypeID = 'RandomBit';
+            modulatedSignalSegment.Planned.Regulatory = ...
+                csrd.catalog.spectrum.RegulatoryValidator.emptyRegulatoryTruth();
         end
-    else
-        segmentConfig.Message.TypeID = 'RandomBit';
-        segmentConfig.Message.Length = 1024;
-    end
 
-    % Build Modulation config
-    segmentConfig.Modulation = struct();
-    if isfield(txScenario, 'Modulation') && isstruct(txScenario.Modulation)
-        segmentConfig.Modulation = txScenario.Modulation;
-        if isfield(txScenario.Modulation, 'Type')
-            segmentConfig.Modulation.TypeID = txScenario.Modulation.Type;
-        elseif isfield(txScenario.Modulation, 'TypeID')
-            segmentConfig.Modulation.TypeID = txScenario.Modulation.TypeID;
+        % Phase 4 (§5 Truth.Design): the v2 annotation Design block reads
+        % `comp.Planned.{PlannedCenterFrequencyHz, PlannedBandwidthHz,
+        % PlannedSampleRate, ModulationFamily, ModulationOrder,
+        % PayloadLengthBits, NumTransmitAntennas}` to publish the
+        % design-time blueprint values verbatim. Project them off
+        % currentTxScenario here (the planner-side ground truth) so the
+        % downstream `buildSourceAnnotation` does not have to reach back
+        % into TxScenario or fall back on NaN sentinels (which get
+        % flagged by `validateMeasurementCompleteness` / smoke tests).
+        modulatedSignalSegment.Planned.PlannedBandwidthHz = ...
+            currentSegmentScenario.Placement.TargetBandwidth;
+        modulatedSignalSegment.Planned.PlannedCenterFrequencyHz = ...
+            currentSegmentScenario.Placement.FrequencyOffset;
+        modulatedSignalSegment.Planned.StartTimeSec = ...
+            currentSegmentScenario.Placement.FrameRelativeStartTime;
+        modulatedSignalSegment.Planned.EndTimeSec = ...
+            currentSegmentScenario.Placement.FrameRelativeEndTime;
+        modulatedSignalSegment.Planned.DurationSec = ...
+            currentSegmentScenario.Placement.Duration;
+        if isfield(currentTxScenario, 'Spectrum') && ...
+                isstruct(currentTxScenario.Spectrum) && ...
+                isfield(currentTxScenario.Spectrum, 'ReceiverSampleRate') && ...
+                ~isempty(currentTxScenario.Spectrum.ReceiverSampleRate)
+            modulatedSignalSegment.Planned.PlannedSampleRate = ...
+                currentTxScenario.Spectrum.ReceiverSampleRate;
         else
-            segmentConfig.Modulation.TypeID = 'PSK';
+            error('CSRD:Construction:MissingPlannedSampleRate', ...
+                ['Frame %d, TxID %s, Segment %d: ', ...
+                 'currentTxScenario.Spectrum.ReceiverSampleRate is required. ', ...
+                 'Execution SampleRate must not be used to backfill Design truth.'], ...
+                FrameId, string(currentTxId), segIdx);
         end
-    else
-        segmentConfig.Modulation.TypeID = 'PSK';
-        segmentConfig.Modulation.Order = 4;
-        segmentConfig.Modulation.SymbolRate = 100e3;
-        segmentConfig.Modulation.SamplesPerSymbol = 4;
-    end
-
-    % Build Placement config with timing and frequency from Spectrum
-    segmentConfig.Placement = struct();
-    segmentConfig.Placement.StartTime = startTime;
-    segmentConfig.Placement.Duration = duration;
-
-    if isfield(txScenario, 'Spectrum') && isstruct(txScenario.Spectrum)
-        if isfield(txScenario.Spectrum, 'PlannedFreqOffset')
-            segmentConfig.Placement.FrequencyOffset = txScenario.Spectrum.PlannedFreqOffset;
+        if isfield(currentTxScenario, 'Modulation') && isstruct(currentTxScenario.Modulation)
+            modSrc = currentTxScenario.Modulation;
+            if isfield(modSrc, 'Type') && ~isempty(modSrc.Type)
+                modulatedSignalSegment.Planned.ModulationFamily = char(modSrc.Type);
+            elseif isfield(modSrc, 'TypeID') && ~isempty(modSrc.TypeID)
+                modulatedSignalSegment.Planned.ModulationFamily = char(modSrc.TypeID);
+            else
+                modulatedSignalSegment.Planned.ModulationFamily = '';
+            end
+            if isfield(modSrc, 'Order') && ~isempty(modSrc.Order) && isnumeric(modSrc.Order)
+                modulatedSignalSegment.Planned.ModulationOrder = double(modSrc.Order);
+            else
+                modulatedSignalSegment.Planned.ModulationOrder = 0;
+            end
+            if isfield(modSrc, 'ModulatorConfig') && isstruct(modSrc.ModulatorConfig) && ...
+                    isfield(modSrc.ModulatorConfig, 'mimo') && ...
+                    isstruct(modSrc.ModulatorConfig.mimo) && ...
+                    isfield(modSrc.ModulatorConfig.mimo, 'Mode') && ...
+                    ~isempty(modSrc.ModulatorConfig.mimo.Mode)
+                modulatedSignalSegment.Planned.ModulationSpatialMode = ...
+                    char(string(modSrc.ModulatorConfig.mimo.Mode));
+            else
+                modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+            end
         else
-            segmentConfig.Placement.FrequencyOffset = 0;
+            modulatedSignalSegment.Planned.ModulationFamily = '';
+            modulatedSignalSegment.Planned.ModulationOrder = 0;
+            modulatedSignalSegment.Planned.ModulationSpatialMode = '';
         end
-        if isfield(txScenario.Spectrum, 'PlannedBandwidth')
-            segmentConfig.Placement.TargetBandwidth = txScenario.Spectrum.PlannedBandwidth;
+        if isfield(currentTxScenario, 'Message') && isstruct(currentTxScenario.Message) && ...
+                isfield(currentTxScenario.Message, 'Length') && ...
+                ~isempty(currentTxScenario.Message.Length) && ...
+                isnumeric(currentTxScenario.Message.Length)
+            modulatedSignalSegment.Planned.PayloadLengthBits = ...
+                double(currentSegmentScenario.Message.Length);
         else
-            segmentConfig.Placement.TargetBandwidth = 100e3;
+            modulatedSignalSegment.Planned.PayloadLengthBits = 0;
         end
-    else
-        segmentConfig.Placement.FrequencyOffset = 0;
-        segmentConfig.Placement.TargetBandwidth = 100e3;
+        if isfield(currentTxScenario, 'Hardware') && isstruct(currentTxScenario.Hardware) && ...
+                isfield(currentTxScenario.Hardware, 'NumAntennas') && ...
+                ~isempty(currentTxScenario.Hardware.NumAntennas) && ...
+                isnumeric(currentTxScenario.Hardware.NumAntennas)
+            modulatedSignalSegment.Planned.NumTransmitAntennas = ...
+                double(currentTxScenario.Hardware.NumAntennas);
+        else
+            error('CSRD:Construction:MissingTxNumAntennas', ...
+                ['Frame %d, TxID %s, Segment %d: ', ...
+                 'currentTxScenario.Hardware.NumAntennas is required.'], ...
+                FrameId, string(currentTxId), segIdx);
+        end
     end
 end

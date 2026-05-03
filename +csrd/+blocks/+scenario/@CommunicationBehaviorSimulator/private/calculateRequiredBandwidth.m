@@ -1,5 +1,8 @@
 function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
     % calculateRequiredBandwidth - Calculate required bandwidth based on modulation
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 calculateRequiredBandwidth 实现。
     %
     % IMPORTANT NOTE: This is an APPROXIMATE bandwidth calculation used only
     % for frequency planning purposes during simulation setup. It serves as
@@ -21,16 +24,22 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
     %   - Based on actual transmitted signal characteristics
     %   - Accounts for real pulse shaping, filtering, and modulation effects
 
-    if isfield(modulationConfig, 'SymbolRate')
+    if isfield(modulationConfig, 'SymbolRate') && ...
+            isnumeric(modulationConfig.SymbolRate) && ...
+            isscalar(modulationConfig.SymbolRate) && ...
+            isfinite(modulationConfig.SymbolRate) && ...
+            modulationConfig.SymbolRate > 0
         symbolRate = modulationConfig.SymbolRate;
     else
-        symbolRate = 100e3;
-        obj.logger.warning('modulationConfig missing SymbolRate, defaulting to 100 kHz');
+        error('CSRD:Scenario:MissingModulationSymbolRate', ...
+            'modulationConfig.SymbolRate is required for bandwidth planning.');
     end
 
-    modType = 'Unknown';
-    if isfield(modulationConfig, 'Type')
+    if isfield(modulationConfig, 'Type') && ~isempty(modulationConfig.Type)
         modType = modulationConfig.Type;
+    else
+        error('CSRD:Scenario:MissingModulationType', ...
+            'modulationConfig.Type is required for bandwidth planning.');
     end
 
     % Bandwidth calculation based on modulation type
@@ -90,7 +99,9 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
             bandwidth = symbolRate * 1.25; % Vestigial sideband
 
         otherwise
-            bandwidth = symbolRate * 1.5; % Default conservative multiplier
+            error('CSRD:Scenario:UnsupportedModulationType', ...
+                'Unsupported modulation type "%s" for bandwidth planning.', ...
+                char(string(modType)));
     end
 
     % Apply minimum bandwidth constraint

@@ -1,5 +1,8 @@
 function setupImpl(obj)
     % setupImpl - Initialize all factories (one-time setup)
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 setupImpl 实现。
     %
     % Each factory is instantiated with ONLY its own configuration,
     % ensuring independence between factories. The ScenarioFactory
@@ -16,6 +19,11 @@ function setupImpl(obj)
     if ~isfield(obj.FactoryConfigs, 'Scenario')
         error('ChangShuo:ConfigurationError', 'Scenario configuration required in FactoryConfigs.');
     end
+
+    wrappedConfig = struct('Factories', obj.FactoryConfigs, ...
+        'Runner', struct(), 'Metadata', struct());
+    wrappedConfig = csrd.pipeline.runtime.normalizeRuntimeContracts(wrappedConfig);
+    obj.FactoryConfigs = wrappedConfig.Factories;
 
     validateFactoryConfigs(obj);
 

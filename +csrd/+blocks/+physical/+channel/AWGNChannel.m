@@ -1,5 +1,6 @@
 classdef AWGNChannel < matlab.System
     % AWGNChannel - Additive White Gaussian Noise Channel Model
+    % 中文说明：提供 CSRD 生产链路中的 AWGNChannel 实现。
     %
     % This class implements an Additive White Gaussian Noise (AWGN) channel model
     % as a MATLAB System object. AWGN is the most fundamental channel model in
@@ -148,6 +149,9 @@ classdef AWGNChannel < matlab.System
 
         function obj = AWGNChannel(varargin)
             % AWGNChannel - Constructor for AWGN channel model
+            % 中文说明：AWGNChannel 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This constructor creates an AWGNChannel object with optional
             % property-value pairs for initial configuration.
@@ -175,6 +179,9 @@ classdef AWGNChannel < matlab.System
 
         function setupImpl(obj, ~)
             % setupImpl - Initialize the AWGN channel system object
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method is called automatically when the System object is
             % first used. It initializes the random number stream with the
@@ -199,6 +206,9 @@ classdef AWGNChannel < matlab.System
 
         function output = stepImpl(obj, inputSignal)
             % stepImpl - Add AWGN to input signal (supports struct or array input)
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             % Handle struct input (signal struct with .Signal field)
             isStructInput = isstruct(inputSignal);
@@ -244,6 +254,9 @@ classdef AWGNChannel < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Reset the random number generator state
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method resets the internal random number stream to its
             % initial state, ensuring reproducible noise sequences when
@@ -265,6 +278,9 @@ classdef AWGNChannel < matlab.System
 
         function s = saveObjectImpl(obj)
             % saveObjectImpl - Save the System object state
+            % 中文说明：saveObjectImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method saves the current state of the AWGNChannel object,
             % including the random number generator state for proper restoration.
@@ -287,6 +303,9 @@ classdef AWGNChannel < matlab.System
 
         function loadObjectImpl(obj, s, wasLocked)
             % loadObjectImpl - Load the System object state
+            % 中文说明：loadObjectImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method restores the AWGNChannel object state from a
             % previously saved structure, including random generator state.

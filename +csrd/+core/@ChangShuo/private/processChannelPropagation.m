@@ -1,5 +1,8 @@
 function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalSegments, TxInfos, RxInfos)
     % processChannelPropagation - Apply channel effects to transmitted signals
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processChannelPropagation 实现。
     %
     % This method processes all transmitter-receiver pairs through the channel model.
     %
@@ -91,6 +94,14 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     channelLinkInfo.RxScenarioConfig = rxScenarioConfig;
                     channelLinkInfo.MapProfile = scenarioMapProfile;
                     channelLinkInfo.ChannelModel = resolveChannelModelFromScenario(channelLinkInfo.MapProfile);
+                    if isfield(segmentSignal, 'BurstId') && ~isempty(segmentSignal.BurstId)
+                        channelLinkInfo.BurstId = segmentSignal.BurstId;
+                    else
+                        error('CSRD:Construction:MissingBurstId', ...
+                            ['Frame %d, TxID %s, RxID %s, Segment %d: ', ...
+                             'segmentSignal.BurstId is required before channel propagation.'], ...
+                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
+                    end
 
                     % Apply channel effects using ChannelFactory
                     channelOutput = step(obj.Factories.Channel, channelInputStruct, ...
@@ -101,30 +112,99 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     if isfield(segmentSignal, 'SegmentId') && ~isempty(segmentSignal.SegmentId)
                         component.SegmentId = segmentSignal.SegmentId;
                     else
-                        component.SegmentId = segIdx;
+                        component.SegmentId = sprintf('%s.Seg%03d', ...
+                            char(string(txInfo.ID)), segIdx);
                     end
-                    component.Signal = channelOutput.Signal;
-                    if isfield(channelOutput, 'SampleRate') && ~isempty(channelOutput.SampleRate) && channelOutput.SampleRate > 0
-                        component.SampleRate = channelOutput.SampleRate;
-                    elseif isfield(segmentSignal, 'SampleRate') && ~isempty(segmentSignal.SampleRate) && segmentSignal.SampleRate > 0
-                        component.SampleRate = segmentSignal.SampleRate;
-                    elseif isfield(rxInfo, 'SampleRate') && ~isempty(rxInfo.SampleRate) && rxInfo.SampleRate > 0
-                        component.SampleRate = rxInfo.SampleRate;
-                        obj.logger.warning(['Frame %d, Tx %s -> Rx %s, Seg %d: ', ...
-                            'channel/segment SampleRate missing; ', ...
-                            'falling back to receiver SampleRate %.0f Hz. ', ...
-                            'Upstream stages should populate SampleRate.'], ...
-                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx, ...
-                            rxInfo.SampleRate);
+                    if isfield(segmentSignal, 'BurstId') && ~isempty(segmentSignal.BurstId)
+                        component.BurstId = segmentSignal.BurstId;
                     else
-                        error('CSRD:Core:MissingSampleRate', ...
-                            ['Frame %d, Tx %s -> Rx %s, Seg %d: cannot ', ...
-                             'determine signal SampleRate (channel, segment ', ...
-                             'and receiver values are all missing).'], ...
+                        error('CSRD:Construction:MissingBurstId', ...
+                            ['Frame %d, TxID %s, RxID %s, Segment %d: ', ...
+                             'segmentSignal.BurstId is required for component annotation.'], ...
                             FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
                     end
-                    component.FrequencyOffset = channelOutput.FrequencyOffset;
+                    % Phase 3 (§3.2.C): single source of truth for the
+                    % component SampleRate is `channelOutput.SampleRate`.
+                    % The legacy three-tier fallback (segment ->
+                    % rxInfo) was removed -- enforcement lives on the
+                    % class as a Static, Hidden helper for testability.
+                    csrd.core.ChangShuo.assertChannelOutputSampleRate( ...
+                        channelOutput, FrameId, txInfo.ID, rxInfo.ID, segIdx);
+                    component.SampleRate = channelOutput.SampleRate;
+
+                    if ~isfield(segmentSignal, 'Planned') || ...
+                            ~isstruct(segmentSignal.Planned) || ...
+                            isempty(fieldnames(segmentSignal.Planned))
+                        error('CSRD:Construction:MissingSegmentPlannedTruth', ...
+                            ['Frame %d, TxID %s, RxID %s, Segment %d: ', ...
+                             'segmentSignal is missing the Planned design ', ...
+                             'truth required for annotation v2.'], ...
+                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
+                    end
+                    component.Planned = segmentSignal.Planned;
+
+                    % Phase 4 (audit §17.6 / H12 / A5): apply physical
+                    % Doppler shift `f_d = v_radial * f_c / c` after the
+                    % channel block produced its baseband output. The
+                    % current channel zoo (AWGN / MIMO / RayTracing as
+                    % wired here) does not honour Tx/Rx velocity, so
+                    % Doppler MUST be applied explicitly. The
+                    % HasInternalDoppler hint on channelOutput.ChannelInfo
+                    % is the future hook for channel types that already
+                    % integrate Doppler internally; presence + true value
+                    % causes us to skip to avoid double-shifting.
+                    [component.Signal, component.DopplerShiftHz, ...
+                     component.RadialVelocityMps] = applyDopplerForComponent( ...
+                        channelOutput, txInfo, rxInfo);
+                    component = csrd.pipeline.signal.gateToDuration( ...
+                        component, localComponentDurationSec(segmentSignal), ...
+                        'ChannelOutput');
+                    % Phase 3 (audit §3.1.ter A / phase-3-construction.md §3.1):
+                    % the per-(Tx,Rx) component MUST carry the
+                    % receiver-baseband ProjectedCenterOffsetHz from
+                    % txScenarioConfig.ReceiverViews, NOT the emitter-global
+                    % offset that came back through channelOutput. In the
+                    % Phase 3 unified-receiver contract these two values are
+                    % equal but the schema source-of-truth is the per-Rx
+                    % projection, so consumers and Phase 4 heterogeneous-rx
+                    % work will both pick up the correct value here.
+                    component.FrequencyOffset = csrd.core.ChangShuo.lookupReceiverViewOffset( ...
+                        txScenarioConfig, rxInfo, rxIdx, channelOutput);
+                    % Phase 4 (§3.5 / S6 / P4-followup-3): persist the
+                    % full per-(Tx,Rx) ReceiverView (5+1 fields) onto the
+                    % component so downstream `buildSourceAnnotation`
+                    % can publish it under SignalSources(k).ReceiverView
+                    % verbatim. The lookup is fail-fast: a missing
+                    % ReceiverViews struct on the Tx is a Phase 3 schema
+                    % violation and must not be papered over.
+                    component.ReceiverView = csrd.core.ChangShuo.lookupReceiverViewEntry( ...
+                        txScenarioConfig, rxInfo, rxIdx);
                     component.Bandwidth = channelOutput.Bandwidth;
+                    % Phase 4 (audit §17.6 / §6 C8 / §3.4): the v1
+                    % `Realized.Bandwidth` was the modulator's analytical
+                    % `(1+rolloff)*Rs`-style scalar set in BaseModulator.
+                    % That formula consistently underestimates the
+                    % actually-realised pulse-shape OBW by 5-30 % (e.g.
+                    % RRC tails, OFDM PAPR clipping, FSK shaping), so a
+                    % straight comparison against the receiver-side
+                    % `Truth.Measured.SourcePlane.OccupiedBandwidthHz`
+                    % made the C8<3% gate structurally infeasible. Phase
+                    % 4 therefore promotes `Execution.ModulatedBandwidthHz`
+                    % to a *measurement* on the **clean** modulator
+                    % output (`segmentSignal.Signal`, pre-channel,
+                    % zero-AWGN), using the same `obwActual` helper that
+                    % powers the SourcePlane number. With the
+                    % peak-relative -3 dBc thresholding rolled out in
+                    % the post-baseline_v0 fix, the threshold floats
+                    % with the signal peak (not with the per-source
+                    % noise floor), so the SourcePlane OBW must equal
+                    % the Execution OBW within the pwelch bin-grid
+                    % quantisation -- which is exactly what the < 3 %
+                    % gate is meant to police.
+                    component.ModulatedBandwidthHz = ...
+                        measureModulatedBandwidth(segmentSignal);
+                    component.AnalyticalBandwidthHz = ...
+                        coerceScalarBandwidth(channelOutput.Bandwidth);
                     if isfield(channelOutput, 'StartTime')
                         component.StartTime = channelOutput.StartTime;
                     elseif isfield(segmentSignal, 'StartTime')
@@ -132,9 +212,34 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     else
                         component.StartTime = 0;
                     end
-                    if isfield(channelOutput, 'Planned')
-                        component.Planned = channelOutput.Planned;
+                    if isfield(segmentSignal, 'FrameRelativeStartTime')
+                        component.FrameRelativeStartTime = ...
+                            segmentSignal.FrameRelativeStartTime;
+                    else
+                        component.FrameRelativeStartTime = component.StartTime;
                     end
+                    if isfield(segmentSignal, 'FrameRelativeEndTime')
+                        component.FrameRelativeEndTime = ...
+                            segmentSignal.FrameRelativeEndTime;
+                    elseif isfield(segmentSignal, 'Duration')
+                        component.FrameRelativeEndTime = ...
+                            component.FrameRelativeStartTime + segmentSignal.Duration;
+                    else
+                        component.FrameRelativeEndTime = ...
+                            component.FrameRelativeStartTime + ...
+                            size(component.Signal, 1) / component.SampleRate;
+                    end
+                    if isfield(segmentSignal, 'FrameWindow')
+                        component.FrameWindow = segmentSignal.FrameWindow;
+                    end
+                    % Phase 3 (§3.2.C / §3.4 D8 / audit §3.1.ter A):
+                    % `component.Planned` is the modulator-side planning
+                    % record set by processSingleSegment L86-88. Channel
+                    % blocks must NOT echo a `.Planned` field back; doing
+                    % so silently overwrote the per-segment planning truth
+                    % with a channel-level reinterpretation. The
+                    % passthrough was removed and any channelOutput.Planned
+                    % is now ignored on purpose.
                     if isfield(channelOutput, 'ModulationTypeID')
                         component.ModulationType = channelOutput.ModulationTypeID;
                     end
@@ -148,9 +253,16 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     end
                     if isfield(txInfo, 'Velocity')
                         component.TxVelocity = txInfo.Velocity;
+                    else
+                        component.TxVelocity = [0, 0, 0];
                     end
                     if isfield(rxInfo, 'Position')
                         component.RxPosition = rxInfo.Position;
+                    end
+                    if isfield(rxInfo, 'Velocity')
+                        component.RxVelocity = rxInfo.Velocity;
+                    else
+                        component.RxVelocity = [0, 0, 0];
                     end
                     if isfield(channelOutput, 'LinkDistance')
                         component.LinkDistance = channelOutput.LinkDistance;
@@ -190,9 +302,10 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                 % Scenario-level identifiers must propagate up to
                 % SimulationRunner so that the offending scenario can be
                 % skipped instead of producing a half-corrupted frame.
-                if csrd.utils.scenario.isScenarioSkipException(ME_channel)
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_channel)
                     rethrow(ME_channel);
                 end
+                rethrow(ME_channel);
             end
         end
     end
@@ -200,7 +313,30 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
     obj.logger.debug("Frame %d: Channel propagation complete.", FrameId);
 end
 
+function durationSec = localComponentDurationSec(segmentSignal)
+    if isfield(segmentSignal, 'FrameRelativeStartTime') && ...
+            isfield(segmentSignal, 'FrameRelativeEndTime') && ...
+            ~isempty(segmentSignal.FrameRelativeStartTime) && ...
+            ~isempty(segmentSignal.FrameRelativeEndTime)
+        durationSec = double(segmentSignal.FrameRelativeEndTime) - ...
+            double(segmentSignal.FrameRelativeStartTime);
+    elseif isfield(segmentSignal, 'Duration') && ~isempty(segmentSignal.Duration)
+        durationSec = double(segmentSignal.Duration);
+    else
+        error('CSRD:Signal:MissingComponentDuration', ...
+            'Channel component is missing Duration/FrameRelative time fields.');
+    end
+    if durationSec < 0 || ~isfinite(durationSec)
+        error('CSRD:Signal:InvalidComponentDuration', ...
+            'Channel component duration must be finite and non-negative.');
+    end
+end
+
 function mapProfile = getMapProfileFromLayout(layout)
+    % getMapProfileFromLayout - Production declaration in CSRD.
+    % 中文说明：getMapProfileFromLayout 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     mapProfile = struct();
     if isfield(layout, 'Environment')
         env = layout.Environment;
@@ -211,10 +347,136 @@ function mapProfile = getMapProfileFromLayout(layout)
         end
     end
 end
-
 function channelModel = resolveChannelModelFromScenario(mapProfile)
+    % resolveChannelModelFromScenario - Production declaration in CSRD.
+    % 中文说明：resolveChannelModelFromScenario 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     channelModel = '';
     if isstruct(mapProfile) && isfield(mapProfile, 'ChannelModel')
         channelModel = mapProfile.ChannelModel;
+    end
+end
+
+function [shiftedSignal, dopplerHz, radialVelMps] = ...
+        applyDopplerForComponent(channelOutput, txInfo, rxInfo)
+    % applyDopplerForComponent - Apply external Doppler when the channel did not.
+    % 中文说明：当信道模块未内部处理多普勒时，基于 Tx/Rx 相对速度补偿当前链路信号。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % Phase 4 (§3.2.B): channel-type whitelist gate. If the channel block
+    % already honoured Tx/Rx velocity internally (e.g. a future
+    % phased.FreeSpace/Doppler-aware variant), it MUST set
+    % channelOutput.ChannelInfo.HasInternalDoppler = true to opt out of
+    % external double-shifting. Default (field absent or false) means we
+    % must apply the shift here.
+    shiftedSignal = channelOutput.Signal;
+    dopplerHz    = 0;
+    radialVelMps = 0;
+
+    if isfield(channelOutput, 'ChannelInfo') && ...
+            isstruct(channelOutput.ChannelInfo) && ...
+            isfield(channelOutput.ChannelInfo, 'HasInternalDoppler') && ...
+            ~isempty(channelOutput.ChannelInfo.HasInternalDoppler) && ...
+            logical(channelOutput.ChannelInfo.HasInternalDoppler)
+        return;
+    end
+
+    if ~isfield(rxInfo, 'RealCarrierFrequency') || ...
+            isempty(rxInfo.RealCarrierFrequency) || ...
+            ~isfinite(rxInfo.RealCarrierFrequency) || ...
+            rxInfo.RealCarrierFrequency <= 0
+        return;
+    end
+
+    if ~isfield(txInfo, 'Position') || ~isfield(rxInfo, 'Position') || ...
+            isempty(txInfo.Position) || isempty(rxInfo.Position)
+        return;
+    end
+
+    relativeVel = csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
+        txInfo, rxInfo);
+
+    if all(relativeVel == 0)
+        return;
+    end
+
+    fs = channelOutput.SampleRate;
+    [shiftedSignal, dopplerHz, radialVelMps] = ...
+        csrd.blocks.physical.channel.impairments.applyDopplerShift( ...
+            channelOutput.Signal, fs, rxInfo.RealCarrierFrequency, ...
+            txInfo.Position, relativeVel, rxInfo.Position);
+end
+
+function bwHz = measureModulatedBandwidth(segmentSignal)
+    %MEASUREMODULATEDBANDWIDTH OBW of clean modulator output.
+    % 中文说明：measureModulatedBandwidth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    %
+    % Phase 4 §3.4 promotes `Truth.Execution.ModulatedBandwidthHz` from
+    % the modulator's analytical formula scalar to a real measurement on
+    % the **clean** baseband waveform (no AWGN, no Doppler, no path
+    % loss). The receiver-side `Truth.Measured.SourcePlane.OccupiedBandwidthHz`
+    % then differs from this Execution number only by the noise-floor
+    % estimator's residual bias — which is what the C8 < 3 % gate is
+    % designed to police.
+    %
+    % Inputs:
+    %   segmentSignal : struct with fields {Signal, SampleRate} produced
+    %                   by ModulationFactory + TransmitFactory.
+    %
+    % Output:
+    %   bwHz : occupied bandwidth in Hz, or NaN if the signal is missing,
+    %          empty, or non-finite (the caller decides whether NaN is
+    %          tolerable per the v2 schema's MeasurementCompleteness
+    %          contract).
+
+    bwHz = NaN;
+    if ~isstruct(segmentSignal) || ...
+            ~isfield(segmentSignal, 'Signal') || ...
+            isempty(segmentSignal.Signal) || ...
+            ~isfield(segmentSignal, 'SampleRate') || ...
+            ~isnumeric(segmentSignal.SampleRate) || ...
+            ~isscalar(segmentSignal.SampleRate) || ...
+            ~isfinite(segmentSignal.SampleRate) || ...
+            segmentSignal.SampleRate <= 0
+        return;
+    end
+
+    sig = segmentSignal.Signal;
+    if any(~isfinite(sig(:)))
+        return;
+    end
+
+    try
+        bwHz = csrd.pipeline.measurement.obwActual( ...
+            sig, double(segmentSignal.SampleRate));
+    catch
+        bwHz = NaN;
+    end
+end
+
+function bwHz = coerceScalarBandwidth(rawBw)
+    %COERCESCALARBANDWIDTH Normalise a [lo,hi] / scalar BW field to Hz.
+    % 中文说明：coerceScalarBandwidth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    %
+    %   The legacy modulator API stored bandwidth as `[lo, hi]`; some
+    %   factories already collapse to a scalar. We accept either and
+    %   always emit a non-negative scalar (or NaN on bad input).
+
+    bwHz = NaN;
+    if isempty(rawBw) || ~isnumeric(rawBw) || any(~isfinite(rawBw(:)))
+        return;
+    end
+
+    if isscalar(rawBw)
+        bwHz = double(abs(rawBw));
+    elseif numel(rawBw) == 2
+        bwHz = double(abs(rawBw(2) - rawBw(1)));
+    else
+        bwHz = double(abs(rawBw(1)));
     end
 end

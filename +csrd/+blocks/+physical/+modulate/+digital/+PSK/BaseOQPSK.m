@@ -1,5 +1,6 @@
 classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     %OQPSKModulator Joint OQPSK modulation and pulse filtering
+    % 中文说明：提供 CSRD 生产链路中的 BaseOQPSK 实现。
     %   MOD = comm.OQPSKModulator creates a modulate object, MOD, that
     %   jointly: (i) modulates the input signal using the offset quadrature
     %   phase shift keying (OQPSK) method, and (ii) pulse shapes the waveform
@@ -123,6 +124,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     methods
         % Constructor
         function obj = BaseOQPSK(varargin)
+            % BaseOQPSK - Production declaration in CSRD.
+            % 中文说明：BaseOQPSK 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             
             if nargin == 1 && isa(varargin{1}, 'comm.OQPSKDemodulator')
                 demod = varargin{1};
@@ -156,6 +161,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         end
         
         function set.OutputDataType(obj, value)
+            % set.OutputDataType - Production declaration in CSRD.
+            % 中文说明：set.OutputDataType 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             
             if strcmpi(value, 'Custom')
                 coder.internal.warning('comm:system:OQPSKModulator:InvalidOutType', 'double', value);
@@ -172,6 +181,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     methods (Access = protected)
         
         function validateInputsImpl(~, x)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             coder.internal.errorIf(isfi(x), ...
                 'comm:system:OQPSKDemodulator:FiInput');
             
@@ -180,6 +193,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         end
         
         function resetImpl(obj)
+            % resetImpl - Production declaration in CSRD.
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             
             if coder.internal.is_defined(obj.pFilter)
                 reset(obj.pFilter);
@@ -189,6 +206,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         end
         
         function setupImpl(obj)
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.pPrevHalfSymbol = zeros(obj.SamplesPerSymbol / 2, obj.NumTransmitAntennas, obj.OutputDataType);
             
             % pMapping does input to phases mapping
@@ -219,6 +240,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         end
         
         function prepareFilter(obj)
+            % prepareFilter - Production declaration in CSRD.
+            % 中文说明：prepareFilter 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             sps = obj.SamplesPerSymbol;
             
             switch obj.PulseShape
@@ -250,6 +275,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         end
         
         function oqpskWaveform = stepImpl(obj, in)
+            % stepImpl - Production declaration in CSRD.
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             
             coder.internal.errorIf(obj.BitInput && mod(length(in), 2), ...
                 'comm:system:bitInVecInWrongLen', length(in), 2);
@@ -333,6 +362,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
         end
         
         function flag = isInputSizeMutableImpl(~, ~)
+            % isInputSizeMutableImpl - Production declaration in CSRD.
+            % 中文说明：isInputSizeMutableImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             flag = true;
         end
         
@@ -341,6 +374,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     methods (Static, Hidden)
         
         function a = getAlternateBlock
+            % getAlternateBlock - Production declaration in CSRD.
+            % 中文说明：getAlternateBlock 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             a = 'commdigbbndpm3/OQPSK Modulator Baseband';
         end
         
@@ -349,6 +386,10 @@ classdef (StrictDefaults)BaseOQPSK < comm.internal.OQPSKBase
     methods (Static, Hidden, Access = protected)
         
         function groups = getPropertyGroupsImpl()
+            % getPropertyGroupsImpl - Production declaration in CSRD.
+            % 中文说明：getPropertyGroupsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             
             modulationSection = matlab.system.display.Section( ...
                 'PropertyList', {'PhaseOffset', 'SymbolMapping', 'BitInput'});

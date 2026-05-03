@@ -133,3 +133,15 @@ work_dirs/
 *.pth
 *.py~
 *.sh~
+
+# CSRD Phase 0 baseline sweep artifacts (audit §17.2 / phase-0-baseline.md §3.2)
+# Keep the committed canonical baseline at docs/baselines/, but ignore the
+# scratch directory the sweep writes per-scenario data and rolling logs into.
+artifacts/
+artifacts/tests/runs/baseline_v0/
+artifacts/tests/runs/
+artifacts/tests/generated_configs/
+
+# Smoke baseline lives next to the canonical one but is regenerated on
+# every run_all_tests('phase0') call; do not commit it.
+docs/baselines/*.smoke.json

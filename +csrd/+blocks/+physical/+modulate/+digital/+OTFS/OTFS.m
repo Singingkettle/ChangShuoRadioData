@@ -1,5 +1,6 @@
 classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
     % OTFS - Orthogonal Time Frequency Space Modulator
+    % 中文说明：提供 CSRD 生产链路中的 OTFS 实现。
     %
     % This class implements Orthogonal Time Frequency Space (OTFS) modulation
     % as a subclass of the BaseModulator. OTFS is a novel modulation technique
@@ -87,7 +88,7 @@ classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
     %   - Aerospace and UAV data links
     %   - Maritime mobile communications
     %
-    % References:
+    % References / 参考资料:
     %   - MATLAB OTFS Modulation Documentation:
     %     https://www.mathworks.com/help/comm/ug/otfs-modulation.html
     %   - Hadani et al., "Orthogonal Time Frequency Space Modulation"
@@ -118,6 +119,9 @@ classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core OTFS modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs the complete OTFS modulation process including
             % first-stage constellation mapping, OSTBC encoding for MIMO, data
@@ -187,6 +191,9 @@ classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
 
         function firstStageModulator = genFirstStageModulator(obj)
             % genFirstStageModulator - Generate constellation mapping function
+            % 中文说明：genFirstStageModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method creates a function handle for the first-stage modulation
             % (constellation mapping) based on the configured modulation type.
@@ -228,6 +235,9 @@ classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
 
         function secondStageModulator = genSecondStageModulator(obj)
             % genSecondStageModulator - Generate OTFS transformation function
+            % 中文说明：genSecondStageModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method creates a function handle for the OTFS transformation
             % that converts delay-Doppler domain signals to time-frequency domain.
@@ -271,6 +281,9 @@ classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured OTFS modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the OTFS modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.
@@ -365,6 +378,9 @@ end
 
 function [modulatedSignal, isfftOutput] = otfsmod(delayDopplerGrid, numTransmitAntennas, paddingLength, varargin)
     % otfsmod - OTFS Modulation Function
+    % 中文说明：otfsmod 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % This function performs OTFS modulation by transforming delay-Doppler domain
     % data to time-frequency domain using inverse symplectic FFT operations and

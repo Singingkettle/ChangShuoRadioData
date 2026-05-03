@@ -1,4 +1,5 @@
 classdef ChannelFactory < matlab.System
+        % 中文说明：提供 CSRD 生产链路中的 ChannelFactory 实现。
 
     properties
         % Config: Struct containing the configuration for channel models.
@@ -18,6 +19,10 @@ classdef ChannelFactory < matlab.System
     methods
 
         function obj = ChannelFactory(varargin)
+            % ChannelFactory - Production declaration in CSRD.
+            % 中文说明：ChannelFactory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
             obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
         end
@@ -27,20 +32,32 @@ classdef ChannelFactory < matlab.System
     methods (Access = protected)
 
         function validateInputsImpl(~, ~, ~, ~, ~, ~)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if isempty(obj.Config) || ~isstruct(obj.Config) || ~isfield(obj.Config, 'ChannelModels')
                 error('ChannelFactory:ConfigError', 'Config property must be a valid struct with a ChannelModels field.');
             end
 
             obj.factoryConfig = obj.Config;
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
             obj.logger.debug('ChannelFactory setup complete; channel model selection is scenario-driven.');
         end
 
         function receivedSignalStruct = stepImpl(obj, inputSignalStruct, frameId, txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo)
+            % stepImpl - Production declaration in CSRD.
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if ~isstruct(channelLinkSpecificInfo)
                 channelLinkSpecificInfo = struct();
             end
@@ -115,6 +132,14 @@ classdef ChannelFactory < matlab.System
                 receivedSignalStruct.PathLoss = computedPathLoss_dB;
 
                 receivedSignalStruct.ComputedSNR = computedSNR_dB;
+                if isfield(channelBlockOutput, 'AppliedSNRdB') && ...
+                        ~isempty(channelBlockOutput.AppliedSNRdB)
+                    receivedSignalStruct.AppliedSNRdB = ...
+                        channelBlockOutput.AppliedSNRdB;
+                elseif ~isfield(receivedSignalStruct, 'AppliedSNRdB') || ...
+                        isempty(receivedSignalStruct.AppliedSNRdB)
+                    receivedSignalStruct.AppliedSNRdB = computedSNR_dB;
+                end
                 receivedSignalStruct.ChannelModel = channelModelName;
 
                 obj.logger.debug('Frame %d, Tx %s to Rx %s: Channel processing by %s successful.', ...
@@ -124,23 +149,22 @@ classdef ChannelFactory < matlab.System
                     frameId, txIdStr, rxIdStr, class(currentChannelBlock), ME_step.message);
                 obj.logger.error('Stack: %s', getReport(ME_step, 'extended', 'hyperlinks', 'off'));
 
-                % Scenario-level identifiers (NoValidPaths, NoBuildingData,
-                % SkipScenario) MUST propagate up so that SimulationRunner
-                % can skip the offending scenario instead of writing a
-                % half-corrupted frame full of "ChannelBlockStepFailed"
-                % markers. Generic, transient errors are still swallowed
-                % so a single bad link does not abort the whole run.
-                if csrd.utils.scenario.isScenarioSkipException(ME_step)
+                % Scenario-level identifiers are still classified through
+                % the shared predicate, but Phase 5 removes the generic
+                % sentinel-output path as well: a failed channel block must
+                % not write a half-corrupted frame or partial annotation.
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_step)
                     rethrow(ME_step);
                 end
-
-                receivedSignalStruct = inputSignalStruct;
-                if ~isfield(receivedSignalStruct, 'Signal'), receivedSignalStruct.Signal = []; end
-                receivedSignalStruct.Error = 'ChannelBlockStepFailed';
+                rethrow(ME_step);
             end
         end
 
         function releaseImpl(obj)
+            % releaseImpl - Production declaration in CSRD.
+            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('ChannelFactory releaseImpl called.');
             obj.releaseCachedBlocks();
             obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
@@ -148,6 +172,10 @@ classdef ChannelFactory < matlab.System
         end
 
         function resetImpl(obj)
+            % resetImpl - Production declaration in CSRD.
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('ChannelFactory resetImpl called.');
             if isa(obj.cachedChannelBlock, 'containers.Map')
                 blockValues = values(obj.cachedChannelBlock);
@@ -166,50 +194,39 @@ classdef ChannelFactory < matlab.System
     methods (Access = private)
 
         function modelName = resolveChannelModelName(obj, channelLinkInfo)
+            % Thin instance-level adapter; the actual resolution policy
+            % 中文说明：resolveChannelModelName 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            % lives in the Hidden static helper so unit tests can
+            % exercise every branch without spinning up matlab.System
+            % setupImpl. Phase 2 (audit D5 / §3.6) removed the
+            % `modelNames{1}` arbitrary-first-key silent fallback that
+            % used to live at the end of this method.
             requested = getStructField(channelLinkInfo, 'ChannelModel', '');
             mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
             mode = getStructField(mapProfile, 'Mode', '');
 
-            if isempty(requested) || strcmpi(requested, 'Statistical')
-                requested = obj.getDefaultModelForMode(mode);
-            end
-
-            if isfield(obj.factoryConfig.ChannelModels, requested)
-                modelName = requested;
-                return;
-            end
-
-            fallback = obj.getDefaultModelForMode(mode);
-            if isfield(obj.factoryConfig.ChannelModels, fallback)
-                modelName = fallback;
-                return;
-            end
-
-            if isfield(obj.factoryConfig.ChannelModels, 'AWGN')
-                modelName = 'AWGN';
-                return;
-            end
-
-            modelNames = fieldnames(obj.factoryConfig.ChannelModels);
-            modelName = modelNames{1};
+            modelName = csrd.factories.ChannelFactory.resolveChannelModelNameFromConfig( ...
+                requested, mode, obj.factoryConfig);
         end
 
         function defaultModel = getDefaultModelForMode(obj, mode)
-            defaultModel = 'AWGN';
-            if ~isfield(obj.factoryConfig, 'DefaultModels') || ~isstruct(obj.factoryConfig.DefaultModels)
-                return;
-            end
-
-            defaults = obj.factoryConfig.DefaultModels;
-            if ~isempty(mode) && isfield(defaults, mode)
-                defaultModel = defaults.(mode);
-            elseif isfield(defaults, 'Statistical')
-                defaultModel = defaults.Statistical;
-            end
+            % Phase 2 (D5): instance-level adapter. The actual policy is
+            % 中文说明：getDefaultModelForMode 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            % a Hidden static helper so unit tests can drive it without
+            % spinning up matlab.System.
+            defaultModel = csrd.factories.ChannelFactory.getDefaultModelForModeFromConfig( ...
+                mode, obj.factoryConfig);
         end
 
         function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr) %#ok<INUSL>
             % All channel models, including ray tracing, MUST be cached per
+            % 中文说明：resolveChannelCacheKey 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % Tx-Rx link. Sharing a single ray-tracing block across links
             % causes per-link state (rays, channel filters, antenna sites,
             % seed) to leak between transmitters/receivers and corrupts
@@ -218,10 +235,18 @@ classdef ChannelFactory < matlab.System
         end
 
         function tf = isRayTracingModelName(~, modelName)
+            % isRayTracingModelName - Production declaration in CSRD.
+            % 中文说明：isRayTracingModelName 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             tf = contains(modelName, 'RayTracing', 'IgnoreCase', true);
         end
 
         function block = getChannelBlock(obj, modelName, cacheKey)
+            % getChannelBlock - Production declaration in CSRD.
+            % 中文说明：getChannelBlock 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if isempty(obj.cachedChannelBlock) || ~isa(obj.cachedChannelBlock, 'containers.Map')
                 obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
             end
@@ -256,6 +281,10 @@ classdef ChannelFactory < matlab.System
         end
 
         function applyBlockConfig(obj, block, blockConfig)
+            % applyBlockConfig - Production declaration in CSRD.
+            % 中文说明：applyBlockConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             cfgFields = fieldnames(blockConfig);
             for idx = 1:numel(cfgFields)
                 fieldName = cfgFields{idx};
@@ -270,7 +299,9 @@ classdef ChannelFactory < matlab.System
                     try
                         block.(fieldName) = fieldValue;
                     catch ME_set
-                        obj.logger.warning('Could not set channel property "%s": %s', fieldName, ME_set.message);
+                        error('CSRD:Channel:BlockConfigAssignmentFailed', ...
+                            'Could not set channel property "%s": %s', ...
+                            fieldName, ME_set.message);
                     end
                 elseif strcmp(fieldName, 'MaxReflections') && isprop(block, 'PropagationModelConfig')
                     pmConfig = block.PropagationModelConfig;
@@ -285,6 +316,9 @@ classdef ChannelFactory < matlab.System
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...
                 txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB)
             % NOTE: linkDistance_m is in METERS to match the documented
+            % 中文说明：configureStatisticalBlock 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % BaseChannel.Distance unit. The previous signature used
             % linkDistance_km but the body referenced linkDistance_m,
             % which would crash with an undefined-variable error if the
@@ -305,7 +339,8 @@ classdef ChannelFactory < matlab.System
                         % BaseChannel.Distance is documented in METERS.
                         currentChannelBlock.Distance = max(linkDistance_m, 1);
                     catch ME_dist
-                        obj.logger.warning('Could not update channel Distance: %s', ME_dist.message);
+                        error('CSRD:Channel:DistanceAssignmentFailed', ...
+                            'Could not update channel Distance: %s', ME_dist.message);
                     end
                 end
             end
@@ -317,7 +352,8 @@ classdef ChannelFactory < matlab.System
                     try
                         currentChannelBlock.(propName) = channelLinkSpecificInfo.(propName);
                     catch ME_setprop_link
-                        obj.logger.warning('Could not set channel prop "%s" from link info. Error: %s', ...
+                        error('CSRD:Channel:LinkInfoAssignmentFailed', ...
+                            'Could not set channel prop "%s" from link info. Error: %s', ...
                             propName, ME_setprop_link.message);
                     end
                 end
@@ -327,7 +363,8 @@ classdef ChannelFactory < matlab.System
                 try
                     currentChannelBlock.NumTransmitAntennas = txSpecificInfo.NumTransmitAntennas;
                 catch ME_txant
-                    obj.logger.warning('Could not update NumTransmitAntennas: %s', ME_txant.message);
+                    error('CSRD:Channel:TxAntennaAssignmentFailed', ...
+                        'Could not update NumTransmitAntennas: %s', ME_txant.message);
                 end
             end
 
@@ -335,22 +372,161 @@ classdef ChannelFactory < matlab.System
                 try
                     currentChannelBlock.NumReceiveAntennas = rxSpecificInfo.NumAntennas;
                 catch ME_rxant
-                    obj.logger.warning('Could not update NumReceiveAntennas: %s', ME_rxant.message);
+                    error('CSRD:Channel:RxAntennaAssignmentFailed', ...
+                        'Could not update NumReceiveAntennas: %s', ME_rxant.message);
                 end
             end
 
             if isprop(currentChannelBlock, 'Seed')
                 try
-                    txHash = sum(double(char(txIdStr)));
-                    rxHash = sum(double(char(rxIdStr)));
-                    currentChannelBlock.Seed = mod(frameId * 10000 + txHash * 100 + rxHash, 2^31 - 1);
+                    % Phase 1 / H13: Channel Seed must be derived from
+                    % (TxId, RxId, BurstId) so the **same burst** keeps
+                    % the **same fading realisation** across frames, and
+                    % so different bursts on the same Tx-Rx link see
+                    % independent fading. The previous frameId-based
+                    % formula re-randomised the channel every frame and
+                    % collapsed two distinct bursts on the same Tx onto
+                    % the same seed within one frame, breaking physical
+                    % consistency.
+                    currentChannelBlock.Seed = obj.deriveChannelSeed( ...
+                        frameId, txIdStr, rxIdStr, channelLinkSpecificInfo);
                 catch ME_seed
-                    obj.logger.warning('Could not update channel Seed: %s', ME_seed.message);
+                    error('CSRD:Channel:SeedAssignmentFailed', ...
+                        'Could not update channel Seed: %s', ME_seed.message);
                 end
             end
         end
 
+    end
+
+    methods
+
+        function seedValue = deriveChannelSeed(~, frameId, txIdStr, rxIdStr, channelLinkInfo)
+            % deriveChannelSeed Compute a burst-aware deterministic seed
+            % 中文说明：deriveChannelSeed 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            % for statistical channel blocks.
+            %
+            % This method is intentionally PUBLIC so unit tests and
+            % downstream consumers (e.g. annotation enrichers in later
+            % phases) can verify and reproduce the channel seed without
+            % running the full step() pipeline.
+            %
+            % Inputs:
+            %   frameId          : current observation frame id, retained
+            %                      only for API stability; it is not part
+            %                      of the seed key.
+            %   txIdStr, rxIdStr : transmitter / receiver identifier (char
+            %                      or string).
+            %   channelLinkInfo  : channelLinkSpecificInfo struct that
+            %                      MUST carry a non-empty BurstId field.
+            %
+            % Output:
+            %   seedValue : non-negative double in [1, 2^31 - 1].
+            %
+            % Formula:
+            %   key = "Tx=<txIdStr>|Rx=<rxIdStr>|Burst=<burstKey>"
+            %   seed = shortInt32Hash(key) (clamped to >= 1)
+            %
+            % burstKey selection:
+            burstKey = '';
+            if isstruct(channelLinkInfo) && isfield(channelLinkInfo, 'BurstId') && ...
+                    ~isempty(channelLinkInfo.BurstId)
+                burstKey = char(string(channelLinkInfo.BurstId));
+            end
+            if isempty(burstKey)
+                error('CSRD:Channel:MissingBurstId', ...
+                    ['channelLinkInfo.BurstId is required for deterministic ', ...
+                     'burst-aware channel seeding.']);
+            end
+            key = sprintf('Tx=%s|Rx=%s|Burst=%s', ...
+                char(txIdStr), char(rxIdStr), burstKey);
+            seedValue = csrd.support.hash.shortInt32Hash(key);
+            if seedValue <= 0
+                seedValue = 1;
+            end
+        end
+
+        function receivedSignalStruct = mergeChannelOutput(~, inputSignalStruct, channelBlockOutput)
+            % mergeChannelOutput Whitelist-based merge of a channel block
+            % 中文说明：mergeChannelOutput 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            % output into the upstream signal struct.
+            %
+            % Phase 1 / H14 contract (see docs/audits/phases/phase-1-dataflow.md §3.5):
+            %
+            %   1. The upstream inputSignalStruct (which already carries
+            %      ID / TxId / BurstId / SegmentId / SubBurstId /
+            %      ModulatorConfig / Header / Planned / etc.) is the
+            %      base. Its fields are ALWAYS preserved unless they
+            %      appear in CHANNEL_OWNED_FIELDS below.
+            %   2. The channel block ONLY owns: 'Signal' plus the
+            %      channel-specific physics fields enumerated in
+            %      CHANNEL_OWNED_FIELDS. These overwrite the upstream
+            %      values when the channel actually produced them.
+            %   3. Any **new** field returned by the channel block that
+            %      is NOT present upstream is added (forward-compatible
+            %      injection of new physics metadata).
+            %   4. A non-struct channelBlockOutput is treated as a raw
+            %      Signal payload, attached to the upstream struct.
+            %
+            % This replaces the previous "if isfield(channelBlockOutput,
+            % 'Signal') return channelBlockOutput end" branch, which
+            % silently dropped every upstream field whenever the channel
+            % block returned a struct containing a Signal field
+            % (e.g. RayTracing).
+            %
+            % The method is intentionally public so unit tests can verify
+            % the whitelist contract directly.
+
+            CHANNEL_OWNED_FIELDS = { ...
+                'Signal', ...
+                'PathLoss', ...
+                'AppliedPathLoss', ...
+                'ChannelInfo', ...
+                'PathDelays', ...
+                'PathGains', ...
+                'NumValidPaths', ...
+                'RayInfo', ...
+                'AntennaConfig', ...
+                'ChannelImpulseResponse', ...
+                'PropagationDelay', ...
+                'NoiseRealization' ...
+            };
+
+            if ~isstruct(channelBlockOutput)
+                receivedSignalStruct = inputSignalStruct;
+                receivedSignalStruct.Signal = channelBlockOutput;
+                return;
+            end
+
+            receivedSignalStruct = inputSignalStruct;
+            outputFields = fieldnames(channelBlockOutput);
+            for idx = 1:numel(outputFields)
+                fieldName = outputFields{idx};
+                if any(strcmp(fieldName, CHANNEL_OWNED_FIELDS))
+                    receivedSignalStruct.(fieldName) = channelBlockOutput.(fieldName);
+                elseif ~isfield(receivedSignalStruct, fieldName)
+                    receivedSignalStruct.(fieldName) = channelBlockOutput.(fieldName);
+                else
+                    % Field exists upstream and is not channel-owned:
+                    % preserve the upstream value (e.g. ID, TxId,
+                    % BurstId, ModulatorConfig, Header, Planned, ...).
+                end
+            end
+        end
+
+    end
+
+    methods (Access = private)
+
         function [linkDistance_m, linkDistance_km] = computeLinkDistance(obj, txInfo, rxInfo, channelLinkInfo)
+            % computeLinkDistance - Production declaration in CSRD.
+            % 中文说明：computeLinkDistance 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             linkDistance_m = 0;
             txPos = getStructField(txInfo, 'Position', []);
             rxPos = getStructField(rxInfo, 'Position', []);
@@ -378,94 +554,131 @@ classdef ChannelFactory < matlab.System
         end
 
         function pathLoss_dB = computeFreeSpacePathLoss(obj, linkDistance_m, rxInfo, channelLinkInfo)
+            % computeFreeSpacePathLoss - Production declaration in CSRD.
+            % 中文说明：computeFreeSpacePathLoss 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             carrierFreq = obj.resolveCarrierFrequency(rxInfo, channelLinkInfo);
             waveLength = physconst('LightSpeed') / carrierFreq;
             pathLoss_dB = fspl(max(linkDistance_m, 1), waveLength);
         end
 
         function carrierFreq = resolveCarrierFrequency(obj, rxInfo, channelLinkInfo)
-            carrierFreq = 2.4e9;
-            if isfield(obj.factoryConfig, 'LinkBudget') && isfield(obj.factoryConfig.LinkBudget, 'CarrierFrequency')
-                carrierFreq = obj.factoryConfig.LinkBudget.CarrierFrequency;
-            end
-
+            % resolveCarrierFrequency - Production declaration in CSRD.
+            % 中文说明：resolveCarrierFrequency 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             rxScenarioConfig = getStructField(channelLinkInfo, 'RxScenarioConfig', struct());
-            if isfield(rxScenarioConfig, 'Observation') && isfield(rxScenarioConfig.Observation, 'RealCarrierFrequency')
+            if isfield(rxScenarioConfig, 'Observation') && ...
+                    isfield(rxScenarioConfig.Observation, 'RealCarrierFrequency') && ...
+                    ~isempty(rxScenarioConfig.Observation.RealCarrierFrequency)
                 carrierFreq = rxScenarioConfig.Observation.RealCarrierFrequency;
-            elseif isfield(rxInfo, 'RealCarrierFrequency')
+            elseif isstruct(rxInfo) && isfield(rxInfo, 'RealCarrierFrequency') && ...
+                    ~isempty(rxInfo.RealCarrierFrequency)
                 carrierFreq = rxInfo.RealCarrierFrequency;
+            else
+                error('CSRD:Channel:MissingCarrierFrequency', ...
+                    ['rxInfo.RealCarrierFrequency or ', ...
+                     'channelLinkInfo.RxScenarioConfig.Observation.RealCarrierFrequency is required.']);
+            end
+            carrierFreq = requirePositiveFiniteScalar(carrierFreq, ...
+                'rxInfo.RealCarrierFrequency');
+
+            if isfield(obj.factoryConfig, 'LinkBudget') && ...
+                    isfield(obj.factoryConfig.LinkBudget, 'CarrierFrequency') && ...
+                    ~isempty(obj.factoryConfig.LinkBudget.CarrierFrequency)
+                error('CSRD:Channel:DeprecatedCarrierFrequencyAuthority', ...
+                    ['FactoryConfigs.Channel.LinkBudget.CarrierFrequency is forbidden. ', ...
+                     'Use rxInfo.RealCarrierFrequency as the only runtime carrier authority.']);
             end
         end
 
         function snr_dB = computeLinkBudgetSNR(obj, pathLoss_dB, txInfo, inputSignalStruct, rxInfo)
             % Compute analytical link-budget SNR.
+            % 中文说明：computeLinkBudgetSNR 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
-            % Noise bandwidth defaults to the receiver observation
-            % bandwidth (rxInfo.SampleRate or rxInfo.ObservableRange) and
-            % is clamped down to the planned occupied bandwidth of the
+            % Noise bandwidth is resolved from explicit link-budget,
+            % receiver observation, and current segment bandwidth facts,
+            % then clamped down to the planned occupied bandwidth of the
             % current Tx segment when the latter is narrower. Without
             % this clamp the noise floor is dominated by spectrum the
             % current Tx is not even using, and narrow-band signals get
             % a systematically pessimistic SNR label.
 
-            txPower_dBm = getStructField(txInfo, 'Power', 20);
-            noisePSD = -174;
+            if ~isstruct(txInfo) || ~isfield(txInfo, 'Power') || isempty(txInfo.Power)
+                error('CSRD:Channel:MissingTransmitPower', ...
+                    'txInfo.Power is required for link-budget SNR.');
+            end
+            txPower_dBm = requireFiniteScalar(txInfo.Power, 'txInfo.Power');
             configuredBW = [];
-            noiseFig = 6;
 
-            if isfield(obj.factoryConfig, 'LinkBudget')
-                lb = obj.factoryConfig.LinkBudget;
-                noisePSD = getStructField(lb, 'ThermalNoisePSD', noisePSD);
-                if isfield(lb, 'NoiseBandwidth') && ~isempty(lb.NoiseBandwidth) && lb.NoiseBandwidth > 0
-                    configuredBW = lb.NoiseBandwidth;
-                end
-                noiseFig = getStructField(lb, 'NoiseFigure', noiseFig);
+            if ~isfield(obj.factoryConfig, 'LinkBudget') || ...
+                    ~isstruct(obj.factoryConfig.LinkBudget)
+                error('CSRD:Channel:MissingLinkBudgetConfig', ...
+                    'FactoryConfigs.Channel.LinkBudget is required for SNR labels.');
+            end
+            lb = obj.factoryConfig.LinkBudget;
+            if ~isfield(lb, 'ThermalNoisePSD') || isempty(lb.ThermalNoisePSD)
+                error('CSRD:Channel:MissingThermalNoisePSD', ...
+                    'FactoryConfigs.Channel.LinkBudget.ThermalNoisePSD is required.');
+            end
+            if ~isfield(lb, 'NoiseFigure') || isempty(lb.NoiseFigure)
+                error('CSRD:Channel:MissingNoiseFigure', ...
+                    'FactoryConfigs.Channel.LinkBudget.NoiseFigure is required.');
+            end
+            noisePSD = requireFiniteScalar(lb.ThermalNoisePSD, ...
+                'FactoryConfigs.Channel.LinkBudget.ThermalNoisePSD');
+            noiseFig = requireFiniteScalar(lb.NoiseFigure, ...
+                'FactoryConfigs.Channel.LinkBudget.NoiseFigure');
+            if isfield(lb, 'NoiseBandwidth') && ~isempty(lb.NoiseBandwidth)
+                configuredBW = requirePositiveFiniteScalar(lb.NoiseBandwidth, ...
+                    'FactoryConfigs.Channel.LinkBudget.NoiseBandwidth');
             end
 
             rxBW = [];
             if nargin >= 5 && isstruct(rxInfo)
-                if isfield(rxInfo, 'SampleRate') && ~isempty(rxInfo.SampleRate) && rxInfo.SampleRate > 0
-                    rxBW = rxInfo.SampleRate;
-                elseif isfield(rxInfo, 'ObservableRange') && numel(rxInfo.ObservableRange) >= 2
-                    rxBW = abs(rxInfo.ObservableRange(2) - rxInfo.ObservableRange(1));
+                if isfield(rxInfo, 'ObservableRange') && numel(rxInfo.ObservableRange) >= 2
+                    rxRange = double(reshape(rxInfo.ObservableRange(1:2), 1, 2));
+                    if any(~isfinite(rxRange)) || rxRange(2) <= rxRange(1)
+                        error('CSRD:Channel:InvalidObservableRange', ...
+                            'rxInfo.ObservableRange must be finite and increasing.');
+                    end
+                    rxBW = rxRange(2) - rxRange(1);
+                elseif isfield(rxInfo, 'SampleRate') && ~isempty(rxInfo.SampleRate) && rxInfo.SampleRate > 0
+                    rxBW = requirePositiveFiniteScalar(rxInfo.SampleRate, ...
+                        'rxInfo.SampleRate');
                 elseif isfield(rxInfo, 'BandWidth') && ~isempty(rxInfo.BandWidth) && rxInfo.BandWidth > 0
-                    rxBW = rxInfo.BandWidth;
+                    rxBW = requirePositiveFiniteScalar(rxInfo.BandWidth, ...
+                        'rxInfo.BandWidth');
                 end
             end
 
             txBW = [];
             if nargin >= 4 && isstruct(inputSignalStruct)
                 if isfield(inputSignalStruct, 'Bandwidth') && ~isempty(inputSignalStruct.Bandwidth) && inputSignalStruct.Bandwidth > 0
-                    txBW = inputSignalStruct.Bandwidth;
+                    txBW = requirePositiveFiniteScalar(inputSignalStruct.Bandwidth, ...
+                        'inputSignalStruct.Bandwidth');
                 elseif isfield(inputSignalStruct, 'Planned') && isstruct(inputSignalStruct.Planned) && ...
                         isfield(inputSignalStruct.Planned, 'Bandwidth') && inputSignalStruct.Planned.Bandwidth > 0
-                    txBW = inputSignalStruct.Planned.Bandwidth;
+                    txBW = requirePositiveFiniteScalar(inputSignalStruct.Planned.Bandwidth, ...
+                        'inputSignalStruct.Planned.Bandwidth');
                 end
             end
 
-            noiseBW = csrd.utils.linkbudget.resolveNoiseBandwidth( ...
-                configuredBW, rxBW, txBW, 50e6);
+            noiseBW = csrd.pipeline.linkbudget.resolveNoiseBandwidth( ...
+                configuredBW, rxBW, txBW);
 
             noisePower_dBm = noisePSD + 10 * log10(noiseBW) + noiseFig;
             snr_dB = txPower_dBm - pathLoss_dB - noisePower_dBm;
         end
 
-        function receivedSignalStruct = mergeChannelOutput(~, inputSignalStruct, channelBlockOutput)
-            if isstruct(channelBlockOutput) && isfield(channelBlockOutput, 'Signal')
-                receivedSignalStruct = channelBlockOutput;
-            elseif isstruct(channelBlockOutput)
-                receivedSignalStruct = inputSignalStruct;
-                outputFields = fieldnames(channelBlockOutput);
-                for idx = 1:numel(outputFields)
-                    receivedSignalStruct.(outputFields{idx}) = channelBlockOutput.(outputFields{idx});
-                end
-            else
-                receivedSignalStruct = inputSignalStruct;
-                receivedSignalStruct.Signal = channelBlockOutput;
-            end
-        end
-
         function releaseCachedBlocks(obj)
+            % releaseCachedBlocks - Production declaration in CSRD.
+            % 中文说明：releaseCachedBlocks 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if ~isa(obj.cachedChannelBlock, 'containers.Map')
                 return;
             end
@@ -481,9 +694,124 @@ classdef ChannelFactory < matlab.System
 
     end
 
+    methods (Static, Hidden)
+
+        function modelName = resolveChannelModelNameFromConfig(requested, mode, factoryConfig)
+            % resolveChannelModelNameFromConfig - Phase 2 (D5) channel
+            % 中文说明：resolveChannelModelNameFromConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            % model resolution policy as a Hidden static helper.
+            %
+            % This is the single source of truth for "given a requested
+            % model name + a propagation mode + the factoryConfig
+            % registry, which channel model should we instantiate?".
+            % The instance method `resolveChannelModelName` is a thin
+            % adapter; tests target this static helper directly so they
+            % do not need to drive matlab.System.setupImpl.
+            %
+            % Resolution order:
+            %   1. Caller asked for an empty/Statistical placeholder
+            %      → resolve to the mode-default first.
+            %   2. Requested model is registered → return it.
+            %   3. Otherwise → throw CSRD:Blueprint:ChannelModelMismatch
+            %      (Phase 2: NO arbitrary `modelNames{1}` silent
+            %      fallback; the validator should have rejected this
+            %      blueprint upstream).
+            if ~isstruct(factoryConfig) || ~isfield(factoryConfig, 'ChannelModels') ...
+                    || ~isstruct(factoryConfig.ChannelModels)
+                error('CSRD:Blueprint:ChannelModelMismatch', ...
+                    ['Channel model resolution failed: factoryConfig.ChannelModels ', ...
+                     'is missing or not a struct (requested model=''%s''). The Phase 2 ', ...
+                     'BlueprintFeasibilityValidator.checkChannelModelInRegistry should ', ...
+                     'have rejected this blueprint upstream.'], char(string(requested)));
+            end
+
+            if isempty(requested) || (ischar(requested) && strcmpi(requested, 'Statistical')) ...
+                    || (isstring(requested) && strcmpi(string(requested), "Statistical"))
+                requested = csrd.factories.ChannelFactory.getDefaultModelForModeFromConfig( ...
+                    mode, factoryConfig);
+            end
+
+            requestedChar = char(string(requested));
+            if isfield(factoryConfig.ChannelModels, requestedChar)
+                modelName = requestedChar;
+                return;
+            end
+
+            % Phase 2 (audit D5 / §3.6) — `modelNames{1}` arbitrary
+            % first-key silent fallback removed; fail fast instead.
+            error('CSRD:Blueprint:ChannelModelMismatch', ...
+                ['Channel model resolution failed: requested model=''%s'' / ', ...
+                 'mode=''%s'' has no matching entry in ', ...
+                 'factoryConfig.ChannelModels. This blueprint should have ', ...
+                 'been rejected by BlueprintFeasibilityValidator.', ...
+                 'checkChannelModelInRegistry; reaching ChannelFactory ', ...
+                 'means the validator was bypassed.'], requestedChar, char(string(mode)));
+        end
+
+        function defaultModel = getDefaultModelForModeFromConfig(mode, factoryConfig)
+            % getDefaultModelForModeFromConfig - Phase 2 (D5) default
+            % 中文说明：getDefaultModelForModeFromConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            % model lookup as a Hidden static helper. The registry must
+            % declare a default for the requested mode or for Statistical.
+            if ~isstruct(factoryConfig) || ~isfield(factoryConfig, 'DefaultModels') ...
+                    || ~isstruct(factoryConfig.DefaultModels)
+                error('CSRD:Blueprint:MissingChannelDefaultModel', ...
+                    'FactoryConfigs.Channel.DefaultModels is required.');
+            end
+
+            defaults = factoryConfig.DefaultModels;
+            modeChar = char(string(mode));
+            if ~isempty(modeChar) && isfield(defaults, modeChar)
+                defaultModel = defaults.(modeChar);
+            elseif isfield(defaults, 'Statistical')
+                defaultModel = defaults.Statistical;
+            else
+                error('CSRD:Blueprint:MissingChannelDefaultModel', ...
+                    ['FactoryConfigs.Channel.DefaultModels must define ', ...
+                     'the mode "%s" or a Statistical default.'], modeChar);
+            end
+
+            if isempty(defaultModel)
+                error('CSRD:Blueprint:MissingChannelDefaultModel', ...
+                    'Resolved channel default model for mode "%s" is empty.', modeChar);
+            end
+            defaultChar = char(string(defaultModel));
+            if ~isfield(factoryConfig.ChannelModels, defaultChar)
+                error('CSRD:Blueprint:ChannelModelMismatch', ...
+                    ['FactoryConfigs.Channel.DefaultModels resolved to "%s", ', ...
+                     'but that model is not registered in ChannelModels.'], defaultChar);
+            end
+        end
+
+    end
+
+end
+
+function value = requireFiniteScalar(value, label)
+    if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
+        error('CSRD:RuntimeTruth:InvalidFiniteScalar', ...
+            '%s must be a finite numeric scalar.', label);
+    end
+    value = double(value);
+end
+
+function value = requirePositiveFiniteScalar(value, label)
+    value = requireFiniteScalar(value, label);
+    if value <= 0
+        error('CSRD:RuntimeTruth:InvalidPositiveScalar', ...
+            '%s must be positive.', label);
+    end
 end
 
 function value = getStructField(s, fieldName, defaultValue)
+    % getStructField - Production declaration in CSRD.
+    % 中文说明：getStructField 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -492,6 +820,10 @@ function value = getStructField(s, fieldName, defaultValue)
 end
 
 function distance_m = geographicDistance(txPos, rxPos)
+    % geographicDistance - Production declaration in CSRD.
+    % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
     lat1 = deg2rad(txPos(2));
     lon1 = deg2rad(txPos(1));

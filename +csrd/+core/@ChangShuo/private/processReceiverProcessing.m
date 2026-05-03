@@ -1,5 +1,8 @@
 function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, signalsAtReceivers, RxInfos)
     % processReceiverProcessing - Process received signals and generate outputs
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processReceiverProcessing 实现。
     %
     % This method combines all received signal components and generates
     % the final frame data and annotations.
@@ -22,10 +25,14 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
     for rxIdx = 1:numRx
         rxInfo = RxInfos{rxIdx};
 
-        if ~isfield(rxInfo, 'ID') || contains(rxInfo.Status, 'Error')
-            FrameData{rxIdx} = [];
-            FrameAnnotation{rxIdx} = struct('FrameId', FrameId, 'ReceiverID', 'Unknown', 'Status', 'Error');
-            continue;
+        if ~isfield(rxInfo, 'ID')
+            error('CSRD:Construction:RxMissingIdentifier', ...
+                'Frame %d, Rx index %d: RxInfo is missing ID.', FrameId, rxIdx);
+        end
+        if isfield(rxInfo, 'Status') && contains(rxInfo.Status, 'Error')
+            error('CSRD:Construction:RxInvalidStatus', ...
+                'Frame %d, RxID %s: RxInfo has error status %s.', ...
+                FrameId, string(rxInfo.ID), string(rxInfo.Status));
         end
 
         try
@@ -33,6 +40,7 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
 
             % Combine all signal components at this receiver
             combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo);
+            frameShape = combinedSignal.FrameShape;
 
             % Apply receiver processing using ReceiveFactory
             % Handle both cell array and struct array formats
@@ -45,6 +53,18 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             end
             processedOutput = step(obj.Factories.Receive, combinedSignal, ...
                 FrameId, rxInfo, rxScenarioConfig);
+            if isfield(processedOutput, 'Signal')
+                [processedOutput.Signal, rxFrameGating] = ...
+                    localCoerceProcessedFrameLength( ...
+                        processedOutput.Signal, frameShape.NumSamples);
+            else
+                rxFrameGating = struct( ...
+                    'InputSamples', 0, ...
+                    'OutputSamples', frameShape.NumSamples, ...
+                    'TargetSamples', frameShape.NumSamples, ...
+                    'Action', 'empty');
+                processedOutput.Signal = complex(zeros(frameShape.NumSamples, 1));
+            end
 
             FrameData{rxIdx} = struct();
             FrameData{rxIdx}.ReceiverID = rxInfo.ID;
@@ -54,11 +74,10 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
                 FrameData{rxIdx}.Signal = [];
             end
             FrameData{rxIdx}.SampleRate = rxInfo.SampleRate;
-            if ~isempty(FrameData{rxIdx}.Signal)
-                FrameData{rxIdx}.Duration = length(FrameData{rxIdx}.Signal) / rxInfo.SampleRate;
-            else
-                FrameData{rxIdx}.Duration = 0;
-            end
+            FrameData{rxIdx}.Duration = frameShape.DurationSec;
+            FrameData{rxIdx}.FrameLengthSamples = frameShape.NumSamples;
+            FrameData{rxIdx}.FrameShape = frameShape;
+            FrameData{rxIdx}.RxFrameGating = rxFrameGating;
 
             FrameAnnotation{rxIdx} = struct();
             FrameAnnotation{rxIdx}.FrameId = FrameId;
@@ -67,128 +86,449 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             FrameAnnotation{rxIdx}.Position = rxInfo.Position;
             FrameAnnotation{rxIdx}.SampleRate = rxInfo.SampleRate;
             FrameAnnotation{rxIdx}.ObservableRange = rxInfo.ObservableRange;
-            FrameAnnotation{rxIdx}.NumSignalComponents = length(rxSignals.SignalComponents);
+            FrameAnnotation{rxIdx}.FrameLengthSamples = frameShape.NumSamples;
+            FrameAnnotation{rxIdx}.FrameDurationSec = frameShape.DurationSec;
+            FrameAnnotation{rxIdx}.NumSignalComponents = length(combinedSignal.Components);
             FrameAnnotation{rxIdx}.Status = 'Success';
 
+            % Phase 4 (audit §17.6 / H17): compute the FramePlane
+            % measurements once per receiver from the combined waveform
+            % (post Rx-combination, pre Rx RF chain). Each SignalSource
+            % then references this cache so we never re-run obw on the
+            % same combined buffer N times.
+            observableBwHz = computeObservableBandwidthHz(rxInfo);
+            framePlaneCache = computeFramePlaneCache( ...
+                combinedSignal, rxInfo.SampleRate, observableBwHz);
+
             FrameAnnotation{rxIdx}.SignalSources = [];
-            for compIdx = 1:length(rxSignals.SignalComponents)
-                comp = rxSignals.SignalComponents{compIdx};
-                sourceInfo = buildSourceAnnotation(comp);
+            for compIdx = 1:length(combinedSignal.Components)
+                comp = combinedSignal.Components{compIdx};
+                sourceInfo = buildSourceAnnotation(comp, comp.Signal, ...
+                    rxInfo.SampleRate, observableBwHz, framePlaneCache);
                 FrameAnnotation{rxIdx}.SignalSources = [FrameAnnotation{rxIdx}.SignalSources, sourceInfo];
             end
 
+            % Phase 1 (C1 / §3.6.2): surface the realized RX-side
+            % RFImpairments at the frame-annotation level. SourceInfo's
+            % RFImpairments field is the TX-side chain (DCOffset /
+            % IQImbalance / PhaseNoise / Nonlinearity), so RX-side
+            % impairments (DCOffset / IqImbalance / ThermalNoise /
+            % MemorylessNonlinearity / SampleRateOffset / Type) need a
+            % separate, unambiguous annotation slot to prove the receiver
+            % chain actually realized them.
+            if isstruct(processedOutput) && isfield(processedOutput, 'RxImpairments')
+                FrameAnnotation{rxIdx}.RxImpairments = processedOutput.RxImpairments;
+            end
+
             obj.logger.debug("Frame %d, RxID %s: Receiver processing complete (%d signal components).", ...
-                FrameId, string(rxInfo.ID), length(rxSignals.SignalComponents));
+                FrameId, string(rxInfo.ID), length(combinedSignal.Components));
 
         catch ME_rx
             obj.logger.error("Frame %d, Rx %s: Receiver processing error: %s", ...
                 FrameId, string(rxInfo.ID), ME_rx.message);
-            FrameData{rxIdx} = [];
-            FrameAnnotation{rxIdx} = struct('FrameId', FrameId, 'ReceiverID', rxInfo.ID, ...
-                'Status', 'Error', 'ErrorMessage', ME_rx.message);
+            rethrow(ME_rx);
         end
     end
 
     obj.logger.debug("Frame %d: All receiver processing complete.", FrameId);
 end
 
-function sourceInfo = buildSourceAnnotation(comp)
-    %BUILDSOURCEANNOTATION Build the per-source annotation struct.
+function sourceInfo = buildSourceAnnotation(comp, isolatedSignal, ...
+        sampleRate, observableBwHz, framePlaneCache)
+    %BUILDSOURCEANNOTATION Phase 4 v2 schema (annotation full-replacement).
+    % 中文说明：buildSourceAnnotation 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
-    %   The annotation is split into four orthogonal sub-structures so
-    %   downstream AI/ML consumers can rely on a stable schema:
+    %   Per Phase 4 §3.4 owner decision A_full_replace, the v1 top-level
+    %   keys (`Realized` / `Planned` / `Temporal` / `Spatial` /
+    %   `LinkBudget` / `Channel`) are deleted in favour of the unified
+    %   Truth.{Design,Execution,Measured} hierarchy. ReceiverView is
+    %   stamped by the upstream processReceiverProcessing main loop in
+    %   Phase 4 §3.5 (S6 plumbing); this builder only writes the field
+    %   when the caller has already attached it onto comp.ReceiverView.
     %
-    %     * Planned   - what the scenario asked for (NEVER fabricated
-    %                   from realised values; absent => empty struct).
-    %     * Realized  - what actually happened in the executed signal
-    %                   (FrequencyOffset, Bandwidth, SampleRate, ...).
-    %     * Temporal  - timing information (StartTime, Duration,
-    %                   SegmentId).
-    %     * Spatial   - geometry only (positions, velocities, distance).
-    %     * LinkBudget- link-budget figures (path losses + SNR).
-    %     * Channel   - channel-specific metadata (model name, ray
-    %                   count, fallback flag, RF impairments).
+    %   Schema:
+    %     SignalSources(k) = struct( ...
+    %       'TxID',         char, ...
+    %       'SegmentId',    char, ...
+    %       'BurstId',      char, ...
+    %       'Truth',        struct('Design', .., 'Execution', .., 'Measured', ..), ...
+    %       'RFImpairments',struct(...), ...
+    %       'ReceiverView', struct(...));
+    %
+    %   Design   : design-time blueprint values (Planned*, ModulationFamily, ...).
+    %   Execution: construction-layer realised values (Modulated bandwidth,
+    %              Doppler, geometry snapshot, applied SNR, ...).
+    %   Measured : receiver-side measurements; SourcePlane = isolated
+    %              per-emitter view (post-channel, pre-combination), and
+    %              FramePlane = combined receiver view (post-combination,
+    %              pre Rx-RF chain). FramePlane is supplied via
+    %              framePlaneCache (computed once per receiver upstream).
 
     sourceInfo = struct();
     sourceInfo.TxID = comp.TxID;
-
-    sourceInfo.Realized = struct();
-    sourceInfo.Realized.FrequencyOffset = getFieldOrDefault(comp, 'FrequencyOffset', NaN);
-    sourceInfo.Realized.Bandwidth = getFieldOrDefault(comp, 'Bandwidth', NaN);
-    sourceInfo.Realized.SampleRate = getFieldOrDefault(comp, 'SampleRate', NaN);
-
-    % Planned MUST come from the producer; we never copy realised
-    % values into it because that would silently hide planner/executor
-    % drift from any downstream consistency checks.
-    if isfield(comp, 'Planned') && isstruct(comp.Planned)
-        sourceInfo.Planned = comp.Planned;
-    else
-        sourceInfo.Planned = struct();
+    sourceInfo.SegmentId = getFieldOrEmpty(comp, 'SegmentId', '');
+    sourceInfo.BurstId   = getFieldOrEmpty(comp, 'BurstId',   '');
+    if isempty(sourceInfo.BurstId)
+        error('CSRD:Annotation:MissingBurstId', ...
+            'SignalSource TxID=%s SegmentId=%s is missing BurstId.', ...
+            char(string(sourceInfo.TxID)), char(string(sourceInfo.SegmentId)));
     end
 
-    sourceInfo.Temporal = struct();
-    if isfield(comp, 'SegmentId')
-        sourceInfo.Temporal.SegmentId = comp.SegmentId;
-    end
-    if isfield(comp, 'StartTime')
-        sourceInfo.Temporal.StartTime = comp.StartTime;
-    end
-    if isfield(comp, 'Duration')
-        sourceInfo.Temporal.Duration = comp.Duration;
-    end
+    truth = struct();
+    truth.Design    = buildDesignTruth(comp);
+    truth.Execution = buildExecutionTruth(comp);
+    truth.Measured  = buildMeasuredTruth( ...
+        isolatedSignal, sampleRate, observableBwHz, comp, framePlaneCache);
+    sourceInfo.Truth = truth;
 
-    sourceInfo.Spatial = struct();
-    if isfield(comp, 'TxPosition')
-        sourceInfo.Spatial.TxPosition = comp.TxPosition;
-    end
-    if isfield(comp, 'TxVelocity')
-        sourceInfo.Spatial.TxVelocity = comp.TxVelocity;
-    end
-    if isfield(comp, 'RxPosition')
-        sourceInfo.Spatial.RxPosition = comp.RxPosition;
-    end
-    if isfield(comp, 'LinkDistance')
-        sourceInfo.Spatial.LinkDistance = comp.LinkDistance;
-    end
-
-    sourceInfo.LinkBudget = struct();
-    if isfield(comp, 'PathLoss')
-        sourceInfo.LinkBudget.AnalyticalPathLoss = comp.PathLoss;
-    end
-    if isfield(comp, 'AppliedPathLoss')
-        sourceInfo.LinkBudget.AppliedPathLoss = comp.AppliedPathLoss;
-    end
-    if isfield(comp, 'ComputedSNR')
-        sourceInfo.LinkBudget.ComputedSNR = comp.ComputedSNR;
-    end
-    if isfield(comp, 'AppliedSNRdB')
-        sourceInfo.LinkBudget.AppliedSNRdB = comp.AppliedSNRdB;
-    end
-
-    sourceInfo.Channel = struct();
-    if isfield(comp, 'ChannelModel')
-        sourceInfo.Channel.Model = comp.ChannelModel;
-    end
-    if isfield(comp, 'RayCount')
-        sourceInfo.Channel.RayCount = comp.RayCount;
-    end
-    if isfield(comp, 'ChannelFallback')
-        sourceInfo.Channel.Fallback = comp.ChannelFallback;
-    end
-    if isfield(comp, 'ChannelInfo')
-        sourceInfo.Channel.Info = comp.ChannelInfo;
-    end
-
-    if isfield(comp, 'ModulationType')
-        sourceInfo.ModulationType = comp.ModulationType;
-    end
     if isfield(comp, 'RFImpairments')
         sourceInfo.RFImpairments = comp.RFImpairments;
+    else
+        sourceInfo.RFImpairments = struct();
+    end
+
+    if isfield(comp, 'ReceiverView') && isstruct(comp.ReceiverView) && ...
+            ~isempty(fieldnames(comp.ReceiverView))
+        sourceInfo.ReceiverView = comp.ReceiverView;
+    else
+        sourceInfo.ReceiverView = struct();
+    end
+end
+
+function design = buildDesignTruth(comp)
+    %BUILDDESIGNTRUTH Project comp.Planned (modulator-set) into v2 Design.
+    % 中文说明：buildDesignTruth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    design = struct();
+    plannedSrc = struct();
+    if isfield(comp, 'Planned') && isstruct(comp.Planned)
+        plannedSrc = comp.Planned;
+    end
+    design.PlannedCenterFrequencyHz = getFieldOrDefault(plannedSrc, 'CenterFrequency', NaN);
+    if isnan(design.PlannedCenterFrequencyHz)
+        design.PlannedCenterFrequencyHz = getFieldOrDefault(plannedSrc, 'PlannedCenterFrequencyHz', NaN);
+    end
+    design.PlannedBandwidthHz = getFieldOrDefault(plannedSrc, 'Bandwidth', NaN);
+    if isnan(design.PlannedBandwidthHz)
+        design.PlannedBandwidthHz = getFieldOrDefault(plannedSrc, 'PlannedBandwidthHz', NaN);
+    end
+    design.PlannedSampleRate = getFieldOrDefault(plannedSrc, 'SampleRate', NaN);
+    if isnan(design.PlannedSampleRate)
+        design.PlannedSampleRate = getFieldOrDefault(plannedSrc, 'PlannedSampleRate', NaN);
+    end
+    design.StartTimeSec = getFieldOrDefault(plannedSrc, 'StartTimeSec', NaN);
+    design.EndTimeSec = getFieldOrDefault(plannedSrc, 'EndTimeSec', NaN);
+    design.DurationSec = getFieldOrDefault(plannedSrc, 'DurationSec', NaN);
+    design.ModulationFamily  = getFieldOrEmpty(plannedSrc, 'ModulationFamily', '');
+    design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
+    design.ModulationSpatialMode = getFieldOrEmpty(plannedSrc, 'ModulationSpatialMode', '');
+    design.PayloadLengthBits = getFieldOrDefault(plannedSrc, 'PayloadLengthBits', NaN);
+    design.NumTransmitAntennas = getFieldOrDefault(plannedSrc, 'NumTransmitAntennas', NaN);
+    design.Regulatory = getFieldOrDefault(plannedSrc, 'Regulatory', ...
+        csrd.catalog.spectrum.RegulatoryValidator.emptyRegulatoryTruth());
+end
+
+function execution = buildExecutionTruth(comp)
+    %BUILDEXECUTIONTRUTH Construction-layer ground truth (post-channel).
+    % 中文说明：buildExecutionTruth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    %
+    %   Phase 4 §3.4 / §6 C8: `ModulatedBandwidthHz` is now the
+    %   `obwActual` measurement performed in `processChannelPropagation`
+    %   on the **clean** modulator output (zero AWGN); the legacy
+    %   modulator-analytical scalar is preserved on the side as
+    %   `AnalyticalBandwidthHz` so historical baselines can still be
+    %   compared. Phase 18 removes the analytical fallback: execution
+    %   truth must report what the channel/modulator path actually
+    %   produced.
+    execution = struct();
+    measuredBwHz = getFieldOrDefault(comp, 'ModulatedBandwidthHz', NaN);
+    if ~isfinite(measuredBwHz) || measuredBwHz <= 0
+        error('CSRD:Annotation:MissingExecutionBandwidth', ...
+            ['Component TxID=%s BurstId=%s must carry positive ', ...
+             'ModulatedBandwidthHz for Truth.Execution.'], ...
+            char(string(getFieldOrEmpty(comp, 'TxID', ''))), ...
+            char(string(getFieldOrEmpty(comp, 'BurstId', ''))));
+    end
+    execution.ModulatedBandwidthHz    = measuredBwHz;
+    execution.AnalyticalBandwidthHz   = getFieldOrDefault(comp, 'AnalyticalBandwidthHz', ...
+        getFieldOrDefault(comp, 'Bandwidth', NaN));
+    execution.CenterFrequencyOffsetHz = getFieldOrDefault(comp, 'FrequencyOffset', NaN);
+    execution.SampleRate              = getFieldOrDefault(comp, 'SampleRate', NaN);
+    execution.StartTimeSec            = getFieldOrDefault(comp, 'FrameRelativeStartTime', ...
+        getFieldOrDefault(comp, 'StartTime', NaN));
+    execution.EndTimeSec              = getFieldOrDefault(comp, 'FrameRelativeEndTime', NaN);
+    execution.DurationSec             = execution.EndTimeSec - execution.StartTimeSec;
+    execution.FrameStartSample        = getFieldOrDefault(comp, 'FrameStartSample', NaN);
+    execution.FrameEndSample          = getFieldOrDefault(comp, 'FrameEndSample', NaN);
+    execution.FrameSampleCount        = getFieldOrDefault(comp, 'FrameSampleCount', NaN);
+    execution.FrameLengthSamples      = getFieldOrDefault(comp, 'FrameLengthSamples', NaN);
+    execution.ChannelModel            = getFieldOrEmpty(comp, 'ChannelModel', '');
+    execution.PathLossDB              = getFieldOrDefault(comp, 'PathLoss', NaN);
+    execution.AnalyticalSNRdB         = getFieldOrDefault(comp, 'ComputedSNR', NaN);
+    execution.AppliedSNRdB            = getFieldOrDefault(comp, 'AppliedSNRdB', NaN);
+    execution.DopplerShiftHz          = getFieldOrDefault(comp, 'DopplerShiftHz', NaN);
+    execution.RadialVelocityMps       = getFieldOrDefault(comp, 'RadialVelocityMps', NaN);
+    if isfield(comp, 'ChannelFallback')
+        execution.ChannelFallback = getFieldOrEmpty(comp, 'ChannelFallback', '');
+    end
+    if isfield(comp, 'RayCount')
+        execution.RayCount = getFieldOrDefault(comp, 'RayCount', NaN);
+    end
+    if isfield(comp, 'ChannelInfo') && isstruct(comp.ChannelInfo)
+        if isfield(comp.ChannelInfo, 'MapProfile') && isstruct(comp.ChannelInfo.MapProfile)
+            execution.MapProfile = comp.ChannelInfo.MapProfile;
+        end
+        if ~isfield(execution, 'ChannelFallback') && isfield(comp.ChannelInfo, 'Fallback')
+            execution.ChannelFallback = getFieldOrEmpty(comp.ChannelInfo, 'Fallback', '');
+        end
+        if ~isfield(execution, 'RayCount') && isfield(comp.ChannelInfo, 'RayCount')
+            execution.RayCount = getFieldOrDefault(comp.ChannelInfo, 'RayCount', NaN);
+        end
+    end
+
+    geom = struct();
+    geom.TxPositionM   = getFieldOrDefault(comp, 'TxPosition', [NaN, NaN, NaN]);
+    geom.TxVelocityMps = getFieldOrDefault(comp, 'TxVelocity', [NaN, NaN, NaN]);
+    geom.RxPositionM   = getFieldOrDefault(comp, 'RxPosition', [NaN, NaN, NaN]);
+    geom.RxVelocityMps = getFieldOrDefault(comp, 'RxVelocity', [NaN, NaN, NaN]);
+    geom.LinkDistanceM = getFieldOrDefault(comp, 'LinkDistance', NaN);
+    execution.GeometrySnapshot = geom;
+    validateExecutionSampleGrid(execution, comp);
+end
+
+function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
+        observableBwHz, comp, framePlaneCache)
+    %BUILDMEASUREDTRUTH SourcePlane (isolated) + FramePlane (cached).
+    % 中文说明：buildMeasuredTruth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    measured = struct();
+
+    sourcePlane = struct();
+    sourcePlane.OccupiedBandwidthHz  = NaN;
+    sourcePlane.CenterFrequencyHz    = NaN;
+    sourcePlane.SNRdB                = getFieldOrDefault(comp, 'AppliedSNRdB', NaN);
+    sourcePlane.TimeOccupancy        = NaN;
+    sourcePlane.FrequencyOccupancy   = NaN;
+    sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
+
+    hasSignal = ~isempty(isolatedSignal) && size(isolatedSignal, 1) > 0 && ...
+        getFieldOrDefault(comp, 'FrameSampleCount', size(isolatedSignal, 1)) > 0;
+    if ~hasSignal
+        sourcePlane.MeasurementStatus = 'NoSignal';
+    else
+        sourcePlane.MeasurementStatus = 'Measured';
+        sourcePlane.SNRdB = requireFiniteMeasurement( ...
+            sourcePlane.SNRdB, 'Truth.Measured.SourcePlane.SNRdB');
+
+        % Phase 4 (audit §17.6 / §6 C8): default 99 %-energy OBW
+        % with peak-relative thresholding. Phase 18 makes failures
+        % visible instead of silently writing NaN for live sources.
+        sourcePlane.OccupiedBandwidthHz = requirePositiveMeasurement( ...
+            guardedMeasurement(@() csrd.pipeline.measurement.obwActual( ...
+                isolatedSignal, sampleRate), 'CSRD:Measurement:SourceOBWFailed'), ...
+            'Truth.Measured.SourcePlane.OccupiedBandwidthHz');
+        sourcePlane.CenterFrequencyHz = requireFiniteMeasurement( ...
+            guardedMeasurement(@() csrd.pipeline.measurement.spectrumCentroid( ...
+                isolatedSignal, sampleRate), 'CSRD:Measurement:SourceCenterFrequencyFailed'), ...
+            'Truth.Measured.SourcePlane.CenterFrequencyHz');
+        envInfo = guardedMeasurement(@() csrd.pipeline.measurement.detectBurstEnvelope( ...
+            isolatedSignal, sampleRate), 'CSRD:Measurement:SourceEnvelopeFailed');
+        sourcePlane.TimeOccupancy = requireFiniteMeasurement( ...
+            envInfo.TimeOccupancy, 'Truth.Measured.SourcePlane.TimeOccupancy');
+        sourcePlane.FrequencyOccupancy = requireFiniteMeasurement( ...
+            guardedMeasurement(@() csrd.pipeline.measurement.frequencyOccupancy( ...
+                sourcePlane.OccupiedBandwidthHz, observableBwHz), ...
+                'CSRD:Measurement:SourceFrequencyOccupancyFailed'), ...
+            'Truth.Measured.SourcePlane.FrequencyOccupancy');
+    end
+
+    measured.SourcePlane = sourcePlane;
+
+    if nargin >= 5 && ~isempty(framePlaneCache) && isstruct(framePlaneCache)
+        measured.FramePlane = framePlaneCache;
+    else
+        measured.FramePlane = makeEmptyFramePlane();
+    end
+end
+
+function fp = computeFramePlaneCache(combinedSignal, sampleRate, observableBwHz)
+    %COMPUTEFRAMEPLANECACHE Once-per-receiver FramePlane measurements.
+    % 中文说明：computeFramePlaneCache 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    fp = makeEmptyFramePlane();
+    if ~isstruct(combinedSignal) || ~isfield(combinedSignal, 'Signal') || ...
+            isempty(combinedSignal.Signal)
+        fp.MeasurementStatus = 'NoSignal';
+        return;
+    end
+    if isfield(combinedSignal, 'Components') && isempty(combinedSignal.Components)
+        fp.MeasurementStatus = 'NoSignal';
+        return;
+    end
+    if isfield(combinedSignal, 'Components')
+        hasLiveComponent = false;
+        for k = 1:numel(combinedSignal.Components)
+            comp = combinedSignal.Components{k};
+            if isstruct(comp) && getFieldOrDefault(comp, 'FrameSampleCount', 0) > 0
+                hasLiveComponent = true;
+                break;
+            end
+        end
+        if ~hasLiveComponent
+            fp.MeasurementStatus = 'NoSignal';
+            return;
+        end
+    end
+
+    sig = combinedSignal.Signal;
+    fp.MeasurementStatus = 'Measured';
+    fp.OccupiedBandwidthHz = requirePositiveMeasurement( ...
+        guardedMeasurement(@() csrd.pipeline.measurement.obwActual(sig, sampleRate), ...
+            'CSRD:Measurement:FrameOBWFailed'), ...
+        'Truth.Measured.FramePlane.OccupiedBandwidthHz');
+    fp.CenterFrequencyHz = requireFiniteMeasurement( ...
+        guardedMeasurement(@() csrd.pipeline.measurement.spectrumCentroid(sig, sampleRate), ...
+            'CSRD:Measurement:FrameCenterFrequencyFailed'), ...
+        'Truth.Measured.FramePlane.CenterFrequencyHz');
+    envInfo = guardedMeasurement(@() csrd.pipeline.measurement.detectBurstEnvelope( ...
+        sig, sampleRate), 'CSRD:Measurement:FrameEnvelopeFailed');
+    fp.TimeOccupancy = requireFiniteMeasurement( ...
+        envInfo.TimeOccupancy, 'Truth.Measured.FramePlane.TimeOccupancy');
+    fp.FrequencyOccupancy = requireFiniteMeasurement( ...
+        guardedMeasurement(@() csrd.pipeline.measurement.frequencyOccupancy( ...
+            fp.OccupiedBandwidthHz, observableBwHz), ...
+            'CSRD:Measurement:FrameFrequencyOccupancyFailed'), ...
+        'Truth.Measured.FramePlane.FrequencyOccupancy');
+end
+
+function fp = makeEmptyFramePlane()
+    % makeEmptyFramePlane - Production declaration in CSRD.
+    % 中文说明：makeEmptyFramePlane 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    fp = struct( ...
+        'OccupiedBandwidthHz',  NaN, ...
+        'CenterFrequencyHz',    NaN, ...
+        'TimeOccupancy',        NaN, ...
+        'FrequencyOccupancy',   NaN, ...
+        'MeasurementStatus',    'NoSignal', ...
+        'MeasurementSemantics', 'post_rx_combined_pre_rfchain');
+end
+
+function bwHz = computeObservableBandwidthHz(rxInfo)
+    %COMPUTEOBSERVABLEBANDWIDTHHZ Resolve receiver observable BW (Hz).
+    % 中文说明：computeObservableBandwidthHz 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if ~isstruct(rxInfo) || ~isfield(rxInfo, 'ObservableRange') || ...
+            numel(rxInfo.ObservableRange) < 2
+        error('CSRD:Receiver:MissingObservableRange', ...
+            'rxInfo.ObservableRange is required for receiver-view measurement truth.');
+    end
+    rng = double(reshape(rxInfo.ObservableRange(1:2), 1, 2));
+    if any(~isfinite(rng)) || rng(2) <= rng(1)
+        error('CSRD:Receiver:InvalidObservableRange', ...
+            'rxInfo.ObservableRange must be finite and increasing.');
+    end
+    bwHz = rng(2) - rng(1);
+end
+
+function validateExecutionSampleGrid(execution, comp)
+    sampleRate = requirePositiveMeasurement(execution.SampleRate, ...
+        'Truth.Execution.SampleRate');
+    frameStart = requireFiniteMeasurement(execution.FrameStartSample, ...
+        'Truth.Execution.FrameStartSample');
+    frameEnd = requireFiniteMeasurement(execution.FrameEndSample, ...
+        'Truth.Execution.FrameEndSample');
+    frameCount = requireFiniteMeasurement(execution.FrameSampleCount, ...
+        'Truth.Execution.FrameSampleCount');
+    frameLength = requirePositiveMeasurement(execution.FrameLengthSamples, ...
+        'Truth.Execution.FrameLengthSamples');
+    if abs(frameStart - round(frameStart)) > 0 || ...
+            abs(frameEnd - round(frameEnd)) > 0 || ...
+            abs(frameCount - round(frameCount)) > 0 || ...
+            abs(frameLength - round(frameLength)) > 0
+        error('CSRD:Annotation:InvalidExecutionSampleGrid', ...
+            'Execution sample-grid fields must be integer-valued samples.');
+    end
+    if frameStart < 0 || frameEnd < frameStart || frameEnd > frameLength || ...
+            frameCount ~= frameEnd - frameStart
+        error('CSRD:Annotation:InvalidExecutionSampleGrid', ...
+            ['Execution sample-grid fields are inconsistent for TxID=%s BurstId=%s.'], ...
+            char(string(getFieldOrEmpty(comp, 'TxID', ''))), ...
+            char(string(getFieldOrEmpty(comp, 'BurstId', ''))));
+    end
+    startTimeSec = requireFiniteMeasurement(execution.StartTimeSec, ...
+        'Truth.Execution.StartTimeSec');
+    endTimeSec = requireFiniteMeasurement(execution.EndTimeSec, ...
+        'Truth.Execution.EndTimeSec');
+    durationSec = requireFiniteMeasurement(execution.DurationSec, ...
+        'Truth.Execution.DurationSec');
+    expectedStartSec = frameStart / sampleRate;
+    expectedEndSec = frameEnd / sampleRate;
+    expectedDurationSec = frameCount / sampleRate;
+    timeTol = max(1 / sampleRate * 1e-6, 1e-12);
+    if abs(startTimeSec - expectedStartSec) > timeTol || ...
+            abs(endTimeSec - expectedEndSec) > timeTol || ...
+            abs(durationSec - expectedDurationSec) > timeTol
+        error('CSRD:Annotation:ExecutionSampleGridMismatch', ...
+            ['Truth.Execution times must equal inserted sample-grid times ', ...
+             '(Start=%g/%g, End=%g/%g, Duration=%g/%g).'], ...
+            startTimeSec, expectedStartSec, ...
+            endTimeSec, expectedEndSec, ...
+            durationSec, expectedDurationSec);
+    end
+end
+
+function value = guardedMeasurement(fn, errorId)
+    try
+        value = fn();
+    catch ME
+        error(errorId, 'Measurement failed: %s', ME.message);
+    end
+end
+
+function value = requireFiniteMeasurement(value, label)
+    if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
+        error('CSRD:Measurement:InvalidMeasuredValue', ...
+            '%s must be a finite numeric scalar for a live signal.', label);
+    end
+    value = double(value);
+end
+
+function value = requirePositiveMeasurement(value, label)
+    value = requireFiniteMeasurement(value, label);
+    if value <= 0
+        error('CSRD:Measurement:InvalidMeasuredValue', ...
+            '%s must be positive for a live signal.', label);
     end
 end
 
 function value = getFieldOrDefault(s, fieldName, defaultValue)
-    if isfield(s, fieldName) && ~isempty(s.(fieldName))
+    % getFieldOrDefault - Production declaration in CSRD.
+    % 中文说明：getFieldOrDefault 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
+        value = s.(fieldName);
+    else
+        value = defaultValue;
+    end
+end
+
+function value = getFieldOrEmpty(s, fieldName, defaultValue)
+    % getFieldOrEmpty - Production declaration in CSRD.
+    % 中文说明：getFieldOrEmpty 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
         value = defaultValue;
@@ -197,61 +537,167 @@ end
 
 function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
     % combineSignalComponents - Combine multiple signal components at receiver
+    % 中文说明：combineSignalComponents 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Aggregates signal components with time-alignment based on StartTime.
     % Each component's StartTime determines its position in the output buffer.
 
-    combinedSignal = struct();
-    combinedSignal.Signal = [];
-    combinedSignal.Components = rxSignals.SignalComponents;
-
-    if isempty(rxSignals.SignalComponents)
-        noiseDuration = 0.001;
-        numSamples = round(noiseDuration * rxInfo.SampleRate);
-        combinedSignal.Signal = complex(zeros(numSamples, 1));
-        obj.logger.debug("RxID %s: No signal components, generating empty frame.", string(rxInfo.ID));
-        return;
-    end
-
     sampleRate = rxInfo.SampleRate;
-
-    % Calculate total buffer length considering StartTime offsets
-    totalLength = 0;
-    for compIdx = 1:length(rxSignals.SignalComponents)
-        comp = rxSignals.SignalComponents{compIdx};
-        if isfield(comp, 'Signal') && ~isempty(comp.Signal)
-            startOffset = 0;
-            if isfield(comp, 'StartTime') && comp.StartTime > 0
-                startOffset = round(comp.StartTime * sampleRate);
-            end
-            endSample = startOffset + numel(comp.Signal);
-            totalLength = max(totalLength, endSample);
-        end
+    signalComponents = {};
+    if isstruct(rxSignals) && isfield(rxSignals, 'SignalComponents') && ...
+            ~isempty(rxSignals.SignalComponents)
+        signalComponents = rxSignals.SignalComponents;
     end
 
-    if totalLength == 0
-        noiseDuration = 0.001;
-        numSamples = round(noiseDuration * sampleRate);
-        combinedSignal.Signal = complex(zeros(numSamples, 1));
+    frameShape = localResolveFrameShape(obj, signalComponents, sampleRate);
+
+    combinedSignal = struct();
+    combinedSignal.Signal = complex(zeros(frameShape.NumSamples, 1));
+    combinedSignal.Components = {};
+    combinedSignal.FrameShape = frameShape;
+
+    if isempty(signalComponents)
+        obj.logger.debug("RxID %s: No signal components, generating fixed empty frame.", string(rxInfo.ID));
         return;
     end
 
-    combinedSignal.Signal = complex(zeros(totalLength, 1));
-
-    for compIdx = 1:length(rxSignals.SignalComponents)
-        comp = rxSignals.SignalComponents{compIdx};
+    for compIdx = 1:length(signalComponents)
+        comp = signalComponents{compIdx};
         if isfield(comp, 'Signal') && ~isempty(comp.Signal)
-            startOffset = 0;
-            if isfield(comp, 'StartTime') && comp.StartTime > 0
-                startOffset = round(comp.StartTime * sampleRate);
+            startOffset = localFrameStartOffset(comp, sampleRate);
+            compSig = localCollapseAntennaSignal(comp.Signal);
+            if startOffset >= frameShape.NumSamples
+                comp = localUpdateComponentSampleGrid( ...
+                    comp, complex(zeros(0, 1)), startOffset, ...
+                    frameShape.NumSamples, sampleRate);
+                combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
+                continue;
             end
-            compSig = comp.Signal(:);
-            sigLen = length(compSig);
+            usableLen = min(size(compSig, 1), frameShape.NumSamples - startOffset);
+            if usableLen < 0
+                usableLen = 0;
+            end
+            compSig = compSig(1:usableLen, :);
             idxStart = startOffset + 1;
-            idxEnd = startOffset + sigLen;
-            combinedSignal.Signal(idxStart:idxEnd) = ...
-                combinedSignal.Signal(idxStart:idxEnd) + compSig;
+            idxEnd = startOffset + usableLen;
+            if usableLen > 0
+                combinedSignal.Signal(idxStart:idxEnd) = ...
+                    combinedSignal.Signal(idxStart:idxEnd) + compSig;
+            end
+            comp = localUpdateComponentSampleGrid( ...
+                comp, compSig, startOffset, frameShape.NumSamples, sampleRate);
+            combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
+        else
+            combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
         end
     end
 end
 
+function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
+    frameWindow = localFrameWindowFromComponents(signalComponents);
+    contractArgs = {'SampleRate', sampleRate};
+    if ~isempty(frameWindow)
+        contractArgs = [contractArgs, {'FrameWindow', frameWindow}]; %#ok<AGROW>
+    end
+    contract = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
+        obj.FactoryConfigs, struct(), contractArgs{:});
+    frameSamples = contract.FrameNumSamples;
+    frameShape = struct( ...
+        'NumSamples', frameSamples, ...
+        'DurationSec', frameSamples / sampleRate, ...
+        'SampleRate', sampleRate, ...
+        'Source', contract.Source);
+end
+
+function frameWindow = localFrameWindowFromComponents(signalComponents)
+    frameWindow = [];
+    for k = 1:numel(signalComponents)
+        comp = signalComponents{k};
+        if isstruct(comp) && isfield(comp, 'FrameWindow') && ...
+                numel(comp.FrameWindow) >= 2 && ...
+                all(isfinite(double(comp.FrameWindow(1:2))))
+            candidate = double(comp.FrameWindow(1:2));
+            if candidate(2) > candidate(1)
+                frameWindow = candidate;
+                return;
+            end
+        end
+    end
+end
+
+function comp = localUpdateComponentSampleGrid(comp, compSig, startOffset, ...
+        frameSamples, sampleRate)
+    sampleCount = size(compSig, 1);
+    gridStart = min(startOffset, frameSamples);
+    endOffset = max(gridStart, min(frameSamples, startOffset + sampleCount));
+    comp.Signal = compSig;
+    comp.FrameStartSample = gridStart;
+    comp.FrameEndSample = endOffset;
+    comp.FrameSampleCount = max(0, endOffset - gridStart);
+    comp.FrameLengthSamples = frameSamples;
+    comp.FrameRelativeStartTime = gridStart / sampleRate;
+    comp.FrameRelativeEndTime = endOffset / sampleRate;
+    comp.ExecutionSampleGrid = struct( ...
+        'StartSample', comp.FrameStartSample, ...
+        'EndSample', comp.FrameEndSample, ...
+        'SampleCount', comp.FrameSampleCount, ...
+        'FrameLengthSamples', frameSamples, ...
+        'SampleRate', sampleRate);
+end
+
+function [signalOut, info] = localCoerceProcessedFrameLength(signalIn, targetSamples)
+    if isempty(signalIn)
+        signalIn = complex(zeros(0, 1));
+    elseif isvector(signalIn)
+        signalIn = signalIn(:);
+    end
+    inputSamples = size(signalIn, 1);
+    numCols = max(1, size(signalIn, 2));
+    action = 'none';
+    if inputSamples > targetSamples
+        signalOut = signalIn(1:targetSamples, :);
+        action = 'trim';
+    elseif inputSamples < targetSamples
+        signalOut = [signalIn; complex(zeros(targetSamples - inputSamples, numCols))];
+        action = 'pad';
+    else
+        signalOut = signalIn;
+    end
+    info = struct( ...
+        'InputSamples', inputSamples, ...
+        'OutputSamples', size(signalOut, 1), ...
+        'TargetSamples', targetSamples, ...
+        'Action', action);
+end
+
+function startOffset = localFrameStartOffset(comp, sampleRate)
+    % localFrameStartOffset - Convert source start time into frame samples.
+    % 中文说明：把源的帧内起始时间转换为样点偏移；优先使用帧相对时间。
+    % Inputs / 输入: component struct and receiver sample rate.
+    % 输出 / Outputs: zero-based sample offset inside the current frame.
+    startTime = 0;
+    if isfield(comp, 'FrameRelativeStartTime') && ~isempty(comp.FrameRelativeStartTime)
+        startTime = comp.FrameRelativeStartTime;
+    elseif isfield(comp, 'StartTime') && ~isempty(comp.StartTime)
+        startTime = comp.StartTime;
+    end
+    startOffset = max(0, round(double(startTime) * sampleRate));
+end
+
+function y = localCollapseAntennaSignal(signal)
+    % localCollapseAntennaSignal - Convert [samples x antennas] into one monitor stream.
+    % 中文说明：把多天线源信号按天线列求和成单个监测通道，避免列优先展开破坏时间轴。
+    % Inputs / 输入: signal matrix from the channel component.
+    % 输出 / Outputs: column vector aligned to the receiver time axis.
+    if isempty(signal)
+        y = complex(zeros(0, 1));
+        return;
+    end
+    if isvector(signal)
+        y = signal(:);
+    else
+        y = sum(signal, 2);
+    end
+end

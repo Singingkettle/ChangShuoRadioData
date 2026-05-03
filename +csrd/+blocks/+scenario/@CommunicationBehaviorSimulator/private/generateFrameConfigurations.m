@@ -1,5 +1,6 @@
 function [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj, frameId, entities)
     % generateFrameConfigurations - Generate frame-specific configurations
+    % 中文说明：提供 CSRD 生产链路中的 generateFrameConfigurations 实现。
     %
     % Creates frame-specific configurations by copying the fixed scenario
     % configurations and updating only the temporal/transmission state parameters.
@@ -102,6 +103,9 @@ end
 
 function [idx, entity] = findEntityById(entities, entityId)
     % findEntityById - Find entity by its ID
+    % 中文说明：findEntityById 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     idx = 0;
     entity = [];
     for i = 1:length(entities)
@@ -115,6 +119,9 @@ end
 
 function entity = updateEntityTemporalSnapshot(obj, entity, frameId, txConfig)
     % updateEntityTemporalSnapshot - Update entity's temporal state in Snapshot
+    % 中文说明：updateEntityTemporalSnapshot 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % This updates the entity's Snapshot with current frame's temporal state.
     % Note: Entity Snapshots are managed by reference (shared with PhysicalEnv).
@@ -135,18 +142,14 @@ function entity = updateEntityTemporalSnapshot(obj, entity, frameId, txConfig)
     % Get or create snapshot for this frame
     snapshot = getOrCreateSnapshot(entity, frameId);
 
-    % Update temporal state with defensive access
-    if isfield(txConfig.TransmissionState, 'IsActive')
-        snapshot.Temporal.IsTransmitting = txConfig.TransmissionState.IsActive;
-    else
-        snapshot.Temporal.IsTransmitting = true;
-    end
-
-    if isfield(txConfig.TransmissionState, 'CurrentIntervalIdx')
-        snapshot.Temporal.CurrentIntervalIdx = txConfig.TransmissionState.CurrentIntervalIdx;
-    else
-        snapshot.Temporal.CurrentIntervalIdx = 1;
-    end
+    % v0.4 deep refactor: TransmissionState exposes IsActive +
+    % ActiveIntervalIndices + ActiveIntervals + FrameWindow only.
+    % These are required fields; the planner is responsible for them.
+    state = txConfig.TransmissionState;
+    snapshot.Temporal.IsTransmitting = state.IsActive;
+    snapshot.Temporal.ActiveIntervalIndices = double(state.ActiveIntervalIndices(:)');
+    snapshot.Temporal.ActiveIntervals = state.ActiveIntervals;
+    snapshot.Temporal.FrameWindow = state.FrameWindow;
 
     if isfield(txConfig, 'Temporal') && isfield(txConfig.Temporal, 'Type')
         snapshot.Temporal.PatternType = txConfig.Temporal.Type;
@@ -163,6 +166,9 @@ end
 
 function snapshot = getOrCreateSnapshot(entity, frameId)
     % getOrCreateSnapshot - Get snapshot for frame or create new one
+    % 中文说明：getOrCreateSnapshot 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     
     if length(entity.Snapshots) >= frameId && ~isempty(entity.Snapshots{frameId})
         snapshot = entity.Snapshots{frameId};

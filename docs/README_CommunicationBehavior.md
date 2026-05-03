@@ -136,7 +136,6 @@ TransmissionState.IsActive = (cycleTime < Duration)
 ```matlab
 TransmissionPattern.Type = 'Scheduled'
 TransmissionPattern.TimeSlotDuration = 0.01  % 10ms时隙
-TransmissionPattern.FrameLength = 0.1        % 100ms帧长
 
 % 每帧计算：
 TransmissionState.IsActive = (mod(frameId, 3) == 0)  % 每3帧激活一次
@@ -188,4 +187,4 @@ simulator = csrd.blocks.scenario.CommunicationBehaviorSimulator('Config', config
 - 只有传输状态（IsActive, StartTime, Duration）在帧间变化
 - 传输模式行为符合预期（连续、突发、调度）
 
-这个重构确保了 `CommunicationBehaviorSimulator` 的行为符合实际无线通信系统的特性，同时保持了代码的可维护性和扩展性。 
+这个重构确保了 `CommunicationBehaviorSimulator` 的行为符合实际无线通信系统的特性，同时保持了代码的可维护性和扩展性。

@@ -1,5 +1,8 @@
 function validateFactoryConfigs(obj)
     % validateFactoryConfigs - Validate factory configuration structures
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 validateFactoryConfigs 实现。
     %
     % Ensures FactoryConfigs contains all required factory configs with proper structure.
     % Each factory config should be a struct (implementation details defined in factory files).

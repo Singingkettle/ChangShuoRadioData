@@ -1,84 +1,83 @@
 function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
-    % calculateTransmissionState - Calculate transmission state for current frame
+    %CALCULATETRANSMISSIONSTATE Compute the per-frame transmission state.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 calculateTransmissionState 实现。
     %
-    % Determines whether the transmitter should be active in the current frame
-    % based on its transmission pattern and frame timing.
+    %   The state is the *only* contract the downstream segment-generation
+    %   code is allowed to consume. After the v0.4 deep refactor it carries
+    %   exactly four fields, all required:
+    %
+    %       IsActive              logical scalar
+    %       ActiveIntervalIndices 1xK uint32, indices into pattern.Intervals
+    %       ActiveIntervals       Kx2 double, [segStart, segEnd] in seconds,
+    %                             clipped to the current frame window
+    %       FrameWindow           1x2 double, [frameStart, frameEnd]
+    %
+    %   Empty K=0 means the transmitter is silent for this frame. There are
+    %   no scalar-only legacy fields (StartTime / Duration /
+    %   CurrentIntervalIdx) — every consumer must walk
+    %   ActiveIntervalIndices/ActiveIntervals as arrays.
 
     transmissionState = struct();
-    transmissionState.IsActive = true; % Default to active
-    transmissionState.StartTime = 0;
-    transmissionState.Duration = Inf;
-    transmissionState.CurrentIntervalIdx = 1; % Default to first interval
+    transmissionState.IsActive = false;
+    transmissionState.ActiveIntervalIndices = uint32([]);
+    transmissionState.ActiveIntervals = zeros(0, 2);
+    transmissionState.FrameWindow = [0, 0];
 
-    % Get temporal pattern with fallback
     if isfield(txConfig, 'Temporal') && isstruct(txConfig.Temporal)
         pattern = txConfig.Temporal;
     else
-        pattern = struct('Type', 'Continuous', 'ObservationDuration', 1.0, 'Intervals', [0, 1.0]);
-        obj.logger.warning('txConfig missing Temporal field, defaulting to Continuous');
+        error('CSRD:Scenario:MissingTemporalPattern', ...
+            ['Frame %d: txConfig is missing the Temporal pattern struct. ' ...
+             'CommunicationBehaviorSimulator must produce one when planning ' ...
+             'the scenario.'], frameId);
     end
 
-    patternType = 'Continuous';
-    if isfield(pattern, 'Type')
-        patternType = pattern.Type;
+    if ~isfield(pattern, 'Type') || isempty(pattern.Type)
+        error('CSRD:Scenario:MissingTemporalPatternType', ...
+            'Frame %d: txConfig.Temporal lacks a non-empty Type.', frameId);
     end
+    patternType = char(pattern.Type);
 
-    % Calculate based on transmission pattern
     switch patternType
         case 'Continuous'
+            if ~isfield(pattern, 'ObservationDuration') || ...
+                    ~isnumeric(pattern.ObservationDuration) || ...
+                    pattern.ObservationDuration <= 0
+                error('CSRD:Scenario:MissingObservationDuration', ...
+                    ['Frame %d: Continuous pattern requires a positive ' ...
+                     'ObservationDuration.'], frameId);
+            end
             transmissionState.IsActive = true;
-            transmissionState.StartTime = 0;
-            transmissionState.Duration = pattern.ObservationDuration;
-            transmissionState.CurrentIntervalIdx = 1;
+            transmissionState.ActiveIntervalIndices = uint32(1);
+            transmissionState.ActiveIntervals = [0, pattern.ObservationDuration];
+            transmissionState.FrameWindow = [0, pattern.ObservationDuration];
 
-        case 'Burst'
-            % Calculate if we're in a burst period based on intervals
-            if isfield(pattern, 'Intervals') && ~isempty(pattern.Intervals)
-                [isActive, intervalIdx, startTime, endTime] = checkIntervals(frameId, pattern);
-                transmissionState.IsActive = isActive;
-                transmissionState.CurrentIntervalIdx = intervalIdx;
-                transmissionState.StartTime = startTime;
-                transmissionState.Duration = endTime - startTime;
-            else
-                transmissionState.IsActive = true;
+        case {'Burst', 'Scheduled', 'Random', 'Explicit'}
+            if ~isfield(pattern, 'Intervals') || isempty(pattern.Intervals)
+                error('CSRD:Scenario:MissingIntervals', ...
+                    ['Frame %d: pattern type "%s" requires a non-empty ' ...
+                     'Intervals matrix; the planner left it empty.'], ...
+                    frameId, patternType);
             end
-
-        case 'Scheduled'
-            % Check scheduled intervals
-            if isfield(pattern, 'Intervals') && ~isempty(pattern.Intervals)
-                [isActive, intervalIdx, startTime, endTime] = checkIntervals(frameId, pattern);
-                transmissionState.IsActive = isActive;
-                transmissionState.CurrentIntervalIdx = intervalIdx;
-                transmissionState.StartTime = startTime;
-                transmissionState.Duration = endTime - startTime;
-            else
-                transmissionState.IsActive = (mod(frameId, 3) == 0);
-                transmissionState.CurrentIntervalIdx = 1;
-            end
-
-        case 'Random'
-            % Check random intervals
-            if isfield(pattern, 'Intervals') && ~isempty(pattern.Intervals)
-                [isActive, intervalIdx, startTime, endTime] = checkIntervals(frameId, pattern);
-                transmissionState.IsActive = isActive;
-                transmissionState.CurrentIntervalIdx = intervalIdx;
-                transmissionState.StartTime = startTime;
-                transmissionState.Duration = endTime - startTime;
-            else
-                transmissionState.IsActive = true;
-            end
+            [activeIdx, activeIntervals, frameWindow] = ...
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals( ...
+                    frameId, pattern);
+            transmissionState.FrameWindow = frameWindow;
+            transmissionState.ActiveIntervalIndices = uint32(activeIdx);
+            transmissionState.ActiveIntervals = activeIntervals;
+            transmissionState.IsActive = ~isempty(activeIdx);
 
         otherwise
-            transmissionState.IsActive = true;
-            transmissionState.CurrentIntervalIdx = 1;
+            error('CSRD:Scenario:UnknownPatternType', ...
+                'Frame %d: unknown transmission pattern type "%s".', ...
+                frameId, patternType);
     end
 
-end
-
-function [isActive, intervalIdx, startTime, endTime] = checkIntervals(frameId, pattern)
-    % checkIntervals - Thin wrapper around csrd.utils.scenario.checkTransmissionInterval.
-    % Kept here so existing call sites stay short; the testable
-    % implementation lives in +csrd/+utils/+scenario/.
-    [isActive, intervalIdx, startTime, endTime] = ...
-        csrd.utils.scenario.checkTransmissionInterval(frameId, pattern);
+    obj.logger.debug(['Frame %d: transmissionState patternType=%s, ' ...
+        'IsActive=%d, NumActiveIntervals=%d, FrameWindow=[%.6f, %.6f]'], ...
+        frameId, patternType, transmissionState.IsActive, ...
+        numel(transmissionState.ActiveIntervalIndices), ...
+        transmissionState.FrameWindow(1), transmissionState.FrameWindow(2));
 end

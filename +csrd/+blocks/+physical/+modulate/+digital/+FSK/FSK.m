@@ -1,5 +1,6 @@
 classdef FSK < csrd.blocks.physical.modulate.BaseModulator
     % FSK - Frequency Shift Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 FSK 实现。
     %
     % This class implements Frequency Shift Keying (FSK) modulation as a subclass
     % of the BaseModulator. FSK modulation encodes digital information by shifting
@@ -59,7 +60,7 @@ classdef FSK < csrd.blocks.physical.modulate.BaseModulator
     %
     % See also: csrd.blocks.physical.modulate.BaseModulator, fskmod
 
-    properties (Access = private)
+    properties (Access = protected)
         % frequencySeparation - Frequency separation between symbols in Hz
         % Type: positive scalar
         frequencySeparation
@@ -73,6 +74,9 @@ classdef FSK < csrd.blocks.physical.modulate.BaseModulator
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core FSK modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs FSK modulation using the configured frequency
             % separation and calculates the occupied bandwidth based on the
@@ -124,6 +128,9 @@ classdef FSK < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured FSK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the FSK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

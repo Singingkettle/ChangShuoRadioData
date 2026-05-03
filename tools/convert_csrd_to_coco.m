@@ -1,735 +1,497 @@
-%% Convert CSRD Radio Data to COCO Format and MAT Spectrograms for Multiple Windows
+function coco = convert_csrd_to_coco(annotationInput, outputPath, varargin)
+%CONVERT_CSRD_TO_COCO Convert CSRD annotation v2 to minimal COCO JSON.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 convert_csrd_to_coco 实现。
 %
-% This script reads annotation data from JSON files and corresponding IQ data
-% from .mat files, performs STFT using different window functions to generate
-% spectrograms, and outputs for each window type:
-%   1. COCO-style JSON annotation files split into train/val/test sets.
-%   2. Spectrogram data saved as MATLAB (.mat) files.
+%   COCO = convert_csrd_to_coco(ANNOTATION_INPUT) validates a CSRD
+%   annotation v2 payload or JSON file and returns a COCO-style struct.
 %
-% Dependencies:
-%   - MATLAB Signal Processing Toolbox (for stft and window functions)
+%   COCO = convert_csrd_to_coco(ANNOTATION_INPUT, OUTPUT_PATH) also writes
+%   the JSON output to OUTPUT_PATH.
 %
-% Adjust STFT parameters, window configurations, and file paths as needed.
+%   This Phase 6 converter intentionally exports a receiver-frequency
+%   canvas: the x axis is the receiver observable frequency window and the
+%   y axis is a one-row minimal canvas. Annotation v2 does not persist
+%   burst start/stop times, so time occupancy is preserved as metadata
+%   rather than projected into a synthetic 2-D time extent.
 
-clear; close all; clc;
-
-%% --- Configuration ---
-enableVisualization = true; % Set to true to visualize bounding boxes (slows down processing)
-
-baseDataPath = '../data/CSRD2025'; % Path to the dataset
-annoDir = fullfile(baseDataPath, 'anno');
-iqDir = fullfile(baseDataPath, 'sequence_data', 'iq');
-outputAnnoBaseName = 'coco_annotations'; % Base name for output JSON files
-outputMatDir = fullfile(baseDataPath, 'stft'); % Output dir for MAT files
-
-% Split Ratios
-trainRatio = 0.8;
-valRatio = 0.1;
-testRatio = 0.1; % Should sum to 1
-
-if abs(trainRatio + valRatio + testRatio - 1.0) > 1e-6
-    error('Split ratios must sum to 1.');
+if nargin < 1 || isempty(annotationInput)
+    error('CSRD:Tools:CocoMissingInput', ...
+        'convert_csrd_to_coco requires an annotation v2 path or struct.');
+end
+if nargin < 2
+    outputPath = '';
+end
+if isNameValueToken(outputPath)
+    varargin = [{outputPath}, varargin];
+    outputPath = '';
 end
 
-% STFT Parameters (Shared)
-stftWindowLength = 256; % Window length
-stftOverlapLength = 16; % Overlap length (ensure <= stftWindowLength)
-stftFftLength = 1024; % FFT length
+p = inputParser;
+addParameter(p, 'ImageWidth', 1024, @isPositiveScalar);
+addParameter(p, 'ImageHeight', 1, @isPositiveScalar);
+parse(p, varargin{:});
 
-% Window Configurations to Process
-% Add more window functions from the Signal Processing Toolbox as needed
-% Format: { 'WindowName', @windowFunctionHandle; ... }
-% Example with parameters: { 'kaiser_5', {@kaiser, 5}; ... } - requires adjusting window creation logic
-windowConfigs = { ...
-                     'hamming', @hamming; ...
-                     'hann', @hann; ...
-                     'blackman', @blackman ...
-% Add other windows like bartlett, triang, kaiser (handle beta param), etc.
-                 };
+imageWidth = double(p.Results.ImageWidth);
+imageHeight = double(p.Results.ImageHeight);
 
-% Create base output directory for MAT files if it doesn't exist
-if ~exist(outputMatDir, 'dir')
-    mkdir(outputMatDir);
-    fprintf('Created base output directory for MAT files: %s\n', outputMatDir);
+reader = csrd.pipeline.annotation.readAnnotationV2(annotationInput, ...
+    'RequireSources', true);
+
+state = struct();
+state.images = localEmptyImages();
+state.annotations = localEmptyAnnotations();
+state.categories = localEmptyCategories();
+state.skippedSources = localEmptySkippedSources();
+state.categoryNames = {};
+state.nextAnnotationId = 1;
+
+for frameIdx = 1:numel(reader.Frames)
+    frame = reader.Frames{frameIdx};
+    imageId = frameIdx;
+    observableRangeHz = resolveObservableRange(frame);
+
+    image = struct();
+    image.id = imageId;
+    image.file_name = makeVirtualFileName(frame);
+    image.width = imageWidth;
+    image.height = imageHeight;
+    image.csrd = struct( ...
+        'frame_id', frame.FrameId, ...
+        'receiver_id', char(frame.ReceiverID), ...
+        'sample_rate_hz', getOptionalScalar(frame, 'SampleRate'), ...
+        'observable_range_hz', observableRangeHz, ...
+        'coordinate_system', 'receiver_frequency_canvas', ...
+        'time_axis', 'not_localized_in_s5_minimal_export');
+    state.images(end + 1) = image;
+
+    sources = localFlattenStructs(frame.SignalSources, ...
+        sprintf('Frames{%d}.SignalSources', frameIdx));
+    for sourceIdx = 1:numel(sources)
+        source = sources{sourceIdx};
+        [state, annotation] = convertSource(state, source, frame, ...
+            imageId, observableRangeHz, imageWidth, imageHeight);
+        if ~isempty(annotation)
+            state.annotations(end + 1) = annotation;
+        end
+    end
 end
 
-%% --- Main Loop for Each Window Type ---
-overallStartTime = tic;
-
-for winIdx = 1:size(windowConfigs, 1)
-    windowName = windowConfigs{winIdx, 1};
-    windowHandle = windowConfigs{winIdx, 2};
-
-    fprintf('\n============================================================\n');
-    fprintf('Processing with window: %s\n', windowName);
-    fprintf('============================================================\n');
-
-    windowStartTime = tic;
-
-    % Construct the STFT window for this iteration
-    try
-        stftWindow = windowHandle(stftWindowLength, 'periodic');
-    catch ME
-        warning('Failed to create window "%s". Skipping. Error: %s', windowName, ME.message);
-        continue;
-    end
-
-    % --- COCO Structure Initialization (Reset for each window) ---
-    cocoData = struct();
-    cocoData.info = struct('description', sprintf('CSRD Spectrogram Dataset (%s window)', windowName), ...
-        'version', 'CSRD2025', 'year', 2025, 'date_created', datestr(now, 'yyyy/mm/dd'));
-    cocoData.licenses = {struct('id', 1, 'name', 'Default License', 'url', '')};
-    cocoData.images = [];
-    cocoData.annotations = [];
-    cocoData.categories = [];
-
-    categoryIdMap = containers.Map('KeyType', 'char', 'ValueType', 'int32');
-    nextCategoryId = 1;
-    annotationId = 1;
-    imageId = 1;
-    processedImageCount = 0;
-    imageIdToFrameIdMap = containers.Map('KeyType', 'double', 'ValueType', 'char'); % Map image ID to Frame ID string
-
-    % --- Process Files for the current window ---
-    % Use faster file search with pattern matching
-    allFiles = dir(annoDir);
-    isJsonFile = arrayfun(@(x) startsWith(x.name, 'Frame_') && endsWith(x.name, '.json'), allFiles);
-    jsonFiles = allFiles(isJsonFile);
-
-    numFiles = length(jsonFiles);
-    fprintf('Found %d JSON files to process for window %s...\n', numFiles, windowName);
-
-    fileLoopStartTime = tic;
-
-    % Create different output directories for each window type
-    outputMatDir_window = fullfile(outputMatDir, windowName);
-
-    if ~exist(outputMatDir_window, 'dir')
-        mkdir(outputMatDir_window);
-        fprintf('Created output directory for window %s: %s\n', windowName, outputMatDir_window);
-    end
-
-    for k = 1:numFiles
-        jsonFileName = jsonFiles(k).name;
-        jsonFilePath = fullfile(annoDir, jsonFileName);
-        % --- Extract Frame ID from filename ---
-        frameIdMatch = regexp(jsonFileName, 'Frame_(\d+)_Rx_', 'tokens');
-
-        frameIdStr = frameIdMatch{1}{1};
-        frameId = str2double(frameIdStr);
-
-        if frameId > 10000
-            break;
-        end
-
-        % Progress indicator within window loop
-        if mod(k, 100) == 0
-            fprintf('  Window %s: Processing file %d/%d: %s\n', windowName, k, numFiles, jsonFileName);
-        end
-
-        try
-            % --- Load Metadata ---
-            jsonContent = fileread(jsonFilePath);
-            meta = jsondecode(jsonContent);
-
-            % --- Validate basic structure ---
-            if ~isfield(meta, 'annotation') || ~isfield(meta.annotation, 'rx') || ~isfield(meta.annotation, 'tx')
-                warning('JSON file %s missing required top-level fields (annotation.rx, annotation.tx). Skipping.', jsonFileName);
-                continue;
-            end
-
-            rxInfo = meta.annotation.rx;
-            txArray = meta.annotation.tx;
-
-            if isempty(frameIdMatch) || isempty(frameIdMatch{1})
-                warning('Could not parse Frame ID from filename: %s. Skipping.', jsonFileName);
-                continue;
-            end
-
-            % Ensure txArray is always a cell array for consistent processing
-            if isstruct(txArray) % Handle struct array case (e.g., Frame_000002_Rx_0002)
-                txArray = num2cell(txArray);
-            elseif ~iscell(txArray) % Handle single struct or other invalid types
-
-                if isscalar(txArray) && isstruct(txArray) % Single struct case
-                    txArray = {txArray};
-                else
-                    warning('Unexpected data type (%s) for annotation.tx in %s. Skipping.', class(txArray), jsonFileName);
-                    continue;
-                end
-
-            end
-
-            % Now txArray should be a cell array
-
-            % --- Construct IQ File Path ---
-            [~, baseName, ~] = fileparts(jsonFileName);
-            iqFileName = [baseName, '.mat'];
-            iqFilePath = fullfile(iqDir, iqFileName);
-
-            if ~exist(iqFilePath, 'file')
-                % warning('IQ file not found, skipping: %s', iqFilePath);
-                continue;
-            end
-
-            % --- Load IQ Data ---
-            iqData = load(iqFilePath);
-
-            if ~isfield(iqData, 'x') || isempty(iqData.x)
-                % warning('IQ data ("x" variable) not found or empty in %s, skipping.', iqFileName);
-                continue;
-            end
-
-            x = iqData.x;
-            % Average across receive antennas if data is multi-channel (e.g., [samples x antennas])
-            if size(x, 2) > 1
-                x = mean(x, 2);
-            end
-
-            % --- Perform STFT ---
-            if ~isfield(rxInfo, 'MasterClockRate') || isempty(rxInfo.MasterClockRate)
-                warning('SampleRate (annotation.rx.MasterClockRate) missing in %s, skipping STFT.', jsonFileName);
-                continue;
-            end
-
-            sampleRate = rxInfo.MasterClockRate;
-
-            [s, f, t] = stft(x, sampleRate, 'Window', stftWindow, 'OverlapLength', stftOverlapLength, 'FFTLength', stftFftLength, 'FrequencyRange', 'centered');
-
-            % --- Process STFT result: Keep only positive frequencies (and zero) ---
-            zeroFreqIndex = find(f >= 0, 1, 'first');
-
-            if isempty(zeroFreqIndex)
-                warning('Could not find zero frequency. Using entire spectrum for %s.', jsonFileName);
-            else
-                s = s(zeroFreqIndex:end, :); % Keep s from zero frequency upwards
-                f = f(zeroFreqIndex:end); % Keep f from zero frequency upwards
-            end
-
-            % Keep complex result, separate real/imag parts, and stack as channels
-            realPart = real(s);
-            imagPart = imag(s);
-            % Create a tensor [numFreqBins x numTimeBins x 2]
-            stftTensor = cat(3, realPart, imagPart);
-
-            % Get dimensions from the original STFT result (frequency x time)
-            [numFreqBins, numTimeBins] = size(s);
-
-            % --- Skip if numTimeBins < numFreqBins ---
-            if numTimeBins < numFreqBins
-                warning('Skipping %s for window %s: numTimeBins (%d) < numFreqBins (%d).', jsonFileName, windowName, numTimeBins, numFreqBins);
-                continue; % Skip to the next JSON file
-            end
-
-            % --- Save STFT Tensor as MAT ---
-            matFileName = sprintf('%s.mat', baseName);
-            matFilePath = fullfile(outputMatDir_window, matFileName);
-
-            try
-                % Save the 2-channel tensor, plus frequency and time axes
-                save(matFilePath, 'stftTensor', 'f', 't');
-            catch ME
-                warning('Failed to write MAT file: %s. Error: %s.', matFileName, ME.message);
-                continue; % Skip adding image/annotations if saving fails
-            end
-
-            % --- Create COCO Image Entry ---
-            currentImageId = imageId;
-            imageEntry = struct();
-            imageEntry.id = currentImageId;
-            imageEntry.width = numTimeBins;
-            imageEntry.height = numFreqBins;
-            imageEntry.file_name = matFileName; % Use the MAT filename
-            imageEntry.license = 1;
-            imageEntry.date_captured = '';
-            cocoData.images = [cocoData.images, imageEntry];
-            imageIdToFrameIdMap(currentImageId) = frameIdStr; % Store mapping
-
-            % --- Create COCO Annotation Entries ---
-            annotationsForThisImage = [];
-            % Iterate through each transmitter's data
-            for txIdx = 1:length(txArray)
-                txInfo = txArray{txIdx};
-                txInfo.BandWidth = reshape(txInfo.BandWidth, [], 2);
-
-                % Check for necessary fields within this txInfo
-                requiredTxFields = {'ModulatorType', 'StartTimes', 'TimeDurations', 'CarrierFrequency', 'BandWidth'};
-
-                if ~all(isfield(txInfo, requiredTxFields))
-                    warning('Tx entry %d in %s missing required fields. Skipping events for this transmitter.', txIdx, jsonFileName);
-                    continue;
-                end
-
-                % Ensure event arrays are consistent length
-                numEventsInTx = length(txInfo.StartTimes);
-
-                if length(txInfo.TimeDurations) ~= numEventsInTx || size(txInfo.BandWidth, 1) ~= numEventsInTx
-                    warning('Inconsistent event array lengths for Tx entry %d in %s. Skipping events for this transmitter.', txIdx, jsonFileName);
-                    continue;
-                end
-
-                % Iterate through each event for this transmitter
-                for eventIdx = 1:numEventsInTx
-
-                    % --- Get or Create Category ID ---
-                    originalModType = txInfo.ModulatorType; % Keep original for mapping
-
-                    % 1. Determine Supercategory using helper function
-                    supercategoryName = getModulationSupercategory(originalModType);
-
-                    % 2. Determine Specific Category Name based on Supercategory
-                    categoryName = ''; % Initialize
-
-                    try % Wrap name generation in try-catch for missing fields
-
-                        switch supercategoryName
-                            case {'OFDM', 'SCFDMA', 'OTFS'}
-
-                                if isfield(txInfo, 'ModulatorOrder') && ~isempty(txInfo.ModulatorOrder) && ...
-                                        isfield(txInfo, 'baseModulatorType') && ~isempty(txInfo.baseModulatorType)
-                                    categoryName = sprintf('%d-%s-%s', sum(txInfo.ModulatorOrder), upper(txInfo.baseModulatorType), originalModType);
-                                else
-                                    warning('Missing ModulatorOrder or BaseModulator for OFDM type in %s. Using "OFDM".', jsonFileName);
-                                    categoryName = 'OFDM'; % Fallback name
-                                end
-
-                            case {'PSK', 'QAM', 'PAM', 'APSK', 'ASK', 'CPM', 'FSK'}
-
-                                if isfield(txInfo, 'ModulatorOrder') && ~isempty(txInfo.ModulatorOrder)
-                                    categoryName = sprintf('%d-%s', sum(txInfo.ModulatorOrder), originalModType);
-                                else
-                                    warning('Missing ModulatorOrder for %s type in %s. Using original type name.', supercategoryName, jsonFileName);
-                                    categoryName = originalModType; % Fallback name
-                                end
-
-                            case {'AM', 'FM', 'PM'}
-                                % Use the original type name directly for these categories
-                                categoryName = originalModType;
-                            case 'Unknown'
-                                % Handled by the check below
-                                categoryName = '';
-                            otherwise % Should not happen if helper covers all cases
-                                warning('Unhandled supercategory "%s" encountered.', supercategoryName);
-                                categoryName = originalModType; % Fallback
-                        end
-
-                    catch nameGenError
-                        warning('Error generating category name for %s: %s. Skipping annotation.', originalModType, nameGenError.message);
-                        continue; % Skip this annotation if name generation fails
-                    end
-
-                    % Check if category name is valid
-                    if isempty(categoryName) || strcmp(supercategoryName, 'Unknown')
-                        warning('Modulation type (%s) could not be properly categorized or name generated. Skipping annotation.', originalModType);
-                        continue;
-                    end
-
-                    % 3. Get/Create Category ID and Entry using specific categoryName
-                    if ~isKey(categoryIdMap, categoryName)
-                        categoryEntry = struct('id', nextCategoryId, 'name', categoryName, 'supercategory', supercategoryName);
-                        cocoData.categories = [cocoData.categories, categoryEntry];
-                        categoryIdMap(categoryName) = nextCategoryId;
-                        currentCategoryId = nextCategoryId;
-                        nextCategoryId = nextCategoryId + 1;
-                    else
-                        currentCategoryId = categoryIdMap(categoryName);
-                    end
-
-                    % --- Calculate Bounding Box [x, y, width, height] ---
-                    % Convert times (seconds) to sample indices
-                    try
-                        eventStartTimeSec = txInfo.StartTimes(eventIdx);
-                        eventDurationSec = txInfo.TimeDurations(eventIdx);
-                        eventStartSample = round(eventStartTimeSec * sampleRate) + 1; % 1-based indexing
-                        eventEndSample = round((eventStartTimeSec + eventDurationSec) * sampleRate);
-                        % Ensure End >= Start
-                        eventEndSample = max(eventStartSample, eventEndSample);
-
-                        centerFreqHz = txInfo.CarrierFrequency;
-                        % Bandwidth = Upper Freq - Lower Freq
-                        bandwidthHz = txInfo.BandWidth(eventIdx, 2) - txInfo.BandWidth(eventIdx, 1);
-
-                        if isempty(eventStartSample) || isempty(eventEndSample) || isempty(centerFreqHz) || isempty(bandwidthHz)
-                            warning('Calculated event parameters are empty for Tx %d, Event %d in %s. Skipping annotation.', txIdx, eventIdx, jsonFileName);
-                            continue;
-                        end
-
-                    catch paramError
-                        warning('Error calculating event parameters for Tx %d, Event %d in %s: %s. Skipping annotation.', txIdx, eventIdx, jsonFileName, paramError.message);
-                        continue;
-                    end
-
-                    % Map sample indices to time bins
-                    samplesPerTimeBin = stftWindowLength - stftOverlapLength;
-                    startTimeBin = max(1, floor((eventStartSample - 1) / samplesPerTimeBin) + 1);
-                    endTimeBin = min(numTimeBins, ceil((eventEndSample - 1) / samplesPerTimeBin) + 1);
-                    startTimeBin = min(startTimeBin, endTimeBin);
-                    bbox_x = startTimeBin;
-                    bbox_width = max(1, endTimeBin - startTimeBin + 1);
-
-                    % Map center frequency and bandwidth to frequency bins
-                    freqMin = centerFreqHz - bandwidthHz / 2;
-                    freqMax = centerFreqHz + bandwidthHz / 2;
-                    [~, startFreqIndex] = min(abs(f - freqMin));
-                    [~, endFreqIndex] = min(abs(f - freqMax));
-                    if startFreqIndex > endFreqIndex, [startFreqIndex, endFreqIndex] = deal(endFreqIndex, startFreqIndex); end
-                    bbox_y = startFreqIndex; % This is from bottom-left (low freq = low index)
-                    bbox_height = max(1, endFreqIndex - startFreqIndex + 1);
-
-                    % Clamp bounding box to image dimensions
-                    bbox_x = max(1, min(bbox_x, numTimeBins));
-                    bbox_y = max(1, min(bbox_y, numFreqBins)); % Use potentially updated numFreqBins
-                    bbox_width = min(bbox_width, numTimeBins - bbox_x + 1);
-                    bbox_height = min(bbox_height, numFreqBins - bbox_y + 1);
-
-                    % --- Visualize Bounding Box (Optional) ---
-                    if enableVisualization
-
-                        try
-                            fprintf('Visualizing: %s, Tx:%d, Event:%d, Cat:%s\n', jsonFileName, txIdx, eventIdx, categoryName);
-                            spectrogramDb = 10 * log10(abs(s) .^ 2 + eps); % Use dB scale for visualization
-                            % Pass additional parameters for boundary lines
-                            visualizeBoundingBox(spectrogramDb, f, t, sampleRate, ...
-                                bbox_x, bbox_y, bbox_width, bbox_height, ...
-                                centerFreqHz, bandwidthHz, eventStartSample, eventEndSample, ...
-                                jsonFileName, eventIdx, categoryName);
-                        catch vizError
-                            warning('Visualization failed for %s, Event %d: %s', jsonFileName, eventIdx, vizError.message);
-                        end
-
-                    end
-
-                    % --- Calculate SNR for the event ---
-                    processedSnr = NaN; % Default SNR value
-                    snrsForCurrentEventAcrossAntennas = []; % Stores SNRs for current event, across all Rx antennas
-
-                    % Ensure rxInfo and necessary subfields for SNR are available
-                    if isfield(rxInfo, 'SNRs') && ~isempty(rxInfo.SNRs) && ...
-                            isfield(rxInfo, 'NumReceiveAntennas') && ~isempty(rxInfo.NumReceiveAntennas) && rxInfo.NumReceiveAntennas > 0
-
-                        allRxSnrsDataFromJSON = rxInfo.SNRs; % This is the 1D cell array from JSON
-                        numActualRxAntennas = rxInfo.NumReceiveAntennas;
-
-                        if length(txArray) > 1
-
-                            snrs = zeros(numActualRxAntennas, 1);
-
-                            for rxAntIdx = 1:numActualRxAntennas
-                                rowId = (rxAntIdx - 1) * length(txArray) + txIdx;
-
-                                if iscell(allRxSnrsDataFromJSON)
-                                    snr_data = allRxSnrsDataFromJSON{rowId}(eventIdx);
-                                else
-
-                                    snr_data = allRxSnrsDataFromJSON(rowId, eventIdx);
-                                end
-
-                                snrs(rxAntIdx) = snr_data;
-                            end
-
-                            processedSnr = mean(snrs);
-
-                        else
-
-                            if numActualRxAntennas > 1
-                                processedSnr = mean(rxInfo.SNRs(:, eventIdx));
-                            else
-                                processedSnr = rxInfo.SNRs(eventIdx);
-                            end
-
-                        end
-
-                    end
-
-                    % --- End SNR Calculation ---
-
-                    % Create Annotation
-                    annotationEntry = struct();
-                    annotationEntry.id = annotationId;
-                    annotationEntry.image_id = currentImageId;
-                    annotationEntry.category_id = currentCategoryId;
-                    annotationEntry.segmentation = [];
-                    annotationEntry.area = bbox_width * bbox_height;
-                    annotationEntry.bbox = [bbox_x, bbox_y, bbox_width, bbox_height];
-                    annotationEntry.iscrowd = 0;
-                    annotationEntry.snr = processedSnr; % Add the processed SNR value
-
-                    annotationsForThisImage = [annotationsForThisImage, annotationEntry];
-                    annotationId = annotationId + 1;
-                end % End event loop (within tx)
-
-            end % End tx loop
-
-            cocoData.annotations = [cocoData.annotations, annotationsForThisImage];
-
-            imageId = imageId + 1;
-            processedImageCount = processedImageCount + 1;
-
-        catch ME
-            warning('Error processing file %s for window %s: %s', jsonFileName, windowName, ME.message);
-            % fprintf('%s\n', ME.getReport('extended', 'on', 'hyperlinks', 'off')); % Verbose error
-        end
-
-    end % End of file processing loop for one window
-
-    fileLoopEndTime = toc(fileLoopStartTime);
-    fprintf('Finished processing %d files for window %s. Successfully added %d images. Time: %.2f seconds.\n', ...
-        k, windowName, processedImageCount, fileLoopEndTime);
-
-    %% --- Data Splitting (based on unique Frame IDs for the current window) ---
-    fprintf('\nSplitting data for window: %s based on Frame IDs...\n', windowName);
-
-    if processedImageCount == 0 || isempty(keys(imageIdToFrameIdMap))
-        warning('No images were successfully processed for window %s. Skipping splitting.', windowName);
-        continue; % Skip to the next window
-    end
-
-    % --- Get Unique Frame IDs for this window's processed images ---
-    processedImageIds = cell2mat(keys(imageIdToFrameIdMap));
-    processedFrameIds = values(imageIdToFrameIdMap);
-    uniqueFrameIds = unique(processedFrameIds);
-    numUniqueFrames = length(uniqueFrameIds);
-
-    if numUniqueFrames == 0
-        warning('No unique frames found for window %s images. Skipping splitting.', windowName);
-        continue;
-    end
-
-    % --- Split Frame IDs (Sequential Order from uniqueFrameIds) ---
-    % Frame IDs are taken in the order returned by unique(), which is sorted.
-    % No random shuffling is performed.
-    % rng('default'); % Removed: No longer shuffling
-    % shuffledFrameIndices = randperm(numUniqueFrames); % Removed: No longer shuffling
-    % shuffledFrameIds = uniqueFrameIds(shuffledFrameIndices); % Removed: Using uniqueFrameIds directly
-
-    numTrainFrames = floor(trainRatio * numUniqueFrames);
-    numValFrames = floor(valRatio * numUniqueFrames);
-    numTestFrames = numUniqueFrames - numTrainFrames - numValFrames; % Ensure all frames are used
-
-    fprintf('  Total unique frames: %d (split sequentially, not shuffled)\n', numUniqueFrames); % Updated message
-    fprintf('    Training frames:   %d (%.1f%%)\n', numTrainFrames, trainRatio * 100);
-    fprintf('    Validation frames: %d (%.1f%%)\n', numValFrames, valRatio * 100);
-    fprintf('    Testing frames:    %d (%.1f%%)\n', numTestFrames, (numTestFrames / numUniqueFrames) * 100);
-
-    % Assign Frame IDs to splits sequentially from uniqueFrameIds
-    trainFrameIdList = uniqueFrameIds(1:numTrainFrames);
-    valFrameIdList = uniqueFrameIds(numTrainFrames + 1:numTrainFrames + numValFrames);
-    testFrameIdList = uniqueFrameIds(numTrainFrames + numValFrames + 1:end);
-
-    % Create maps for quick Frame ID lookup per split
-    trainFrameIdMap = containers.Map(trainFrameIdList, true(1, numTrainFrames));
-    valFrameIdMap = containers.Map(valFrameIdList, true(1, numValFrames));
-    testFrameIdMap = containers.Map(testFrameIdList, true(1, numTestFrames));
-
-    % --- Determine Image IDs for each split based on Frame ID ---
-    trainImageIdList = [];
-    valImageIdList = [];
-    testImageIdList = [];
-
-    allProcessedImageIds = cell2mat(keys(imageIdToFrameIdMap)); % Get all image IDs processed
-
-    for imgId = allProcessedImageIds
-        frameId = imageIdToFrameIdMap(imgId);
-
-        if isKey(trainFrameIdMap, frameId)
-            trainImageIdList = [trainImageIdList, imgId];
-        elseif isKey(valFrameIdMap, frameId)
-            valImageIdList = [valImageIdList, imgId];
-        elseif isKey(testFrameIdMap, frameId)
-            testImageIdList = [testImageIdList, imgId];
-        end
-
-    end
-
-    % Create maps for quick Image ID lookup per split
-    trainImageIds = containers.Map(trainImageIdList, true(1, length(trainImageIdList)));
-    valImageIds = containers.Map(valImageIdList, true(1, length(valImageIdList)));
-    testImageIds = containers.Map(testImageIdList, true(1, length(testImageIdList)));
-
-    % --- Initialize and Populate Split COCO Structures ---
-    cocoTrain = struct('info', cocoData.info, 'licenses', cocoData.licenses, 'categories', cocoData.categories, 'images', [], 'annotations', []);
-    cocoVal = struct('info', cocoData.info, 'licenses', cocoData.licenses, 'categories', cocoData.categories, 'images', [], 'annotations', []);
-    cocoTest = struct('info', cocoData.info, 'licenses', cocoData.licenses, 'categories', cocoData.categories, 'images', [], 'annotations', []);
-
-    % Assign images to splits based on Image ID map
-    for i = 1:length(cocoData.images)
-        img = cocoData.images(i);
-
-        if isKey(trainImageIds, img.id)
-            cocoTrain.images = [cocoTrain.images, img];
-        elseif isKey(valImageIds, img.id)
-            cocoVal.images = [cocoVal.images, img];
-        elseif isKey(testImageIds, img.id)
-            cocoTest.images = [cocoTest.images, img];
-        end
-
-    end
-
-    % Assign annotations to splits based on Image ID map
-    for i = 1:length(cocoData.annotations)
-        ann = cocoData.annotations(i);
-
-        if isKey(trainImageIds, ann.image_id)
-            cocoTrain.annotations = [cocoTrain.annotations, ann];
-        elseif isKey(valImageIds, ann.image_id)
-            cocoVal.annotations = [cocoVal.annotations, ann];
-        elseif isKey(testImageIds, ann.image_id)
-            cocoTest.annotations = [cocoTest.annotations, ann];
-        end
-
-    end
-
-    %% --- Save Split COCO JSON Files (for the current window) ---
-    splitData = {cocoTrain, cocoVal, cocoTest};
-    splitNames = {'train', 'val', 'test'};
-
-    for i = 1:length(splitNames)
-        % Include window name in the JSON filename
-        outputFile = fullfile(baseDataPath, sprintf('%s_%s_%s.json', outputAnnoBaseName, windowName, splitNames{i}));
-        fprintf('  Saving %s annotations (%d images, %d annotations) to %s...\n', ...
-            splitNames{i}, length(splitData{i}.images), length(splitData{i}.annotations), outputFile);
-
-        try
-            jsonStr = jsonencode(splitData{i}, 'PrettyPrint', true);
-            fid = fopen(outputFile, 'w');
-            if fid == -1, error('Cannot open file for writing: %s', outputFile); end
-            fprintf(fid, '%s', jsonStr);
-            fclose(fid);
-            fprintf('  %s annotation file saved successfully.\n', splitNames{i});
-        catch ME
-            warning('Failed to save %s JSON file for window %s: %s', splitNames{i}, windowName, ME.message);
-        end
-
-    end
-
-    windowEndTime = toc(windowStartTime);
-    fprintf('Finished processing and splitting for window %s. Time: %.2f seconds.\n', windowName, windowEndTime);
-
-end % End of window type loop
-
-overallEndTime = toc(overallStartTime);
-fprintf('\n============================================================\n');
-fprintf('Finished processing all window types. Total script time: %.2f seconds.\n', overallEndTime);
-fprintf('============================================================\n');
-
-%% --- Helper Functions ---
-
-function supercat = getModulationSupercategory(modType)
-    % Maps a specific modulation type string to a broader supercategory.
-    if isempty(modType), supercat = 'Unknown'; return; end
-
-    modTypeUpper = upper(modType);
-
-    switch modTypeUpper
-        case {'DSBAM', 'DSBSCAM', 'SSBAM', 'VSBAM'}
-            supercat = 'AM';
-        case {'FM', 'PM', 'FSK'}
-            supercat = modTypeUpper;
-        case {'ASK', 'OOK', '2ASK', '4ASK', '8ASK'}
-            supercat = 'ASK';
-        case {'CPFSK', 'GFSK', 'GMSK', 'MSK'}
-            supercat = 'CPM';
-        case {'APSK', 'APSK2', 'APSK4', 'APSK8', 'APSK16', 'APSK32', 'APSK64', 'APSK128', 'APSK256', 'DVBSAPSK'}
-            supercat = 'APSK';
-        case {'PSK', 'BPSK', 'QPSK', '8PSK', '16PSK', 'DPSK', 'OQPSK'}
-            supercat = 'PSK';
-        case {'QAM', '16QAM', '32QAM', '64QAM', '128QAM', '256QAM', 'MILL88QAM'}
-            supercat = 'QAM';
-        case {'PAM', '4PAM', '8PAM'}
-            supercat = 'PAM';
-        case {'OFDM'}
-            supercat = 'OFDM';
-        case {'OTFS'}
-            supercat = 'OTFS';
-        case {'SCFDMA'}
-            supercat = 'SCFDMA';
-        otherwise
-            % Attempt basic pattern matching for common prefixes
-            if startsWith(modTypeUpper, 'QAM'), supercat = 'QAM';
-            elseif startsWith(modTypeUpper, 'PSK'), supercat = 'PSK';
-            elseif startsWith(modTypeUpper, 'FSK'), supercat = 'FSK';
-            elseif startsWith(modTypeUpper, 'ASK'), supercat = 'ASK';
-            elseif startsWith(modTypeUpper, 'PAM'), supercat = 'PAM';
-            else
-                supercat = 'Unknown';
-                warning('Unknown modulation type for supercategory mapping: %s', modType);
-            end
-
-    end
-
+coco = struct();
+coco.info = struct( ...
+    'description', 'CSRD annotation v2 receiver-frequency COCO export', ...
+    'version', 'csrd-coco-v2-minimal', ...
+    'source_schema', reader.Summary.Schema, ...
+    'coordinate_system', 'receiver_frequency_canvas');
+coco.licenses = localEmptyLicenses();
+coco.images = state.images;
+coco.annotations = state.annotations;
+coco.categories = state.categories;
+coco.csrd_export = struct( ...
+    'schema', 'csrd.coco.v2.minimal', ...
+    'source_path', reader.Summary.SourcePath, ...
+    'num_frames', numel(state.images), ...
+    'num_sources', reader.Summary.NumSources, ...
+    'num_annotations', numel(state.annotations), ...
+    'num_skipped_sources', numel(state.skippedSources), ...
+    'skipped_sources', state.skippedSources, ...
+    'field_sources', localFieldSources());
+
+if ~isempty(outputPath)
+    coco = writeCocoJson(coco, outputPath);
+end
 end
 
-function visualizeBoundingBox(spectrogramData, f, t, sampleRate, ...
-        bbox_x_coco, bbox_y_coco, bbox_width_coco, bbox_height_coco, ... % These are COCO bbox values
-        centerFreqHz, bandwidthHz, eventStartSample, eventEndSample, ...
-        fileName, eventIdx, categoryName)
-    % Displays the spectrogram and the calculated bounding box for an event.
-    % Note: spectrogramData and f here should be the positive-frequency only versions.
 
-    figure; % Create a new figure for each visualization
-    imagesc(t, f, spectrogramData); % Use imagesc for better performance with large data
-    axis xy; % Ensure frequency axis is oriented correctly (low to high)
-    colorbar;
-    xlabel('Time (s)');
-    ylabel('Frequency (Hz) - Positive Half');
-    titleStr = sprintf('%s - Event %d (%s)', strrep(fileName, '_', '\_'), eventIdx, categoryName);
-    title(titleStr);
+function tf = isNameValueToken(value)
+    % isNameValueToken - Production declaration in CSRD.
+    % 中文说明：isNameValueToken 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+tf = (ischar(value) || isstring(value)) && ...
+    any(strcmpi(char(value), {'ImageWidth', 'ImageHeight'}));
+end
 
-    % --- Draw Bounding Box Rectangle (from COCO bbox values) ---
-    hold on; % Ensure subsequent plots are overlaid
 
-    try
-        rect_x_plot = t(bbox_x_coco);
-        rect_y_plot = t(bbox_y_coco);
-        rect_width_plot = (t(min(length(t), bbox_x_coco + bbox_width_coco -1)) - t(bbox_x_coco)) + mean(diff(t)) / 2;
-        rect_height_plot = (f(min(length(f), bbox_y_coco + bbox_height_coco -1)) - f(bbox_y_coco)) + mean(diff(f)) / 2;
-        rect_width_plot = max(rect_width_plot, mean(diff(t)) / 2); % Ensure minimum width
-        rect_height_plot = max(rect_height_plot, mean(diff(f)) / 2); % Ensure minimum height
+function tf = isPositiveScalar(value)
+    % isPositiveScalar - Production declaration in CSRD.
+    % 中文说明：isPositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+tf = isnumeric(value) && isscalar(value) && isfinite(value) && value > 0;
+end
 
-        % Draw the rectangle (Red, Solid)
-        rectangle('Position', [rect_x_plot, rect_y_plot, rect_width_plot, rect_height_plot], ...
-            'EdgeColor', 'r', ...
-            'LineWidth', 1.5, ...
-            'LineStyle', '-');
 
-        fprintf('  COCO BBox: [x:%d, y:%d, w:%d, h:%d]\n', bbox_x_coco, bbox_y_coco, bbox_width_coco, bbox_height_coco);
-        fprintf('  Plotted Rectangle Time: [%.4f, %.4f], Freq: [%.1f, %.1f]\n', rect_x_plot, rect_x_plot + rect_width_plot, rect_y_plot, rect_y_plot + rect_height_plot);
-
-    catch rectError
-        warning('Could not draw rectangle for event %d in %s: %s', eventIdx, fileName, rectError.message);
+function items = localFlattenStructs(value, context)
+    % localFlattenStructs - Production declaration in CSRD.
+    % 中文说明：localFlattenStructs 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+items = {};
+if isempty(value)
+    return;
+end
+if isstruct(value)
+    cells = num2cell(value);
+    items = reshape(cells, 1, []);
+    return;
+end
+if iscell(value)
+    for k = 1:numel(value)
+        nested = localFlattenStructs(value{k}, ...
+            sprintf('%s{%d}', context, k));
+        items = [items, nested]; %#ok<AGROW>
     end
+    return;
+end
+error('CSRD:Tools:CocoInvalidSignalSources', ...
+    'Expected %s to contain structs, got %s.', context, class(value));
+end
 
-    % --- Draw Nominal Boundary Lines (from metadata) ---
-    try
-        % Calculate nominal time boundaries from samples
-        timeStartMeta = (eventStartSample - 1) / sampleRate; % Time of first sample
-        timeEndMeta = (eventEndSample -1) / sampleRate; % Time of last sample
 
-        % Calculate nominal frequency boundaries
-        freqLowMeta = centerFreqHz - bandwidthHz / 2;
-        freqHighMeta = centerFreqHz + bandwidthHz / 2;
+function [state, annotation] = convertSource(state, source, frame, imageId, ...
+        observableRangeHz, imageWidth, imageHeight)
+            % convertSource - Production declaration in CSRD.
+            % 中文说明：convertSource 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+annotation = [];
 
-        % Get plot limits
-        xLims = xlim;
-        yLims = ylim;
+rv = source.ReceiverView;
+if ~logicalScalar(rv.IsVisible)
+    state.skippedSources(end + 1) = makeSkippedSource(source, frame);
+    return;
+end
 
-        % Plot vertical time lines (Magenta, Dashed)
-        line([timeStartMeta timeStartMeta], [yLims(1) freqLowMeta], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 2);
-        line([timeEndMeta timeEndMeta], [yLims(1) freqLowMeta], 'Color', 'm', 'LineStyle', '--', 'LineWidth', 2);
+categoryName = char(source.Truth.Design.ModulationFamily);
+if isempty(categoryName)
+    error('CSRD:Tools:CocoMissingCategory', ...
+        ['Signal source TxID=%s BurstId=%s is missing ', ...
+         'Truth.Design.ModulationFamily.'], ...
+        char(source.TxID), char(source.BurstId));
+end
+[state, categoryId] = ensureCategory(state, categoryName);
 
-        % Plot horizontal frequency lines (Magenta, Dashed)
-        line([xLims(1) timeStartMeta], [centerFreqHz centerFreqHz], 'Color', 'g', 'LineStyle', '--', 'LineWidth', 2);
-        line([xLims(1) timeStartMeta], [freqLowMeta freqLowMeta], 'Color', 'g', 'LineStyle', '--', 'LineWidth', 2);
-        line([xLims(1) timeStartMeta], [freqHighMeta freqHighMeta], 'Color', 'g', 'LineStyle', '--', 'LineWidth', 2);
+[bbox, bboxHz] = makeFrequencyBbox(source, observableRangeHz, ...
+    imageWidth, imageHeight);
 
-        fprintf('  Nominal   Time: [%.4f, %.4f], Freq: [%.1f, %.1f, %.1f]\n', timeStartMeta, timeEndMeta, freqLowMeta, centerFreqHz, freqHighMeta);
+annotation = struct();
+annotation.id = state.nextAnnotationId;
+annotation.image_id = imageId;
+annotation.category_id = categoryId;
+annotation.bbox = bbox;
+annotation.area = bbox(3) * bbox(4);
+annotation.iscrowd = 0;
+annotation.csrd = makeAnnotationMetadata(source, frame, bboxHz);
+state.nextAnnotationId = state.nextAnnotationId + 1;
+end
 
-    catch lineError
-        warning('Could not draw boundary lines for event %d in %s: %s', eventIdx, fileName, lineError.message);
-    end
 
-    hold off;
+function tf = logicalScalar(value)
+    % logicalScalar - Production declaration in CSRD.
+    % 中文说明：logicalScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+if islogical(value)
+    tf = isscalar(value) && value;
+elseif isnumeric(value)
+    tf = isscalar(value) && value ~= 0;
+else
+    tf = false;
+end
+end
 
-    drawnow; % Ensure the plot is displayed
 
+function skipped = makeSkippedSource(source, frame)
+    % makeSkippedSource - Production declaration in CSRD.
+    % 中文说明：makeSkippedSource 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+skipped = struct( ...
+    'frame_id', frame.FrameId, ...
+    'receiver_id', char(frame.ReceiverID), ...
+    'tx_id', char(source.TxID), ...
+    'segment_id', source.SegmentId, ...
+    'burst_id', char(source.BurstId), ...
+    'visibility_reason', char(source.ReceiverView.VisibilityReason));
+end
+
+
+function [state, categoryId] = ensureCategory(state, categoryName)
+    % ensureCategory - Production declaration in CSRD.
+    % 中文说明：ensureCategory 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+hit = find(strcmp(state.categoryNames, categoryName), 1);
+if ~isempty(hit)
+    categoryId = hit;
+    return;
+end
+
+categoryId = numel(state.categoryNames) + 1;
+state.categoryNames{end + 1} = categoryName;
+category = struct( ...
+    'id', categoryId, ...
+    'name', categoryName, ...
+    'supercategory', 'modulation_family');
+state.categories(end + 1) = category;
+end
+
+
+function [bbox, bboxHz] = makeFrequencyBbox(source, observableRangeHz, ...
+        imageWidth, imageHeight)
+            % makeFrequencyBbox - Production declaration in CSRD.
+            % 中文说明：makeFrequencyBbox 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+rv = source.ReceiverView;
+sourcePlane = source.Truth.Measured.SourcePlane;
+
+centerHz = requireFiniteScalar(rv.ProjectedCenterOffsetHz, ...
+    'ReceiverView.ProjectedCenterOffsetHz');
+bandwidthHz = requireFiniteScalar(sourcePlane.OccupiedBandwidthHz, ...
+    'Truth.Measured.SourcePlane.OccupiedBandwidthHz');
+if bandwidthHz <= 0
+    error('CSRD:Tools:CocoInvalidMeasuredBandwidth', ...
+        'SourcePlane.OccupiedBandwidthHz must be positive, got %.17g.', ...
+        bandwidthHz);
+end
+
+rangeMinHz = observableRangeHz(1);
+rangeMaxHz = observableRangeHz(2);
+rangeWidthHz = rangeMaxHz - rangeMinHz;
+lowerHz = centerHz - bandwidthHz / 2;
+upperHz = centerHz + bandwidthHz / 2;
+clippedLowerHz = max(lowerHz, rangeMinHz);
+clippedUpperHz = min(upperHz, rangeMaxHz);
+
+if clippedUpperHz <= clippedLowerHz
+    error('CSRD:Tools:CocoBBoxOutsideObservableRange', ...
+        ['Visible source TxID=%s projects outside receiver observable ', ...
+         'range [%.17g %.17g] Hz.'], ...
+        char(source.TxID), rangeMinHz, rangeMaxHz);
+end
+
+x = (clippedLowerHz - rangeMinHz) / rangeWidthHz * imageWidth;
+width = (clippedUpperHz - clippedLowerHz) / rangeWidthHz * imageWidth;
+bbox = [x, 0, width, imageHeight];
+bboxHz = struct( ...
+    'lower_edge_hz', clippedLowerHz, ...
+    'upper_edge_hz', clippedUpperHz, ...
+    'center_hz', centerHz, ...
+    'occupied_bandwidth_hz', bandwidthHz, ...
+    'was_clipped_to_observable_range', ...
+        clippedLowerHz ~= lowerHz || clippedUpperHz ~= upperHz);
+end
+
+
+function value = requireFiniteScalar(value, context)
+    % requireFiniteScalar - Production declaration in CSRD.
+    % 中文说明：requireFiniteScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
+    error('CSRD:Tools:CocoMissingFiniteScalar', ...
+        '%s must be a finite numeric scalar.', context);
+end
+value = double(value);
+end
+
+
+function metadata = makeAnnotationMetadata(source, frame, bboxHz)
+    % makeAnnotationMetadata - Production declaration in CSRD.
+    % 中文说明：makeAnnotationMetadata 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+truth = source.Truth;
+metadata = struct( ...
+    'schema', 'annotation-v2-derived', ...
+    'frame_id', frame.FrameId, ...
+    'receiver_id', char(frame.ReceiverID), ...
+    'tx_id', char(source.TxID), ...
+    'segment_id', source.SegmentId, ...
+    'burst_id', char(source.BurstId), ...
+    'visibility_reason', char(source.ReceiverView.VisibilityReason), ...
+    'bbox_frequency_hz', bboxHz, ...
+    'source_fields', localFieldSources(), ...
+    'design', truth.Design, ...
+    'execution', truth.Execution, ...
+    'measured', truth.Measured, ...
+    'receiver_view', source.ReceiverView);
+end
+
+
+function fieldSources = localFieldSources()
+    % localFieldSources - Production declaration in CSRD.
+    % 中文说明：localFieldSources 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+fieldSources = struct( ...
+    'category', 'Truth.Design.ModulationFamily', ...
+    'bbox_center_hz', 'ReceiverView.ProjectedCenterOffsetHz', ...
+    'bbox_width_hz', ...
+        'Truth.Measured.SourcePlane.OccupiedBandwidthHz', ...
+    'time_occupancy', ...
+        'Truth.Measured.SourcePlane.TimeOccupancy', ...
+    'execution_metadata', 'Truth.Execution', ...
+    'measurement_metadata', 'Truth.Measured');
+end
+
+
+function rangeHz = resolveObservableRange(frame)
+    % resolveObservableRange - Production declaration in CSRD.
+    % 中文说明：resolveObservableRange 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+if isfield(frame, 'ObservableRange') && isnumeric(frame.ObservableRange) && ...
+        numel(frame.ObservableRange) >= 2 && ...
+        all(isfinite(frame.ObservableRange(1:2)))
+    vals = double(frame.ObservableRange(1:2));
+    rangeHz = [min(vals), max(vals)];
+elseif isfield(frame, 'SampleRate') && isnumeric(frame.SampleRate) && ...
+        isscalar(frame.SampleRate) && isfinite(frame.SampleRate) && ...
+        frame.SampleRate > 0
+    halfBw = double(frame.SampleRate) / 2;
+    rangeHz = [-halfBw, halfBw];
+else
+    error('CSRD:Tools:CocoMissingObservableRange', ...
+        ['FrameId=%s ReceiverID=%s lacks ObservableRange and valid ', ...
+         'SampleRate.'], mat2str(frame.FrameId), char(frame.ReceiverID));
+end
+if rangeHz(2) <= rangeHz(1)
+    error('CSRD:Tools:CocoInvalidObservableRange', ...
+        'Frame observable range must be increasing after normalization.');
+end
+end
+
+
+function value = getOptionalScalar(s, fieldName)
+    % getOptionalScalar - Production declaration in CSRD.
+    % 中文说明：getOptionalScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+if isfield(s, fieldName) && isnumeric(s.(fieldName)) && isscalar(s.(fieldName))
+    value = double(s.(fieldName));
+else
+    value = [];
+end
+end
+
+
+function name = makeVirtualFileName(frame)
+    % makeVirtualFileName - Production declaration in CSRD.
+    % 中文说明：makeVirtualFileName 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+name = sprintf('frame_%06d_%s_frequency_canvas', ...
+    double(frame.FrameId), sanitizeName(char(frame.ReceiverID)));
+end
+
+
+function out = sanitizeName(value)
+    % sanitizeName - Production declaration in CSRD.
+    % 中文说明：sanitizeName 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+out = regexprep(value, '[^A-Za-z0-9_=-]', '_');
+if isempty(out)
+    out = 'receiver';
+end
+end
+
+
+function coco = writeCocoJson(coco, outputPath)
+    % writeCocoJson - Production declaration in CSRD.
+    % 中文说明：writeCocoJson 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+assert(ischar(outputPath) || isstring(outputPath), ...
+    'CSRD:Tools:CocoInvalidOutputPath', ...
+    'OUTPUT_PATH must be a character vector or string scalar.');
+outputPath = char(outputPath);
+outDir = fileparts(outputPath);
+if ~isempty(outDir) && exist(outDir, 'dir') ~= 7
+    mkdir(outDir);
+end
+
+[clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(coco);
+clean.csrd_export.sanitize_manifest = manifest;
+
+fid = fopen(outputPath, 'w');
+assert(fid > 0, 'CSRD:Tools:CocoWriteFailed', ...
+    'Could not open COCO output for writing: %s', outputPath);
+cleanup = onCleanup(@() fclose(fid));
+fprintf(fid, '%s', jsonencode(clean, 'PrettyPrint', true));
+delete(cleanup);
+coco = clean;
+end
+
+
+function out = localEmptyImages()
+    % localEmptyImages - Production declaration in CSRD.
+    % 中文说明：localEmptyImages 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+out = repmat(struct( ...
+    'id', [], ...
+    'file_name', '', ...
+    'width', [], ...
+    'height', [], ...
+    'csrd', struct()), 0, 1);
+end
+
+
+function out = localEmptyAnnotations()
+    % localEmptyAnnotations - Production declaration in CSRD.
+    % 中文说明：localEmptyAnnotations 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+out = repmat(struct( ...
+    'id', [], ...
+    'image_id', [], ...
+    'category_id', [], ...
+    'bbox', [], ...
+    'area', [], ...
+    'iscrowd', [], ...
+    'csrd', struct()), 0, 1);
+end
+
+
+function out = localEmptyCategories()
+    % localEmptyCategories - Production declaration in CSRD.
+    % 中文说明：localEmptyCategories 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+out = repmat(struct( ...
+    'id', [], ...
+    'name', '', ...
+    'supercategory', ''), 0, 1);
+end
+
+
+function out = localEmptyLicenses()
+    % localEmptyLicenses - Production declaration in CSRD.
+    % 中文说明：localEmptyLicenses 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+out = repmat(struct( ...
+    'id', [], ...
+    'name', '', ...
+    'url', ''), 0, 1);
+end
+
+
+function out = localEmptySkippedSources()
+    % localEmptySkippedSources - Production declaration in CSRD.
+    % 中文说明：localEmptySkippedSources 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+out = repmat(struct( ...
+    'frame_id', [], ...
+    'receiver_id', '', ...
+    'tx_id', '', ...
+    'segment_id', [], ...
+    'burst_id', '', ...
+    'visibility_reason', ''), 0, 1);
 end

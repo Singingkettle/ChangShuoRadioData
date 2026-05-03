@@ -1,5 +1,8 @@
 function initializeStatisticalMap(obj)
     % initializeStatisticalMap - Initialize statistical/logical map
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 initializeStatisticalMap 实现。
     %
     % Sets up logical boundaries for statistical channel modeling
 
@@ -11,6 +14,8 @@ function initializeStatisticalMap(obj)
     else
         boundaries = [-2000, 2000, -2000, 2000]; % Default 4km x 4km
     end
+
+    channelModel = resolveStatisticalChannelModel(obj);
 
     % Initialize default boundaries in mapData
     obj.mapData.Boundaries = struct( ...
@@ -27,7 +32,7 @@ function initializeStatisticalMap(obj)
         'Terrain', '', ...
         'TerrainMaterial', '', ...
         'MaxNumReflections', [], ...
-        'ChannelModel', 'Statistical', ...
+        'ChannelModel', channelModel, ...
         'Boundaries', obj.mapData.Boundaries);
 
     % Update configuration
@@ -38,8 +43,29 @@ function initializeStatisticalMap(obj)
         obj.Config.Environment = struct();
     end
     obj.Config.Environment.MapProfile = obj.mapData.MapProfile;
-    obj.Config.Environment.ChannelModel = 'Statistical';
+    obj.Config.Environment.ChannelModel = channelModel;
 
-    obj.logger.debug('Statistical map initialized with boundaries: [%.0f, %.0f, %.0f, %.0f] meters', ...
-        boundaries(1), boundaries(2), boundaries(3), boundaries(4));
+    obj.logger.debug(['Statistical map initialized with boundaries: ', ...
+        '[%.0f, %.0f, %.0f, %.0f] meters and channel model %s'], ...
+        boundaries(1), boundaries(2), boundaries(3), boundaries(4), channelModel);
+end
+
+function channelModel = resolveStatisticalChannelModel(obj)
+    % resolveStatisticalChannelModel - Production declaration in CSRD.
+    % 中文说明：resolveStatisticalChannelModel 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    channelModel = 'Statistical';
+    if isfield(obj.Config, 'Environment') && ...
+            isstruct(obj.Config.Environment) && ...
+            isfield(obj.Config.Environment, 'ChannelModel') && ...
+            ~isempty(obj.Config.Environment.ChannelModel)
+        channelModel = char(string(obj.Config.Environment.ChannelModel));
+    elseif isfield(obj.Config, 'Map') && isstruct(obj.Config.Map) && ...
+            isfield(obj.Config.Map, 'Statistical') && ...
+            isstruct(obj.Config.Map.Statistical) && ...
+            isfield(obj.Config.Map.Statistical, 'ChannelModel') && ...
+            ~isempty(obj.Config.Map.Statistical.ChannelModel)
+        channelModel = char(string(obj.Config.Map.Statistical.ChannelModel));
+    end
 end

@@ -1,5 +1,8 @@
 function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalSegments, TxInfos)
     % processTransmitImpairments - Apply transmitter frontend impairments
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processTransmitImpairments 实现。
     %
     % This method applies transmitter RF frontend impairments to all signal segments
     % using the TransmitFactory.
@@ -38,55 +41,28 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
                             obj.logger.debug("Frame %d, TxID %s, Seg %d: Applying transmit impairments.", ...
                                 FrameId, string(currentTxId), segIdx);
 
-                            try
-                                segSignal = txsSignalSegments{txIdx}{segIdx};
+                            % Phase 3 (§3.2.B): the segment-signal contract is
+                            % enforced by a Static, Hidden helper on the class so
+                            % the same fail-fast surface can be exercised from
+                            % unit tests. The legacy `2.5 * plannedBW` derive
+                            % branch and the `FrequencyOffset = 0` /
+                            % `TransmitError = true` swallows have been removed.
+                            segSignal = txsSignalSegments{txIdx}{segIdx};
+                            csrd.core.ChangShuo.assertSegmentSignalReadyForImpairments( ...
+                                segSignal, FrameId, currentTxId, segIdx);
 
-                                if ~isfield(segSignal, 'FrequencyOffset')
-                                    segSignal.FrequencyOffset = 0;
-                                end
-
-                                % SampleRate must come from the modulator
-                                % output (processSingleSegment now enforces
-                                % that). If it is still missing, derive it
-                                % from the planned occupied bandwidth
-                                % (Nyquist factor 2 with a small guard) and
-                                % emit a warning - never silently fall back
-                                % to a magic 200 kHz default.
-                                if ~isfield(segSignal, 'SampleRate') || ...
-                                        isempty(segSignal.SampleRate) || ...
-                                        segSignal.SampleRate <= 0
-                                    plannedBW = localResolvePlannedBandwidth(txScenarioConfig);
-                                    if ~isempty(plannedBW) && plannedBW > 0
-                                        segSignal.SampleRate = 2.5 * plannedBW;
-                                        obj.logger.warning(['Frame %d, TxID %s, Seg %d: ', ...
-                                            'modulator output missing SampleRate; ', ...
-                                            'derived %.0f Hz from planned bandwidth ', ...
-                                            '%.0f Hz. Fix the modulator to set SampleRate explicitly.'], ...
-                                            FrameId, string(currentTxId), segIdx, ...
-                                            segSignal.SampleRate, plannedBW);
-                                    else
-                                        error('CSRD:Core:MissingSampleRate', ...
-                                            ['Frame %d, TxID %s, Seg %d: cannot ', ...
-                                             'apply transmit impairments because ', ...
-                                             'segment SampleRate is missing and no ', ...
-                                             'planned bandwidth is available to derive it.'], ...
-                                            FrameId, string(currentTxId), segIdx);
-                                    end
-                                end
-
-                                if ~isfield(segSignal, 'Signal') || isempty(segSignal.Signal)
-                                    obj.logger.debug("Frame %d, TxID %s, Seg %d: No signal data, skipping transmit impairments.", ...
-                                        FrameId, string(currentTxId), segIdx);
-                                    continue;
-                                end
-
-                                txsSignalSegments{txIdx}{segIdx} = step(obj.Factories.Transmit, ...
-                                    segSignal, FrameId, currentTxInfo, txScenarioConfig);
-                            catch ME_transmit
-                                obj.logger.error("Frame %d, TxID %s, Seg %d: Error during transmit impairments: %s", ...
-                                    FrameId, string(currentTxId), segIdx, ME_transmit.message);
-                                txsSignalSegments{txIdx}{segIdx}.TransmitError = true;
+                            if ~isfield(segSignal, 'Signal') || isempty(segSignal.Signal)
+                                obj.logger.debug("Frame %d, TxID %s, Seg %d: No signal data, skipping transmit impairments.", ...
+                                    FrameId, string(currentTxId), segIdx);
+                                continue;
                             end
+
+                            txOut = step(obj.Factories.Transmit, ...
+                                segSignal, FrameId, currentTxInfo, txScenarioConfig);
+                            txOut = csrd.pipeline.signal.gateToDuration( ...
+                                txOut, localSegmentDurationSec(txOut), ...
+                                'TransmitOutput');
+                            txsSignalSegments{txIdx}{segIdx} = txOut;
 
                         end
 
@@ -105,23 +81,21 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
     obj.logger.debug("Frame %d: Transmit impairment stage complete.", FrameId);
 end
 
-function plannedBW = localResolvePlannedBandwidth(txScenarioConfig)
-    %LOCALRESOLVEPLANNEDBANDWIDTH Return the planned occupied bandwidth in Hz.
-    %
-    % Looks for ``Spectrum.PlannedBandwidth`` (current TxPlan field) and
-    % falls back to the legacy ``Spectrum.TargetBandwidth`` field if the
-    % former is absent. Returns [] when neither is available.
-
-    plannedBW = [];
-    if ~isstruct(txScenarioConfig) || ~isfield(txScenarioConfig, 'Spectrum')
-        return;
+function durationSec = localSegmentDurationSec(segSignal)
+    if isfield(segSignal, 'FrameRelativeStartTime') && ...
+            isfield(segSignal, 'FrameRelativeEndTime') && ...
+            ~isempty(segSignal.FrameRelativeStartTime) && ...
+            ~isempty(segSignal.FrameRelativeEndTime)
+        durationSec = double(segSignal.FrameRelativeEndTime) - ...
+            double(segSignal.FrameRelativeStartTime);
+    elseif isfield(segSignal, 'Duration') && ~isempty(segSignal.Duration)
+        durationSec = double(segSignal.Duration);
+    else
+        error('CSRD:Signal:MissingSegmentDuration', ...
+            'Segment signal is missing Duration/FrameRelative time fields.');
     end
-    spec = txScenarioConfig.Spectrum;
-    if isfield(spec, 'PlannedBandwidth') && ~isempty(spec.PlannedBandwidth) && spec.PlannedBandwidth > 0
-        plannedBW = spec.PlannedBandwidth;
-        return;
-    end
-    if isfield(spec, 'TargetBandwidth') && ~isempty(spec.TargetBandwidth) && spec.TargetBandwidth > 0
-        plannedBW = spec.TargetBandwidth;
+    if durationSec < 0 || ~isfinite(durationSec)
+        error('CSRD:Signal:InvalidSegmentDuration', ...
+            'Segment duration must be finite and non-negative.');
     end
 end

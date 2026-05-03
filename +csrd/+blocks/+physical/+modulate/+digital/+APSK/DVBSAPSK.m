@@ -1,5 +1,6 @@
 classdef DVBSAPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
     % DVBSAPSK - Digital Video Broadcasting Satellite APSK Modulator
+    % 中文说明：提供 CSRD 生产链路中的 DVBSAPSK 实现。
     %
     % This class implements DVB-S2/S2X/SH (Digital Video Broadcasting Satellite)
     % compliant APSK modulation as a subclass of the APSK modulator. DVB-S APSK
@@ -19,7 +20,7 @@ classdef DVBSAPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
     %   - OSTBC encoding support for MIMO transmission
     %   - Pulse shaping with raised cosine filters
     %
-    % Standards Reference:
+    % References / 参考资料:
     %   DVB-S APSK modulation parameters specification:
     %   https://www.mathworks.com/help/comm/ref/dvbsapskmod.html
     %
@@ -69,6 +70,9 @@ classdef DVBSAPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core DVB-S APSK modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs DVB-S compliant APSK modulation with the configured
             % standard suffix, code identifier, and frame length parameters, followed
@@ -132,6 +136,9 @@ classdef DVBSAPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured DVB-S APSK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the DVB-S APSK modulator with valid parameters
             % according to DVB standards if not specified and returns a function handle
@@ -231,6 +238,9 @@ end
 
 function codeIdentifier = randomSelectCodeIdentifier(modulationOrder, standardSuffix, frameLength)
     % randomSelectCodeIdentifier - Select valid code identifier for DVB-S APSK
+    % 中文说明：randomSelectCodeIdentifier 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % This function selects a random valid code identifier based on the DVB
     % standard suffix, modulation order, and frame length according to the

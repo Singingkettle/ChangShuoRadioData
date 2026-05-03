@@ -1,5 +1,6 @@
 classdef OOK < csrd.blocks.physical.modulate.digital.APSK.APSK
     % OOK - On-Off Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 OOK 实现。
     %
     % This class implements On-Off Keying (OOK) modulation as a subclass of the
     % APSK modulator. OOK is the simplest form of amplitude-shift keying (ASK)
@@ -59,6 +60,9 @@ classdef OOK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core OOK modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs OOK modulation by directly applying pulse shaping
             % to the binary input symbols. Unlike other modulation schemes, OOK
@@ -111,6 +115,9 @@ classdef OOK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured OOK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the OOK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

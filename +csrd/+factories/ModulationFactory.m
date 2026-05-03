@@ -1,4 +1,5 @@
 classdef ModulationFactory < matlab.System
+        % 中文说明：提供 CSRD 生产链路中的 ModulationFactory 实现。
 
     properties
         % Config: Struct containing the configuration for modulation types.
@@ -16,6 +17,10 @@ classdef ModulationFactory < matlab.System
     methods
 
         function obj = ModulationFactory(varargin)
+            % ModulationFactory - Production declaration in CSRD.
+            % 中文说明：ModulationFactory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
             obj.modulatorCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
             % Logger initialization now in setupImpl
@@ -26,9 +31,17 @@ classdef ModulationFactory < matlab.System
     methods (Access = protected)
 
         function validateInputsImpl(~, ~, ~, ~, ~, ~, ~)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if isempty(obj.Config) || ~isstruct(obj.Config)
                 error('ModulationFactory:ConfigError', 'Config property must be a valid struct.');
@@ -36,13 +49,14 @@ classdef ModulationFactory < matlab.System
 
             obj.factoryConfig = obj.Config; % The passed-in struct is the factory's config
 
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             obj.logger.debug('ModulationFactory setupImpl initializing with directly passed config struct.');
 
             % Optional: Pre-validate structure of factoryConfig (e.g., existence of .digital, .analog)
             if ~isfield(obj.factoryConfig, 'digital') && ~isfield(obj.factoryConfig, 'analog')
-                obj.logger.warning('ModulationFactory config does not seem to have top-level ''digital'' or ''analog'' fields.');
+                error('CSRD:ModulationFactory:MissingRegistry', ...
+                    'ModulationFactory config must contain top-level digital or analog registries.');
             end
 
             obj.logger.debug('ModulationFactory setupImpl complete.');
@@ -50,6 +64,9 @@ classdef ModulationFactory < matlab.System
 
         function outputSignalStruct = stepImpl(obj, inputData, frameId, txIdStr, segmentId, segmentModulationConfig, segmentPlacementConfig)
             % segmentModulationConfig: struct from scenario, e.g., Scenario.Transmitters.Segments.Modulation
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % segmentPlacementConfig: struct from scenario, e.g., Scenario.Transmitters.Segments.Placement
 
             if ~isfield(segmentModulationConfig, 'TypeID') || isempty(segmentModulationConfig.TypeID)
@@ -126,8 +143,9 @@ classdef ModulationFactory < matlab.System
             if ~foundModulatorEntry
                 obj.logger.error('Frame %d, Tx %s, Seg %d: Modulator TypeID ''%s'' not found in ModulationFactory config. Searched under digital, analog, and top-level.', ...
                     frameId, txIdStr, segmentId, modulatorTypeID);
-                outputSignalStruct = struct('Error', 'ModulatorTypeNotFoundInFactoryConfig', 'OriginalData', inputData);
-                return;
+                error('CSRD:ModulationFactory:ModulatorTypeNotFound', ...
+                    'Modulator TypeID "%s" not found in ModulationFactory config.', ...
+                    modulatorTypeID);
             end
 
             % Ensure handle is fully qualified (heuristic)
@@ -184,7 +202,7 @@ classdef ModulationFactory < matlab.System
                     if isprop(currentModulator, 'ModulatorConfig')
                         currentModulator.ModulatorConfig = mergeStructs( ...
                             currentModulator.ModulatorConfig, ...
-                            adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID));
+                            adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID));
                     end
 
                     obj.logger.debug('Initial properties from factory config applied to %s.', class(currentModulator));
@@ -193,8 +211,7 @@ classdef ModulationFactory < matlab.System
                     obj.logger.error('Frame %d, Tx %s, Seg %d: Failed to feval modulator handle '' %s''. Error: %s', ...
                         frameId, txIdStr, segmentId, modulatorBlockHandle, ME_feval.message);
                     obj.logger.error('Check if class %s exists and is on the path.', modulatorBlockHandle);
-                    outputSignalStruct = struct('Error', 'ModulatorBlockFevalFailed', 'Handle', modulatorBlockHandle, 'OriginalData', inputData);
-                    return;
+                    rethrow(ME_feval);
                 end
 
                 obj.logger.debug('Modulator block %s instantiated.', class(currentModulator));
@@ -205,16 +222,18 @@ classdef ModulationFactory < matlab.System
             obj.logger.debug('Configuring modulator block %s for segment...', class(currentModulator));
 
             % Determine SymbolRate (used to compute SampleRate below)
-            symbolRate = [];
-            if isfield(segmentModulationConfig, 'SymbolRate')
+            if isfield(segmentModulationConfig, 'SymbolRate') && ...
+                    ~isempty(segmentModulationConfig.SymbolRate) && ...
+                    isnumeric(segmentModulationConfig.SymbolRate) && ...
+                    isscalar(segmentModulationConfig.SymbolRate) && ...
+                    isfinite(segmentModulationConfig.SymbolRate) && ...
+                    segmentModulationConfig.SymbolRate > 0
                 symbolRate = segmentModulationConfig.SymbolRate;
-            elseif isfield(segmentPlacementConfig, 'TargetBandwidth')
-                rolloff = 0.35;
-                if isfield(segmentModulationConfig, 'RolloffFactor')
-                    rolloff = segmentModulationConfig.RolloffFactor;
-                end
-                symbolRate = segmentPlacementConfig.TargetBandwidth / (1 + rolloff);
-                obj.logger.debug('Auto-calculated SymbolRate from TargetBandwidth: %.2f Hz', symbolRate);
+            else
+                error('CSRD:Modulation:MissingSymbolRate', ...
+                    ['segmentModulationConfig.SymbolRate must be a positive ', ...
+                     'scalar. Execution sample rate cannot be inferred from ', ...
+                     'TargetBandwidth inside ModulationFactory.']);
             end
 
             % Set SamplePerSymbol (scenario uses 'SamplesPerSymbol', modulator uses 'SamplePerSymbol')
@@ -222,6 +241,10 @@ classdef ModulationFactory < matlab.System
                 currentModulator.SamplePerSymbol = segmentModulationConfig.SamplesPerSymbol;
             elseif isfield(segmentModulationConfig, 'SamplePerSymbol') && isprop(currentModulator, 'SamplePerSymbol')
                 currentModulator.SamplePerSymbol = segmentModulationConfig.SamplePerSymbol;
+            elseif isprop(currentModulator, 'SamplePerSymbol')
+                error('CSRD:Modulation:MissingSamplesPerSymbol', ...
+                    'segmentModulationConfig.SamplesPerSymbol is required for %s.', ...
+                    class(currentModulator));
             end
 
             % Compute and set SampleRate = SymbolRate × SamplePerSymbol
@@ -231,47 +254,48 @@ classdef ModulationFactory < matlab.System
                     currentModulator.SampleRate, symbolRate, currentModulator.SamplePerSymbol);
             end
 
-            % Set ModulationOrder with robust fallback
-            % Priority: 1) segmentModulationConfig.Order, 2) modulatorDefaultBlockConfig.Order
+            % Set ModulationOrder from the scenario plan. Factory defaults
+            % describe legal ranges, not execution facts.
             modulatorOrder = [];
             if isfield(segmentModulationConfig, 'Order')
                 modulatorOrder = segmentModulationConfig.Order;
                 obj.logger.debug('ModulationOrder from segmentModulationConfig: %d', modulatorOrder);
-            elseif isfield(modulatorDefaultBlockConfig, 'Order')
-                modOrders = modulatorDefaultBlockConfig.Order;
-                if isscalar(modOrders)
-                    modulatorOrder = modOrders;
-                else
-                    modulatorOrder = modOrders(randi(length(modOrders)));
-                end
-                obj.logger.debug('ModulationOrder from factory config defaults: %d', modulatorOrder);
             end
             
-            % Ensure minimum order for digital modulations (PSK, QAM, FSK need >= 2)
             digitalTypes = {'PSK', 'OQPSK', 'QAM', 'APSK', 'DVBSAPSK', 'ASK', 'FSK', 'CPFSK', 'GFSK', 'GMSK', 'MSK', 'OOK', 'Mill88QAM'};
             if ismember(modulatorTypeID, digitalTypes) && (isempty(modulatorOrder) || modulatorOrder < 2)
-                modulatorOrder = 2;  % Default minimum for digital modulations
-                obj.logger.warning('ModulationOrder was < 2 for digital type %s, forcing to 2', modulatorTypeID);
+                error('CSRD:Modulation:InvalidModulationOrder', ...
+                    'Digital modulator %s requires segmentModulationConfig.Order >= 2.', ...
+                    modulatorTypeID);
             end
             
             % Apply ModulatorOrder if we have a valid value
             % Note: Property is 'ModulatorOrder' (not 'ModulationOrder') in BaseModulator
             if ~isempty(modulatorOrder)
-                try
-                    currentModulator.ModulatorOrder = modulatorOrder;
-                    obj.logger.debug('Set ModulatorOrder to %d for %s', modulatorOrder, class(currentModulator));
-                catch ME_setOrder
-                    obj.logger.warning('Failed to set ModulatorOrder on %s: %s', class(currentModulator), ME_setOrder.message);
+                if isprop(currentModulator, 'ModulatorOrder')
+                    try
+                        currentModulator.ModulatorOrder = modulatorOrder;
+                        obj.logger.debug('Set ModulatorOrder to %d for %s', modulatorOrder, class(currentModulator));
+                    catch ME_setOrder
+                        error('CSRD:Modulation:ModulatorOrderAssignmentFailed', ...
+                            'Failed to set ModulatorOrder on %s: %s', ...
+                            class(currentModulator), ME_setOrder.message);
+                    end
+                elseif ismember(modulatorTypeID, digitalTypes)
+                    error('CSRD:Modulation:MissingModulatorOrderProperty', ...
+                        'Digital modulator %s does not expose ModulatorOrder.', ...
+                        class(currentModulator));
                 end
-            else
-                obj.logger.warning('No ModulatorOrder value available for %s', modulatorTypeID);
             end
 
             % NumTransmitAntennas might come from TxSite config, passed in segmentModulationConfig if needed by modulator
             if isfield(segmentModulationConfig, 'NumTransmitAntennas') && isprop(currentModulator, 'NumTransmitAntennas')
                 currentModulator.NumTransmitAntennas = segmentModulationConfig.NumTransmitAntennas;
             elseif ~isfield(segmentModulationConfig, 'NumTransmitAntennas') && isprop(currentModulator, 'NumTransmitAntennas')
-                currentModulator.NumTransmitAntennas = 1; % Default if not specified in scenario segment
+                error('CSRD:Modulation:MissingNumTransmitAntennas', ...
+                    ['Segment modulation config must provide NumTransmitAntennas ', ...
+                     'for %s. The execution layer must not default antenna ', ...
+                     'count to 1.'], class(currentModulator));
             end
 
             % TargetBandwidth from placement config (critical for some modulators)
@@ -285,6 +309,12 @@ classdef ModulationFactory < matlab.System
                     frameId, txIdStr, segmentId, segmentPlacementConfig.TargetBandwidth, class(currentModulator));
             end
 
+            if isprop(currentModulator, 'ModulatorConfig')
+                currentModulator.ModulatorConfig = mergeStructs( ...
+                    currentModulator.ModulatorConfig, ...
+                    adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID));
+            end
+
             % Generic application of other parameters from segmentModulationConfig
             % This allows scenario to pass any other valid property for the chosen modulator block.
             scenarioFields = fieldnames(segmentModulationConfig);
@@ -292,7 +322,7 @@ classdef ModulationFactory < matlab.System
             for i = 1:length(scenarioFields)
                 fName = scenarioFields{i};
                 % Avoid re-setting already handled specific props or the TypeID itself
-                if ~ismember(fName, {'TypeID', 'SymbolRate', 'SamplePerSymbol', 'SamplesPerSymbol', 'Order', 'NumTransmitAntennas', 'RolloffFactor', 'BitsPerSymbol', 'Type'})
+                if ~ismember(fName, {'TypeID', 'SymbolRate', 'SamplePerSymbol', 'SamplesPerSymbol', 'Order', 'NumTransmitAntennas', 'RolloffFactor', 'BitsPerSymbol', 'Type', 'ModulatorConfig'})
 
                     if isprop(currentModulator, fName)
                         currentModulator.(fName) = segmentModulationConfig.(fName);
@@ -319,32 +349,51 @@ classdef ModulationFactory < matlab.System
 
                 % --- Post-process: normalize Bandwidth to scalar Hz value ---
                 if ~isfield(outputSignalStruct, 'Bandwidth') || isempty(outputSignalStruct.Bandwidth)
-                    obj.logger.warning('Modulator %s did not output Bandwidth. Attempting fallback.', class(currentModulator));
-                    if isfield(segmentPlacementConfig, 'TargetBandwidth')
-                        outputSignalStruct.Bandwidth = segmentPlacementConfig.TargetBandwidth;
-                    elseif isprop(currentModulator, 'SymbolRate')
-                        outputSignalStruct.Bandwidth = currentModulator.SymbolRate;
-                    else
-                        outputSignalStruct.Bandwidth = 0;
-                    end
+                    error('CSRD:Modulation:MissingBandwidth', ...
+                        ['Modulator %s did not output Bandwidth. ', ...
+                         'Design TargetBandwidth must not be copied into ', ...
+                         'Execution bandwidth.'], class(currentModulator));
                 elseif isvector(outputSignalStruct.Bandwidth) && length(outputSignalStruct.Bandwidth) == 2
                     outputSignalStruct.Bandwidth = outputSignalStruct.Bandwidth(2) - outputSignalStruct.Bandwidth(1);
                 elseif ~isscalar(outputSignalStruct.Bandwidth)
-                    obj.logger.warning('Modulator %s output Bandwidth in unexpected format. Using first element.', class(currentModulator));
-                    outputSignalStruct.Bandwidth = outputSignalStruct.Bandwidth(1);
+                    error('CSRD:Modulation:InvalidBandwidth', ...
+                        'Modulator %s output Bandwidth in an unsupported shape.', ...
+                        class(currentModulator));
+                end
+                if ~isfinite(outputSignalStruct.Bandwidth) || outputSignalStruct.Bandwidth <= 0
+                    error('CSRD:Modulation:InvalidBandwidth', ...
+                        'Modulator %s output non-positive/non-finite Bandwidth.', ...
+                        class(currentModulator));
                 end
 
                 % --- Post-process: ensure SampleRate is present ---
-                if ~isfield(outputSignalStruct, 'SampleRate') || isempty(outputSignalStruct.SampleRate)
-                    obj.logger.warning('Modulator %s did not output SampleRate. Attempting fallback.', class(currentModulator));
-                    if isprop(currentModulator, 'SampleRate')
-                        outputSignalStruct.SampleRate = currentModulator.SampleRate;
-                    elseif isprop(currentModulator, 'SymbolRate') && isprop(currentModulator, 'SamplePerSymbol')
-                        outputSignalStruct.SampleRate = currentModulator.SymbolRate * currentModulator.SamplePerSymbol;
-                    elseif outputSignalStruct.Bandwidth > 0
-                        outputSignalStruct.SampleRate = 2 * outputSignalStruct.Bandwidth;
-                    else
-                        outputSignalStruct.SampleRate = 0;
+                if ~isfield(outputSignalStruct, 'SampleRate') || isempty(outputSignalStruct.SampleRate) || ...
+                        ~isnumeric(outputSignalStruct.SampleRate) || ...
+                        ~isscalar(outputSignalStruct.SampleRate) || ...
+                        ~isfinite(outputSignalStruct.SampleRate) || ...
+                        outputSignalStruct.SampleRate <= 0
+                    error('CSRD:Modulation:MissingSampleRate', ...
+                        ['Modulator %s must output a positive scalar SampleRate. ', ...
+                         'Execution SampleRate must not be derived after the fact.'], ...
+                        class(currentModulator));
+                end
+
+                if isprop(currentModulator, 'NumTransmitAntennas')
+                    if ~isfield(outputSignalStruct, 'NumTransmitAntennas') || ...
+                            isempty(outputSignalStruct.NumTransmitAntennas) || ...
+                            ~isnumeric(outputSignalStruct.NumTransmitAntennas) || ...
+                            ~isscalar(outputSignalStruct.NumTransmitAntennas)
+                        error('CSRD:Modulation:MissingNumTransmitAntennas', ...
+                            'Modulator %s must output NumTransmitAntennas.', ...
+                            class(currentModulator));
+                    end
+                    requestedAntennas = double(segmentModulationConfig.NumTransmitAntennas);
+                    if double(outputSignalStruct.NumTransmitAntennas) ~= requestedAntennas
+                        error('CSRD:Modulation:NumTransmitAntennasMismatch', ...
+                            ['Modulator %s output NumTransmitAntennas=%g but ', ...
+                             'planner requested %g.'], class(currentModulator), ...
+                            double(outputSignalStruct.NumTransmitAntennas), ...
+                            requestedAntennas);
                     end
                 end
 
@@ -356,14 +405,19 @@ classdef ModulationFactory < matlab.System
             catch ME_mod_step
                 obj.logger.error('Frame %d, Tx %s, Seg %d: Error during step() of modulator %s. Error: %s', ...
                     frameId, txIdStr, segmentId, class(currentModulator), ME_mod_step.message);
-                obj.logger.error('Modulator State at Error: %s', jsonencode(currentModulator));
+                obj.logger.error('Modulator State at Error: %s', ...
+                    jsonencode(summarizeModulatorForLog(currentModulator)));
                 obj.logger.error('Stack: %s', getReport(ME_mod_step, 'extended', 'hyperlinks', 'off'));
-                outputSignalStruct = struct('Error', 'ModulatorBlockStepFailed', 'ModulatorClass', class(currentModulator), 'OriginalData', inputData);
+                rethrow(ME_mod_step);
             end
 
         end
 
         function releaseImpl(obj)
+            % releaseImpl - Production declaration in CSRD.
+            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('ModulationFactory releaseImpl called.');
             blockKeys = keys(obj.modulatorCache);
 
@@ -381,6 +435,10 @@ classdef ModulationFactory < matlab.System
         end
 
         function resetImpl(obj)
+            % resetImpl - Production declaration in CSRD.
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('ModulationFactory resetImpl called.');
             blockKeys = keys(obj.modulatorCache);
 
@@ -400,7 +458,33 @@ classdef ModulationFactory < matlab.System
 
 end
 
+function summary = summarizeModulatorForLog(modulator)
+    % summarizeModulatorForLog - Production declaration in CSRD.
+    % 中文说明：summarizeModulatorForLog 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    summary = struct('Class', class(modulator));
+    props = {'ModulatorOrder', 'SampleRate', 'SamplePerSymbol', ...
+        'NumTransmitAntennas', 'NumSymbols', 'NumDataSubcarriers', ...
+        'ModulatorConfig'};
+    for k = 1:numel(props)
+        propName = props{k};
+        if isprop(modulator, propName)
+            try
+                summary.(propName) = modulator.(propName);
+            catch ME
+                summary.(propName) = sprintf('<unavailable:%s>', ME.identifier);
+            end
+        end
+    end
+    summary = csrd.pipeline.annotation.sanitizeForJson(summary);
+end
+
 function adaptedConfig = adaptModulatorConfig(rawConfig, modulatorTypeID)
+    % adaptModulatorConfig - Production declaration in CSRD.
+    % 中文说明：adaptModulatorConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     adaptedConfig = struct();
     if ~isstruct(rawConfig)
         return;
@@ -420,6 +504,10 @@ function adaptedConfig = adaptModulatorConfig(rawConfig, modulatorTypeID)
 end
 
 function adaptedConfig = adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID)
+    % adaptScenarioModulatorConfig - Production declaration in CSRD.
+    % 中文说明：adaptScenarioModulatorConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     adaptedConfig = struct();
     if ~isstruct(segmentModulationConfig)
         return;
@@ -436,10 +524,39 @@ function adaptedConfig = adaptScenarioModulatorConfig(segmentModulationConfig, m
     adaptedConfig = ensurePulseShapeDefaults(adaptedConfig, modulatorTypeID);
 end
 
+function adaptedConfig = adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID)
+    % adaptSegmentModulatorConfig - Production declaration in CSRD.
+    % 中文说明：adaptSegmentModulatorConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    adaptedConfig = struct();
+    if ~isstruct(segmentModulationConfig)
+        return;
+    end
+
+    if isfield(segmentModulationConfig, 'ModulatorConfig') && ...
+            isstruct(segmentModulationConfig.ModulatorConfig)
+        adaptedConfig = mergeStructs(adaptedConfig, ...
+            adaptModulatorConfig(segmentModulationConfig.ModulatorConfig, modulatorTypeID));
+    end
+
+    adaptedConfig = mergeStructs(adaptedConfig, ...
+        adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID));
+end
+
 function cfg = ensurePulseShapeDefaults(cfg, modulatorTypeID)
-    pulseShapedTypes = {'PSK', 'QAM', 'Mill88QAM', 'ASK', 'OOK', 'PAM'};
+    % ensurePulseShapeDefaults - Production declaration in CSRD.
+    % 中文说明：ensurePulseShapeDefaults 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    pulseShapedTypes = {'PSK', 'OQPSK', 'QAM', 'Mill88QAM', ...
+        'APSK', 'DVBSAPSK', 'ASK', 'OOK', 'PAM'};
     if ~ismember(char(string(modulatorTypeID)), pulseShapedTypes)
         return;
+    end
+
+    if ~isfield(cfg, 'beta') || isempty(cfg.beta)
+        cfg.beta = 0.25;
     end
 
     if ~isfield(cfg, 'span') || isempty(cfg.span)
@@ -459,9 +576,22 @@ function cfg = ensurePulseShapeDefaults(cfg, modulatorTypeID)
             cfg.PhaseOffset = 0;
         end
     end
+
+    if strcmp(char(string(modulatorTypeID)), 'OQPSK')
+        if ~isfield(cfg, 'SymbolMapping') || isempty(cfg.SymbolMapping)
+            cfg.SymbolMapping = "Gray";
+        end
+        if ~isfield(cfg, 'PhaseOffset') || isempty(cfg.PhaseOffset)
+            cfg.PhaseOffset = 0;
+        end
+    end
 end
 
 function merged = mergeStructs(baseStruct, overrideStruct)
+    % mergeStructs - Production declaration in CSRD.
+    % 中文说明：mergeStructs 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isstruct(baseStruct) || isempty(fieldnames(baseStruct))
         if isstruct(overrideStruct)
             merged = overrideStruct;

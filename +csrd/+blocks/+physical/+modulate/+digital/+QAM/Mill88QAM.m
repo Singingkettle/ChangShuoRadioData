@@ -1,5 +1,6 @@
 classdef Mill88QAM < csrd.blocks.physical.modulate.digital.APSK.APSK
     % Mill88QAM - MIL-STD-188-110 QAM Modulator
+    % 中文说明：提供 CSRD 生产链路中的 Mill88QAM 实现。
     %
     % This class implements MIL-STD-188-110 compliant QAM modulation as a subclass
     % of the APSK modulator. MIL-STD-188-110 defines the standard for interoperability
@@ -63,6 +64,9 @@ classdef Mill88QAM < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core MIL-188 QAM modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs MIL-STD-188-110 compliant QAM modulation with
             % unit average power normalization, OSTBC encoding for MIMO, and
@@ -122,6 +126,9 @@ classdef Mill88QAM < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured MIL-188 QAM modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the MIL-188 QAM modulator with default parameters
             % if not specified and returns a function handle for the complete modulation

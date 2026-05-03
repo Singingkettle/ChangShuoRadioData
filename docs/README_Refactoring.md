@@ -127,4 +127,4 @@ simulator = csrd.blocks.scenario.CommunicationBehaviorSimulator('Config', config
 1. 所有私有方法文件都必须放在 `private/` 目录下
 2. 私有方法调用必须使用 `fun(obj, args)` 格式
 3. 主类文件中的方法声明必须与私有方法文件名匹配
-4. 保持向后兼容性，外部接口不变 
+4. Phase 17 之后，运行合同字段不再追求旧别名兼容：`Runner.FixedFrameLength`、`Factories.Scenario.Global.FrameLength`、`SegmentID`、`SeedValue` 等旧入口应 fail-fast，避免信号、场景和标注三者描述不同事件。

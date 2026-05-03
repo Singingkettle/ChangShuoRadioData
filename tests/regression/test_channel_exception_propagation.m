@@ -6,7 +6,7 @@ function results = test_channel_exception_propagation()
 %     1. Channel block raises ``RayTracing:NoValidPaths`` (or any
 %        identifier containing the magic tokens).
 %     2. ``csrd.factories.ChannelFactory.stepImpl`` rethrows when
-%        ``csrd.utils.scenario.isScenarioSkipException`` matches.
+%        ``csrd.pipeline.scenario.isScenarioSkipException`` matches.
 %     3. ``processChannelPropagation`` rethrows.
 %     4. ``generateSingleFrame`` rethrows.
 %     5. ``SimulationRunner.runScenario`` catches and skips the scenario.
@@ -29,7 +29,7 @@ function results = test_channel_exception_propagation()
         'predicateRecognisesAllSkipTokens', @testPredicateRecognisesAllSkipTokens; ...
         'predicateIgnoresGenericIdentifiers', @testPredicateIgnoresGenericIdentifiers; ...
         'channelFactoryRethrowsNoValidPaths', @testChannelFactoryRethrowsNoValidPaths; ...
-        'channelFactorySwallowsTransientError', @testChannelFactorySwallowsTransientError; ...
+        'channelFactoryRethrowsTransientError', @testChannelFactoryRethrowsTransientError; ...
         'upstreamFilesUseSharedPredicate', @testUpstreamFilesUseSharedPredicate};
 
     for i = 1:size(tests, 1)
@@ -42,7 +42,7 @@ function results = test_channel_exception_propagation()
             fprintf('  [PASS] %s\n', name);
         catch ME
             results.Failed = results.Failed + 1;
-            results.Failures{end+1} = sprintf('%s: %s', name, ME.message); %#ok<AGROW>
+            results.Failures{end+1} = sprintf('%s: %s', name, ME.message);
             fprintf('  [FAIL] %s -- %s\n', name, ME.message);
         end
     end
@@ -61,7 +61,7 @@ function testPredicateRecognisesAllSkipTokens()
         'CSRD:Map:NoBuildingData'};
     for k = 1:numel(skipIds)
         ME = MException(skipIds{k}, 'simulated %s', skipIds{k});
-        assert(csrd.utils.scenario.isScenarioSkipException(ME), ...
+        assert(csrd.pipeline.scenario.isScenarioSkipException(ME), ...
             sprintf('Predicate must accept %s', skipIds{k}));
     end
 end
@@ -74,7 +74,7 @@ function testPredicateIgnoresGenericIdentifiers()
         'CSRD:Whatever:Other'};
     for k = 1:numel(nonSkipIds)
         ME = MException(nonSkipIds{k}, 'msg');
-        assert(~csrd.utils.scenario.isScenarioSkipException(ME), ...
+        assert(~csrd.pipeline.scenario.isScenarioSkipException(ME), ...
             sprintf('Predicate must reject %s', nonSkipIds{k}));
     end
 end
@@ -82,7 +82,7 @@ end
 
 function testChannelFactoryRethrowsNoValidPaths()
     factory = makeFactoryWithStub('throwSkip');
-    cleanup = onCleanup(@() releaseFactory(factory)); %#ok<NASGU>
+    cleanup = onCleanup(@() releaseFactory(factory));
 
     inputSignal = makeInputSignal();
     txInfo = makeTxInfo();
@@ -103,12 +103,12 @@ function testChannelFactoryRethrowsNoValidPaths()
 end
 
 
-function testChannelFactorySwallowsTransientError()
-    % A non-scenario-level error must NOT bring down the whole pipeline,
-    % the factory should record it as ChannelBlockStepFailed and return
-    % a degraded receivedSignal struct.
+function testChannelFactoryRethrowsTransientError()
+    % Phase 5 removes the generic sentinel-output path. A non-scenario-level
+    % channel error is still a real construction failure and must not write
+    % ChannelBlockStepFailed into a partial annotation.
     factory = makeFactoryWithStub('throwGeneric');
-    cleanup = onCleanup(@() releaseFactory(factory)); %#ok<NASGU>
+    cleanup = onCleanup(@() releaseFactory(factory));
 
     inputSignal = makeInputSignal();
     txInfo = makeTxInfo();
@@ -117,10 +117,15 @@ function testChannelFactorySwallowsTransientError()
         'ChannelModel', 'Stub', ...
         'MapProfile', struct('Mode', 'FlatTerrain'));
 
-    out = step(factory, inputSignal, 1, txInfo, rxInfo, channelLinkInfo);
-    assert(isstruct(out), 'Factory must return a struct after generic errors.');
-    assert(isfield(out, 'Error') && strcmp(out.Error, 'ChannelBlockStepFailed'), ...
-        'Generic channel error should be tagged as ChannelBlockStepFailed.');
+    raised = false;
+    try
+        step(factory, inputSignal, 1, txInfo, rxInfo, channelLinkInfo);
+    catch ME
+        raised = true;
+        assert(strcmp(ME.identifier, 'CSRD:Test:GenericError'), ...
+            sprintf('Expected CSRD:Test:GenericError but got %s', ME.identifier));
+    end
+    assert(raised, 'ChannelFactory swallowed a generic channel exception.');
 end
 
 
@@ -136,7 +141,7 @@ function testUpstreamFilesUseSharedPredicate()
         fullfile(repoRoot, '+csrd', 'SimulationRunner.m'); ...
         fullfile(repoRoot, '+csrd', '+factories', 'ScenarioFactory.m')};
 
-    needle = 'csrd.utils.scenario.isScenarioSkipException';
+    needle = 'csrd.pipeline.scenario.isScenarioSkipException';
     for k = 1:numel(upstream)
         text = fileread(upstream{k});
         assert(contains(text, needle), ...
@@ -148,8 +153,8 @@ end
 % --- helpers --------------------------------------------------------------
 
 function factory = makeFactoryWithStub(mode)
-    csrd.utils.logger.GlobalLogManager.reset();
-    csrd.utils.logger.GlobalLogManager.initialize(struct( ...
+    csrd.runtime.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.initialize(struct( ...
         'Level', 'CRITICAL', ...
         'SaveToFile', false, ...
         'DisplayInConsole', false));
@@ -170,7 +175,7 @@ function releaseFactory(factory)
         release(factory);
     catch
     end
-    csrd.utils.logger.GlobalLogManager.reset();
+    csrd.runtime.logger.GlobalLogManager.reset();
 end
 
 

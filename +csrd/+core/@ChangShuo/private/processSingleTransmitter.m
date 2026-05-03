@@ -1,5 +1,8 @@
 function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, txIdx)
     % processSingleTransmitter - Process a single transmitter configuration
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processSingleTransmitter 实现。
     %
     % This method handles the complete processing of one transmitter including
     % configuration validation, message generation, and modulation for all segments.
@@ -14,20 +17,20 @@ function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, 
 
     % Validate transmitter scenario configuration
     if txIdx > length(obj.ScenarioConfig.Transmitters)
-        obj.logger.warning('Frame %d, Tx Index %d: Scenario definition issue.', FrameId, txIdx);
-        signalSegmentsPerTx = {};
-        TxInfo = struct('Status', 'Error_MissingTxScenarioID');
-        return;
+        error('CSRD:Construction:TxScenarioOutOfRange', ...
+            ['Frame %d, Tx index %d exceeds ScenarioConfig.Transmitters. ', ...
+             'The scenario planner must provide one transmitter plan per ', ...
+             'requested Tx.'], FrameId, txIdx);
     end
 
     % Access transmitter config (stored as cell array)
     currentTxScenario = obj.ScenarioConfig.Transmitters{txIdx};
     
     if ~isfield(currentTxScenario, 'EntityID')
-        obj.logger.warning('Frame %d, Tx Index %d: EntityID missing in scenario.', FrameId, txIdx);
-        signalSegmentsPerTx = {};
-        TxInfo = struct('Status', 'Error_MissingTxScenarioID');
-        return;
+        error('CSRD:Construction:TxMissingEntityID', ...
+            ['Frame %d, Tx index %d: transmitter scenario is missing ', ...
+             'EntityID. The planner must preserve physical/communication ', ...
+             'entity identity across the pipeline.'], FrameId, txIdx);
     end
 
     currentTxId = currentTxScenario.EntityID;
@@ -44,34 +47,32 @@ function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, 
         return;
     end
 
-    % Determine which segments to process based on TransmissionState
-    if isfield(currentTxScenario, 'TransmissionState') && ...
-            isfield(currentTxScenario.TransmissionState, 'CurrentIntervalIdx') && ...
-            currentTxScenario.TransmissionState.CurrentIntervalIdx > 0
-        activeIntervalIdx = currentTxScenario.TransmissionState.CurrentIntervalIdx;
-        currentTxScenario.NumSegments = 1;
-        currentTxScenario.ActiveSegmentIndices = activeIntervalIdx;
-    elseif isfield(currentTxScenario, 'Temporal') && isfield(currentTxScenario.Temporal, 'Intervals')
-        intervals = currentTxScenario.Temporal.Intervals;
-        if ~isempty(intervals) && size(intervals, 1) > 0
-            currentTxScenario.NumSegments = size(intervals, 1);
-            currentTxScenario.ActiveSegmentIndices = 1:size(intervals, 1);
-        else
-            currentTxScenario.NumSegments = 1;
-            currentTxScenario.ActiveSegmentIndices = 1;
-        end
-    else
-        currentTxScenario.NumSegments = 1;
-        currentTxScenario.ActiveSegmentIndices = 1;
+    % v0.4 deep refactor: TransmissionState.ActiveIntervalIndices is the
+    % single source of truth. CommunicationBehaviorSimulator must populate
+    % it (possibly empty) for every active transmitter; there are no
+    % silent fallbacks to legacy scalar fields any more.
+    if ~isfield(currentTxScenario, 'TransmissionState') || ...
+            ~isfield(currentTxScenario.TransmissionState, 'ActiveIntervalIndices')
+        error('CSRD:Construction:MissingActiveIntervalIndices', ...
+            ['Frame %d, TxID %s: TransmissionState.ActiveIntervalIndices ' ...
+             'is missing. CommunicationBehaviorSimulator must produce it.'], ...
+            FrameId, string(currentTxId));
     end
+    activeIdx = currentTxScenario.TransmissionState.ActiveIntervalIndices;
+    if isempty(activeIdx)
+        % Active transmitter with no overlapping interval in this frame
+        % is a planner-side bug: IsActive should already be false.
+        error('CSRD:Construction:ActiveButNoIntervals', ...
+            ['Frame %d, TxID %s: TransmissionState.IsActive=true but ' ...
+             'ActiveIntervalIndices is empty. The planner contract is ' ...
+             'inconsistent.'], FrameId, string(currentTxId));
+    end
+    currentTxScenario.NumSegments = numel(activeIdx);
+    currentTxScenario.ActiveSegmentIndices = double(reshape(activeIdx, 1, []));
 
     % Setup transmitter configuration
     TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentTxId);
 
     % Process only active segments for this transmitter
     signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentTxScenario, currentTxId);
-
-    % Update antenna configuration based on modulator output.
-    % Must reassign TxInfo because MATLAB structs are passed by value.
-    TxInfo = updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo);
 end

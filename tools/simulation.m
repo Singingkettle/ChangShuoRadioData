@@ -1,5 +1,6 @@
 function simulation(worker_id, num_workers, config_name)
     % simulation - CSRD Framework Simulation Entry Point
+    % 中文说明：提供 CSRD 生产链路中的 simulation 实现。
     %
     % This function serves as the main entry point for ChangShuoRadioData (CSRD)
     % simulation execution. It creates and executes a SimulationRunner that manages
@@ -34,7 +35,7 @@ function simulation(worker_id, num_workers, config_name)
     %   % Custom configuration simulation
     %   simulation(1, 1, 'csrd2025/my_custom_config.m');
     %
-    % See also: csrd.SimulationRunner, csrd.utils.config_loader, csrd.core.ChangShuo
+    % See also: csrd.SimulationRunner, csrd.runtime.config_loader, csrd.core.ChangShuo
 
     try
         % === MATLAB Path Setup ===
@@ -60,11 +61,11 @@ function simulation(worker_id, num_workers, config_name)
 
         % === Configuration Loading ===
         fprintf('[CSRD Simulation] Loading configuration: %s\n', config_name);
-        configStruct = csrd.utils.config_loader(config_name);
+        configStruct = csrd.runtime.config_loader(config_name);
 
         % === Global Logging Initialization ===
         % Reset global logging system to ensure clean initialization
-        csrd.utils.logger.GlobalLogManager.reset();
+        csrd.runtime.logger.GlobalLogManager.reset();
 
         % Initialize global logging system with Log configuration
         if isfield(configStruct, 'Log')
@@ -86,8 +87,8 @@ function simulation(worker_id, num_workers, config_name)
         end
 
         % Initialize global logging system
-        csrd.utils.logger.GlobalLogManager.initialize(logConfig, outputDir);
-        logger = csrd.utils.logger.GlobalLogManager.getLogger();
+        csrd.runtime.logger.GlobalLogManager.initialize(logConfig, outputDir);
+        logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
         logger.info('=== CSRD Simulation Session Started ===');
         logger.info('Worker: %d of %d', worker_id, num_workers);
@@ -95,8 +96,20 @@ function simulation(worker_id, num_workers, config_name)
         logger.info('Output Directory: %s', outputDir);
 
         % === System Configuration Information ===
-        sysInfoCollector = csrd.utils.sysinfo.SystemInfoCollector();
+        sysInfoCollector = csrd.runtime.sysinfo.SystemInfoCollector();
         sysInfoCollector.collectAndLog(logger);
+
+        % === Full Coverage Validation Dispatch ===
+        % 中文说明：当配置显式请求 Phase 13 覆盖验证时，仍从本入口调度所有生成 case。
+        if isCoverageValidationConfig(configStruct)
+            logger.info('CoverageValidation.Enable=true; dispatching Phase 13 full coverage validation.');
+            summary = csrd.support.validation.runFullCoverageValidation( ...
+                configStruct, config_name, projectRoot, worker_id, num_workers);
+            fprintf(['[CSRD Simulation] Full coverage validation completed: ', ...
+                '%d passed, %d skipped, %d failed\n'], ...
+                summary.CasesPassed, summary.CasesSkipped, summary.CasesFailed);
+            return;
+        end
 
         % === SimulationRunner Creation and Execution ===
         logger.info('Creating SimulationRunner for worker %d of %d', worker_id, num_workers);
@@ -140,8 +153,23 @@ function simulation(worker_id, num_workers, config_name)
 
 end
 
+function tf = isCoverageValidationConfig(configStruct)
+    % isCoverageValidationConfig - Detect Phase 13 coverage validation configs.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：识别显式全量覆盖验证配置，避免普通 csrd2025 默认路径变重。
+
+    tf = isfield(configStruct, 'CoverageValidation') && ...
+        isstruct(configStruct.CoverageValidation) && ...
+        isfield(configStruct.CoverageValidation, 'Enable') && ...
+        isequal(configStruct.CoverageValidation.Enable, true);
+end
+
 function projectRoot = setupProjectPath()
     % setupProjectPath - Setup MATLAB path for CSRD project
+    % 中文说明：setupProjectPath 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % This function adds the project root directory to MATLAB path
     % to ensure all packages (+csrd, +config, etc.) can be found.
@@ -178,6 +206,9 @@ end
 
 function validateInputParameters(worker_id, num_workers, config_name)
     % validateInputParameters - Validate simulation input parameters
+    % 中文说明：validateInputParameters 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % This function validates all input parameters for the simulation function,
     % ensuring they meet the required constraints and data types.

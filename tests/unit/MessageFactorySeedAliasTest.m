@@ -1,24 +1,15 @@
 classdef MessageFactorySeedAliasTest < matlab.unittest.TestCase
-    % MessageFactorySeedAliasTest - Pin the SeedValue->Seed alias contract.
-    %
-    %   The scenario layer historically annotates the per-segment seed
-    %   field as ``SeedValue`` while csrd.blocks.physical.message.RandomBit
-    %   exposes the property as ``Seed``. The pre-fix factory used a
-    %   generic isprop loop that silently dropped the value, breaking
-    %   reproducibility. This black-box test creates two independent
-    %   factories and checks that ``SeedValue=N`` produces the exact same
-    %   bit sequence as the native ``Seed=N`` field; if the alias is
-    %   broken, the two factories will pull from different RNG states.
+    % MessageFactorySeedAliasTest - Phase 17 rejects the old SeedValue alias.
 
     methods (TestMethodSetup)
 
         function configureLogging(~)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             logCfg = struct( ...
                 'Level', 'ERROR', ...
                 'SaveToFile', false, ...
                 'DisplayInConsole', false);
-            csrd.utils.logger.GlobalLogManager.initialize(logCfg);
+            csrd.runtime.logger.GlobalLogManager.initialize(logCfg);
         end
 
     end
@@ -26,36 +17,32 @@ classdef MessageFactorySeedAliasTest < matlab.unittest.TestCase
     methods (TestMethodTeardown)
 
         function teardown(~)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
         end
 
     end
 
     methods (Test)
 
-        function seedValueAliasMatchesNativeSeed(testCase)
+        function seedValueAliasFailsFast(testCase)
             seedValue = 4242;
             seg = struct();
             seg.SegmentId = 'aliased';
-            seg.Message = struct('Length', 1024, 'SeedValue', seedValue);
-            outAlias = MessageFactorySeedAliasTest.runFactoryOnce(seg);
+            seg.Message = struct('Length', 1024, 'SymbolRate', 100e3, ...
+                'SeedValue', seedValue);
 
-            seg.SegmentId = 'native';
-            seg.Message = struct('Length', 1024, 'Seed', seedValue);
-            outNative = MessageFactorySeedAliasTest.runFactoryOnce(seg);
-
-            testCase.verifyEqual(outAlias.data, outNative.data, ...
-                'SeedValue must produce identical bits to Seed (alias was dropped).');
+            testCase.verifyError(@() MessageFactorySeedAliasTest.runFactoryOnce(seg), ...
+                'CSRD:Message:DeprecatedSeedValueAlias');
         end
 
         function differentSeedsProduceDifferentSequences(testCase)
             seg = struct();
             seg.SegmentId = 'A';
-            seg.Message = struct('Length', 1024, 'Seed', 11);
+            seg.Message = struct('Length', 1024, 'SymbolRate', 100e3, 'Seed', 11);
             outA = MessageFactorySeedAliasTest.runFactoryOnce(seg);
 
             seg.SegmentId = 'B';
-            seg.Message = struct('Length', 1024, 'Seed', 22);
+            seg.Message = struct('Length', 1024, 'SymbolRate', 100e3, 'Seed', 22);
             outB = MessageFactorySeedAliasTest.runFactoryOnce(seg);
 
             testCase.verifyFalse(isequal(outA.data, outB.data), ...
@@ -73,7 +60,8 @@ classdef MessageFactorySeedAliasTest < matlab.unittest.TestCase
             cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
             setup(factory);
 
-            seg = struct('SegmentId', 's', 'Message', struct('Length', 512, 'Seed', 100));
+            seg = struct('SegmentId', 's', 'Message', ...
+                struct('Length', 512, 'SymbolRate', 100e3, 'Seed', 100));
             firstA = step(factory, 1, seg, 'RandomBit');
 
             seg.Message.Seed = 999;

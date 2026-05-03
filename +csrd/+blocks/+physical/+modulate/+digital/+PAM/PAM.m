@@ -1,5 +1,6 @@
 classdef PAM < csrd.blocks.physical.modulate.BaseModulator
     % PAM - Pulse Amplitude Modulation Modulator
+    % 中文说明：提供 CSRD 生产链路中的 PAM 实现。
     %
     % This class implements Pulse Amplitude Modulation (PAM) as a subclass
     % of the BaseModulator. PAM modulation encodes digital information by varying
@@ -75,6 +76,9 @@ classdef PAM < csrd.blocks.physical.modulate.BaseModulator
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core PAM modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs the complete PAM modulation process including
             % amplitude normalization for unit power, PAM symbol mapping, and
@@ -132,6 +136,9 @@ classdef PAM < csrd.blocks.physical.modulate.BaseModulator
 
         function filterCoeffs = genFilterCoeffs(obj)
             % genFilterCoeffs - Generate raised cosine filter coefficients
+            % 中文说明：genFilterCoeffs 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method creates a raised cosine filter for pulse shaping based on
             % the configured roll-off factor, filter span, and samples per symbol.
@@ -161,6 +168,9 @@ classdef PAM < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured PAM modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the PAM modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

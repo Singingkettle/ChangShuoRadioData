@@ -1,5 +1,6 @@
 function constrainedPosition = applyBoundaryConstraints(obj, position)
     % applyBoundaryConstraints - Apply map boundary constraints to position
+    % 中文说明：提供 CSRD 生产链路中的 applyBoundaryConstraints 实现。
     %
     % Input Arguments:
     %   position - 3D position vector [x, y, z]

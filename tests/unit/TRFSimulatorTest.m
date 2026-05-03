@@ -20,12 +20,12 @@ classdef TRFSimulatorTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
 
         function configureLogging(~)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             logCfg = struct( ...
                 'Level', 'ERROR', ...
                 'SaveToFile', false, ...
                 'DisplayInConsole', false);
-            csrd.utils.logger.GlobalLogManager.initialize(logCfg);
+            csrd.runtime.logger.GlobalLogManager.initialize(logCfg);
         end
 
     end
@@ -33,7 +33,7 @@ classdef TRFSimulatorTest < matlab.unittest.TestCase
     methods (TestMethodTeardown)
 
         function teardown(~)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
         end
 
     end
@@ -63,12 +63,9 @@ classdef TRFSimulatorTest < matlab.unittest.TestCase
         end
 
         function frequencyTranslationShiftsSpectrum(testCase)
-            % Frequency translation runs at the input sample rate, so the
-            % carrier must lie inside the input Nyquist band, otherwise
-            % the complex exponential aliases. Production code feeds this
-            % block with baseband signals at the modulator output rate
-            % and a CarrierFrequency that is already constrained by the
-            % planner.
+            % Frequency translation runs after target-rate resampling, so
+            % the carrier is constrained by the receiver observation rate,
+            % not by the narrower modulator output rate.
             inputFs = 4e6;
             targetFs = 20e6;
             carrier = 800e3;
@@ -97,6 +94,36 @@ classdef TRFSimulatorTest < matlab.unittest.TestCase
                     peakFreq, expected));
         end
 
+        function frequencyTranslationAvoidsLowRateAlias(testCase)
+            % Regression for Phase 16 visual QA: a narrow modulation can
+            % have an input sample rate far below the planned receiver-view
+            % offset. TRF must upsample first, then translate, otherwise
+            % the emitted IQ aliases back near baseband while annotation
+            % still claims the true offset.
+            inputFs = 640e3;
+            targetFs = 20e6;
+            carrier = -9.67356014811217e6;
+
+            trf = TRFSimulatorTest.makeSimulator(carrier, ...
+                'TargetSampleRate', targetFs, ...
+                'SampleRate', inputFs, ...
+                'BandWidth', 200e3);
+            cleanupObj = onCleanup(@() release(trf)); %#ok<NASGU>
+
+            outSig = step(trf, ones(4096, 1));
+
+            nfft = 65536;
+            spectrum = fftshift(fft(outSig(1:min(end, nfft)), nfft));
+            freqAxis = (-nfft/2:nfft/2-1) * targetFs / nfft;
+            [~, peakIdx] = max(abs(spectrum));
+            peakFreq = freqAxis(peakIdx);
+
+            tolerance = max(25e3, targetFs / nfft * 8);
+            testCase.verifyLessThan(abs(peakFreq - carrier), tolerance, ...
+                sprintf('Peak at %.1f Hz; expected target-rate carrier %.1f Hz.', ...
+                    peakFreq, carrier));
+        end
+
         function sampleRateConversionChangesLength(testCase)
             inputFs = 1e6;
             targetFs = 5e6;
@@ -115,6 +142,33 @@ classdef TRFSimulatorTest < matlab.unittest.TestCase
             testCase.verifyLessThan(abs(numel(outSig) - expectedLen), ...
                 max(10, round(0.05 * expectedLen)), ...
                 'Resampled length must be within 5% (or 10 samples) of expected.');
+        end
+
+        function exactRationalResampleDoesNotWarnOrDrift(testCase)
+            inputFs = 42e6;
+            targetFs = 50e6; % exact 25/21 conversion
+            inputLen = 420;
+
+            trf = TRFSimulatorTest.makeSimulator(0, ...
+                'TargetSampleRate', targetFs, ...
+                'SampleRate', inputFs);
+            cleanupObj = onCleanup(@() release(trf)); %#ok<NASGU>
+
+            sig = complex(randn(inputLen, 1), randn(inputLen, 1));
+            outSig = testCase.verifyWarningFree(@() step(trf, sig));
+
+            expectedLen = round(inputLen * targetFs / inputFs);
+            testCase.verifyLessThanOrEqual(abs(numel(outSig) - expectedLen), 2);
+        end
+
+        function intractableApproximateRatioFailsFast(testCase)
+            trf = TRFSimulatorTest.makeSimulator(0, ...
+                'TargetSampleRate', sqrt(2) * 1e6, ...
+                'SampleRate', 1e6);
+            cleanupObj = onCleanup(@() release(trf)); %#ok<NASGU>
+
+            testCase.verifyError(@() step(trf, ones(64, 1)), ...
+                'CSRD:TRF:UnsupportedResampleRatio');
         end
 
         function multiAntennaIsProcessedColumnByColumn(testCase)

@@ -1,5 +1,6 @@
 classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
     % VSBAM - Vestigial Sideband Amplitude Modulation Modulator
+    % 中文说明：提供 CSRD 生产链路中的 VSBAM 实现。
     %
     % This class implements Vestigial Sideband Amplitude Modulation (VSB-AM) as a
     % subclass of DSBSCAM. VSB-AM is a bandwidth-efficient form of amplitude modulation
@@ -53,6 +54,12 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
     %   % Modulate the signal
     %   modulatedSignal = vsbMod.step(audioSignal);
     %
+    % References / 参考资料:
+    %   - MathWorks fft and ifft documentation for spectral shaping:
+    %     https://www.mathworks.com/help/matlab/ref/fft.html
+    %   - MathWorks obw occupied bandwidth documentation:
+    %     https://www.mathworks.com/help/signal/ref/obw.html
+    %
     % See also: csrd.blocks.physical.modulate.analog.AM.DSBSCAM,
     %           csrd.blocks.physical.modulate.analog.AM.SSBAM,
     %           csrd.blocks.physical.modulate.BaseModulator
@@ -69,6 +76,9 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
         function filterResponse = vestigialFilter(obj, frequency, bandwidthParameter)
             % vestigialFilter - Generate vestigial filter frequency response
+            % 中文说明：vestigialFilter 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method implements the characteristic vestigial filter response
             % that defines VSB-AM modulation. The filter completely attenuates
@@ -114,6 +124,9 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core VSB-AM modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs VSB-AM modulation by applying vestigial filtering
             % in the frequency domain to create the characteristic VSB spectrum with
@@ -182,6 +195,9 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured VSB-AM modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the VSB-AM modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

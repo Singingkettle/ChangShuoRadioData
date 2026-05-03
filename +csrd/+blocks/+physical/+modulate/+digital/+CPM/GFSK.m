@@ -1,5 +1,6 @@
 classdef GFSK < csrd.blocks.physical.modulate.BaseModulator
     % GFSK - Gaussian Frequency Shift Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 GFSK 实现。
     %
     % This class implements Gaussian Frequency Shift Keying (GFSK) modulation
     % as a subclass of the BaseModulator. GFSK is a form of Continuous Phase
@@ -65,7 +66,7 @@ classdef GFSK < csrd.blocks.physical.modulate.BaseModulator
     %   % Modulate the signal
     %   modulatedSignal = gfskMod.step(inputData);
     %
-    % References:
+    % References / 参考资料:
     %   - MATLAB Communications Toolbox CPM Documentation:
     %     https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
     %   - Deep Learning Modulation Classification:
@@ -90,6 +91,9 @@ classdef GFSK < csrd.blocks.physical.modulate.BaseModulator
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core GFSK modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs GFSK modulation using the MATLAB Communication
             % Toolbox CPMModulator with Gaussian frequency pulse shaping. The method
@@ -142,6 +146,9 @@ classdef GFSK < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured GFSK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the GFSK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation

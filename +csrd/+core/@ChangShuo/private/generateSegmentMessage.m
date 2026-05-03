@@ -1,5 +1,8 @@
 function rawMessageStruct = generateSegmentMessage(obj, FrameId, currentTxId, segIdx, currentSegmentScenario)
     % generateSegmentMessage - Generate message for a single segment
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 generateSegmentMessage 实现。
     %
     % This method uses the MessageFactory to generate message data for a segment.
     %
@@ -25,7 +28,8 @@ function rawMessageStruct = generateSegmentMessage(obj, FrameId, currentTxId, se
     end
 
     segmentInfo = struct();
-    segmentInfo.SegmentId = sprintf('%s_Seg%d', string(currentTxId), segIdx);
+    segmentInfo.SegmentId = sprintf('%s.Seg%03d', char(string(currentTxId)), segIdx);
+    segmentInfo.BurstId = sprintf('%s.Burst%03d', char(string(currentTxId)), segIdx);
     segmentInfo.Message = msgConfig;
     if isfield(currentSegmentScenario, 'Modulation') && isfield(currentSegmentScenario.Modulation, 'SymbolRate')
         segmentInfo.Message.SymbolRate = currentSegmentScenario.Modulation.SymbolRate;

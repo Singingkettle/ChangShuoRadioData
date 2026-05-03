@@ -6,7 +6,7 @@ function test_map_config_validation()
     projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
     addpath(projectRoot);
 
-    masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+    masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     scenarioConfig = masterConfig.Factories.Scenario;
 
     scenarioConfig.PhysicalEnvironment.Map.Types = {'Statistical', 'OSM'};

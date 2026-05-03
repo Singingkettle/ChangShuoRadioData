@@ -1,0 +1,19 @@
+function profile = DenseArrayStation_200MHz()
+%DENSEARRAYSTATION_200MHZ v0 receiver profile: fixed dense-array station, 200 MHz Fs.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 DenseArrayStation_200MHz 实现。
+%
+% Source numbers: docs/audits/2026-04-...refactor.md §5.bis B (row 3).
+% Schema:        docs/audits/phases/phase-2-blueprint.md §3.1.3.B.
+%
+% Hard constraint (§5.bis B): SampleRate == ObservableBandwidth.
+
+    profile = struct( ...
+        'SampleRateChoicesHz',     {{80e6, 160e6, 200e6}}, ...
+        'ObservableBandwidthHz',   [], ...
+        'NumAntennasRange',        [4 16], ...
+        'NoiseFigureRangeDb',      [4 6], ...
+        'SensitivityDbm',          -115, ...
+        'CarrierFrequencyRangeHz', [600e6 12e9]);
+end

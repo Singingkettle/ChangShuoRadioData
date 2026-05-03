@@ -1,5 +1,6 @@
 classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
     % OFDM - Orthogonal Frequency Division Multiplexing Modulator
+    % 中文说明：提供 CSRD 生产链路中的 OFDM 实现。
     %
     % This class implements OFDM modulation with configurable parameters and
     % support for MIMO transmission.
@@ -22,7 +23,7 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
     %   genSecondStageModulator - Creates OFDM modulation stage
 
     %
-    % References:
+    % References / 参考资料:
     % - https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
     % - Regarding OFDM signal sampling simulation, essentially a conversion process:
     %   https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html
@@ -47,12 +48,47 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
     methods (Access = protected)
 
         function [y, bw] = baseModulator(obj, x)
+            % baseModulator - Production declaration in CSRD.
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             x = obj.firstStageModulator(x);
-            x = obj.ostbc(x);
+
+            % Resolve the spatial abstraction before shaping the OFDM grid.
+            % 中文说明：先明确多天线抽象，再整理 OFDM 资源栅格，避免隐式把多流当 OSTBC。
+            spatialMode = obj.resolveSpatialMode();
+            switch spatialMode
+                case 'OSTBC'
+                    obj.ostbc = obj.genOSTBC;
+                    x = obj.ostbc(x);
+                    if obj.NumTransmitAntennas == 1
+                        x = x(:);
+                    end
+                case 'SpatialMultiplexing'
+                    x = obj.reshapeSpatialMultiplexingStreams(x);
+                otherwise
+                    error('CSRD:Modulation:InvalidOFDMMimoMode', ...
+                        'Unsupported OFDM spatial mode: %s.', spatialMode);
+            end
             obj.NumSymbols = fix(size(x, 1) / obj.NumDataSubcarriers);
+            if obj.NumSymbols < 1
+                error('CSRD:Modulation:OFDMInsufficientPayload', ...
+                    ['OFDM payload has %d symbols per stream, but at least ', ...
+                     '%d data subcarriers are required.'], ...
+                    size(x, 1), obj.NumDataSubcarriers);
+            end
             x = x(1:obj.NumSymbols * obj.NumDataSubcarriers, :);
             x = reshape(x, [obj.NumDataSubcarriers, obj.NumSymbols, obj.NumTransmitAntennas]);
+
+            if isempty(obj.secondStageModulator) || ...
+                    obj.secondStageModulator.NumTransmitAntennas ~= obj.NumTransmitAntennas
+                if ~isempty(obj.secondStageModulator) && ...
+                        isLocked(obj.secondStageModulator)
+                    release(obj.secondStageModulator);
+                end
+                obj.secondStageModulator = obj.genSecondStageModulator;
+            end
 
             % Ensure the object is released before changing non-tunable properties
             if isLocked(obj.secondStageModulator)
@@ -87,6 +123,10 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
         end
 
         function firstStageModulator = genFirstStageModulator(obj)
+            % genFirstStageModulator - Production declaration in CSRD.
+            % 中文说明：genFirstStageModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if contains(lower(obj.ModulatorConfig.base.mode), "psk")
                 firstStageModulator = @(x)pskmod(x, ...
@@ -104,6 +144,10 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
         end
 
         function pilotModulator = genPilotModulator(obj)
+            % genPilotModulator - Production declaration in CSRD.
+            % 中文说明：genPilotModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if contains(lower(obj.ModulatorConfig.pilot.mode), "psk")
                 pilotModulatorOrder = randsample([2, 4, 8, 16, 32, 64], 1);
@@ -125,6 +169,10 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
         end
 
         function secondStageModulator = genSecondStageModulator(obj)
+            % genSecondStageModulator - Production declaration in CSRD.
+            % 中文说明：genSecondStageModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             p = obj.ModulatorConfig.ofdm;
 
             secondStageModulator = comm.OFDMModulator( ...
@@ -156,7 +204,10 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
     methods
 
         function modulatorHandle = genModulatorHandle(obj)
-            obj.NumTransmitAntennas = 2;
+            % genModulatorHandle - Production declaration in CSRD.
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.IsDigital = true;
 
             if obj.NumTransmitAntennas > 2
@@ -201,11 +252,16 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
                     validRange = cat(2, validRangeLeft, validRangeRight);
 
                     if obj.NumTransmitAntennas > 1
-                        % To avoid bugs in multi-antenna scenarios, pilot settings are temporarily not considered
-                        % Pilots are different for each symbol, but ensure pilots are different across antennas
-                        if floor(length(validRange) / nPilot) < obj.NumTransmitAntennas
-                            obj.NumTransmitAntennas = floor(length(validRange) / nPilot);
+                        % Keep the configured hardware antenna count stable; reduce the
+                        % per-antenna pilot count when the random pilot request is too large.
+                        % 保持配置的硬件天线数量不变；随机 pilot 数过大时缩减每根天线的 pilot 数。
+                        maxPilotsPerAntenna = floor(length(validRange) / obj.NumTransmitAntennas);
+                        if maxPilotsPerAntenna < 1
+                            error('CSRD:Modulation:OFDMInsufficientPilotCarriers', ...
+                                ['OFDM valid pilot carrier range cannot support %d ', ...
+                                 'transmit antennas.'], obj.NumTransmitAntennas);
                         end
+                        nPilot = min(nPilot, maxPilotsPerAntenna);
 
                         validRange = shuffleArray(validRange);
                         validRange = sort(validRange(1:nPilot * obj.NumTransmitAntennas));
@@ -267,12 +323,53 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
             modulatorHandle = @(x)obj.baseModulator(x);
         end
 
+        function mode = resolveSpatialMode(obj)
+            % resolveSpatialMode - Return the explicit OFDM multi-antenna mode.
+            % 中文说明：返回显式 OFDM 多天线模式；单天线等价为 OSTBC 直通。
+            % Inputs / 输入: object ModulatorConfig.mimo.Mode.
+            % 输出 / Outputs: 'OSTBC' or 'SpatialMultiplexing'.
+            mode = 'OSTBC';
+            if isfield(obj.ModulatorConfig, 'mimo') && ...
+                    isstruct(obj.ModulatorConfig.mimo) && ...
+                    isfield(obj.ModulatorConfig.mimo, 'Mode') && ...
+                    ~isempty(obj.ModulatorConfig.mimo.Mode)
+                mode = char(string(obj.ModulatorConfig.mimo.Mode));
+            end
+            allowed = {'OSTBC', 'SpatialMultiplexing'};
+            idx = find(strcmpi(mode, allowed), 1, 'first');
+            if isempty(idx)
+                error('CSRD:Modulation:InvalidOFDMMimoMode', ...
+                    'OFDM ModulatorConfig.mimo.Mode must be one of {%s}; got %s.', ...
+                    strjoin(allowed, ', '), mode);
+            end
+            mode = allowed{idx};
+            obj.ModulatorConfig.mimo.Mode = mode;
+        end
+
+        function streams = reshapeSpatialMultiplexingStreams(obj, symbols)
+            % reshapeSpatialMultiplexingStreams - Split symbols into antenna streams.
+            % 中文说明：把调制符号按列分配到发射流，直接匹配 comm.OFDMModulator 的第三维。
+            % Inputs / 输入: column/vector of first-stage constellation symbols.
+            % 输出 / Outputs: [symbolsPerStream x NumTransmitAntennas] stream matrix.
+            symbols = symbols(:);
+            nTx = obj.NumTransmitAntennas;
+            usable = floor(numel(symbols) / nTx) * nTx;
+            if usable < nTx
+                error('CSRD:Modulation:OFDMMimoPayloadTooShort', ...
+                    'SpatialMultiplexing needs at least one symbol per %d transmit streams.', nTx);
+            end
+            streams = reshape(symbols(1:usable), nTx, []).';
+        end
+
     end
 
 end
 
 function shuffledArray = shuffleArray(array)
     % Generate random permutation of indices
+    % 中文说明：shuffleArray 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     randomIndices = randperm(numel(array));
     % Reorder the original array using random indices
     shuffledArray = array(randomIndices);

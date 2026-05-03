@@ -1,5 +1,6 @@
 classdef PhysicalEnvironmentSimulator < matlab.System
     % PhysicalEnvironmentSimulator - Physical World Environment Modeling and Simulation
+    % 中文说明：提供 CSRD 生产链路中的 PhysicalEnvironmentSimulator 实现。
     %
     % This class implements comprehensive physical environment modeling for wireless
     % communication scenarios, including geographical mapping, entity positioning,
@@ -116,6 +117,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function obj = PhysicalEnvironmentSimulator(varargin)
             % PhysicalEnvironmentSimulator - Constructor for physical environment simulator
+            % 中文说明：PhysicalEnvironmentSimulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates a new physical environment simulator with configurable
             % geographical, mobility, and environmental parameters.
@@ -130,6 +134,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function history = getStateHistory(obj)
             % getStateHistory - Get complete state history for scenario replay
+            % 中文说明：getStateHistory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Returns the complete simulation state history stored during
             % simulation execution, useful for scenario replay, debugging,
@@ -143,6 +150,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function clearStateHistory(obj)
             % clearStateHistory - Clear stored state history to free memory
+            % 中文说明：clearStateHistory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Clears the internal state history to free memory after simulation
             % completion or when history is no longer needed.
@@ -153,6 +163,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function timeRes = getTimeResolution(obj)
             % getTimeResolution - Get current time resolution setting
+            % 中文说明：getTimeResolution 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Returns the current time resolution used for simulation updates.
             %
@@ -164,6 +177,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function siteViewer = getSiteViewer(obj)
             % getSiteViewer - Get site viewer for OSM/ray tracing mode
+            % 中文说明：getSiteViewer 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Returns the site viewer object if available (OSM mode)
 
@@ -200,8 +216,10 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         initializeEnvironment(obj)
         initializeMobilityModels(obj)
 
-        % Utility methods
-        mobilityModel = assignMobilityModel(obj, entityType, entityID)
+        % Utility methods (Phase 3 note: assignMobilityModel was promoted
+        % to a Static, Hidden method below so it can be unit-tested
+        % without instantiating the full simulator. The legacy random
+        % fallback has been removed.)
         maxSpeed = getMaxSpeedForEntityType(obj, entityType)
         entityProperties = initializeEntityProperties(obj, entityType)
         constrainedPosition = applyBoundaryConstraints(obj, position)
@@ -225,6 +243,83 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         initializeOSMMap(obj)
         hasBuildings = checkOSMHasBuildings(obj, osmFile)
         initializeStatisticalMap(obj)
+    end
+
+    methods (Static, Hidden)
+
+        function mobilityModel = assignMobilityModel(entityType, entityConfig)
+            %ASSIGNMOBILITYMODEL Phase 3 strict-construction mobility resolver.
+            % 中文说明：assignMobilityModel 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            %
+            % In Phase 3 (audit §3.1.ter / §17.5 P3-followup) the per-entity
+            % mobility model MUST be supplied explicitly through the
+            % physical-environment configuration. The legacy fallback that
+            % randomly chose among `{'RandomWalk', 'Waypoint', 'Stationary'}`
+            % for transmitters has been removed because it silently
+            % destroyed run reproducibility and could not be tied back to
+            % any blueprint provenance.
+            %
+            % Inputs:
+            %   entityType   - 'Transmitter' or 'Receiver' (used for
+            %                  diagnostic messages).
+            %   entityConfig - Per-entity-type config slice. Accepts either
+            %                    entityConfig.Mobility.Model
+            %                       (canonical layout produced by
+            %                        config/_base_/factories/scenario_factory.m
+            %                        and ScenarioFactory.getPhysicalEnvironmentConfig)
+            %                  or
+            %                    entityConfig.MobilityModel
+            %                       (flat alternate kept for unit tests).
+            %
+            % Output:
+            %   mobilityModel - Resolved mobility model name (char vector).
+            %
+            % Errors:
+            %   CSRD:Construction:MissingMobilityModel - Raised when neither
+            %       supported field is present / non-empty / a valid string.
+            %       The identifier is on the scenario-skip whitelist
+            %       (+csrd/+pipeline/+scenario/isScenarioSkipException.m).
+
+            if nargin < 2
+                error('CSRD:Construction:MissingMobilityModel', ...
+                    ['assignMobilityModel: entityConfig is required ', ...
+                     '(Phase 3 removed the random fallback). Pass the ', ...
+                     'per-entity-type slice, e.g. ', ...
+                     'obj.Config.Entities.Transmitters.']);
+            end
+
+            if isstruct(entityConfig) && isfield(entityConfig, 'Mobility') ...
+                    && isstruct(entityConfig.Mobility) ...
+                    && isfield(entityConfig.Mobility, 'Model')
+                candidate = entityConfig.Mobility.Model;
+            elseif isstruct(entityConfig) && isfield(entityConfig, 'MobilityModel')
+                candidate = entityConfig.MobilityModel;
+            else
+                error('CSRD:Construction:MissingMobilityModel', ...
+                    ['assignMobilityModel: %s entity config lacks an ', ...
+                     'explicit Mobility.Model (or MobilityModel) field. ', ...
+                     'Phase 3 requires the mobility selection to be ', ...
+                     'carried in the blueprint; see ', ...
+                     'config/_base_/factories/scenario_factory.m for ', ...
+                     'the canonical layout.'], entityType);
+            end
+
+            if isstring(candidate)
+                candidate = char(candidate);
+            end
+
+            if ~ischar(candidate) || isempty(strtrim(candidate))
+                error('CSRD:Construction:MissingMobilityModel', ...
+                    ['assignMobilityModel: %s entity Mobility.Model must ', ...
+                     'be a non-empty char vector / string. Got %s.'], ...
+                    entityType, class(candidate));
+            end
+
+            mobilityModel = candidate;
+        end
+
     end
 
 end

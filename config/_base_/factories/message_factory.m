@@ -1,5 +1,8 @@
 function config = message_factory()
     % message_factory - Message factory configuration
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 message_factory 实现。
     %
     % DESIGN PRINCIPLE:
     %   - Scenario config: Selects message TYPE (e.g., 'RandomBit', 'Audio')

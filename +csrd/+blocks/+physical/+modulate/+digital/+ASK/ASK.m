@@ -1,5 +1,6 @@
 classdef ASK < csrd.blocks.physical.modulate.digital.APSK.APSK
     % ASK - Amplitude Shift Keying Modulator
+    % 中文说明：提供 CSRD 生产链路中的 ASK 实现。
     %
     % This class implements Amplitude Shift Keying (ASK) modulation as a subclass
     % of the APSK modulator. ASK modulation varies the amplitude of the carrier
@@ -46,6 +47,9 @@ classdef ASK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core ASK modulation implementation
+            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs the complete ASK modulation process including
             % amplitude normalization, PAM modulation, OSTBC encoding for MIMO,
@@ -103,6 +107,9 @@ classdef ASK < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured ASK modulator function handle
+            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the ASK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

@@ -8,10 +8,10 @@ A comprehensive MATLAB-based radio communication simulation framework for wirele
 
 ## ⚠️ **IMPORTANT NOTICE / 重要提示**
 
-### 🔄 **Code Refactoring in Progress / 代码重构进行中**
+### 🔄 **Code Refactoring Status / 代码重构状态**
 
 **English:**
-> ⚠️ **The codebase is still undergoing active, multi-stage refactoring.** Although a deep audit pass has just landed on `main` (see "Recent audit pass" below), the public API, configuration schema, annotation layout, and several block contracts are **NOT frozen yet** and may still change without notice.
+> ⚠️ **The v0.4 multi-stage refactor is frozen as of 2026-04-27.** The Blueprint / Construction / Measurement contracts now have Phase 0-5 audit and regression evidence, but no new public release has been cut yet; use the v1 stable tag below if you need the exact JSAC-era behavior.
 >
 > The original drivers for the refactor:
 >
@@ -24,7 +24,7 @@ A comprehensive MATLAB-based radio communication simulation framework for wirele
 > **Stable Version (v1, JSAC paper)**: [https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
 
 **中文：**
-> ⚠️ **代码库目前仍处于多阶段、滚动式重构状态。** 虽然 `main` 上刚刚合并了一轮端到端审计修复（见下方 "Recent audit pass"），但公共 API、配置 schema、标注结构以及若干 block 契约 **仍未冻结**，后续可能继续调整。
+> ⚠️ **v0.4 多阶段重构已于 2026-04-27 冻结。** Blueprint / Construction / Measurement 三层契约已有 Phase 0-5 审计与回归证据，但尚未切新的公开稳定 release；如果需要 JSAC 论文时代的完全一致行为，请继续使用下方 v1 稳定 tag。
 >
 > 重构的两个原始驱动力：
 >
@@ -36,6 +36,86 @@ A comprehensive MATLAB-based radio communication simulation framework for wirele
 >
 > **稳定版本（v1，对应 JSAC 论文）**：[https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)
 
+### 🚦 v0.4 phased refactor — **Phase 0-5 Frozen 2026-04-27**
+
+The audit pass below (review/spectrum-sim-audit) finished v0.3 of the refactor. The current track is **v0.4**, organised into 6 phases (audit document: [`docs/audits/2026-04-spectrum-blueprint-construction-refactor.md`](docs/audits/2026-04-spectrum-blueprint-construction-refactor.md), §17.2).
+
+| Phase | Title | Status |
+|------:|------|:--:|
+| 0 | Baseline + foundations (toolbox check, log policy, JSON sanitization, baseline sweep) | ✅ **Frozen 2026-04-24** ([`docs/audits/phases/phase-0-baseline.md`](docs/audits/phases/phase-0-baseline.md)) |
+| 1 | Dataflow + exception contract (signal struct schema, channel seed, mergeChannelOutput) | ✅ **Frozen 2026-04-25** ([`docs/audits/phases/phase-1-dataflow.md`](docs/audits/phases/phase-1-dataflow.md)) |
+| 2 | Blueprint layer skeleton (profile libraries, BlueprintHash, validator) | ✅ **Frozen 2026-04-25** ([`docs/audits/phases/phase-2-blueprint.md`](docs/audits/phases/phase-2-blueprint.md)) |
+| 3 | Construction layer rigorisation (silent-fallback removal, ReceiverViews, provenance dataflow) | ✅ **Frozen 2026-04-25** ([`docs/audits/phases/phase-3-construction.md`](docs/audits/phases/phase-3-construction.md)) |
+| 4 | Measurement layer + Doppler + annotation v2 | ✅ **Frozen 2026-04-26** ([`docs/audits/phases/phase-4-measurement.md`](docs/audits/phases/phase-4-measurement.md)) |
+| 5 | Large-scale MC + CI hooks + final hardening | ✅ **Frozen 2026-04-27** ([`docs/audits/phases/phase-5-mc-validation.md`](docs/audits/phases/phase-5-mc-validation.md)) |
+
+Phase 5 outcome (from `docs/baselines/2026-04-final-v04.json`): 1000 scenarios, **BlueprintAcceptanceRate = 1.0**, **ChannelFactoryFailureRate = 0**, **ExecutionVsMeasuredBwAbsRelDiffP95 = 0.022217530072084515**, **JsonNanCount = 0**, **JsonInfinityCount = 0**. Operator MC wallclock is recorded as diagnostic metadata; CI smoke remains the hard runtime gate.
+
+### 🧭 v0.5 release hardening — **Phase 6 Frozen 2026-04-28**
+
+The release-hardening stage is now frozen, not a rewrite of the frozen truth model. Phase 6 is documented in [`docs/audits/phases/phase-6-release-hardening.md`](docs/audits/phases/phase-6-release-hardening.md) and covers release readiness, annotation v2 reader/export tooling, COCO v2 conversion, performance diagnostics, CI hardening, and the final documentation consistency gate. The v2 reader, release readiness gate, minimal receiver-frequency COCO v2 converter, read-only performance diagnostics, release/CI readiness aggregator, and Phase 6 release freeze report are available. Phase 6 explicitly does **not** reintroduce annotation v1 compatibility or change the Blueprint / Construction / Measurement contract.
+
+Phase 6 release readiness check:
+
+```matlab
+addpath(fullfile(pwd, 'tools', 'release'))
+run_csrd_release_readiness()                % read-only final-v04 readiness gate
+
+addpath(fullfile(pwd, 'tests'))
+run_all_tests('phase6')                     % v2 reader + COCO converter + readiness
+
+addpath(fullfile(pwd, 'tools'))
+coco = convert_csrd_to_coco(annotationPath, outputJsonPath);
+% annotationPath must point to a CSRD annotation v2 JSON file with populated
+% Truth.Design and Truth.Measured.SourcePlane fields.
+
+addpath(fullfile(pwd, 'tools', 'phase6'))
+run_phase6_performance_diagnostics()        % read-only baseline + hotspot report
+
+addpath(fullfile(pwd, 'tools', 'release'))
+run_csrd_release_ci_readiness()             % release readiness + phase6 + CI smoke
+
+addpath(fullfile(pwd, 'tools', 'release'))
+run_csrd_downstream_docs_readiness()        % schema docs + downstream example + release notes
+
+addpath(fullfile(pwd, 'tests'))
+run_all_tests('phase7')                     % downstream docs/example release regression
+```
+
+Downstream documentation:
+
+- [`docs/annotation-v2-schema.md`](docs/annotation-v2-schema.md)
+- [`docs/examples/annotation-v2-downstream.md`](docs/examples/annotation-v2-downstream.md)
+- [`docs/release/RELEASE_NOTES_v0.5.0.md`](docs/release/RELEASE_NOTES_v0.5.0.md)
+- [`examples/read_annotation_v2_downstream.m`](examples/read_annotation_v2_downstream.m)
+
+Phase 0 quick start (no real simulation needed):
+
+```matlab
+cd('c:\Users\lenovo\ChangShuoRadioData')
+addpath(pwd)
+addpath(fullfile(pwd, 'tests'))
+run_all_tests('phase0')                    % 6 unit tests + 2 regression tests
+```
+
+The Phase 4 baseline sweep defaults to a 12-scenario smoke run; the canonical 210-scenario sweep is operator-driven:
+
+```matlab
+addpath(fullfile(pwd, 'tests', 'regression'))
+test_baseline_sweep_200(210, 'Mode', 'full')
+% writes docs/baselines/2026-04-baseline-v0.json
+```
+
+Phase 5 final verification uses a local CI smoke entry point and an operator-driven 1000-scenario MC wrapper:
+
+```matlab
+addpath(fullfile(pwd, 'tools', 'ci'))
+run_csrd_ci_smoke()                         % static gates + phase4 + MC smoke
+
+addpath(fullfile(pwd, 'tools', 'phase5'))
+run_phase5_mc_validation()                  % writes docs/baselines/2026-04-final-v04.json
+```
+
 ### 🛠️ Recent audit pass (review/spectrum-sim-audit, merged into `main`)
 
 This branch landed an end-to-end review and 18 fix commits across five stages. Key things that changed:
@@ -45,11 +125,11 @@ This branch landed an end-to-end review and 18 fix commits across five stages. K
   - `TRFSimulator` writes IIP3 to the IIP3 property (not OIP3); RRFSimulator class doc now reflects only the actually-wired stages.
   - Antenna upgrade (SISO → MIMO) is propagated back to `TxInfo` instead of dying inside a value-passed struct.
 - **Annotation truthfulness**
-  - Per-source annotation is now split into `Planned` / `Realized` / `Temporal` / `Spatial` / `LinkBudget` / `Channel` substructures. `Planned` is **never** filled from `Realized`.
+  - Per-source annotation is now split into `Truth.Design`, `Truth.Execution`, and `Truth.Measured`. Design facts come from the blueprint; execution and measured facts record what the generator actually realized and observed.
   - RayTracing path loss is recorded as `AppliedPathLoss`; the analytical FSPL the planner reasoned about is recorded separately as `AnalyticalPathLoss`.
   - Link-budget noise bandwidth is now `min(rxFs, txOccupiedBW, configured)` so narrow-band signals stop carrying pessimistic SNR labels.
 - **Exception contract**
-  - Scenario-skip identifiers (`SkipScenario`, `NoBuildingData`, `NoValidPaths`) are classified by a single helper (`csrd.utils.scenario.isScenarioSkipException`) and propagate cleanly all the way up to `SimulationRunner.runScenario`, instead of being smothered by `ChannelFactory.stepImpl`.
+  - Scenario-skip identifiers (`SkipScenario`, `NoBuildingData`, `NoValidPaths`) are classified by a single helper (`csrd.pipeline.scenario.isScenarioSkipException`) and propagate cleanly all the way up to `SimulationRunner.runScenario`, instead of being smothered by `ChannelFactory.stepImpl`.
 - **Testing**
   - 11 unit suites (52 cases) and 7 regression scripts now run green via `run_all_tests('unit'|'regression'|'all')`. `'all'` finally sweeps all three categories instead of aliasing to `'regression'`.
 - **Development discipline**
@@ -85,7 +165,7 @@ ChangShuoRadioData/
 │   │           ├── processSingleSegment.m
 │   │           ├── processTransmitImpairments.m
 │   │           ├── processChannelPropagation.m
-│   │           ├── processReceiverProcessing.m  # Planned/Realized split lives here
+│   │           ├── processReceiverProcessing.m  # Truth.Design/Execution/Measured annotation builder
 │   │           └── updateTransmitterAntennaConfig.m
 │   ├── +factories/                              # Factory pattern (executors of the plan)
 │   │   ├── ScenarioFactory.m                   # Scenario instantiation
@@ -217,7 +297,7 @@ simulation(1, 1, 'csrd2025/my_custom_config.m');
 simulation(2, 4, 'csrd2025/csrd2025.m'); % Worker 2 of 4
 
 % Direct configuration loading
-masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 runner = csrd.SimulationRunner('RunnerConfig', masterConfig.Runner);
 runner.FactoryConfigs = masterConfig.Factories;
 runner(1, 1);
@@ -266,7 +346,7 @@ The CSRD framework features a comprehensive modular configuration system with in
 ### Configuration Architecture
 ```matlab
 % Load complete configuration with inheritance
-masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
 % Configuration structure:
 masterConfig = {
@@ -359,10 +439,10 @@ end
 **Usage Examples:**
 ```matlab
 % Load default configuration
-config = csrd.utils.config_loader();
+config = csrd.runtime.config_loader();
 
 % Load specific configuration  
-config = csrd.utils.config_loader('csrd2025/csrd2025.m');
+config = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
 % Use in simulation (with tools/ added to path)
 addpath('tools');
@@ -407,9 +487,9 @@ Cursor) and mirrored in `AGENTS.md` for non-Cursor contributors. Headlines:
 
 - **Units are explicit and never silently converted**: distance is meters, frequency is Hz, power is dBm. Helpers that need other units (`fogpl` km, etc.) must be wrapped with a clearly named adapter.
 - **Planning vs execution stays separated**: scenario blocks plan; factories execute. Factories must NOT inject random parameters at execution time to fill in missing plan fields — that is a planner bug.
-- **Annotations cannot fabricate `Planned` from `Realized`**: if the producer did not record a planned value, the field stays as an empty struct.
+- **Annotations cannot fabricate design facts from execution facts**: `Truth.Design` comes from the blueprint, while `Truth.Execution` and `Truth.Measured` record realized and observed generator facts.
 - **`SampleRate` always comes from the producer**: missing or non-positive `SampleRate` raises `CSRD:Core:MissingSampleRate`. No `length(Signal)/Duration` reverse derivation, no hard-coded `200e3` fallbacks.
-- **Scenario-skip exceptions propagate**: any `try/catch` that may need to distinguish "skip this scenario, keep going" from "abort the run" must consult `csrd.utils.scenario.isScenarioSkipException` and rethrow on match.
+- **Scenario-skip exceptions propagate**: any `try/catch` that may need to distinguish "skip this scenario, keep going" from "abort the run" must consult `csrd.pipeline.scenario.isScenarioSkipException` and rethrow on match.
 - **Every fix ships with a test**: a fix without a test that would have caught the bug does not land. Tests live only under `tests/{unit,regression,integration}/` — never in the repo root or `examples/`.
 
 ## 🧪 Testing and Validation
@@ -451,7 +531,7 @@ results = run_all_tests('integration');  % cross-block integration suites
 
 ### Configuration Management
 - **Modular Design**: Inheritance-based configuration with base components
-- **Single Interface**: Unified `csrd.utils.config_loader()` function
+- **Single Interface**: Unified `csrd.runtime.config_loader()` function
 - **Complete Coverage**: All 6 factory configurations (Scenario, Message, Modulation, Transmit, Channel, Receive)
 - **Easy Customization**: Override specific parameters while inheriting base configurations
 

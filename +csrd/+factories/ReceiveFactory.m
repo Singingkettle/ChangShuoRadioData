@@ -1,4 +1,5 @@
 classdef ReceiveFactory < matlab.System
+        % 中文说明：提供 CSRD 生产链路中的 ReceiveFactory 实现。
 
     properties
         % Config: Struct containing the configuration for receiver types.
@@ -16,6 +17,10 @@ classdef ReceiveFactory < matlab.System
     methods
 
         function obj = ReceiveFactory(varargin)
+            % ReceiveFactory - Production declaration in CSRD.
+            % 中文说明：ReceiveFactory 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
             obj.cachedReceiverBlocks = containers.Map;
         end
@@ -25,16 +30,24 @@ classdef ReceiveFactory < matlab.System
     methods (Access = protected)
 
         function validateInputsImpl(~, ~, ~, ~, ~)
+            % validateInputsImpl - Production declaration in CSRD.
+            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
+            % setupImpl - Production declaration in CSRD.
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if isempty(obj.Config) || ~isstruct(obj.Config)
                 error('ReceiveFactory:ConfigError', 'Config property must be a valid struct.');
             end
 
             obj.factoryConfig = obj.Config;
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             obj.logger.debug('ReceiveFactory setupImpl initializing.');
 
@@ -44,6 +57,9 @@ classdef ReceiveFactory < matlab.System
 
         function receivedDataStruct = stepImpl(obj, inputSignalStruct, frameId, rxInfoThisRx, receiverScenarioConfig)
             % inputSignalStruct: from ChannelFactory (signal after passing through channel)
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % rxInfoThisRx: The specific RxInfo struct for this receiver
             % receiverScenarioConfig: RxPlan struct from ScenarioConfig.Receivers
 
@@ -57,8 +73,9 @@ classdef ReceiveFactory < matlab.System
             if ~isfield(obj.factoryConfig, receiverType)
                 obj.logger.error('Frame %d, Rx %s: Receiver type ''%s'' not found in config.', ...
                     frameId, rxIdStr, receiverType);
-                receivedDataStruct = struct('Error', 'ReceiverTypeNotFound', 'OriginalSignal', inputSignalStruct);
-                return;
+                error('CSRD:ReceiveFactory:ReceiverTypeNotFound', ...
+                    'Receiver type "%s" not found in ReceiveFactory config.', ...
+                    receiverType);
             end
 
             typeConfig = obj.factoryConfig.(receiverType);
@@ -66,8 +83,9 @@ classdef ReceiveFactory < matlab.System
             if ~isfield(typeConfig, 'handle')
                 obj.logger.error('Frame %d, Rx %s: No handle found for receiver type ''%s''.', ...
                     frameId, rxIdStr, receiverType);
-                receivedDataStruct = struct('Error', 'ReceiverTypeHandleNotFound', 'OriginalSignal', inputSignalStruct);
-                return;
+                error('CSRD:ReceiveFactory:ReceiverTypeHandleNotFound', ...
+                    'No handle configured for receiver type "%s".', ...
+                    receiverType);
             end
 
             blockHandleStr = typeConfig.handle;
@@ -89,8 +107,7 @@ classdef ReceiveFactory < matlab.System
                 catch ME
                     obj.logger.error('Frame %d, Rx %s: Failed to create receiver block. Error: %s', ...
                         frameId, rxIdStr, ME.message);
-                    receivedDataStruct = struct('Error', 'ReceiverBlockInstantiationFailed', 'OriginalSignal', inputSignalStruct);
-                    return;
+                    rethrow(ME);
                 end
             end
 
@@ -98,9 +115,13 @@ classdef ReceiveFactory < matlab.System
 
             try
                 % Set block properties from signal struct / rxInfo before calling step
-                if isfield(rxInfoThisRx, 'SampleRate')
-                    currentReceiverBlock.MasterClockRate = rxInfoThisRx.SampleRate;
+                if ~isfield(rxInfoThisRx, 'SampleRate') || isempty(rxInfoThisRx.SampleRate) || ...
+                        ~isnumeric(rxInfoThisRx.SampleRate) || ~isscalar(rxInfoThisRx.SampleRate) || ...
+                        ~isfinite(rxInfoThisRx.SampleRate) || rxInfoThisRx.SampleRate <= 0
+                    error('CSRD:ReceiveFactory:MissingReceiverSampleRate', ...
+                        'rxInfo.SampleRate is required for receiver processing.');
                 end
+                currentReceiverBlock.MasterClockRate = rxInfoThisRx.SampleRate;
 
                 % Extract signal array - RRFSimulator accepts numeric arrays
                 if isstruct(inputSignalStruct) && isfield(inputSignalStruct, 'Signal')
@@ -119,26 +140,58 @@ classdef ReceiveFactory < matlab.System
                     receivedDataStruct.Components = inputSignalStruct.Components;
                 end
 
+                % Phase 1 / C1: emit the FULL set of RF impairments
+                % actually realised by RRFSimulator. Previously we only
+                % surfaced 3 of the 5 impairment knobs, dropping
+                % MemoryLessNonlinearityConfig and SampleRateOffset on
+                % the floor and breaking annotation reproducibility for
+                % AI/ML training. Type is included as a defensive
+                % traceability tag so consumers can correlate the
+                % impairment dump with the receiver-type recipe used.
+                receivedDataStruct.RxImpairments = struct();
+                receivedDataStruct.RxImpairments.Type = receiverType;
                 receivedDataStruct.RxImpairments.DCOffset = currentReceiverBlock.DCOffset;
                 receivedDataStruct.RxImpairments.IqImbalanceConfig = currentReceiverBlock.IqImbalanceConfig;
                 receivedDataStruct.RxImpairments.ThermalNoiseConfig = currentReceiverBlock.ThermalNoiseConfig;
+                if isprop(currentReceiverBlock, 'MemoryLessNonlinearityConfig')
+                    receivedDataStruct.RxImpairments.MemoryLessNonlinearityConfig = ...
+                        currentReceiverBlock.MemoryLessNonlinearityConfig;
+                else
+                    receivedDataStruct.RxImpairments.MemoryLessNonlinearityConfig = struct();
+                end
+                if isprop(currentReceiverBlock, 'SampleRateOffset')
+                    receivedDataStruct.RxImpairments.SampleRateOffset = ...
+                        currentReceiverBlock.SampleRateOffset;
+                else
+                    receivedDataStruct.RxImpairments.SampleRateOffset = 0;
+                end
 
                 obj.logger.debug('Frame %d, Rx %s: Reception step successful.', frameId, rxIdStr);
             catch ME_step
+                % Phase 3 (audit §3.4 / §17.5 P3-6): the legacy fallback
+                % stamped `receivedDataStruct.Error = 'ReceiverBlockStepFailed'`
+                % onto the input signal and let the pipeline keep walking,
+                % which produced annotations with phantom RxImpairments and
+                % buried the real failure. Phase 3 lets the exception
+                % propagate so generateSingleFrame / SimulationRunner can
+                % decide between scenario-skip
+                % (csrd.pipeline.scenario.isScenarioSkipException) and a hard
+                % crash.
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_step)
+                    rethrow(ME_step);
+                end
                 obj.logger.error('Frame %d, Rx %s: Error during step. Error: %s', ...
                     frameId, rxIdStr, ME_step.message);
-                receivedDataStruct = inputSignalStruct;
-                if isstruct(receivedDataStruct)
-                    receivedDataStruct.Error = 'ReceiverBlockStepFailed';
-                else
-                    receivedDataStruct = struct('Error', 'ReceiverBlockStepFailed', 'OriginalSignal', inputSignalStruct);
-                end
+                rethrow(ME_step);
             end
 
         end
 
         function configureReceiverBlock(obj, rxBlock, typeConfig, rxInfoThisRx, receiverScenarioConfig)
             % Configure the receiver block with parameters from typeConfig
+            % 中文说明：configureReceiverBlock 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % Parameters are randomly selected from the defined ranges
 
             obj.logger.debug('Configuring receiver block with RF impairment parameters');
@@ -212,93 +265,205 @@ classdef ReceiveFactory < matlab.System
         end
 
         function nonlinConfig = configureNonlinearity(obj, nonlinField)
-            % Configure nonlinearity by randomly selecting a method and its parameters
+            %CONFIGURENONLINEARITY Build a `comm.MemorylessNonlinearity` config.
+            % 中文说明：configureNonlinearity 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            %
+            %   v0.4 deep refactor: the config produced here populates
+            %   ONLY the property set the System object accepts for the
+            %   chosen Method, per the official MATLAB documentation
+            %   "Dependencies" section. No off-Method fields are emitted.
+            %
+            %   The selected Method is drawn uniformly from
+            %   nonlinField.Methods. ReferenceImpedance is sourced from
+            %   nonlinField.ReferenceImpedance (defaulting to 50 Ω
+            %   industry standard) and applied to every Method.
 
-            nonlinConfig = struct();
-
-            % Select a random method from available methods
-            if isfield(nonlinField, 'Methods')
-                methods = nonlinField.Methods;
-                selectedMethod = methods{randi(length(methods))};
-                nonlinConfig.Method = selectedMethod;
-
-                % Get the corresponding model config based on selected method
-                switch selectedMethod
-                    case 'Cubic polynomial'
-                        modelConfig = nonlinField.CubicPolynomial;
-                    case 'Hyperbolic tangent'
-                        modelConfig = nonlinField.HyperbolicTangent;
-                    case 'Saleh model'
-                        modelConfig = nonlinField.SalehModel;
-                    case 'Ghorbani model'
-                        modelConfig = nonlinField.GhorbaniModel;
-                    case 'Modified Rapp model'
-                        modelConfig = nonlinField.ModifiedRappModel;
-                    otherwise
-                        obj.logger.warning('Unknown nonlinearity method: %s', selectedMethod);
-                        return;
-                end
-
-                % Configure parameters for the selected model
-                paramFields = fieldnames(modelConfig);
-                for i = 1:length(paramFields)
-                    paramName = paramFields{i};
-                    paramValue = modelConfig.(paramName);
-
-                    if iscell(paramValue)
-                        % Select randomly from cell array (e.g., TOISpecification)
-                        nonlinConfig.(paramName) = paramValue{randi(length(paramValue))};
-                    elseif isnumeric(paramValue) && length(paramValue) == 2
-                        % Random value from range
-                        nonlinConfig.(paramName) = obj.randomInRange(paramValue(1), paramValue(2));
-                    else
-                        % Use as-is
-                        nonlinConfig.(paramName) = paramValue;
-                    end
-                end
-
-                % Special handling for Saleh/Ghorbani models: combine Left/Right into Parameters
-                if strcmp(selectedMethod, 'Saleh model')
-                    if isfield(modelConfig, 'AMAMParametersLeft') && isfield(modelConfig, 'AMAMParametersRight')
-                        alpha = obj.randomInRange(modelConfig.AMAMParametersLeft(1), modelConfig.AMAMParametersLeft(2));
-                        beta = obj.randomInRange(modelConfig.AMAMParametersRight(1), modelConfig.AMAMParametersRight(2));
-                        nonlinConfig.AMAMParameters = [alpha, beta];
-                    end
-                    if isfield(modelConfig, 'AMPMParametersLeft') && isfield(modelConfig, 'AMPMParametersRight')
-                        alpha = obj.randomInRange(modelConfig.AMPMParametersLeft(1), modelConfig.AMPMParametersLeft(2));
-                        beta = obj.randomInRange(modelConfig.AMPMParametersRight(1), modelConfig.AMPMParametersRight(2));
-                        nonlinConfig.AMPMParameters = [alpha, beta];
-                    end
-                elseif strcmp(selectedMethod, 'Ghorbani model')
-                    if isfield(modelConfig, 'AMAMParametersLeft1') && isfield(modelConfig, 'AMAMParametersLeft2') && ...
-                       isfield(modelConfig, 'AMAMParametersRight1') && isfield(modelConfig, 'AMAMParametersRight2')
-                        x1 = obj.randomInRange(modelConfig.AMAMParametersLeft1(1), modelConfig.AMAMParametersLeft1(2));
-                        x2 = obj.randomInRange(modelConfig.AMAMParametersLeft2(1), modelConfig.AMAMParametersLeft2(2));
-                        y1 = obj.randomInRange(modelConfig.AMAMParametersRight1(1), modelConfig.AMAMParametersRight1(2));
-                        y2 = obj.randomInRange(modelConfig.AMAMParametersRight2(1), modelConfig.AMAMParametersRight2(2));
-                        nonlinConfig.AMAMParameters = [x1, x2, y1, y2];
-                    end
-                    if isfield(modelConfig, 'AMPMParametersLeft1') && isfield(modelConfig, 'AMPMParametersLeft2') && ...
-                       isfield(modelConfig, 'AMPMParametersRight1') && isfield(modelConfig, 'AMPMParametersRight2')
-                        x1 = obj.randomInRange(modelConfig.AMPMParametersLeft1(1), modelConfig.AMPMParametersLeft1(2));
-                        x2 = obj.randomInRange(modelConfig.AMPMParametersLeft2(1), modelConfig.AMPMParametersLeft2(2));
-                        y1 = obj.randomInRange(modelConfig.AMPMParametersRight1(1), modelConfig.AMPMParametersRight1(2));
-                        y2 = obj.randomInRange(modelConfig.AMPMParametersRight2(1), modelConfig.AMPMParametersRight2(2));
-                        nonlinConfig.AMPMParameters = [x1, x2, y1, y2];
-                    end
-                end
-
-                % Add default ReferenceImpedance if not in config
-                if ~isfield(nonlinConfig, 'ReferenceImpedance')
-                    nonlinConfig.ReferenceImpedance = 1; % Default 1 ohm
-                end
-
-                obj.logger.debug('Configured nonlinearity method ''%s''', selectedMethod);
+            if ~isstruct(nonlinField) || ~isfield(nonlinField, 'Methods') ...
+                    || isempty(nonlinField.Methods)
+                error('CSRD:ReceiveFactory:NoNonlinearityMethods', ...
+                    ['Nonlinearity config must list at least one Method ' ...
+                     'in nonlinField.Methods.']);
             end
 
+            methodsList = nonlinField.Methods;
+            selectedMethod = methodsList{randi(numel(methodsList))};
+
+            referenceImpedance = 50;
+            if isfield(nonlinField, 'ReferenceImpedance') && ...
+                    ~isempty(nonlinField.ReferenceImpedance)
+                referenceImpedance = nonlinField.ReferenceImpedance;
+            end
+
+            switch selectedMethod
+                case 'Cubic polynomial'
+                    nonlinConfig = obj.buildCubicPolynomialConfig( ...
+                        nonlinField.CubicPolynomial);
+                case 'Hyperbolic tangent'
+                    nonlinConfig = obj.buildHyperbolicTangentConfig( ...
+                        nonlinField.HyperbolicTangent);
+                case 'Saleh model'
+                    nonlinConfig = obj.buildSalehModelConfig( ...
+                        nonlinField.SalehModel);
+                case 'Ghorbani model'
+                    nonlinConfig = obj.buildGhorbaniModelConfig( ...
+                        nonlinField.GhorbaniModel);
+                case 'Modified Rapp model'
+                    nonlinConfig = obj.buildModifiedRappModelConfig( ...
+                        nonlinField.ModifiedRappModel);
+                case 'Lookup table'
+                    nonlinConfig = obj.buildLookupTableConfig( ...
+                        nonlinField.LookupTable);
+                otherwise
+                    error('CSRD:ReceiveFactory:UnknownNonlinearityMethod', ...
+                        ['Unknown comm.MemorylessNonlinearity Method "%s". ' ...
+                         'Supported: Cubic polynomial, Hyperbolic tangent, ' ...
+                         'Saleh model, Ghorbani model, Modified Rapp model, ' ...
+                         'Lookup table.'], selectedMethod);
+            end
+
+            nonlinConfig.ReferenceImpedance = referenceImpedance;
+            obj.logger.debug('Configured nonlinearity method "%s"', selectedMethod);
+        end
+
+        function cfg = buildCubicPolynomialConfig(obj, src)
+            % buildCubicPolynomialConfig - Production declaration in CSRD.
+            % 中文说明：buildCubicPolynomialConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            cfg = struct();
+            cfg.Method = 'Cubic polynomial';
+            cfg.LinearGain = obj.randomInRange(src.LinearGain(1), src.LinearGain(2));
+            toiList = src.TOISpecifications;
+            cfg.TOISpecification = toiList{randi(numel(toiList))};
+            switch cfg.TOISpecification
+                case 'IIP3',  cfg.IIP3  = obj.randomInRange(src.IIP3(1),  src.IIP3(2));
+                case 'OIP3',  cfg.OIP3  = obj.randomInRange(src.OIP3(1),  src.OIP3(2));
+                case 'IP1dB', cfg.IP1dB = obj.randomInRange(src.IP1dB(1), src.IP1dB(2));
+                case 'OP1dB', cfg.OP1dB = obj.randomInRange(src.OP1dB(1), src.OP1dB(2));
+                case 'IPsat', cfg.IPsat = obj.randomInRange(src.IPsat(1), src.IPsat(2));
+                case 'OPsat', cfg.OPsat = obj.randomInRange(src.OPsat(1), src.OPsat(2));
+            end
+            cfg.AMPMConversion  = obj.randomInRange( ...
+                src.AMPMConversion(1), src.AMPMConversion(2));
+            cfg.PowerLowerLimit = obj.resolvePowerLimit(src.PowerLowerLimit, -40);
+            cfg.PowerUpperLimit = obj.resolvePowerLimit(src.PowerUpperLimit,  Inf);
+        end
+
+        function cfg = buildHyperbolicTangentConfig(obj, src)
+            % buildHyperbolicTangentConfig - Production declaration in CSRD.
+            % 中文说明：buildHyperbolicTangentConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            cfg = struct();
+            cfg.Method = 'Hyperbolic tangent';
+            cfg.LinearGain      = obj.randomInRange(src.LinearGain(1),     src.LinearGain(2));
+            cfg.IIP3            = obj.randomInRange(src.IIP3(1),           src.IIP3(2));
+            cfg.AMPMConversion  = obj.randomInRange(src.AMPMConversion(1), src.AMPMConversion(2));
+            cfg.PowerLowerLimit = obj.resolvePowerLimit(src.PowerLowerLimit, -40);
+            cfg.PowerUpperLimit = obj.resolvePowerLimit(src.PowerUpperLimit,  Inf);
+        end
+
+        function cfg = buildSalehModelConfig(obj, src)
+            % buildSalehModelConfig - Production declaration in CSRD.
+            % 中文说明：buildSalehModelConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            cfg = struct();
+            cfg.Method = 'Saleh model';
+            cfg.InputScaling   = obj.randomInRange(src.InputScaling(1),   src.InputScaling(2));
+            cfg.OutputScaling  = obj.randomInRange(src.OutputScaling(1),  src.OutputScaling(2));
+            alphaA = obj.randomInRange(src.AMAMParametersAlpha(1), src.AMAMParametersAlpha(2));
+            betaA  = obj.randomInRange(src.AMAMParametersBeta(1),  src.AMAMParametersBeta(2));
+            cfg.AMAMParameters = [alphaA, betaA];
+            alphaP = obj.randomInRange(src.AMPMParametersAlpha(1), src.AMPMParametersAlpha(2));
+            betaP  = obj.randomInRange(src.AMPMParametersBeta(1),  src.AMPMParametersBeta(2));
+            cfg.AMPMParameters = [alphaP, betaP];
+        end
+
+        function cfg = buildGhorbaniModelConfig(obj, src)
+            % buildGhorbaniModelConfig - Production declaration in CSRD.
+            % 中文说明：buildGhorbaniModelConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            cfg = struct();
+            cfg.Method = 'Ghorbani model';
+            cfg.InputScaling   = obj.randomInRange(src.InputScaling(1),  src.InputScaling(2));
+            cfg.OutputScaling  = obj.randomInRange(src.OutputScaling(1), src.OutputScaling(2));
+            x1 = obj.randomInRange(src.AMAMParametersX1(1), src.AMAMParametersX1(2));
+            x2 = obj.randomInRange(src.AMAMParametersX2(1), src.AMAMParametersX2(2));
+            x3 = obj.randomInRange(src.AMAMParametersX3(1), src.AMAMParametersX3(2));
+            x4 = obj.randomInRange(src.AMAMParametersX4(1), src.AMAMParametersX4(2));
+            cfg.AMAMParameters = [x1, x2, x3, x4];
+            y1 = obj.randomInRange(src.AMPMParametersY1(1), src.AMPMParametersY1(2));
+            y2 = obj.randomInRange(src.AMPMParametersY2(1), src.AMPMParametersY2(2));
+            y3 = obj.randomInRange(src.AMPMParametersY3(1), src.AMPMParametersY3(2));
+            y4 = obj.randomInRange(src.AMPMParametersY4(1), src.AMPMParametersY4(2));
+            cfg.AMPMParameters = [y1, y2, y3, y4];
+        end
+
+        function cfg = buildModifiedRappModelConfig(obj, src)
+            % buildModifiedRappModelConfig - Production declaration in CSRD.
+            % 中文说明：buildModifiedRappModelConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            cfg = struct();
+            cfg.Method = 'Modified Rapp model';
+            cfg.LinearGain            = obj.randomInRange(src.LinearGain(1),            src.LinearGain(2));
+            cfg.Smoothness            = obj.randomInRange(src.Smoothness(1),            src.Smoothness(2));
+            cfg.PhaseGainRadian       = obj.randomInRange(src.PhaseGainRadian(1),       src.PhaseGainRadian(2));
+            cfg.PhaseSaturation       = obj.randomInRange(src.PhaseSaturation(1),       src.PhaseSaturation(2));
+            cfg.PhaseSmoothness       = obj.randomInRange(src.PhaseSmoothness(1),       src.PhaseSmoothness(2));
+            cfg.OutputSaturationLevel = obj.randomInRange(src.OutputSaturationLevel(1), src.OutputSaturationLevel(2));
+        end
+
+        function cfg = buildLookupTableConfig(~, src)
+            % buildLookupTableConfig - Production declaration in CSRD.
+            % 中文说明：buildLookupTableConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            cfg = struct();
+            cfg.Method = 'Lookup table';
+            if ~isfield(src, 'Table') || isempty(src.Table) || size(src.Table, 2) ~= 3
+                error('CSRD:ReceiveFactory:InvalidLookupTable', ...
+                    ['Lookup table must be an Nx3 matrix [Pin_dBm, ' ...
+                     'Pout_dBm, dPhi_deg]; the supplied src.Table is ' ...
+                     'missing or has the wrong shape.']);
+            end
+            cfg.Table = src.Table;
+        end
+
+        function value = resolvePowerLimit(obj, raw, defaultValue)
+            % resolvePowerLimit - Production declaration in CSRD.
+            % 中文说明：resolvePowerLimit 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
+            if isempty(raw)
+                value = defaultValue;
+                return;
+            end
+            if ischar(raw) || isstring(raw)
+                value = Inf;
+                return;
+            end
+            if isnumeric(raw) && isscalar(raw)
+                value = raw;
+                return;
+            end
+            if isnumeric(raw) && numel(raw) == 2
+                value = obj.randomInRange(raw(1), raw(2));
+                return;
+            end
+            error('CSRD:ReceiveFactory:InvalidPowerLimit', ...
+                'PowerLimit must be empty, scalar, [min max], or "Inf".');
         end
 
         function releaseImpl(obj)
+            % releaseImpl - Production declaration in CSRD.
+            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('ReceiveFactory releaseImpl called.');
             blockKeys = keys(obj.cachedReceiverBlocks);
 
@@ -306,7 +471,7 @@ classdef ReceiveFactory < matlab.System
                 blockKey = blockKeys{i};
                 receiverBlock = obj.cachedReceiverBlocks(blockKey);
 
-                if ~isempty(receiverBlock) && hasMethod(receiverBlock, 'release')
+                if ~isempty(receiverBlock) && ismethod(receiverBlock, 'release')
                     try
                         release(receiverBlock);
                         obj.logger.debug('Receiver block ''%s'' released.', blockKey);
@@ -321,6 +486,10 @@ classdef ReceiveFactory < matlab.System
         end
 
         function resetImpl(obj)
+            % resetImpl - Production declaration in CSRD.
+            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             obj.logger.debug('ReceiveFactory resetImpl called.');
             blockKeys = keys(obj.cachedReceiverBlocks);
 
@@ -328,7 +497,7 @@ classdef ReceiveFactory < matlab.System
                 blockKey = blockKeys{i};
                 receiverBlock = obj.cachedReceiverBlocks(blockKey);
 
-                if ~isempty(receiverBlock) && hasMethod(receiverBlock, 'reset')
+                if ~isempty(receiverBlock) && ismethod(receiverBlock, 'reset')
                     try
                         reset(receiverBlock);
                         obj.logger.debug('Receiver block ''%s'' reset.', blockKey);
@@ -343,6 +512,9 @@ classdef ReceiveFactory < matlab.System
 
         function receiverTypes = getReceiverTypes(obj)
             % Get available receiver types from configuration
+            % 中文说明：getReceiverTypes 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             excludeFields = {'LogDetails', 'Description', 'Types'};
             allFields = fieldnames(obj.factoryConfig);
             receiverTypes = setdiff(allFields, excludeFields);
@@ -350,6 +522,9 @@ classdef ReceiveFactory < matlab.System
 
         function value = randomInRange(~, minVal, maxVal)
             % Generate random value in specified range
+            % 中文说明：randomInRange 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             if minVal == maxVal
                 value = minVal;
             else
@@ -362,6 +537,10 @@ classdef ReceiveFactory < matlab.System
 end
 
 function value = resolveField(s, flatName, nestedAlt)
+    % resolveField - Production declaration in CSRD.
+    % 中文说明：resolveField 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isfield(s, flatName)
         value = s.(flatName);
     elseif strcmp(flatName, 'Type') && isfield(s, 'Hardware') && isstruct(s.Hardware) && isfield(s.Hardware, 'Type')

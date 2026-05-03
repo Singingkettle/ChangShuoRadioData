@@ -1,0 +1,62 @@
+function fcHz = spectrumCentroid(signal, sampleRate)
+%SPECTRUMCENTROID Center-of-mass frequency (Hz) of |FFT(signal)|^2.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 spectrumCentroid 实现。
+%
+% Phase 4 §3.1 measurement helper. Computes the energy-weighted mean
+% frequency over the two-sided spectrum [-Fs/2, Fs/2). For complex baseband
+% signals this is the spectral centroid relative to baseband 0 Hz; the
+% caller is responsible for shifting by the receiver's CenterFrequency to
+% obtain absolute RF Hz.
+%
+% Inputs:
+%   signal      : complex column vector (or [N x M]); multi-antenna is
+%                 collapsed by sum across columns.
+%   sampleRate  : positive scalar (Hz)
+%
+% Outputs:
+%   fcHz        : scalar centroid (Hz) in [-Fs/2, Fs/2)
+%
+% Throws:
+%   CSRD:Measurement:EmptySignal       - empty input
+%   CSRD:Measurement:InvalidSampleRate - sampleRate <= 0 or non-finite
+%   CSRD:Measurement:InvalidSignal     - signal contains NaN/Inf
+%
+% See also: csrd.pipeline.measurement.obwActual
+
+    if isempty(signal)
+        error('CSRD:Measurement:EmptySignal', ...
+            'spectrumCentroid: input signal is empty.');
+    end
+
+    if ~isnumeric(sampleRate) || ~isscalar(sampleRate) || ...
+            ~isfinite(sampleRate) || sampleRate <= 0
+        error('CSRD:Measurement:InvalidSampleRate', ...
+            'spectrumCentroid: sampleRate must be positive finite scalar (got %s).', ...
+            mat2str(sampleRate));
+    end
+
+    if any(~isfinite(signal(:)))
+        error('CSRD:Measurement:InvalidSignal', ...
+            'spectrumCentroid: signal contains NaN or Inf.');
+    end
+
+    if size(signal, 2) > 1
+        signalCol = sum(signal, 2);
+    else
+        signalCol = signal(:);
+    end
+
+    N = length(signalCol);
+    spec = fftshift(fft(double(signalCol)));
+    psd = abs(spec) .^ 2;
+    totalPower = sum(psd);
+    if totalPower <= 0
+        fcHz = 0;
+        return;
+    end
+
+    fAxis = ((0:N - 1)' - floor(N / 2)) * (double(sampleRate) / N);
+    fcHz = sum(fAxis .* psd) / totalPower;
+end

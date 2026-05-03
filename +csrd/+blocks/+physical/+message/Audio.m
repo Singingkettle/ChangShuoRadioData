@@ -1,5 +1,6 @@
 classdef Audio < matlab.System
     % Audio - Audio Message Generator for Radio Communication Simulation
+    % 中文说明：提供 CSRD 生产链路中的 Audio 实现。
     %
     % This class reads audio files and generates message samples for use in
     % radio communication simulations. It supports continuous audio playback
@@ -38,6 +39,9 @@ classdef Audio < matlab.System
 
         function obj = Audio(varargin)
             % Audio - Constructor for Audio message generator
+            % 中文说明：Audio 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   obj = Audio()
@@ -56,6 +60,9 @@ classdef Audio < matlab.System
 
         function setupImpl(obj)
             % setupImpl - Initialize the audio file reader
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates a dsp.AudioFileReader object configured for:
             % - 1024 samples per frame
@@ -67,6 +74,9 @@ classdef Audio < matlab.System
 
         function out = stepImpl(obj, MessageLength, SymbolRate)
             % stepImpl - Generate audio message samples
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   out = stepImpl(obj, MessageLength, SymbolRate)

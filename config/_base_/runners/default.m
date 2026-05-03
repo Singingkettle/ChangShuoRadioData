@@ -1,10 +1,12 @@
 function config = default()
     % default - Default runner configuration
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 default 实现。
     %
     % Provides standard simulation execution settings.
 
     config.Runner.NumScenarios = 4;
-    config.Runner.FixedFrameLength = 1024;
     config.Runner.RandomSeed = 'shuffle';
     config.Runner.SimulationMode = 'Scenario-Driven';
     config.Runner.ValidationLevel = 'Moderate';

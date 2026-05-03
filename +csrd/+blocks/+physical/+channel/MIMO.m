@@ -1,5 +1,6 @@
 classdef MIMO < csrd.blocks.physical.channel.BaseChannel
     % MIMO - Multiple-Input Multiple-Output Channel Model
+    % 中文说明：提供 CSRD 生产链路中的 MIMO 实现。
     %
     % This class implements a comprehensive MIMO channel model as a subclass of
     % BaseChannel, providing realistic wireless propagation effects including
@@ -260,6 +261,9 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
 
         function setupImpl(obj)
             % setupImpl - Initialize the MIMO channel system object
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method configures the underlying Communications Toolbox
             % MIMOChannel object based on the specified parameters. Different
@@ -329,6 +333,9 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
 
         function outputSignal = stepImpl(obj, inputSignal)
             % stepImpl - Process input signal through MIMO channel
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method applies complete channel effects including path loss,
             % multipath fading, and Doppler shifts to the input signal matrix.
@@ -422,6 +429,9 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
 
         function channelInfo = infoImpl(obj)
             % infoImpl - Return comprehensive channel configuration information
+            % 中文说明：infoImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method provides detailed information about the current
             % channel configuration, useful for analysis and debugging.

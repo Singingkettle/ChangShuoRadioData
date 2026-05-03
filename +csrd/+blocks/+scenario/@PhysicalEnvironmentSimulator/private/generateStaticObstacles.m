@@ -1,5 +1,6 @@
 function obstacles = generateStaticObstacles(obj)
     % generateStaticObstacles - Generate random static obstacles within map boundaries
+    % 中文说明：提供 CSRD 生产链路中的 generateStaticObstacles 实现。
     %
     % Output Arguments:
     %   obstacles - Array of obstacle structures with position and size

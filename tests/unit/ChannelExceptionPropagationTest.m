@@ -31,17 +31,12 @@ classdef ChannelExceptionPropagationTest < matlab.unittest.TestCase
             testCase.verifyError(f, 'CSRD:Scenario:SkipScenario');
         end
 
-        function unrelatedErrorIsSwallowed(testCase)
-            % Generic, non-skip identifiers are still logged and swallowed
-            % so transient per-link issues do not abort the entire run.
-            try
-                ChannelExceptionPropagationTest.runHarness('CSRD:Channel:Generic', ...
-                    'transient channel error');
-                testCase.verifyTrue(true);
-            catch ME
-                testCase.verifyFail(sprintf( ...
-                    'Generic exception (%s) leaked out: %s', ME.identifier, ME.message));
-            end
+        function unrelatedErrorIsRethrown(testCase)
+            % Phase 5 removes the generic catch-swallow branch: a channel
+            % bug must not degrade into a partial annotation.
+            f = @() ChannelExceptionPropagationTest.runHarness( ...
+                'CSRD:Channel:Generic', 'transient channel error');
+            testCase.verifyError(f, 'CSRD:Channel:Generic');
         end
 
     end
@@ -56,12 +51,10 @@ classdef ChannelExceptionPropagationTest < matlab.unittest.TestCase
             try
                 error(identifier, '%s', message);
             catch ME_channel
-                identifierStr = string(ME_channel.identifier);
-                if contains(identifierStr, 'SkipScenario') || ...
-                        contains(identifierStr, 'NoBuildingData') || ...
-                        contains(identifierStr, 'NoValidPaths')
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_channel)
                     rethrow(ME_channel);
                 end
+                rethrow(ME_channel);
             end
         end
 
