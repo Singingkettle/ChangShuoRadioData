@@ -1,5 +1,6 @@
 function provenance = extractProvenanceFromGlobalLayout(globalLayout)
     %EXTRACTPROVENANCEFROMGLOBALLAYOUT Phase 3 provenance dataflow helper.
+    % 中文说明：提供 CSRD 生产链路中的 extractProvenanceFromGlobalLayout 实现。
     %
     %   Phase 3 (audit §3.5 / §17.5 P3-7) replaces the legacy
     %   `ChangShuo.getScenarioBlueprintProvenance` Hidden accessor (which

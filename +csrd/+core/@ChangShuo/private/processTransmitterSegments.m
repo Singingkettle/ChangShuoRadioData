@@ -1,5 +1,8 @@
 function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentTxScenario, currentTxId)
     %PROCESSTRANSMITTERSEGMENTS Phase 3 strict-construction segment fan-out.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processTransmitterSegments 实现。
     %
     %   Iterates every active segment of currentTxScenario and dispatches
     %   to processSingleSegment. Phase 3 (audit §3.4 / §17.5 P3-6) removed
@@ -9,7 +12,7 @@ function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentT
     %   instead of decaying into an empty annotation.
     %
     %   Scenario-skip identifiers (see
-    %   csrd.utils.scenario.isScenarioSkipException) are rethrown without
+    %   csrd.pipeline.scenario.isScenarioSkipException) are rethrown without
     %   logging to keep the sweep log readable; everything else is logged
     %   then rethrown for diagnostics.
 
@@ -29,7 +32,7 @@ function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentT
         try
             signalSegmentsPerTx{k} = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx);
         catch ME_seg
-            if csrd.utils.scenario.isScenarioSkipException(ME_seg)
+            if csrd.pipeline.scenario.isScenarioSkipException(ME_seg)
                 rethrow(ME_seg);
             end
             obj.logger.error('Frame %d, TxID %s, Seg %d: Error processing segment: %s', ...

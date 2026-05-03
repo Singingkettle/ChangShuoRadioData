@@ -1,5 +1,6 @@
 function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(obj, ...
         transmitters, rxConfigs)
+    % 中文说明：提供 CSRD 生产链路中的 generateScenarioTransmitterConfigurations 实现。
     % generateScenarioTransmitterConfigurations - Generate fixed transmitter configurations
     %
     % DESIGN PRINCIPLE:
@@ -31,7 +32,7 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         globalLayout.Strategy = 'ReceiverCentric';
     end
     globalLayout.FrequencyAllocations = {};
-    regulatoryEnabled = csrd.utils.spectrum.RegionSpectrumSelector.isEnabled(obj.Config);
+    regulatoryEnabled = csrd.catalog.spectrum.RegionSpectrumSelector.isEnabled(obj.Config);
     regulatoryPlan = struct();
     if regulatoryEnabled
         if isempty(obj.scenarioRegulatoryPlan) || ...
@@ -87,17 +88,12 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
         % Physical group
         txPlan.Physical.Position = transmitter.Position;
+        txPlan.Physical.Velocity = requireEntityVelocity(transmitter, ...
+            'Transmitter');
 
         % Hardware group
         txPlan.Hardware.Type = selectTransmitterType(txParams.Types);
         txPlan.Hardware.Power = randomInRange(obj, txParams.Power.Min, txParams.Power.Max);
-        if regulatoryEnabled
-            txPlan.Hardware.NumAntennas = selectNumAntennasForModulation( ...
-                txParams.NumAntennas, regulatoryEmitterPlan.ModulationFamily);
-        else
-            txPlan.Hardware.NumAntennas = randi([txParams.NumAntennas.Min, txParams.NumAntennas.Max]);
-        end
-        txPlan.Hardware.AntennaGain = calculateAntennaGain(obj, txPlan.Hardware.NumAntennas);
 
         % ===== CALCULATION FLOW (Order matters!) =====
         
@@ -123,7 +119,7 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         txPlan.Spectrum.ReceiverSampleRate = obj.unifiedReceiverConfig.SampleRate;
 
         % 2. Second: Generate TEMPORAL PATTERN (need transmission duration)
-        temporalPattern = generateTemporalPattern(obj, temporalParams);
+        temporalPattern = generateTemporalPattern(obj, temporalParams, i);
         if regulatoryEnabled && isfield(regulatoryEmitterPlan, 'TemporalPattern')
             temporalPattern = applyRegulatoryTemporalPattern( ...
                 temporalPattern, regulatoryEmitterPlan.TemporalPattern);
@@ -137,10 +133,16 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         if regulatoryEnabled
             txPlan.Modulation = generateRegulatoryModulationConfig(obj, ...
                 txPlan.Spectrum.PlannedBandwidth, modParams, regulatoryEmitterPlan);
+            modulationFamily = regulatoryEmitterPlan.ModulationFamily;
         else
             txPlan.Modulation = generateModulationConfig(obj, ...
                 txPlan.Spectrum.PlannedBandwidth, modParams);
+            modulationFamily = txPlan.Modulation.Type;
         end
+        txPlan.Hardware.NumAntennas = selectNumAntennasForModulation( ...
+            txParams.NumAntennas, modulationFamily);
+        txPlan.Hardware.AntennaGain = calculateAntennaGain(obj, ...
+            txPlan.Hardware.NumAntennas);
 
         % 4. Fourth: Generate MESSAGE config (length derived from symbol rate and duration)
         txPlan.Message = generateMessageConfig(obj, ...
@@ -154,9 +156,29 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         rxConfigs, observableRange, globalLayout);
 end
 
+function velocity = requireEntityVelocity(entity, entityType)
+    % requireEntityVelocity - Production declaration in CSRD.
+    % 中文说明：requireEntityVelocity 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if ~isfield(entity, 'Velocity') || isempty(entity.Velocity) || ...
+            ~isnumeric(entity.Velocity) || numel(entity.Velocity) ~= 3 || ...
+            any(~isfinite(entity.Velocity(:)))
+        error('CSRD:Scenario:MissingEntityVelocity', ...
+            ['%s %s is missing a finite 3-element Velocity vector. ', ...
+             'PhysicalEnvironmentSimulator must publish velocity so ', ...
+             'Doppler design/execution truth is not silently zeroed.'], ...
+            entityType, char(string(entity.ID)));
+    end
+    velocity = double(entity.Velocity(:)).';
+end
+
 function params = getTransmitterParams(config)
     % getTransmitterParams - Extract transmitter parameters from config
-    
+    % 中文说明：getTransmitterParams 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+
     params = struct();
     
     % Default values
@@ -191,6 +213,9 @@ end
 
 function params = getModulationParams(config)
     % getModulationParams - Extract modulation parameters from config
+    % 中文说明：getModulationParams 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % DESIGN PRINCIPLE:
     %   - Types from config (for random selection)
@@ -211,6 +236,7 @@ function params = getModulationParams(config)
     params.DefaultOrders.FM = 1;
     params.DefaultOrders.AM = 1;
     params.MinimumModulatorSampleRateHz = 0;
+    params.OFDMMimoMode = 'OSTBC';
     
     % Get from config
     if isfield(config, 'Modulation')
@@ -228,6 +254,9 @@ function params = getModulationParams(config)
         if isfield(modConfig, 'DefaultOrders')
             params.DefaultOrders = modConfig.DefaultOrders;
         end
+        if isfield(modConfig, 'OFDMMimoMode') && ~isempty(modConfig.OFDMMimoMode)
+            params.OFDMMimoMode = char(string(modConfig.OFDMMimoMode));
+        end
     end
     if isfield(config, 'Regulatory') && isstruct(config.Regulatory) && ...
             isfield(config.Regulatory, 'MinimumModulatorSampleRateHz') && ...
@@ -241,6 +270,9 @@ end
 
 function params = getMessageParams(config)
     % getMessageParams - Extract message parameters from config
+    % 中文说明：getMessageParams 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % DESIGN PRINCIPLE:
     %   - Types from config (for random selection)
@@ -268,6 +300,9 @@ end
 
 function params = getTemporalParams(config)
     % getTemporalParams - Extract temporal behavior parameters from config
+    % 中文说明：getTemporalParams 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     
     params = struct();
     
@@ -300,7 +335,11 @@ function params = getTemporalParams(config)
     params.Random.DurationRatio.Max = 0.9;
     params.Random.NumBursts.Min = 1;
     params.Random.NumBursts.Max = 5;
-    
+
+    % Explicit pattern defaults. Intervals may be a single Nx2 matrix
+    % shared by every transmitter or a 1xNumTx cell array of Nx2 matrices.
+    params.Explicit.Intervals = [];
+
     % Override with config values
     if isfield(config, 'Global')
         if isfield(config.Global, 'ObservationDuration')
@@ -329,11 +368,17 @@ function params = getTemporalParams(config)
         if isfield(temporal, 'Random')
             params.Random = mergeStructs(params.Random, temporal.Random);
         end
+        if isfield(temporal, 'Explicit')
+            params.Explicit = mergeStructs(params.Explicit, temporal.Explicit);
+        end
     end
 end
 
 function merged = mergeStructs(base, override)
     % mergeStructs - Merge two structs, override takes precedence
+    % 中文说明：mergeStructs 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     merged = base;
     if isstruct(override)
         fields = fieldnames(override);
@@ -345,6 +390,9 @@ end
 
 function selectedType = selectTransmitterType(types)
     % selectTransmitterType - Randomly select a transmitter type
+    % 中文说明：selectTransmitterType 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isempty(types)
         selectedType = 'Simulation';
     elseif iscell(types)
@@ -356,6 +404,9 @@ end
 
 function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulationFamily)
     % selectNumAntennasForModulation - Keep hardware compatible with the
+    % 中文说明：selectNumAntennasForModulation 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     % Phase 8 service-driven modulation family before the blueprint
     % validator sees it.
     family = char(string(modulationFamily));
@@ -364,27 +415,29 @@ function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulatio
     analogOrCpm = {'FM','PM','AM','SSBAM','DSBAM','DSBSCAM','VSBAM', ...
         'FSK','MSK','CPFSK','GFSK','GMSK'};
     if ismember(family, analogOrCpm)
-        numAntennas = 1;
-        return;
-    end
-    if strcmp(family, 'OFDM')
-        if maxAnt >= 2
-            numAntennas = max(2, min(maxAnt, 2));
-        else
-            numAntennas = max(1, minAnt);
+        if minAnt > 1
+            error('CSRD:Scenario:IncompatibleAntennaModulation', ...
+                ['Modulation family %s is single-antenna in this pipeline, ', ...
+                 'but Transmitter.NumAntennas.Min=%g.'], family, minAnt);
         end
+        numAntennas = 1;
         return;
     end
     maxAllowed = min(maxAnt, 4);
     minAllowed = max(1, minAnt);
     if minAllowed > maxAllowed
-        numAntennas = 1;
-    else
-        numAntennas = randi([minAllowed, maxAllowed]);
+        error('CSRD:Scenario:InvalidTxAntennaRange', ...
+            'Transmitter.NumAntennas range [%g, %g] is incompatible with supported range [1, 4].', ...
+            minAnt, maxAnt);
     end
+    numAntennas = randi([minAllowed, maxAllowed]);
 end
 
 function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
+    % applyRegulatoryTemporalPattern - Production declaration in CSRD.
+    % 中文说明：applyRegulatoryTemporalPattern 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     recommended = char(string(temporalPattern));
     if isempty(recommended) || strcmp(recommended, pattern.Type)
         return;
@@ -415,6 +468,9 @@ end
 
 function totalDuration = calculateTotalTransmissionDuration(transmissionPattern)
     % calculateTotalTransmissionDuration - Sum up all transmission intervals
+    % 中文说明：calculateTotalTransmissionDuration 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     
     intervals = transmissionPattern.Intervals;
     if isempty(intervals) || (size(intervals, 1) == 1 && all(intervals == 0))
@@ -430,6 +486,9 @@ end
 
 function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     % generateModulationConfig - Generate modulation config from scenario params
+    % 中文说明：generateModulationConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Symbol Rate Calculation:
     %   SymbolRate = Bandwidth / (1 + RolloffFactor)
@@ -449,6 +508,7 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     % Get rolloff factor
     rolloffFactor = modParams.RolloffFactor;
     modConfig.RolloffFactor = rolloffFactor;
+    modConfig.OFDMMimoMode = modParams.OFDMMimoMode;
     
     % Calculate symbol rate from bandwidth
     modConfig.SymbolRate = bandwidth / (1 + rolloffFactor);
@@ -484,12 +544,16 @@ end
 
 function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
     % generateRegulatoryModulationConfig - Generate modulation config from a
+    % 中文说明：generateRegulatoryModulationConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     % regulatory service plan rather than from an unconstrained type list.
     modConfig = struct();
     modConfig.Type = char(string(emitterPlan.ModulationFamily));
     modConfig.Family = modConfig.Type;
     modConfig.Order = double(emitterPlan.ModulationOrder);
     modConfig.RolloffFactor = modParams.RolloffFactor;
+    modConfig.OFDMMimoMode = modParams.OFDMMimoMode;
     modConfig.SymbolRate = bandwidth / (1 + modParams.RolloffFactor);
     if isstruct(modParams.SamplesPerSymbol)
         spsMin = modParams.SamplesPerSymbol.Min;
@@ -515,6 +579,10 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
 end
 
 function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
+    % buildRegulatoryModulatorConfig - Production declaration in CSRD.
+    % 中文说明：buildRegulatoryModulatorConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
@@ -530,6 +598,7 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
             modulatorConfig.ofdm.CyclicPrefixLength = 144;
             modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.ofdm.Windowing = false;
+            modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
         case 'OQPSK'
             modulatorConfig.beta = modConfig.RolloffFactor;
             modulatorConfig.span = 10;
@@ -543,6 +612,10 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
 end
 
 function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
+    % buildLegacyModulatorConfig - Production declaration in CSRD.
+    % 中文说明：buildLegacyModulatorConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
@@ -558,6 +631,7 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             modulatorConfig.ofdm.CyclicPrefixLength = 64;
             modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.ofdm.Windowing = false;
+            modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
         case 'OTFS'
             delayLength = 512;
             subcarrierSpacing = max(15e3, ceil(bandwidth / max(1, delayLength - 8) / 1e3) * 1e3);
@@ -590,8 +664,31 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
     end
 end
 
+function mode = localValidateOFDMMimoMode(modConfig)
+    % localValidateOFDMMimoMode - Resolve the explicit OFDM spatial abstraction.
+    % 中文说明：解析 OFDM 多天线抽象，避免把 OSTBC 和独立空间流混成隐式行为。
+    % Inputs / 输入: modulation config with optional OFDMMimoMode.
+    % 输出 / Outputs: validated mode string stored in ModulatorConfig.mimo.Mode.
+    if isfield(modConfig, 'OFDMMimoMode') && ~isempty(modConfig.OFDMMimoMode)
+        mode = char(string(modConfig.OFDMMimoMode));
+    else
+        mode = 'OSTBC';
+    end
+    allowed = {'OSTBC', 'SpatialMultiplexing'};
+    idx = find(strcmpi(mode, allowed), 1, 'first');
+    if isempty(idx)
+        error('CSRD:Scenario:InvalidOFDMMimoMode', ...
+            'OFDMMimoMode must be one of {%s}; got %s.', ...
+            strjoin(allowed, ', '), mode);
+    end
+    mode = allowed{idx};
+end
+
 function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgParams)
     % generateMessageConfig - Generate message config from scenario params
+    % 中文说明：generateMessageConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Message Length Calculation:
     %   Length = SymbolRate × BitsPerSymbol × TransmissionDuration
@@ -620,6 +717,8 @@ function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgP
     
     % Clamp to bounds
     msgConfig.Length = max(lengthMin, min(lengthMax, calculatedLength));
+    msgConfig.LengthMin = lengthMin;
+    msgConfig.LengthMax = lengthMax;
     
     % Store calculation info for debugging
     msgConfig.CalculatedLength = calculatedLength;
@@ -629,6 +728,9 @@ end
 
 function order = selectModulationOrder(modType, modParams)
     % selectModulationOrder - Select modulation order based on type
+    % 中文说明：selectModulationOrder 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Orders are from scenario config DefaultOrders
     
@@ -668,8 +770,11 @@ function order = selectModulationOrder(modType, modParams)
     end
 end
 
-function pattern = generateTemporalPattern(obj, temporalParams)
+function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
     % generateTemporalPattern - Generate temporal transmission pattern
+    % 中文说明：generateTemporalPattern 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     
     pattern = struct();
     
@@ -704,7 +809,7 @@ function pattern = generateTemporalPattern(obj, temporalParams)
             pattern.StartTime = 0;
             pattern.EndTime = temporalParams.ObservationDuration;
             pattern.Intervals = [0, temporalParams.ObservationDuration];
-            
+
         case 'Burst'
             burstParams = temporalParams.Burst;
             obsDur = temporalParams.ObservationDuration;
@@ -715,7 +820,7 @@ function pattern = generateTemporalPattern(obj, temporalParams)
             offMax = min(burstParams.OffDuration.Max, obsDur * 0.5);
             delayMax = min(burstParams.InitialDelay.Max, obsDur * 0.3);
             delayMin = min(burstParams.InitialDelay.Min, delayMax);
-            
+
             pattern.OnDuration = randomInRange(obj, onMin, onMax);
             pattern.OffDuration = randomInRange(obj, offMin, offMax);
             pattern.DutyCycle = pattern.OnDuration / (pattern.OnDuration + pattern.OffDuration);
@@ -736,10 +841,65 @@ function pattern = generateTemporalPattern(obj, temporalParams)
             randomParams = temporalParams.Random;
             pattern.NumBursts = randi([randomParams.NumBursts.Min, randomParams.NumBursts.Max]);
             pattern.Intervals = generateRandomIntervals(obj, randomParams, temporalParams.ObservationDuration, pattern.NumBursts);
+
+        case 'Explicit'
+            pattern.Intervals = selectExplicitIntervals( ...
+                temporalParams.Explicit, txIndex, temporalParams.ObservationDuration);
+            pattern.NumBursts = size(pattern.Intervals, 1);
+
+        otherwise
+            error('CSRD:Scenario:UnknownTemporalPattern', ...
+                'Unsupported TemporalBehavior pattern type "%s".', ...
+                char(string(selectedType)));
+    end
+end
+
+function intervals = selectExplicitIntervals(explicitParams, txIndex, observationDuration)
+    % selectExplicitIntervals - Resolve per-transmitter explicit bursts.
+    if ~isstruct(explicitParams) || ~isfield(explicitParams, 'Intervals') || ...
+            isempty(explicitParams.Intervals)
+        error('CSRD:Scenario:MissingExplicitIntervals', ...
+            ['TemporalBehavior.Explicit.Intervals is required when ', ...
+             'PatternTypes selects Explicit.']);
+    end
+
+    raw = explicitParams.Intervals;
+    if iscell(raw)
+        if txIndex > numel(raw) || isempty(raw{txIndex})
+            error('CSRD:Scenario:MissingExplicitIntervalsForTx', ...
+                'Explicit intervals are missing for transmitter index %d.', ...
+                txIndex);
+        end
+        intervals = raw{txIndex};
+    else
+        intervals = raw;
+    end
+
+    if ~isnumeric(intervals) || size(intervals, 2) ~= 2 || ...
+            isempty(intervals) || any(~isfinite(intervals(:)))
+        error('CSRD:Scenario:InvalidExplicitIntervals', ...
+            'Explicit intervals must be a finite non-empty Nx2 numeric matrix.');
+    end
+    if any(intervals(:, 2) <= intervals(:, 1))
+        error('CSRD:Scenario:InvalidExplicitIntervals', ...
+            'Explicit intervals must have strictly positive durations.');
+    end
+    if any(intervals(:) < 0) || any(intervals(:) > observationDuration)
+        error('CSRD:Scenario:InvalidExplicitIntervals', ...
+            ['Explicit intervals must lie within [0, ObservationDuration] ', ...
+             'seconds.']);
+    end
+    if size(intervals, 1) > 1 && any(intervals(2:end, 1) < intervals(1:end-1, 2))
+        error('CSRD:Scenario:InvalidExplicitIntervals', ...
+            'Explicit intervals must be sorted and non-overlapping per transmitter.');
     end
 end
 
 function intervals = generateBurstIntervals(pattern, observationDuration)
+    % generateBurstIntervals - Production declaration in CSRD.
+    % 中文说明：generateBurstIntervals 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     intervals = [];
     t = pattern.InitialDelay;
     while t < observationDuration
@@ -756,6 +916,10 @@ function intervals = generateBurstIntervals(pattern, observationDuration)
 end
 
 function intervals = generateScheduledIntervals(pattern, observationDuration)
+    % generateScheduledIntervals - Production declaration in CSRD.
+    % 中文说明：generateScheduledIntervals 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     intervals = [];
     frameLength = pattern.SlotDuration * pattern.NumSlots;
     slotStart = (pattern.AssignedSlot - 1) * pattern.SlotDuration;
@@ -775,6 +939,10 @@ function intervals = generateScheduledIntervals(pattern, observationDuration)
 end
 
 function intervals = generateRandomIntervals(~, randomParams, observationDuration, numBursts)
+    % generateRandomIntervals - Production declaration in CSRD.
+    % 中文说明：generateRandomIntervals 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     intervals = [];
     for i = 1:numBursts
         startRatio = randomParams.StartTimeRatio.Min + rand() * (randomParams.StartTimeRatio.Max - randomParams.StartTimeRatio.Min);

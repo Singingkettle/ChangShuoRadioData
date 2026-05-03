@@ -11,10 +11,8 @@ classdef ChannelSeedBurstAwareTest < matlab.unittest.TestCase
     %   2. Same (txId, rxId, frameId) but different BurstId => different
     %      seeds. Two distinct bursts on the same link in the same frame
     %      see independent fading.
-    %   3. When BurstId is absent the implementation falls back to
-    %      "frame_<frameId>" so the legacy 1-burst-per-frame path keeps
-    %      a deterministic seed.
-    %   4. Output is a finite double in [1, 2^31 - 1].
+%   3. Missing BurstId is a contract error.
+%   4. Output is a finite double in [1, 2^31 - 1].
 
     properties
         Factory
@@ -62,27 +60,16 @@ classdef ChannelSeedBurstAwareTest < matlab.unittest.TestCase
                 'Distinct (Tx, Rx) pairs must yield distinct seeds.');
         end
 
-        function fallbackUsesFrameIdWhenBurstIdMissing(testCase)
+        function missingBurstIdFailsFast(testCase)
             link = struct();  % no BurstId
-            s1 = testCase.Factory.deriveChannelSeed(1, 'Tx1', 'Rx1', link);
-            s2 = testCase.Factory.deriveChannelSeed(2, 'Tx1', 'Rx1', link);
-            testCase.verifyNotEqual(s1, s2, ...
-                'Without BurstId the fallback must include frameId so distinct frames differ.');
-
-            % Fallback must match the documented "frame_<frameId>" formula.
-            expected = csrd.utils.hash.shortInt32Hash('Tx=Tx1|Rx=Rx1|Burst=frame_1');
-            if expected <= 0; expected = 1; end
-            testCase.verifyEqual(s1, expected, ...
-                'Fallback formula must be Tx=...|Rx=...|Burst=frame_<frameId>.');
+            testCase.verifyError(@() testCase.Factory.deriveChannelSeed( ...
+                1, 'Tx1', 'Rx1', link), 'CSRD:Channel:MissingBurstId');
         end
 
-        function fallbackUsesFrameIdWhenBurstIdEmpty(testCase)
+        function emptyBurstIdFailsFast(testCase)
             link = struct('BurstId', '');
-            s = testCase.Factory.deriveChannelSeed(7, 'Tx1', 'Rx1', link);
-            expected = csrd.utils.hash.shortInt32Hash('Tx=Tx1|Rx=Rx1|Burst=frame_7');
-            if expected <= 0; expected = 1; end
-            testCase.verifyEqual(s, expected, ...
-                'Empty BurstId must trigger the frame_<frameId> fallback.');
+            testCase.verifyError(@() testCase.Factory.deriveChannelSeed( ...
+                7, 'Tx1', 'Rx1', link), 'CSRD:Channel:MissingBurstId');
         end
 
         function seedRangeIsValid(testCase)

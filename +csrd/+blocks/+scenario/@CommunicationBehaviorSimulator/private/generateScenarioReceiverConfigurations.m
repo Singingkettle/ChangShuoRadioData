@@ -1,5 +1,6 @@
 function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
     % generateScenarioReceiverConfigurations - Generate unified receiver configurations
+    % 中文说明：提供 CSRD 生产链路中的 generateScenarioReceiverConfigurations 实现。
     %
     % DESIGN PRINCIPLE:
     %   All spectrum monitoring receivers share the SAME unified configuration.
@@ -25,6 +26,8 @@ function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
 
         % Physical group
         rxPlan.Physical.Position = receiver.Position;
+        rxPlan.Physical.Velocity = requireEntityVelocity(receiver, ...
+            'Receiver');
 
         % Hardware group (unified for all receivers)
         rxPlan.Hardware.Type = unifiedConfig.Type;
@@ -55,4 +58,21 @@ function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
 
     obj.logger.debug('Scenario: All %d receivers configured with unified sample rate %.1f MHz', ...
         length(receivers), unifiedConfig.SampleRate / 1e6);
+end
+
+function velocity = requireEntityVelocity(entity, entityType)
+    % requireEntityVelocity - Production declaration in CSRD.
+    % 中文说明：requireEntityVelocity 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if ~isfield(entity, 'Velocity') || isempty(entity.Velocity) || ...
+            ~isnumeric(entity.Velocity) || numel(entity.Velocity) ~= 3 || ...
+            any(~isfinite(entity.Velocity(:)))
+        error('CSRD:Scenario:MissingEntityVelocity', ...
+            ['%s %s is missing a finite 3-element Velocity vector. ', ...
+             'PhysicalEnvironmentSimulator must publish velocity so ', ...
+             'Doppler design/execution truth is not silently zeroed.'], ...
+            entityType, char(string(entity.ID)));
+    end
+    velocity = double(entity.Velocity(:)).';
 end

@@ -1,5 +1,8 @@
 function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalSegments, TxInfos, RxInfos)
     % processChannelPropagation - Apply channel effects to transmitted signals
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processChannelPropagation 实现。
     %
     % This method processes all transmitter-receiver pairs through the channel model.
     %
@@ -91,6 +94,14 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     channelLinkInfo.RxScenarioConfig = rxScenarioConfig;
                     channelLinkInfo.MapProfile = scenarioMapProfile;
                     channelLinkInfo.ChannelModel = resolveChannelModelFromScenario(channelLinkInfo.MapProfile);
+                    if isfield(segmentSignal, 'BurstId') && ~isempty(segmentSignal.BurstId)
+                        channelLinkInfo.BurstId = segmentSignal.BurstId;
+                    else
+                        error('CSRD:Construction:MissingBurstId', ...
+                            ['Frame %d, TxID %s, RxID %s, Segment %d: ', ...
+                             'segmentSignal.BurstId is required before channel propagation.'], ...
+                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
+                    end
 
                     % Apply channel effects using ChannelFactory
                     channelOutput = step(obj.Factories.Channel, channelInputStruct, ...
@@ -101,7 +112,16 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     if isfield(segmentSignal, 'SegmentId') && ~isempty(segmentSignal.SegmentId)
                         component.SegmentId = segmentSignal.SegmentId;
                     else
-                        component.SegmentId = segIdx;
+                        component.SegmentId = sprintf('%s.Seg%03d', ...
+                            char(string(txInfo.ID)), segIdx);
+                    end
+                    if isfield(segmentSignal, 'BurstId') && ~isempty(segmentSignal.BurstId)
+                        component.BurstId = segmentSignal.BurstId;
+                    else
+                        error('CSRD:Construction:MissingBurstId', ...
+                            ['Frame %d, TxID %s, RxID %s, Segment %d: ', ...
+                             'segmentSignal.BurstId is required for component annotation.'], ...
+                            FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
                     end
                     % Phase 3 (§3.2.C): single source of truth for the
                     % component SampleRate is `channelOutput.SampleRate`.
@@ -136,6 +156,9 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     [component.Signal, component.DopplerShiftHz, ...
                      component.RadialVelocityMps] = applyDopplerForComponent( ...
                         channelOutput, txInfo, rxInfo);
+                    component = csrd.pipeline.signal.gateToDuration( ...
+                        component, localComponentDurationSec(segmentSignal), ...
+                        'ChannelOutput');
                     % Phase 3 (audit §3.1.ter A / phase-3-construction.md §3.1):
                     % the per-(Tx,Rx) component MUST carry the
                     % receiver-baseband ProjectedCenterOffsetHz from
@@ -188,6 +211,26 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                         component.StartTime = segmentSignal.StartTime;
                     else
                         component.StartTime = 0;
+                    end
+                    if isfield(segmentSignal, 'FrameRelativeStartTime')
+                        component.FrameRelativeStartTime = ...
+                            segmentSignal.FrameRelativeStartTime;
+                    else
+                        component.FrameRelativeStartTime = component.StartTime;
+                    end
+                    if isfield(segmentSignal, 'FrameRelativeEndTime')
+                        component.FrameRelativeEndTime = ...
+                            segmentSignal.FrameRelativeEndTime;
+                    elseif isfield(segmentSignal, 'Duration')
+                        component.FrameRelativeEndTime = ...
+                            component.FrameRelativeStartTime + segmentSignal.Duration;
+                    else
+                        component.FrameRelativeEndTime = ...
+                            component.FrameRelativeStartTime + ...
+                            size(component.Signal, 1) / component.SampleRate;
+                    end
+                    if isfield(segmentSignal, 'FrameWindow')
+                        component.FrameWindow = segmentSignal.FrameWindow;
                     end
                     % Phase 3 (§3.2.C / §3.4 D8 / audit §3.1.ter A):
                     % `component.Planned` is the modulator-side planning
@@ -259,7 +302,7 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                 % Scenario-level identifiers must propagate up to
                 % SimulationRunner so that the offending scenario can be
                 % skipped instead of producing a half-corrupted frame.
-                if csrd.utils.scenario.isScenarioSkipException(ME_channel)
+                if csrd.pipeline.scenario.isScenarioSkipException(ME_channel)
                     rethrow(ME_channel);
                 end
                 rethrow(ME_channel);
@@ -270,7 +313,30 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
     obj.logger.debug("Frame %d: Channel propagation complete.", FrameId);
 end
 
+function durationSec = localComponentDurationSec(segmentSignal)
+    if isfield(segmentSignal, 'FrameRelativeStartTime') && ...
+            isfield(segmentSignal, 'FrameRelativeEndTime') && ...
+            ~isempty(segmentSignal.FrameRelativeStartTime) && ...
+            ~isempty(segmentSignal.FrameRelativeEndTime)
+        durationSec = double(segmentSignal.FrameRelativeEndTime) - ...
+            double(segmentSignal.FrameRelativeStartTime);
+    elseif isfield(segmentSignal, 'Duration') && ~isempty(segmentSignal.Duration)
+        durationSec = double(segmentSignal.Duration);
+    else
+        error('CSRD:Signal:MissingComponentDuration', ...
+            'Channel component is missing Duration/FrameRelative time fields.');
+    end
+    if durationSec < 0 || ~isfinite(durationSec)
+        error('CSRD:Signal:InvalidComponentDuration', ...
+            'Channel component duration must be finite and non-negative.');
+    end
+end
+
 function mapProfile = getMapProfileFromLayout(layout)
+    % getMapProfileFromLayout - Production declaration in CSRD.
+    % 中文说明：getMapProfileFromLayout 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     mapProfile = struct();
     if isfield(layout, 'Environment')
         env = layout.Environment;
@@ -282,6 +348,10 @@ function mapProfile = getMapProfileFromLayout(layout)
     end
 end
 function channelModel = resolveChannelModelFromScenario(mapProfile)
+    % resolveChannelModelFromScenario - Production declaration in CSRD.
+    % 中文说明：resolveChannelModelFromScenario 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     channelModel = '';
     if isstruct(mapProfile) && isfield(mapProfile, 'ChannelModel')
         channelModel = mapProfile.ChannelModel;
@@ -290,6 +360,10 @@ end
 
 function [shiftedSignal, dopplerHz, radialVelMps] = ...
         applyDopplerForComponent(channelOutput, txInfo, rxInfo)
+    % applyDopplerForComponent - Apply external Doppler when the channel did not.
+    % 中文说明：当信道模块未内部处理多普勒时，基于 Tx/Rx 相对速度补偿当前链路信号。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     % Phase 4 (§3.2.B): channel-type whitelist gate. If the channel block
     % already honoured Tx/Rx velocity internally (e.g. a future
     % phased.FreeSpace/Doppler-aware variant), it MUST set
@@ -336,6 +410,9 @@ end
 
 function bwHz = measureModulatedBandwidth(segmentSignal)
     %MEASUREMODULATEDBANDWIDTH OBW of clean modulator output.
+    % 中文说明：measureModulatedBandwidth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Phase 4 §3.4 promotes `Truth.Execution.ModulatedBandwidthHz` from
     % the modulator's analytical formula scalar to a real measurement on
@@ -373,7 +450,7 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
     end
 
     try
-        bwHz = csrd.utils.measurement.obwActual( ...
+        bwHz = csrd.pipeline.measurement.obwActual( ...
             sig, double(segmentSignal.SampleRate));
     catch
         bwHz = NaN;
@@ -382,6 +459,9 @@ end
 
 function bwHz = coerceScalarBandwidth(rawBw)
     %COERCESCALARBANDWIDTH Normalise a [lo,hi] / scalar BW field to Hz.
+    % 中文说明：coerceScalarBandwidth 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     %   The legacy modulator API stored bandwidth as `[lo, hi]`; some
     %   factories already collapse to a scalar. We accept either and

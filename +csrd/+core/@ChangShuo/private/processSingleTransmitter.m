@@ -1,5 +1,8 @@
 function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, txIdx)
     % processSingleTransmitter - Process a single transmitter configuration
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processSingleTransmitter 实现。
     %
     % This method handles the complete processing of one transmitter including
     % configuration validation, message generation, and modulation for all segments.
@@ -72,8 +75,4 @@ function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, 
 
     % Process only active segments for this transmitter
     signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentTxScenario, currentTxId);
-
-    % Update antenna configuration based on modulator output.
-    % Must reassign TxInfo because MATLAB structs are passed by value.
-    TxInfo = updateTransmitterAntennaConfig(obj, FrameId, currentTxId, signalSegmentsPerTx, TxInfo);
 end

@@ -1,5 +1,6 @@
 function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
     %BUILDSEGMENTCONFIGFROMTXSCENARIO Phase 3 strict-construction segment builder.
+    % 中文说明：提供 CSRD 生产链路中的 buildSegmentConfigFromTxScenario 实现。
     %
     %   segmentConfig = csrd.core.ChangShuo.buildSegmentConfigFromTxScenario( ...
     %       txScenario, segIdx)
@@ -37,6 +38,27 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
 
     startTime = intervals(segIdx, 1);
     endTime = intervals(segIdx, 2);
+    originalStartTime = startTime;
+    originalEndTime = endTime;
+
+    frameWindow = [0, 0];
+    if isfield(txScenario, 'TransmissionState') && ...
+            isstruct(txScenario.TransmissionState) && ...
+            isfield(txScenario.TransmissionState, 'FrameWindow') && ...
+            numel(txScenario.TransmissionState.FrameWindow) >= 2
+        frameWindow = double(txScenario.TransmissionState.FrameWindow(1:2));
+    end
+    if isfield(txScenario, 'TransmissionState') && ...
+            isstruct(txScenario.TransmissionState) && ...
+            isfield(txScenario.TransmissionState, 'ActiveIntervals') && ...
+            size(txScenario.TransmissionState.ActiveIntervals, 1) >= 1
+        activePositions = find(double(txScenario.TransmissionState.ActiveIntervalIndices(:)) == segIdx, 1, 'first');
+        if ~isempty(activePositions)
+            clipped = double(txScenario.TransmissionState.ActiveIntervals(activePositions, :));
+            startTime = clipped(1);
+            endTime = clipped(2);
+        end
+    end
     duration = endTime - startTime;
 
     % --- Message ---------------------------------------------------------
@@ -108,6 +130,23 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
     else
         segmentConfig.Modulation.TypeID = txScenario.Modulation.TypeID;
     end
+    segmentConfig.Message.Duration = duration;
+    segmentConfig.Message.Length = localPerSegmentMessageLength( ...
+        txScenario.Message, txScenario.Modulation, duration);
+    segmentConfig.Message.LengthDerivation = 'PerSegmentDuration';
+    if ~isfield(txScenario, 'Hardware') || ~isstruct(txScenario.Hardware) || ...
+            ~isfield(txScenario.Hardware, 'NumAntennas') || ...
+            isempty(txScenario.Hardware.NumAntennas) || ...
+            ~isnumeric(txScenario.Hardware.NumAntennas) || ...
+            ~isscalar(txScenario.Hardware.NumAntennas) || ...
+            txScenario.Hardware.NumAntennas <= 0
+        error('CSRD:Construction:MissingTxNumAntennas', ...
+            ['buildSegmentConfigFromTxScenario: txScenario.Hardware.NumAntennas ', ...
+             'is required so the modulator, channel, and annotation share ', ...
+             'the same Tx antenna count.']);
+    end
+    segmentConfig.Modulation.NumTransmitAntennas = ...
+        double(txScenario.Hardware.NumAntennas);
 
     % --- Placement -------------------------------------------------------
     % Phase 3 (audit §3.1.ter A / phase-3-construction.md §3.1):
@@ -123,6 +162,13 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
     segmentConfig.Placement = struct();
     segmentConfig.Placement.StartTime = startTime;
     segmentConfig.Placement.Duration = duration;
+    segmentConfig.Placement.EndTime = endTime;
+    segmentConfig.Placement.OriginalStartTime = originalStartTime;
+    segmentConfig.Placement.OriginalEndTime = originalEndTime;
+    segmentConfig.Placement.FrameWindow = frameWindow;
+    segmentConfig.Placement.FrameRelativeStartTime = max(0, startTime - frameWindow(1));
+    segmentConfig.Placement.FrameRelativeEndTime = max( ...
+        segmentConfig.Placement.FrameRelativeStartTime, endTime - frameWindow(1));
 
     if ~isfield(txScenario, 'ReceiverViews') || isempty(txScenario.ReceiverViews) ...
             || ~isstruct(txScenario.ReceiverViews) ...
@@ -150,4 +196,34 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
              'is required (received empty / non-positive).']);
     end
     segmentConfig.Placement.TargetBandwidth = txScenario.Spectrum.PlannedBandwidth;
+end
+
+function lengthBits = localPerSegmentMessageLength(messageConfig, modulationConfig, durationSec)
+    % localPerSegmentMessageLength - Derive payload bits from this segment.
+    if isfield(messageConfig, 'LengthMin') && ~isempty(messageConfig.LengthMin)
+        lengthMin = double(messageConfig.LengthMin);
+    else
+        lengthMin = double(messageConfig.Length);
+    end
+    if isfield(messageConfig, 'LengthMax') && ~isempty(messageConfig.LengthMax)
+        lengthMax = double(messageConfig.LengthMax);
+    else
+        lengthMax = double(messageConfig.Length);
+    end
+    if lengthMax < lengthMin
+        error('CSRD:Construction:InvalidMessageLengthBounds', ...
+            'Message length bounds must satisfy LengthMin <= LengthMax.');
+    end
+    if ~isfield(modulationConfig, 'BitsPerSymbol') || ...
+            isempty(modulationConfig.BitsPerSymbol) || ...
+            ~isnumeric(modulationConfig.BitsPerSymbol) || ...
+            modulationConfig.BitsPerSymbol <= 0
+        error('CSRD:Construction:MissingModulationBitsPerSymbol', ...
+            ['Modulation.BitsPerSymbol is required to derive per-segment ', ...
+             'message length. Do not fall back to 1 bit/symbol.']);
+    end
+    bitsPerSymbol = double(modulationConfig.BitsPerSymbol);
+    calculatedLength = ceil(double(modulationConfig.SymbolRate) * ...
+        bitsPerSymbol * double(durationSec) * 1.1);
+    lengthBits = max(lengthMin, min(lengthMax, calculatedLength));
 end

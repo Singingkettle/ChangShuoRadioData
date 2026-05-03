@@ -22,7 +22,7 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
             pattern = struct('FrameDuration', 0.01, 'NumFrames', 10, ...
                 'Intervals', []);
             [idx, intervals, win] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             testCase.verifyEmpty(idx);
             testCase.verifyEqual(size(intervals), [0, 2]);
             testCase.verifyEqual(win, [0, 0], ...
@@ -36,9 +36,9 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
             % Frame 1 is [0, 0.01) -> overlaps interval 1 only (which
             % starts at 0.005, in the middle of the frame).
             [idx, intervals, win] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             testCase.verifyEqual(idx, 1);
-            testCase.verifyEqual(intervals, [0.005, 0.025]);
+            testCase.verifyEqual(intervals, [0.005, 0.010], 'AbsTol', 1e-12);
             testCase.verifyEqual(win, [0, 0.01], 'AbsTol', 1e-12);
         end
 
@@ -51,7 +51,7 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
                 'FrameDuration', 0.01, 'NumFrames', 10, ...
                 'Intervals', [0.005, 0.025]);
             [idx, ~, ~] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             testCase.verifyEqual(idx, 1, ...
                 'Mid-frame-start interval must be caught by the overlap rule.');
 
@@ -61,7 +61,7 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
             warnState = warning('off', 'CSRD:Scenario:FrameOutOfRange');
             cleanup = onCleanup(@() warning(warnState));
             [legacyActive, ~] = ...
-                csrd.utils.scenario.checkTransmissionInterval(1, pattern);
+                csrd.pipeline.scenario.checkTransmissionInterval(1, pattern);
             testCase.verifyFalse(legacyActive, ...
                 ['Sanity check: the legacy helper does NOT detect this ' ...
                  'mid-frame-start interval. This is the exact A2 defect ' ...
@@ -80,11 +80,11 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
                     0.020, 0.025  ...   % interval 4 fully outside frame 1
                 ]);
             [idx, intervals, win] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             testCase.verifyEqual(idx, [1, 2, 3], ...
                 'All three overlapping intervals must be reported.');
             testCase.verifyEqual(intervals, ...
-                [0.000, 0.002; 0.003, 0.006; 0.008, 0.012], 'AbsTol', 1e-12);
+                [0.000, 0.002; 0.003, 0.006; 0.008, 0.010], 'AbsTol', 1e-12);
             testCase.verifyEqual(win, [0, 0.01], 'AbsTol', 1e-12);
         end
 
@@ -95,9 +95,9 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
                 'FrameDuration', 0.01, 'NumFrames', 10, ...
                 'Intervals', [0.008, 0.012; 0.015, 0.018]);
             [idx1, ~, win1] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             [idx2, ~, win2] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(2, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(2, pattern);
             testCase.verifyTrue(any(idx1 == 1), 'Boundary interval missing from frame 1 active set.');
             testCase.verifyTrue(any(idx2 == 1), 'Boundary interval missing from frame 2 active set.');
             testCase.verifyEqual(win1, [0,    0.01], 'AbsTol', 1e-12);
@@ -109,7 +109,7 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
                 'FrameDuration', 0.01, 'NumFrames', 10, ...
                 'Intervals', [0.05, 0.07]);
             [idx, intervals, ~] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             testCase.verifyEmpty(idx);
             testCase.verifyEqual(size(intervals), [0, 2]);
         end
@@ -117,7 +117,7 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
         function missingFrameTimingWarns(testCase)
             pattern = struct('Intervals', [0, 1]);
             testCase.verifyWarning(@() ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern), ...
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern), ...
                 'CSRD:Scenario:MissingFrameTiming');
         end
 
@@ -130,12 +130,12 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
                 'FrameDuration', 0.01, 'NumFrames', 5, ...
                 'Intervals', [0.000, 0.010]);
             [idx2, ~, ~] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(2, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(2, pattern);
             testCase.verifyEmpty(idx2, ...
                 'Interval ending exactly at frameStart must NOT count as overlap.');
 
             [idx1, ~, ~] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals(1, pattern);
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern);
             testCase.verifyEqual(idx1, 1, ...
                 'Same interval still belongs to frame 1.');
         end

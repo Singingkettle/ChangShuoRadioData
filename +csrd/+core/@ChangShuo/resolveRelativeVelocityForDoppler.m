@@ -1,6 +1,9 @@
 function [relativeVelocityMps, txVelocityMps, rxVelocityMps] = ...
         resolveRelativeVelocityForDoppler(txInfo, rxInfo)
     %RESOLVERELATIVEVELOCITYFORDOPPLER Resolve Tx/Rx relative velocity.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 resolveRelativeVelocityForDoppler 实现。
     %
     %   Doppler is driven by relative motion along the Tx-to-Rx line of
     %   sight. applyDopplerShift assumes its velocity input has already
@@ -14,6 +17,10 @@ end
 
 
 function velocity = localVelocityOrZero(info, context)
+    % localVelocityOrZero - Production declaration in CSRD.
+    % 中文说明：localVelocityOrZero 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isstruct(info) || ~isfield(info, 'Velocity') || isempty(info.Velocity)
         velocity = [0, 0, 0];
         return;

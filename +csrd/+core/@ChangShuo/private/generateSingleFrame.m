@@ -1,5 +1,8 @@
 function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
     % generateSingleFrame - Generate data for a single frame (refactored)
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 generateSingleFrame 实现。
     %
     % This method orchestrates the complete frame generation process by calling
     % specialized private methods for each major processing stage. This modular
@@ -79,7 +82,7 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         obj.logger.debug("Scenario frame %d: Single frame generation completed successfully.", FrameId);
 
     catch ME
-        if csrd.utils.scenario.isScenarioSkipException(ME)
+        if csrd.pipeline.scenario.isScenarioSkipException(ME)
             rethrow(ME);
         end
         obj.logger.error("Scenario frame %d: Error during frame generation: %s", FrameId, ME.message);

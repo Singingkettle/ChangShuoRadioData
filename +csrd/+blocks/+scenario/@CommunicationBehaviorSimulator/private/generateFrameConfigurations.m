@@ -1,5 +1,6 @@
 function [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj, frameId, entities)
     % generateFrameConfigurations - Generate frame-specific configurations
+    % 中文说明：提供 CSRD 生产链路中的 generateFrameConfigurations 实现。
     %
     % Creates frame-specific configurations by copying the fixed scenario
     % configurations and updating only the temporal/transmission state parameters.
@@ -102,6 +103,9 @@ end
 
 function [idx, entity] = findEntityById(entities, entityId)
     % findEntityById - Find entity by its ID
+    % 中文说明：findEntityById 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     idx = 0;
     entity = [];
     for i = 1:length(entities)
@@ -115,6 +119,9 @@ end
 
 function entity = updateEntityTemporalSnapshot(obj, entity, frameId, txConfig)
     % updateEntityTemporalSnapshot - Update entity's temporal state in Snapshot
+    % 中文说明：updateEntityTemporalSnapshot 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % This updates the entity's Snapshot with current frame's temporal state.
     % Note: Entity Snapshots are managed by reference (shared with PhysicalEnv).
@@ -159,6 +166,9 @@ end
 
 function snapshot = getOrCreateSnapshot(entity, frameId)
     % getOrCreateSnapshot - Get snapshot for frame or create new one
+    % 中文说明：getOrCreateSnapshot 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     
     if length(entity.Snapshots) >= frameId && ~isempty(entity.Snapshots{frameId})
         snapshot = entity.Snapshots{frameId};

@@ -1,5 +1,8 @@
 function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalSegments, TxInfos)
     % processTransmitImpairments - Apply transmitter frontend impairments
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processTransmitImpairments 实现。
     %
     % This method applies transmitter RF frontend impairments to all signal segments
     % using the TransmitFactory.
@@ -54,8 +57,12 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
                                 continue;
                             end
 
-                            txsSignalSegments{txIdx}{segIdx} = step(obj.Factories.Transmit, ...
+                            txOut = step(obj.Factories.Transmit, ...
                                 segSignal, FrameId, currentTxInfo, txScenarioConfig);
+                            txOut = csrd.pipeline.signal.gateToDuration( ...
+                                txOut, localSegmentDurationSec(txOut), ...
+                                'TransmitOutput');
+                            txsSignalSegments{txIdx}{segIdx} = txOut;
 
                         end
 
@@ -72,4 +79,23 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
     end
 
     obj.logger.debug("Frame %d: Transmit impairment stage complete.", FrameId);
+end
+
+function durationSec = localSegmentDurationSec(segSignal)
+    if isfield(segSignal, 'FrameRelativeStartTime') && ...
+            isfield(segSignal, 'FrameRelativeEndTime') && ...
+            ~isempty(segSignal.FrameRelativeStartTime) && ...
+            ~isempty(segSignal.FrameRelativeEndTime)
+        durationSec = double(segSignal.FrameRelativeEndTime) - ...
+            double(segSignal.FrameRelativeStartTime);
+    elseif isfield(segSignal, 'Duration') && ~isempty(segSignal.Duration)
+        durationSec = double(segSignal.Duration);
+    else
+        error('CSRD:Signal:MissingSegmentDuration', ...
+            'Segment signal is missing Duration/FrameRelative time fields.');
+    end
+    if durationSec < 0 || ~isfinite(durationSec)
+        error('CSRD:Signal:InvalidSegmentDuration', ...
+            'Segment duration must be finite and non-negative.');
+    end
 end

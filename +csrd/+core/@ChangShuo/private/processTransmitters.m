@@ -1,5 +1,8 @@
 function [txsSignalSegments, TxInfos] = processTransmitters(obj, FrameId, numTxThisFrame)
     %PROCESSTRANSMITTERS Phase 3 strict-construction transmitter fan-out.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processTransmitters 实现。
     %
     %   Iterates every transmitter scheduled for FrameId and dispatches to
     %   processSingleTransmitter. Phase 3 (audit §3.4 / §17.5 P3-6) removed
@@ -7,7 +10,7 @@ function [txsSignalSegments, TxInfos] = processTransmitters(obj, FrameId, numTxT
     %   `Status='Error_TransmitterProcessing'` sentinel and an empty signal
     %   segments cell. Errors now propagate to generateSingleFrame, which
     %   routes scenario-skip identifiers (see
-    %   csrd.utils.scenario.isScenarioSkipException) up to SimulationRunner
+    %   csrd.pipeline.scenario.isScenarioSkipException) up to SimulationRunner
     %   and turns truly unexpected crashes into a hard frame-level failure.
     %
     %   The skip-vs-crash contract is intentionally identical to the one in
@@ -24,7 +27,7 @@ function [txsSignalSegments, TxInfos] = processTransmitters(obj, FrameId, numTxT
             [txsSignalSegments{txIdx}, TxInfos{txIdx}] = ...
                 processSingleTransmitter(obj, FrameId, txIdx);
         catch ME_tx
-            if csrd.utils.scenario.isScenarioSkipException(ME_tx)
+            if csrd.pipeline.scenario.isScenarioSkipException(ME_tx)
                 rethrow(ME_tx);
             end
             obj.logger.error("Frame %d, Tx Index %d: Error processing transmitter: %s", ...

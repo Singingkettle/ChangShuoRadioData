@@ -1,5 +1,8 @@
 function TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentTxId)
     % setupTransmitterInfo - Setup transmitter information structure
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 setupTransmitterInfo 实现。
     %
     % This method creates and configures the transmitter information structure
     % including antenna configuration and site parameters.
@@ -15,41 +18,42 @@ function TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentT
     TxInfo = struct();
     TxInfo.ID = currentTxId;
 
-    % Physical group
-    if isfield(currentTxScenario, 'Physical') && isfield(currentTxScenario.Physical, 'Position')
-        TxInfo.Position = currentTxScenario.Physical.Position;
-    else
-        TxInfo.Position = [0, 0, 50];
-    end
-    if isfield(currentTxScenario, 'Physical') && isfield(currentTxScenario.Physical, 'Velocity')
-        TxInfo.Velocity = currentTxScenario.Physical.Velocity;
-    else
-        TxInfo.Velocity = [0, 0, 0];
-    end
+    requireStructField(currentTxScenario, 'Physical', ...
+        'CSRD:Construction:TxMissingPhysical', FrameId, currentTxId);
+    requireNumericVector(currentTxScenario.Physical, 'Position', 3, ...
+        'CSRD:Construction:TxMissingPhysical', FrameId, currentTxId);
+    requireNumericVector(currentTxScenario.Physical, 'Velocity', 3, ...
+        'CSRD:Construction:TxMissingPhysical', FrameId, currentTxId);
+    TxInfo.Position = double(currentTxScenario.Physical.Position(:)).';
+    TxInfo.Velocity = double(currentTxScenario.Physical.Velocity(:)).';
 
     % Hardware group
-    if isfield(currentTxScenario, 'Hardware')
-        hw = currentTxScenario.Hardware;
-        TxInfo.Type = getFieldOrDefault(hw, 'Type', 'Simulation');
-        TxInfo.Power = getFieldOrDefault(hw, 'Power', 20);
-        TxInfo.NumTransmitAntennas = getFieldOrDefault(hw, 'NumAntennas', 2);
-        TxInfo.AntennaGain = getFieldOrDefault(hw, 'AntennaGain', 3);
-    else
-        TxInfo.Type = 'Simulation';
-        TxInfo.Power = 20;
-        TxInfo.NumTransmitAntennas = 2;
-        TxInfo.AntennaGain = 3;
-    end
+    requireStructField(currentTxScenario, 'Hardware', ...
+        'CSRD:Construction:TxMissingHardware', FrameId, currentTxId);
+    hw = currentTxScenario.Hardware;
+    requireAnyField(hw, 'Type', ...
+        'CSRD:Construction:TxMissingHardware', FrameId, currentTxId);
+    requireFiniteScalar(hw, 'Power', ...
+        'CSRD:Construction:TxMissingHardware', FrameId, currentTxId);
+    requirePositiveIntegerScalar(hw, 'NumAntennas', ...
+        'CSRD:Construction:TxMissingHardware', FrameId, currentTxId);
+    requireFiniteScalar(hw, 'AntennaGain', ...
+        'CSRD:Construction:TxMissingHardware', FrameId, currentTxId);
+    TxInfo.Type = hw.Type;
+    TxInfo.Power = double(hw.Power);
+    TxInfo.NumTransmitAntennas = double(hw.NumAntennas);
+    TxInfo.AntennaGain = double(hw.AntennaGain);
 
     % Spectrum group
-    if isfield(currentTxScenario, 'Spectrum')
-        spec = currentTxScenario.Spectrum;
-        TxInfo.FrequencyOffset = getFieldOrDefault(spec, 'PlannedFreqOffset', 0);
-        TxInfo.Bandwidth = getFieldOrDefault(spec, 'PlannedBandwidth', 10e6);
-    else
-        TxInfo.FrequencyOffset = 0;
-        TxInfo.Bandwidth = 10e6;
-    end
+    requireStructField(currentTxScenario, 'Spectrum', ...
+        'CSRD:Construction:TxMissingSpectrum', FrameId, currentTxId);
+    spec = currentTxScenario.Spectrum;
+    requireFiniteScalar(spec, 'PlannedFreqOffset', ...
+        'CSRD:Construction:TxMissingSpectrum', FrameId, currentTxId);
+    requirePositiveScalar(spec, 'PlannedBandwidth', ...
+        'CSRD:Construction:TxMissingSpectrum', FrameId, currentTxId);
+    TxInfo.FrequencyOffset = double(spec.PlannedFreqOffset);
+    TxInfo.Bandwidth = double(spec.PlannedBandwidth);
 
     % Temporal group
     if isfield(currentTxScenario, 'Temporal')
@@ -69,10 +73,81 @@ function TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentT
 
 end
 
-function val = getFieldOrDefault(s, fieldName, default)
-    if isfield(s, fieldName)
-        val = s.(fieldName);
-    else
-        val = default;
+function requireStructField(s, fieldName, errId, FrameId, txId)
+    % requireStructField - Production declaration in CSRD.
+    % 中文说明：requireStructField 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if ~isfield(s, fieldName) || ~isstruct(s.(fieldName))
+        error(errId, ...
+            'Frame %d, TxID %s: transmitter plan must include struct field %s.', ...
+            FrameId, char(string(txId)), fieldName);
+    end
+end
+
+function requireAnyField(s, fieldName, errId, FrameId, txId)
+    % requireAnyField - Production declaration in CSRD.
+    % 中文说明：requireAnyField 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if ~isfield(s, fieldName) || isempty(s.(fieldName))
+        error(errId, ...
+            'Frame %d, TxID %s: transmitter plan missing %s.', ...
+            FrameId, char(string(txId)), fieldName);
+    end
+end
+
+function requireFiniteScalar(s, fieldName, errId, FrameId, txId)
+    % requireFiniteScalar - Production declaration in CSRD.
+    % 中文说明：requireFiniteScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    requireAnyField(s, fieldName, errId, FrameId, txId);
+    value = s.(fieldName);
+    if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
+        error(errId, ...
+            'Frame %d, TxID %s: %s must be a finite scalar.', ...
+            FrameId, char(string(txId)), fieldName);
+    end
+end
+
+function requirePositiveScalar(s, fieldName, errId, FrameId, txId)
+    % requirePositiveScalar - Production declaration in CSRD.
+    % 中文说明：requirePositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    requireFiniteScalar(s, fieldName, errId, FrameId, txId);
+    if s.(fieldName) <= 0
+        error(errId, ...
+            'Frame %d, TxID %s: %s must be positive.', ...
+            FrameId, char(string(txId)), fieldName);
+    end
+end
+
+function requirePositiveIntegerScalar(s, fieldName, errId, FrameId, txId)
+    % requirePositiveIntegerScalar - Production declaration in CSRD.
+    % 中文说明：requirePositiveIntegerScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    requirePositiveScalar(s, fieldName, errId, FrameId, txId);
+    if abs(s.(fieldName) - round(s.(fieldName))) > 0
+        error(errId, ...
+            'Frame %d, TxID %s: %s must be a positive integer.', ...
+            FrameId, char(string(txId)), fieldName);
+    end
+end
+
+function requireNumericVector(s, fieldName, expectedNumel, errId, FrameId, txId)
+    % requireNumericVector - Production declaration in CSRD.
+    % 中文说明：requireNumericVector 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    requireAnyField(s, fieldName, errId, FrameId, txId);
+    value = s.(fieldName);
+    if ~isnumeric(value) || numel(value) ~= expectedNumel || ...
+            any(~isfinite(value(:)))
+        error(errId, ...
+            'Frame %d, TxID %s: %s must be a finite %d-element vector.', ...
+            FrameId, char(string(txId)), fieldName, expectedNumel);
     end
 end

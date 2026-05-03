@@ -1,5 +1,8 @@
 function setupImpl(obj)
     % setupImpl - Initialize communication behavior modeling systems
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 setupImpl 实现。
     %
     % TWO-PHASE ARCHITECTURE:
     %   Phase 1 (here in setupImpl):
@@ -14,11 +17,12 @@ function setupImpl(obj)
     %   All spectrum monitoring receivers share the SAME unified configuration.
     %   This simplifies spectrum sensing algorithm design by removing device heterogeneity.
 
-    obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+    obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
     obj.logger.debug('CommunicationBehaviorSimulator setup starting...');
 
     % Initialize default configuration if not provided
-    if isempty(obj.Config) || ~isstruct(obj.Config)
+    if isempty(obj.Config) || ~isstruct(obj.Config) || ...
+            isempty(fieldnames(obj.Config))
         obj.Config = getDefaultConfiguration(obj);
     end
 
@@ -44,6 +48,9 @@ end
 
 function unifiedConfig = initializeUnifiedReceiverConfig(obj)
     % initializeUnifiedReceiverConfig - Create unified receiver configuration
+    % 中文说明：initializeUnifiedReceiverConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     %
     % Reads configuration from obj.Config.Receiver and creates a single
     % unified configuration that all receivers will share.
@@ -66,14 +73,8 @@ function unifiedConfig = initializeUnifiedReceiverConfig(obj)
         end
 
         if isfield(rxConfig, 'SampleRate')
-            % Handle both single value and Min/Max struct for backward compatibility
-            if isstruct(rxConfig.SampleRate)
-                % Old format: randomly select within range (but we prefer single value now)
-                unifiedConfig.SampleRate = rxConfig.SampleRate.Min + ...
-                    rand() * (rxConfig.SampleRate.Max - rxConfig.SampleRate.Min);
-            else
-                unifiedConfig.SampleRate = rxConfig.SampleRate;
-            end
+            unifiedConfig.SampleRate = requirePositiveScalar( ...
+                rxConfig.SampleRate, 'Receiver.SampleRate');
         end
 
         if isfield(rxConfig, 'CenterFrequency')
@@ -85,15 +86,41 @@ function unifiedConfig = initializeUnifiedReceiverConfig(obj)
         end
 
         if isfield(rxConfig, 'NumAntennas')
-            % Handle both single value and Min/Max struct for backward compatibility
-            if isstruct(rxConfig.NumAntennas)
-                unifiedConfig.NumAntennas = randi([rxConfig.NumAntennas.Min, rxConfig.NumAntennas.Max]);
-            else
-                unifiedConfig.NumAntennas = rxConfig.NumAntennas;
-            end
+            unifiedConfig.NumAntennas = requirePositiveIntegerScalar( ...
+                rxConfig.NumAntennas, 'Receiver.NumAntennas');
         end
     end
 
     % Calculate observable range from sample rate (baseband: -fs/2 to +fs/2)
     unifiedConfig.ObservableRange = [-unifiedConfig.SampleRate/2, unifiedConfig.SampleRate/2];
+end
+
+function value = requirePositiveScalar(value, fieldName)
+    % requirePositiveScalar - Production declaration in CSRD.
+    % 中文说明：requirePositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    if isstruct(value)
+        error('CSRD:Scenario:InvalidReceiverConfig', ...
+            ['%s must be a positive scalar. Min/Max receiver ranges were ', ...
+             'removed because they add hidden RNG draws before the ', ...
+             'regulatory planner selects the monitoring band.'], fieldName);
+    end
+    if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value) || value <= 0
+        error('CSRD:Scenario:InvalidReceiverConfig', ...
+            '%s must be a positive finite scalar.', fieldName);
+    end
+end
+
+function value = requirePositiveIntegerScalar(value, fieldName)
+    % requirePositiveIntegerScalar - Production declaration in CSRD.
+    % 中文说明：requirePositiveIntegerScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    value = requirePositiveScalar(value, fieldName);
+    if abs(value - round(value)) > 0
+        error('CSRD:Scenario:InvalidReceiverConfig', ...
+            '%s must be a positive integer scalar.', fieldName);
+    end
+    value = round(value);
 end

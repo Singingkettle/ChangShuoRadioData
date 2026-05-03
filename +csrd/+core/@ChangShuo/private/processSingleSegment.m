@@ -1,5 +1,8 @@
 function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx)
     % processSingleSegment - Process a single segment for message generation and modulation
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 processSingleSegment 实现。
     %
     % This method handles the complete processing of one segment including
     % message generation and modulation.
@@ -67,9 +70,20 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         currentSegmentScenario, rawMessageStruct);
 
     if ~isempty(modulatedSignalSegment)
-        modulatedSignalSegment.SegmentId = segIdx;
+        segmentId = sprintf('%s.Seg%03d', char(string(currentTxId)), segIdx);
+        burstId = sprintf('%s.Burst%03d', char(string(currentTxId)), segIdx);
+        modulatedSignalSegment.ID = segmentId;
+        modulatedSignalSegment.TxId = currentTxId;
+        modulatedSignalSegment.SegmentId = segmentId;
+        modulatedSignalSegment.BurstId = burstId;
         modulatedSignalSegment.StartTime = currentSegmentScenario.Placement.StartTime;
         modulatedSignalSegment.Duration = currentSegmentScenario.Placement.Duration;
+        modulatedSignalSegment.EndTime = currentSegmentScenario.Placement.EndTime;
+        modulatedSignalSegment.FrameWindow = currentSegmentScenario.Placement.FrameWindow;
+        modulatedSignalSegment.FrameRelativeStartTime = ...
+            currentSegmentScenario.Placement.FrameRelativeStartTime;
+        modulatedSignalSegment.FrameRelativeEndTime = ...
+            currentSegmentScenario.Placement.FrameRelativeEndTime;
         modulatedSignalSegment.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
 
         % Modulators are required to set SampleRate explicitly. The
@@ -89,6 +103,12 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
                 FrameId, string(currentTxId), segIdx);
         end
 
+        modulatedSignalSegment = csrd.pipeline.signal.gateToDuration( ...
+            modulatedSignalSegment, ...
+            currentSegmentScenario.Placement.FrameRelativeEndTime - ...
+                currentSegmentScenario.Placement.FrameRelativeStartTime, ...
+            'ModulatorOutput');
+
         modulatedSignalSegment.Planned = struct();
         modulatedSignalSegment.Planned.Bandwidth = currentSegmentScenario.Placement.TargetBandwidth;
         modulatedSignalSegment.Planned.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
@@ -97,7 +117,7 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             modulatedSignalSegment.Planned.Regulatory = currentTxScenario.Regulatory;
         else
             modulatedSignalSegment.Planned.Regulatory = ...
-                csrd.utils.spectrum.RegulatoryValidator.emptyRegulatoryTruth();
+                csrd.catalog.spectrum.RegulatoryValidator.emptyRegulatoryTruth();
         end
 
         % Phase 4 (§5 Truth.Design): the v2 annotation Design block reads
@@ -113,6 +133,12 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             currentSegmentScenario.Placement.TargetBandwidth;
         modulatedSignalSegment.Planned.PlannedCenterFrequencyHz = ...
             currentSegmentScenario.Placement.FrequencyOffset;
+        modulatedSignalSegment.Planned.StartTimeSec = ...
+            currentSegmentScenario.Placement.FrameRelativeStartTime;
+        modulatedSignalSegment.Planned.EndTimeSec = ...
+            currentSegmentScenario.Placement.FrameRelativeEndTime;
+        modulatedSignalSegment.Planned.DurationSec = ...
+            currentSegmentScenario.Placement.Duration;
         if isfield(currentTxScenario, 'Spectrum') && ...
                 isstruct(currentTxScenario.Spectrum) && ...
                 isfield(currentTxScenario.Spectrum, 'ReceiverSampleRate') && ...
@@ -120,8 +146,11 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             modulatedSignalSegment.Planned.PlannedSampleRate = ...
                 currentTxScenario.Spectrum.ReceiverSampleRate;
         else
-            modulatedSignalSegment.Planned.PlannedSampleRate = ...
-                modulatedSignalSegment.SampleRate;
+            error('CSRD:Construction:MissingPlannedSampleRate', ...
+                ['Frame %d, TxID %s, Segment %d: ', ...
+                 'currentTxScenario.Spectrum.ReceiverSampleRate is required. ', ...
+                 'Execution SampleRate must not be used to backfill Design truth.'], ...
+                FrameId, string(currentTxId), segIdx);
         end
         if isfield(currentTxScenario, 'Modulation') && isstruct(currentTxScenario.Modulation)
             modSrc = currentTxScenario.Modulation;
@@ -137,16 +166,27 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             else
                 modulatedSignalSegment.Planned.ModulationOrder = 0;
             end
+            if isfield(modSrc, 'ModulatorConfig') && isstruct(modSrc.ModulatorConfig) && ...
+                    isfield(modSrc.ModulatorConfig, 'mimo') && ...
+                    isstruct(modSrc.ModulatorConfig.mimo) && ...
+                    isfield(modSrc.ModulatorConfig.mimo, 'Mode') && ...
+                    ~isempty(modSrc.ModulatorConfig.mimo.Mode)
+                modulatedSignalSegment.Planned.ModulationSpatialMode = ...
+                    char(string(modSrc.ModulatorConfig.mimo.Mode));
+            else
+                modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+            end
         else
             modulatedSignalSegment.Planned.ModulationFamily = '';
             modulatedSignalSegment.Planned.ModulationOrder = 0;
+            modulatedSignalSegment.Planned.ModulationSpatialMode = '';
         end
         if isfield(currentTxScenario, 'Message') && isstruct(currentTxScenario.Message) && ...
                 isfield(currentTxScenario.Message, 'Length') && ...
                 ~isempty(currentTxScenario.Message.Length) && ...
                 isnumeric(currentTxScenario.Message.Length)
             modulatedSignalSegment.Planned.PayloadLengthBits = ...
-                double(currentTxScenario.Message.Length);
+                double(currentSegmentScenario.Message.Length);
         else
             modulatedSignalSegment.Planned.PayloadLengthBits = 0;
         end
@@ -157,7 +197,10 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             modulatedSignalSegment.Planned.NumTransmitAntennas = ...
                 double(currentTxScenario.Hardware.NumAntennas);
         else
-            modulatedSignalSegment.Planned.NumTransmitAntennas = 1;
+            error('CSRD:Construction:MissingTxNumAntennas', ...
+                ['Frame %d, TxID %s, Segment %d: ', ...
+                 'currentTxScenario.Hardware.NumAntennas is required.'], ...
+                FrameId, string(currentTxId), segIdx);
         end
     end
 end

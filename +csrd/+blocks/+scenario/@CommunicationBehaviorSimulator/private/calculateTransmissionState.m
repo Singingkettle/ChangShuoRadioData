@@ -1,5 +1,8 @@
 function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
     %CALCULATETRANSMISSIONSTATE Compute the per-frame transmission state.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 calculateTransmissionState 实现。
     %
     %   The state is the *only* contract the downstream segment-generation
     %   code is allowed to consume. After the v0.4 deep refactor it carries
@@ -51,7 +54,7 @@ function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
             transmissionState.ActiveIntervals = [0, pattern.ObservationDuration];
             transmissionState.FrameWindow = [0, pattern.ObservationDuration];
 
-        case {'Burst', 'Scheduled', 'Random'}
+        case {'Burst', 'Scheduled', 'Random', 'Explicit'}
             if ~isfield(pattern, 'Intervals') || isempty(pattern.Intervals)
                 error('CSRD:Scenario:MissingIntervals', ...
                     ['Frame %d: pattern type "%s" requires a non-empty ' ...
@@ -59,7 +62,7 @@ function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
                     frameId, patternType);
             end
             [activeIdx, activeIntervals, frameWindow] = ...
-                csrd.utils.scenario.findOverlappingTransmissionIntervals( ...
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals( ...
                     frameId, pattern);
             transmissionState.FrameWindow = frameWindow;
             transmissionState.ActiveIntervalIndices = uint32(activeIdx);

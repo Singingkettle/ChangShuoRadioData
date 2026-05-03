@@ -1,5 +1,8 @@
 function RxInfos = setupReceivers(obj, FrameId, numRxThisFrame)
     %SETUPRECEIVERS Phase 3 strict-construction receiver setup.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 setupReceivers 实现。
     %
     %   RxInfos = setupReceivers(obj, FrameId, numRxThisFrame)
     %
@@ -9,7 +12,7 @@ function RxInfos = setupReceivers(obj, FrameId, numRxThisFrame)
     %   fail-fast contract can be unit-tested without instantiating the
     %   full engine. Errors propagate to SimulationRunner, which decides
     %   per-scenario skip versus sweep abort via
-    %   csrd.utils.scenario.isScenarioSkipException.
+    %   csrd.pipeline.scenario.isScenarioSkipException.
     %
     %   Inputs:
     %       FrameId         - Frame identifier (used for diagnostics).

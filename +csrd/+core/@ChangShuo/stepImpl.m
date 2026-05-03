@@ -1,5 +1,8 @@
 function [ScenarioData, ScenarioAnnotation] = stepImpl(obj, scenarioId)
     % stepImpl - Execute simulation for an entire scenario
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 stepImpl 实现。
     %
     % This method handles the complete execution of a scenario by extracting
     % the frame count from scenario configuration and managing the frame-level

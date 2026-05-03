@@ -1,5 +1,8 @@
 function modulatedSignalSegment = modulateSegmentMessage(obj, FrameId, currentTxId, segIdx, currentSegmentScenario, rawMessageStruct)
     % modulateSegmentMessage - Modulate message for a single segment
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
+    % 中文说明：提供 CSRD 生产链路中的 modulateSegmentMessage 实现。
     %
     % This method uses the ModulationFactory to modulate message data.
     %
