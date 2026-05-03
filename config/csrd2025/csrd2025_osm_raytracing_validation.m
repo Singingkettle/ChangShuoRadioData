@@ -1,5 +1,7 @@
 function config = csrd2025_osm_raytracing_validation()
     % csrd2025_osm_raytracing_validation - Phase 16 OSM RayTracing validation config.
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     % 中文说明：通过正式 simulation.m 入口压测 building/empty OSM RayTracing、多实体、多天线和法规频谱链路。
 
     config.baseConfigs = {

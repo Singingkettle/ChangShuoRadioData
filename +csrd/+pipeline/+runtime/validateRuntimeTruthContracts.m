@@ -1,5 +1,7 @@
 function contract = validateRuntimeTruthContracts(factoryConfigs, runnerConfig)
 %VALIDATERUNTIMETRUTHCONTRACTS Validate global runtime truth authorities.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：集中校验运行真值合同，禁止下游 block 反向补运行事实。
 %
 % This validator is intentionally narrow: it checks the cross-module facts
@@ -99,6 +101,10 @@ end
 end
 
 function channelContract = localValidateChannelContract(channelConfig, receiverCarrierHz)
+    % localValidateChannelContract - Production declaration in CSRD.
+    % 中文说明：localValidateChannelContract 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 channelContract = struct();
 if isfield(channelConfig, 'LinkBudget') && isstruct(channelConfig.LinkBudget)
     linkBudget = channelConfig.LinkBudget;
@@ -127,6 +133,10 @@ end
 end
 
 function txContract = localValidateTransmitContract(transmitConfig)
+    % localValidateTransmitContract - Production declaration in CSRD.
+    % 中文说明：localValidateTransmitContract 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 txContract = struct();
 if isfield(transmitConfig, 'Power') && isstruct(transmitConfig.Power)
     powerCfg = transmitConfig.Power;
@@ -143,6 +153,10 @@ end
 end
 
 function registryContract = localValidateRegistryContract(factoryConfig, label)
+    % localValidateRegistryContract - Production declaration in CSRD.
+    % 中文说明：localValidateRegistryContract 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 registryContract = struct();
 types = {};
 if strcmp(label, 'Message') && isfield(factoryConfig, 'MessageTypes') && ...
@@ -180,6 +194,10 @@ registryContract.TypeIds = types(:).';
 end
 
 function types = localValidateNamedHandleStruct(typeStruct, label)
+    % localValidateNamedHandleStruct - Production declaration in CSRD.
+    % 中文说明：localValidateNamedHandleStruct 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 types = fieldnames(typeStruct);
 for k = 1:numel(types)
     typeConfig = typeStruct.(types{k});
@@ -191,11 +209,19 @@ end
 end
 
 function tf = localHasHandle(typeConfig)
+    % localHasHandle - Production declaration in CSRD.
+    % 中文说明：localHasHandle 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 tf = (isfield(typeConfig, 'handle') && ~isempty(typeConfig.handle)) || ...
     (isfield(typeConfig, 'Handle') && ~isempty(typeConfig.Handle));
 end
 
 function sub = localRequireStructPath(root, pathParts, label)
+    % localRequireStructPath - Production declaration in CSRD.
+    % 中文说明：localRequireStructPath 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 sub = root;
 for k = 1:numel(pathParts)
     key = pathParts{k};
@@ -207,6 +233,10 @@ end
 end
 
 function value = localRequirePositiveInteger(root, fieldName, label)
+    % localRequirePositiveInteger - Production declaration in CSRD.
+    % 中文说明：localRequirePositiveInteger 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 value = localRequirePositiveScalar(root, fieldName, label);
 rounded = round(value);
 if abs(value - rounded) > 0
@@ -216,6 +246,10 @@ value = rounded;
 end
 
 function value = localRequirePositiveScalar(root, fieldName, label)
+    % localRequirePositiveScalar - Production declaration in CSRD.
+    % 中文说明：localRequirePositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 value = localRequireFiniteScalar(root, fieldName, label);
 if value <= 0
     error('CSRD:RuntimeTruth:InvalidPositiveScalar', ...
@@ -224,6 +258,10 @@ end
 end
 
 function value = localRequireFiniteScalar(root, fieldName, label)
+    % localRequireFiniteScalar - Production declaration in CSRD.
+    % 中文说明：localRequireFiniteScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isfield(root, fieldName) || isempty(root.(fieldName)) || ...
         ~isnumeric(root.(fieldName)) || ~isscalar(root.(fieldName)) || ...
         ~isfinite(root.(fieldName))
@@ -234,6 +272,10 @@ value = double(root.(fieldName));
 end
 
 function range = localRequireIncreasingRange(rawRange, label)
+    % localRequireIncreasingRange - Production declaration in CSRD.
+    % 中文说明：localRequireIncreasingRange 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isnumeric(rawRange) || numel(rawRange) ~= 2
     error('CSRD:RuntimeTruth:InvalidRange', ...
         '%s must be a numeric 1x2 [low high] range.', label);
@@ -246,6 +288,10 @@ end
 end
 
 function localAssertClose(actual, expected, errorId, message)
+    % localAssertClose - Production declaration in CSRD.
+    % 中文说明：localAssertClose 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 tolerance = max(1e-9 * max(abs([actual, expected])), 1e-6);
 if abs(actual - expected) > tolerance
     error(errorId, message, actual, expected);

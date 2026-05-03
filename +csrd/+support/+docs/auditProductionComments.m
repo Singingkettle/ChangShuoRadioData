@@ -54,7 +54,7 @@ summary = localBuildSummary(projectRoot, records, changedCount);
 if p.Results.WriteManifest
     manifestPath = char(p.Results.ManifestPath);
     if isempty(manifestPath)
-        manifestPath = fullfile(projectRoot, 'docs', 'audits', 'reports', ...
+        manifestPath = fullfile(projectRoot, 'artifacts', 'audits', 'reports', ...
             'phase-14-production-comment-audit.json');
     end
     localWriteManifest(manifestPath, summary);

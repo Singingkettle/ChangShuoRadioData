@@ -366,6 +366,10 @@ classdef CommunicationBehaviorSimulator < matlab.System
 end
 
 function r = localValidateObservableRange(r)
+    % localValidateObservableRange - Production declaration in CSRD.
+    % 中文说明：localValidateObservableRange 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     r = double(reshape(r, 1, 2));
     if any(~isfinite(r)) || r(2) <= r(1)
         error('CSRD:Scenario:InvalidReceiverObservableRange', ...

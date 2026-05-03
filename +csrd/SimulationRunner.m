@@ -389,6 +389,8 @@ classdef SimulationRunner < matlab.System
 
         function normalizeAndValidateFactoryRuntimeContracts(obj)
             %NORMALIZEANDVALIDATEFACTORYRUNTIMECONTRACTS Enforce Phase 18 contracts.
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % 中文说明：直传 FactoryConfigs 的路径也必须走配置加载后的同一合同。
             if isempty(obj.FactoryConfigs)
                 error('SimulationRunner:ConfigError', ...

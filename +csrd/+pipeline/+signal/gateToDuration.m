@@ -1,5 +1,8 @@
 function signalStruct = gateToDuration(signalStruct, durationSec, stageName)
 %GATETODURATION Align a signal struct to an explicit duration.
+% 中文说明：把信号结构体显式裁剪或补零到指定持续时间，并记录 gating 元数据。
+% Inputs / 输入: signalStruct is a signal struct; durationSec is seconds; stageName names the caller stage.
+% Outputs / 输出: signalStruct is the aligned signal struct with GatingMetadata.
 %
 %   signalStruct = csrd.pipeline.signal.gateToDuration(signalStruct,
 %       durationSec, stageName)

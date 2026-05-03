@@ -82,6 +82,10 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
 end
 
 function durationSec = localSegmentDurationSec(segSignal)
+    % localSegmentDurationSec - Production declaration in CSRD.
+    % 中文说明：localSegmentDurationSec 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isfield(segSignal, 'FrameRelativeStartTime') && ...
             isfield(segSignal, 'FrameRelativeEndTime') && ...
             ~isempty(segSignal.FrameRelativeStartTime) && ...

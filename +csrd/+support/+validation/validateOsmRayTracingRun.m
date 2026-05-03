@@ -114,6 +114,8 @@ end
 
 function value = getTextField(s, fieldName, fallback)
 % getTextField - Read a text field from a struct with a safe fallback.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：从结构体读取文本字段，缺失时返回指定默认值。
 if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
     value = char(string(s.(fieldName)));

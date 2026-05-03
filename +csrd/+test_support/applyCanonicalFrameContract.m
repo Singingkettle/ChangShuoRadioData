@@ -1,5 +1,7 @@
 function cfg = applyCanonicalFrameContract(cfg, observationDurationSec, numFrames)
 %APPLYCANONICALFRAMECONTRACT Write the strict Phase 17 frame contract.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：测试辅助函数；每次改场景总时长时同步写入 canonical 帧样点数。
 
 if nargin < 3
@@ -42,6 +44,10 @@ end
 end
 
 function [scenarioConfig, target] = localScenarioConfig(cfg)
+    % localScenarioConfig - Production declaration in CSRD.
+    % 中文说明：localScenarioConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if isfield(cfg, 'Factories') && isstruct(cfg.Factories) && ...
         isfield(cfg.Factories, 'Scenario') && isstruct(cfg.Factories.Scenario)
     scenarioConfig = cfg.Factories.Scenario;
@@ -59,6 +65,10 @@ end
 end
 
 function sampleRateHz = localReceiverSampleRate(scenarioConfig)
+    % localReceiverSampleRate - Production declaration in CSRD.
+    % 中文说明：localReceiverSampleRate 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isfield(scenarioConfig, 'CommunicationBehavior') || ...
         ~isstruct(scenarioConfig.CommunicationBehavior) || ...
         ~isfield(scenarioConfig.CommunicationBehavior, 'Receiver') || ...

@@ -237,6 +237,9 @@ end
 
 function intervals = localScaleIntervalFractions(intervalFractions, durationSec)
     % localScaleIntervalFractions - Convert [0,1] fractions to seconds.
+    % 中文说明：localScaleIntervalFractions 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~iscell(intervalFractions)
     error('CSRD:Validation:InvalidExplicitIntervals', ...
         'ExplicitIntervalFractions must be a cell array of Nx2 matrices.');
@@ -256,6 +259,9 @@ end
 
 function txt = localMatlabCellOfMatrices(values)
     % localMatlabCellOfMatrices - Serialize a cell array of numeric matrices.
+    % 中文说明：localMatlabCellOfMatrices 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 parts = cell(1, numel(values));
 for k = 1:numel(values)
     parts{k} = localMatlabMatrix(values{k});
@@ -265,6 +271,10 @@ end
 
 
 function txt = localMatlabMatrix(values)
+    % localMatlabMatrix - Production declaration in CSRD.
+    % 中文说明：localMatlabMatrix 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 values = double(values);
 rows = cell(1, size(values, 1));
 for r = 1:size(values, 1)

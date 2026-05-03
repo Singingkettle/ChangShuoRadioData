@@ -792,6 +792,10 @@ classdef ChannelFactory < matlab.System
 end
 
 function value = requireFiniteScalar(value, label)
+    % requireFiniteScalar - Production declaration in CSRD.
+    % 中文说明：requireFiniteScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
         error('CSRD:RuntimeTruth:InvalidFiniteScalar', ...
             '%s must be a finite numeric scalar.', label);
@@ -800,6 +804,10 @@ function value = requireFiniteScalar(value, label)
 end
 
 function value = requirePositiveFiniteScalar(value, label)
+    % requirePositiveFiniteScalar - Production declaration in CSRD.
+    % 中文说明：requirePositiveFiniteScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     value = requireFiniteScalar(value, label);
     if value <= 0
         error('CSRD:RuntimeTruth:InvalidPositiveScalar', ...

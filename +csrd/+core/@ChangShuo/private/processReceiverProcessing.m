@@ -441,6 +441,10 @@ function bwHz = computeObservableBandwidthHz(rxInfo)
 end
 
 function validateExecutionSampleGrid(execution, comp)
+    % validateExecutionSampleGrid - Production declaration in CSRD.
+    % 中文说明：validateExecutionSampleGrid 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     sampleRate = requirePositiveMeasurement(execution.SampleRate, ...
         'Truth.Execution.SampleRate');
     frameStart = requireFiniteMeasurement(execution.FrameStartSample, ...
@@ -488,6 +492,10 @@ function validateExecutionSampleGrid(execution, comp)
 end
 
 function value = guardedMeasurement(fn, errorId)
+    % guardedMeasurement - Production declaration in CSRD.
+    % 中文说明：guardedMeasurement 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     try
         value = fn();
     catch ME
@@ -496,6 +504,10 @@ function value = guardedMeasurement(fn, errorId)
 end
 
 function value = requireFiniteMeasurement(value, label)
+    % requireFiniteMeasurement - Production declaration in CSRD.
+    % 中文说明：requireFiniteMeasurement 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
         error('CSRD:Measurement:InvalidMeasuredValue', ...
             '%s must be a finite numeric scalar for a live signal.', label);
@@ -504,6 +516,10 @@ function value = requireFiniteMeasurement(value, label)
 end
 
 function value = requirePositiveMeasurement(value, label)
+    % requirePositiveMeasurement - Production declaration in CSRD.
+    % 中文说明：requirePositiveMeasurement 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     value = requireFiniteMeasurement(value, label);
     if value <= 0
         error('CSRD:Measurement:InvalidMeasuredValue', ...
@@ -596,6 +612,10 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
 end
 
 function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
+    % localResolveFrameShape - Production declaration in CSRD.
+    % 中文说明：localResolveFrameShape 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     frameWindow = localFrameWindowFromComponents(signalComponents);
     contractArgs = {'SampleRate', sampleRate};
     if ~isempty(frameWindow)
@@ -612,6 +632,10 @@ function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
 end
 
 function frameWindow = localFrameWindowFromComponents(signalComponents)
+    % localFrameWindowFromComponents - Production declaration in CSRD.
+    % 中文说明：localFrameWindowFromComponents 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     frameWindow = [];
     for k = 1:numel(signalComponents)
         comp = signalComponents{k};
@@ -629,6 +653,10 @@ end
 
 function comp = localUpdateComponentSampleGrid(comp, compSig, startOffset, ...
         frameSamples, sampleRate)
+            % localUpdateComponentSampleGrid - Production declaration in CSRD.
+            % 中文说明：localUpdateComponentSampleGrid 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
     sampleCount = size(compSig, 1);
     gridStart = min(startOffset, frameSamples);
     endOffset = max(gridStart, min(frameSamples, startOffset + sampleCount));
@@ -648,6 +676,10 @@ function comp = localUpdateComponentSampleGrid(comp, compSig, startOffset, ...
 end
 
 function [signalOut, info] = localCoerceProcessedFrameLength(signalIn, targetSamples)
+    % localCoerceProcessedFrameLength - Production declaration in CSRD.
+    % 中文说明：localCoerceProcessedFrameLength 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isempty(signalIn)
         signalIn = complex(zeros(0, 1));
     elseif isvector(signalIn)

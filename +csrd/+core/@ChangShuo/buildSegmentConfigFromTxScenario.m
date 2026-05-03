@@ -200,6 +200,9 @@ end
 
 function lengthBits = localPerSegmentMessageLength(messageConfig, modulationConfig, durationSec)
     % localPerSegmentMessageLength - Derive payload bits from this segment.
+    % 中文说明：localPerSegmentMessageLength 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isfield(messageConfig, 'LengthMin') && ~isempty(messageConfig.LengthMin)
         lengthMin = double(messageConfig.LengthMin);
     else

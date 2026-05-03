@@ -1,5 +1,7 @@
 function summary = run_phase18_nightly_validation(varargin)
 %RUN_PHASE18_NIGHTLY_VALIDATION Execute Phase 18 full validation.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：Phase 18 夜跑入口；默认执行 69-case 非 dry-run 验证。
 
 p = inputParser;

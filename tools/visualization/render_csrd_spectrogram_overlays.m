@@ -118,6 +118,8 @@ end
 
 function matFiles = localOrderMatFiles(matFiles, selectionMode)
 % localOrderMatFiles - Prefer visually rich cases when requested.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：在 diverse 模式下优先选择多 Tx/多 burst、OSM building/flat 和调制覆盖样本。
 if ~strcmp(selectionMode, 'diverse')
     return;
@@ -140,6 +142,8 @@ end
 
 function annotationPath = localAnnotationPathForDataPath(dataPath)
 % localAnnotationPathForDataPath - Resolve sibling annotation path.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：根据 scenarios/scenario_x_data.mat 找到同 session 下的 annotation JSON。
 [sessionScenariosDir, fileName] = fileparts(dataPath);
 sessionDir = fileparts(sessionScenariosDir);
@@ -154,6 +158,8 @@ end
 
 function frames = localFrameCells(scenarioData)
 % localFrameCells - Normalize scenarioData into a row cell array of frames.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：把保存的 scenarioData 标准化为按帧索引的 cell 数组。
 if iscell(scenarioData)
     frames = scenarioData;
@@ -166,6 +172,8 @@ end
 
 function rxCells = localReceiverCells(frameData)
 % localReceiverCells - Normalize one frame into receiver cells.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：把单帧数据标准化为按接收机索引的 cell 数组。
 if iscell(frameData)
     rxCells = frameData;
@@ -180,6 +188,8 @@ end
 
 function fs = localSampleRate(rxFrame)
 % localSampleRate - Read sample rate from a receiver frame.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：从接收机帧结构读取采样率并做正数校验。
 assert(isfield(rxFrame, 'SampleRate') && isnumeric(rxFrame.SampleRate) && ...
     isscalar(rxFrame.SampleRate) && isfinite(rxFrame.SampleRate) && ...
@@ -192,6 +202,8 @@ end
 
 function receiverId = localReceiverId(rxFrame, rxIdx)
 % localReceiverId - Resolve receiver identifier for annotation matching.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：读取接收机 ID，缺失时回退到 Rx<index>。
 if isfield(rxFrame, 'ReceiverID') && ~isempty(rxFrame.ReceiverID)
     receiverId = char(string(rxFrame.ReceiverID));
@@ -203,6 +215,8 @@ end
 
 function sources = localSourcesForFrame(frames, frameIdx, receiverId)
 % localSourcesForFrame - Select annotation sources for one frame/receiver.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：按 FrameId 和 ReceiverID 匹配 annotation v2 中的信号源。
 sources = {};
 for k = 1:numel(frames)
@@ -222,6 +236,8 @@ end
 
 function sources = localFlattenSources(value)
 % localFlattenSources - Normalize SignalSources into a cell array.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：把 SignalSources 的 struct/cell 形态标准化，便于绘制矩形框。
 sources = {};
 if isempty(value)
@@ -240,6 +256,8 @@ end
 
 function rectCount = localRenderOne(signal, fs, duration, sources, imagePath)
 % localRenderOne - Render one spectrogram with time-frequency GT boxes.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：渲染单个接收机帧的频谱图，并叠加每个源的帧内时间-频率真值框。
 signal = double(signal(:));
 if ~isreal(signal)
@@ -300,6 +318,8 @@ end
 
 function [x0, x1] = localSourceTimeBounds(src, duration)
 % localSourceTimeBounds - Read frame-relative source time limits.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：从 annotation v2 的 Design/Execution 字段读取帧内 burst 起止时间。
 x0 = 0;
 x1 = duration;
@@ -325,6 +345,8 @@ end
 
 function [t, f, powerDb] = localStft(signal, fs)
 % localStft - Minimal toolbox-light STFT for visual QA.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：用基础 FFT 实现轻量 STFT，避免频谱图工具依赖额外 toolbox。
 n = numel(signal);
 winLen = min(512, max(64, 2 ^ floor(log2(max(64, min(n, 512))))));
@@ -351,6 +373,8 @@ end
 
 function label = localSourceLabel(src)
 % localSourceLabel - Build a compact overlay label.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：为频谱图矩形框生成简短标签，包含 Tx、调制和业务/频段信息。
 tx = localText(src, 'TxID', 'Tx');
 modulation = '';
@@ -370,6 +394,8 @@ end
 
 function value = localText(s, fieldName, fallback)
 % localText - Return a scalar text field or fallback.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：读取标注文本字段，缺失时返回默认文本。
 if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
     value = char(string(s.(fieldName)));
@@ -381,6 +407,8 @@ end
 
 function caseName = localCaseName(dataPath)
 % localCaseName - Extract run folder name for output filenames.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：从数据路径中提取 run/case 名称，便于追踪图片来源。
 parts = strsplit(dataPath, filesep);
 caseName = 'case';
@@ -395,6 +423,8 @@ end
 
 function safe = localSafeName(value)
 % localSafeName - Make a filesystem-safe lowercase name.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：把 case/receiver 名称转为适合作为文件名的安全字符串。
 safe = regexprep(char(string(value)), '[^A-Za-z0-9_]', '_');
 safe = regexprep(safe, '_+', '_');
@@ -404,6 +434,8 @@ end
 
 function rectCount = localCountRectangles(sources, fs)
 % localCountRectangles - Count drawable annotation boxes before rendering.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：渲染前统计可绘制真值框数量，用于筛选多源/多 burst 目视样本。
 rectCount = 0;
 for s = 1:numel(sources)
@@ -431,6 +463,8 @@ end
 
 function localWriteContactSheet(outputRoot, summary)
 % localWriteContactSheet - Write a Markdown index for visual inspection.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：写出 Markdown 目视检查索引，列出每张频谱图和矩形框数量。
 sheetPath = fullfile(outputRoot, 'contact_sheet.md');
 fid = fopen(sheetPath, 'w');

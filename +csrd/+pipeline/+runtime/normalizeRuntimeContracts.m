@@ -1,5 +1,7 @@
 function config = normalizeRuntimeContracts(config)
 %NORMALIZERUNTIMECONTRACTS Stamp derived runtime contract fields after config load.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：配置加载后写入派生运行合同字段；旧别名不再被接收。
 
 if nargin < 1 || isempty(config) || ~isstruct(config) || ...

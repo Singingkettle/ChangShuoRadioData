@@ -67,6 +67,8 @@ end
 
 function tf = localIsSafeGeneratedPath(projectRoot, pathName)
 % localIsSafeGeneratedPath - Restrict cleanup to known generated roots.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：只允许删除项目内明确的 generated artifact 路径，避免误删数据资产。
 resolvedRoot = localCanonicalFolder(projectRoot);
 resolvedPath = localCanonicalFolder(pathName);
@@ -80,6 +82,8 @@ end
 
 function folderPath = localCanonicalFolder(pathName)
 % localCanonicalFolder - Resolve an existing folder without Java.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：不依赖 Java，将现有目录解析为 MATLAB 当前平台的绝对路径。
 oldFolder = pwd;
 cleanup = onCleanup(@() cd(oldFolder));
@@ -90,6 +94,8 @@ end
 
 function tf = localIsInsideOrEqual(pathName, rootName)
 % localIsInsideOrEqual - Check whether a path is a root or child path.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：判断目标路径是否位于允许删除的 generated 根目录内。
 rootName = char(rootName);
 pathName = char(pathName);

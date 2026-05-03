@@ -1,5 +1,7 @@
 function contract = resolveFrameRuntimeContract(factoryConfigs, runnerConfig, varargin)
 %RESOLVEFRAMERUNTIMECONTRACT Resolve the canonical frame/time contract.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
 % 中文说明：集中解析运行期帧合同，避免 Runner、Scenario 和执行层各自解释帧长。
 %
 % Canonical input:
@@ -95,6 +97,10 @@ contract = struct( ...
 end
 
 function opts = localParseOptions(varargin)
+    % localParseOptions - Production declaration in CSRD.
+    % 中文说明：localParseOptions 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 opts = struct( ...
     'SampleRate', [], ...
     'FrameWindow', [], ...
@@ -114,6 +120,10 @@ end
 end
 
 function scenarioConfig = localScenarioConfig(factoryConfigs)
+    % localScenarioConfig - Production declaration in CSRD.
+    % 中文说明：localScenarioConfig 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if nargin < 1 || isempty(factoryConfigs) || ~isstruct(factoryConfigs)
     error('CSRD:Frame:MissingFactoryConfigs', ...
         'FactoryConfigs must be a struct containing Scenario.');
@@ -131,6 +141,10 @@ end
 end
 
 function sampleRateHz = localReceiverSampleRate(scenarioConfig)
+    % localReceiverSampleRate - Production declaration in CSRD.
+    % 中文说明：localReceiverSampleRate 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 sampleRateHz = [];
 if isfield(scenarioConfig, 'CommunicationBehavior') && ...
         isstruct(scenarioConfig.CommunicationBehavior) && ...
@@ -142,6 +156,10 @@ end
 end
 
 function numFrames = localResolveNumFrames(globalConfig)
+    % localResolveNumFrames - Production declaration in CSRD.
+    % 中文说明：localResolveNumFrames 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if isfield(globalConfig, 'NumFramesPerScenario') && ...
         ~isempty(globalConfig.NumFramesPerScenario)
     raw = globalConfig.NumFramesPerScenario;
@@ -157,6 +175,10 @@ numFrames = localRequirePositiveInteger(raw, ...
 end
 
 function [frameNumSamples, source] = localResolveFrameSamples(globalConfig)
+    % localResolveFrameSamples - Production declaration in CSRD.
+    % 中文说明：localResolveFrameSamples 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if isfield(globalConfig, 'FrameNumSamples') && ~isempty(globalConfig.FrameNumSamples)
     frameNumSamples = localRequirePositiveInteger(globalConfig.FrameNumSamples, ...
         'Factories.Scenario.Global.FrameNumSamples', ...
@@ -175,6 +197,10 @@ error('CSRD:Frame:MissingFrameNumSamples', ...
 end
 
 function value = localRequirePositiveInteger(value, fieldName, errorId)
+    % localRequirePositiveInteger - Production declaration in CSRD.
+    % 中文说明：localRequirePositiveInteger 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 value = localRequirePositiveScalar(value, fieldName, errorId);
 rounded = round(value);
 if abs(value - rounded) > 0
@@ -184,6 +210,10 @@ value = rounded;
 end
 
 function value = localRequirePositiveScalar(value, fieldName, errorId)
+    % localRequirePositiveScalar - Production declaration in CSRD.
+    % 中文说明：localRequirePositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value) || value <= 0
     error(errorId, '%s must be a positive finite scalar.', fieldName);
 end
@@ -191,6 +221,10 @@ value = double(value);
 end
 
 function localAssertDurationMatchesSamples(durationSec, frameSamples, sampleRateHz, label)
+    % localAssertDurationMatchesSamples - Production declaration in CSRD.
+    % 中文说明：localAssertDurationMatchesSamples 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 computedSamples = durationSec * sampleRateHz;
 if abs(computedSamples - frameSamples) > 1
     error('CSRD:Frame:InconsistentFrameSamples', ...

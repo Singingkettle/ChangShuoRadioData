@@ -856,6 +856,9 @@ end
 
 function intervals = selectExplicitIntervals(explicitParams, txIndex, observationDuration)
     % selectExplicitIntervals - Resolve per-transmitter explicit bursts.
+    % 中文说明：selectExplicitIntervals 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if ~isstruct(explicitParams) || ~isfield(explicitParams, 'Intervals') || ...
             isempty(explicitParams.Intervals)
         error('CSRD:Scenario:MissingExplicitIntervals', ...

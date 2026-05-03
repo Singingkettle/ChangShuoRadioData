@@ -314,6 +314,10 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
 end
 
 function durationSec = localComponentDurationSec(segmentSignal)
+    % localComponentDurationSec - Production declaration in CSRD.
+    % 中文说明：localComponentDurationSec 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
     if isfield(segmentSignal, 'FrameRelativeStartTime') && ...
             isfield(segmentSignal, 'FrameRelativeEndTime') && ...
             ~isempty(segmentSignal.FrameRelativeStartTime) && ...
