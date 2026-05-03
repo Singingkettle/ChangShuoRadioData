@@ -129,7 +129,7 @@ This branch landed an end-to-end review and 18 fix commits across five stages. K
   - RayTracing path loss is recorded as `AppliedPathLoss`; the analytical FSPL the planner reasoned about is recorded separately as `AnalyticalPathLoss`.
   - Link-budget noise bandwidth is now `min(rxFs, txOccupiedBW, configured)` so narrow-band signals stop carrying pessimistic SNR labels.
 - **Exception contract**
-  - Scenario-skip identifiers (`SkipScenario`, `NoBuildingData`, `NoValidPaths`) are classified by a single helper (`csrd.utils.scenario.isScenarioSkipException`) and propagate cleanly all the way up to `SimulationRunner.runScenario`, instead of being smothered by `ChannelFactory.stepImpl`.
+  - Scenario-skip identifiers (`SkipScenario`, `NoBuildingData`, `NoValidPaths`) are classified by a single helper (`csrd.pipeline.scenario.isScenarioSkipException`) and propagate cleanly all the way up to `SimulationRunner.runScenario`, instead of being smothered by `ChannelFactory.stepImpl`.
 - **Testing**
   - 11 unit suites (52 cases) and 7 regression scripts now run green via `run_all_tests('unit'|'regression'|'all')`. `'all'` finally sweeps all three categories instead of aliasing to `'regression'`.
 - **Development discipline**
@@ -297,7 +297,7 @@ simulation(1, 1, 'csrd2025/my_custom_config.m');
 simulation(2, 4, 'csrd2025/csrd2025.m'); % Worker 2 of 4
 
 % Direct configuration loading
-masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 runner = csrd.SimulationRunner('RunnerConfig', masterConfig.Runner);
 runner.FactoryConfigs = masterConfig.Factories;
 runner(1, 1);
@@ -346,7 +346,7 @@ The CSRD framework features a comprehensive modular configuration system with in
 ### Configuration Architecture
 ```matlab
 % Load complete configuration with inheritance
-masterConfig = csrd.utils.config_loader('csrd2025/csrd2025.m');
+masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
 % Configuration structure:
 masterConfig = {
@@ -439,10 +439,10 @@ end
 **Usage Examples:**
 ```matlab
 % Load default configuration
-config = csrd.utils.config_loader();
+config = csrd.runtime.config_loader();
 
 % Load specific configuration  
-config = csrd.utils.config_loader('csrd2025/csrd2025.m');
+config = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
 % Use in simulation (with tools/ added to path)
 addpath('tools');
@@ -489,7 +489,7 @@ Cursor) and mirrored in `AGENTS.md` for non-Cursor contributors. Headlines:
 - **Planning vs execution stays separated**: scenario blocks plan; factories execute. Factories must NOT inject random parameters at execution time to fill in missing plan fields — that is a planner bug.
 - **Annotations cannot fabricate design facts from execution facts**: `Truth.Design` comes from the blueprint, while `Truth.Execution` and `Truth.Measured` record realized and observed generator facts.
 - **`SampleRate` always comes from the producer**: missing or non-positive `SampleRate` raises `CSRD:Core:MissingSampleRate`. No `length(Signal)/Duration` reverse derivation, no hard-coded `200e3` fallbacks.
-- **Scenario-skip exceptions propagate**: any `try/catch` that may need to distinguish "skip this scenario, keep going" from "abort the run" must consult `csrd.utils.scenario.isScenarioSkipException` and rethrow on match.
+- **Scenario-skip exceptions propagate**: any `try/catch` that may need to distinguish "skip this scenario, keep going" from "abort the run" must consult `csrd.pipeline.scenario.isScenarioSkipException` and rethrow on match.
 - **Every fix ships with a test**: a fix without a test that would have caught the bug does not land. Tests live only under `tests/{unit,regression,integration}/` — never in the repo root or `examples/`.
 
 ## 🧪 Testing and Validation
@@ -531,7 +531,7 @@ results = run_all_tests('integration');  % cross-block integration suites
 
 ### Configuration Management
 - **Modular Design**: Inheritance-based configuration with base components
-- **Single Interface**: Unified `csrd.utils.config_loader()` function
+- **Single Interface**: Unified `csrd.runtime.config_loader()` function
 - **Complete Coverage**: All 6 factory configurations (Scenario, Message, Modulation, Transmit, Channel, Receive)
 - **Easy Customization**: Override specific parameters while inheriting base configurations
 

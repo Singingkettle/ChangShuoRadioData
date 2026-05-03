@@ -4,7 +4,7 @@
 |------|----|
 | 状态 | ❄️ **Frozen**（2026-04-25 baseline 200 场景全过：BlueprintAcceptanceRate=1.0 / BlueprintResamplesP95=0 / BlueprintProvenanceCoverage=1.0；§9 实施快照已填，audit §17.4 已标 Frozen）|
 | 顶层 audit 引用 | `docs/audits/2026-04-spectrum-blueprint-construction-refactor.md` §17.4（"Phase 2 蓝图层骨架"），并实施 §16.5 / §16.7 / §16.8 三处规范化条款 |
-| 关联 H/M 条目 | H6 (allocateFrequenciesRandom/Optimized 转调假象) / H11 (channel modelName 多级回落) / H16 (`+csrd/+utils/+profile/` 不存在) / H17 部分（Validator 不存在）/ D5 (modelNames{1} 兜底) / D7 (allocate 假分支) / C1 (强 schema)/ C5 (可施工率) / C8 (BlueprintHash) + §4.bis 12 条 + §4.ter 5 条 + §16.7 4 条 = **21 条 Validator check** |
+| 关联 H/M 条目 | H6 (allocateFrequenciesRandom/Optimized 转调假象) / H11 (channel modelName 多级回落) / H16 (`+csrd/+catalog/+profile/` 不存在) / H17 部分（Validator 不存在）/ D5 (modelNames{1} 兜底) / D7 (allocate 假分支) / C1 (强 schema)/ C5 (可施工率) / C8 (BlueprintHash) + §4.bis 12 条 + §4.ter 5 条 + §16.7 4 条 = **21 条 Validator check** |
 | 前置 | Phase 1 已 Frozen（`signal struct` 字段契约 / mergeChannelOutput 白名单 / Channel Seed 含 BurstId / RFImpairments + RxImpairments 全集落地）|
 | 目标产出 | **14** 个 profile `.m`（7 bands + 3 receivers + 3 phaseNoise + 1 antennaCompat + 1 loader）/ **2** 个 blueprint 工具 `.m`（computeBlueprintHash + BlueprintFeasibilityValidator）/ **1** 个 ScenarioFactory 改造（resample loop）/ **3** 处死代码删除（D7 两个 + D5 一处，D5 待 §1.4 决策）/ **6** 个新单测套（profileLoader / 14 profile 数值 / hash roundtrip / 21 条 validator 正反样本 / resample loop / D5 削路径）/ baseline JSON 重生成 |
 | 预估耗时 | 实施 ~2 个工作日；S8 全套测试 ~12 min；S9 200 场景 baseline ~75 min |
@@ -27,7 +27,7 @@
 
 | 编号 | 标题 | 当前问题 / 现状 | 处方位置 |
 |------|------|----------------|---------|
-| **P2-1** | Profile 库不存在 | `+csrd/+utils/+profile/` 整目录缺失（grep 0 命中）；v0.3 §5.bis 给出的 7 个 band + 3 个 receiver + 3 档 phaseNoise + 1 个 antenna 兼容矩阵全是文档表格，没有任何 `.m` 文件 | §3.1（14 个 .m 落地）|
+| **P2-1** | Profile 库不存在 | `+csrd/+catalog/+profile/` 整目录缺失（grep 0 命中）；v0.3 §5.bis 给出的 7 个 band + 3 个 receiver + 3 档 phaseNoise + 1 个 antenna 兼容矩阵全是文档表格，没有任何 `.m` 文件 | §3.1（14 个 .m 落地）|
 | **P2-2** | BlueprintHash 不存在 | grep `computeBlueprintHash` 在 `+csrd` 0 命中；annotation 里写的 `BlueprintHash` 字段当前是 placeholder | §3.2（typed-JSON 规范化 + SHA-256）|
 | **P2-3** | BlueprintFeasibilityValidator 不存在 | grep `BlueprintFeasibilityValidator` 在 `+csrd` 0 命中；下游 `ScenarioFactory.stepImpl` 直接消费 simulator 输出，无任何施工前可施工性检查 | §3.3（21 条 check + ValidationReport）|
 | **P2-4** | 蓝图重采样无机制 | 一旦 `step(communicationBehaviorSimulator,…)` 输出"施工失败的图纸"（带宽超 Rx 窗口、调制-天线不兼容等），下游 ChangShuo 直到调制/信道阶段才崩，整 scenario 浪费 | §3.4（ScenarioFactory 内 resample loop）|
@@ -105,8 +105,8 @@
 ### 2.1 P2-1 —— Profile 目录不存在
 
 ```bash
-$ ls +csrd/+utils/+profile/
-ls: +csrd/+utils/+profile/: No such file or directory
+$ ls +csrd/+catalog/+profile/
+ls: +csrd/+catalog/+profile/: No such file or directory
 ```
 
 ```bash
@@ -114,7 +114,7 @@ $ rg "BlueprintFeasibilityValidator|computeBlueprintHash|profileLoader" +csrd
 # 0 hits
 ```
 
-> Phase 2 必须从零创建整个 `+csrd/+utils/+profile/` 目录树（含 4 个子包 + 14 个 `.m` 文件）；同样从零创建 `+csrd/+utils/+blueprint/` 目录（含 2 个 `.m` 文件）。
+> Phase 2 必须从零创建整个 `+csrd/+catalog/+profile/` 目录树（含 4 个子包 + 14 个 `.m` 文件）；同样从零创建 `+csrd/+pipeline/+blueprint/` 目录（含 2 个 `.m` 文件）。
 
 ### 2.2 P2-3 / D5 —— ChannelFactory 三级 silent fallback
 
@@ -205,7 +205,7 @@ end
 完全照搬 §16.8.1，Phase 2 freeze 时这 14 个文件必须全部存在（grep 验证）：
 
 ```text
-+csrd/+utils/+profile/
++csrd/+catalog/+profile/
 ├── profileLoader.m                        # 唯一入口；按 (category, name) 返回 struct
 ├── +bands/
 │   ├── Broadcast_FM_VHF.m
@@ -236,7 +236,7 @@ function profile = profileLoader(category, name)
 % Inputs:
 %   category : char vector, one of {'bands','receivers','phaseNoise','antennaCompat'}
 %   name     : char vector, must match a function name in
-%              +csrd/+utils/+profile/+<category>/<name>.m
+%              +csrd/+catalog/+profile/+<category>/<name>.m
 %
 % Outputs:
 %   profile  : struct, schema depends on category (see §3.1.3)
@@ -248,7 +248,7 @@ end
 ```
 
 实施要点：
-- 用 `which(['csrd.utils.profile.' category '.' name])` 探测存在性
+- 用 `which(['csrd.catalog.profile.' category '.' name])` 探测存在性
 - 用 `feval` 调对应包函数
 - 返回前调 `validateProfileSchema(category, profile)`（同文件 helper）：
   - `bands`：必含 `FrequencyRangeHz [1×2]` / `RecommendedBandwidthsHz {cell}` / `RecommendedModulationFamilies {cell}` / `TemporalPattern (char)` / `RecommendedTxAntennas [1×N]` / `TypicalNoiseFigureDb (scalar)` / `RecommendedRxProfiles {cell}`
@@ -347,13 +347,13 @@ end
 Phase 2 落地的 14 个 `.m` **当前没有任何下游消费**（§1.4-Q1 推荐 (A) Soft-import）。它们的存在只服务于：
 - Validator 内 `*ProfileBound` check（蓝图字段含 `ProfileName` 时启用）
 - 单元测试 + 文档/培训材料的引用源（避免文档表格与代码二来源漂移）
-- Phase 3 配置 migration 时直接 `csrd.utils.profile.profileLoader('bands','ISM24_WiFi24')` 即可
+- Phase 3 配置 migration 时直接 `csrd.catalog.profile.profileLoader('bands','ISM24_WiFi24')` 即可
 
 #### 3.1.5 单元测试断言点
 
 `tests/unit/ProfileLoaderTest.m`（新增，§5.2.A）：
 
-1. 14 张 profile 各跑一次 `csrd.utils.profile.profileLoader(category,name)` → 返回 struct，schema 字段全在
+1. 14 张 profile 各跑一次 `csrd.catalog.profile.profileLoader(category,name)` → 返回 struct，schema 字段全在
 2. `profileLoader('bands','NotExist')` → throws `CSRD:Profile:NotFound`
 3. `profileLoader('typo','xxx')` → throws `CSRD:Profile:NotFound`
 4. **数值校核**（防文档/代码漂移）：每张 band/receiver profile 抽 2-3 个关键字段（如 ISM24 的 `FrequencyRangeHz==[2400e6 2483.5e6]`）assertEqual
@@ -416,7 +416,7 @@ hashHex16 = hashHexFull(1:16);
 
 #### 3.2.4 与下游兼容性
 
-- Phase 1 §3.7 `stampRuntimeHeader` 已在 `Header.Runtime` 写 `BlueprintHash` 字段（当前是 placeholder `''`）。Phase 2 把 `SimulationRunner` 改为：在 stampRuntimeHeader 调用前调用 `csrd.utils.blueprint.computeBlueprintHash(scenarioBlueprint)`，把结果传入。
+- Phase 1 §3.7 `stampRuntimeHeader` 已在 `Header.Runtime` 写 `BlueprintHash` 字段（当前是 placeholder `''`）。Phase 2 把 `SimulationRunner` 改为：在 stampRuntimeHeader 调用前调用 `csrd.pipeline.blueprint.computeBlueprintHash(scenarioBlueprint)`，把结果传入。
 - **作用域**：`scenarioBlueprint` 在 Phase 2 阶段尚未有正式 schema（Phase 3 才完整定义 ScenarioBlueprint）。Phase 2 用"当前 ScenarioFactory.stepImpl 输出的 (txConfigs, rxConfigs, globalLayout) 三元组打包成 struct"作为 hash 输入；Phase 3 把它替换为正式 ScenarioBlueprint。**Hash 算法本身不需要改**——只是输入对象升级。
 
 #### 3.2.5 单元测试断言点
@@ -439,7 +439,7 @@ hashHex16 = hashHexFull(1:16);
 #### 3.3.1 类位置与签名
 
 ```matlab
-% +csrd/+utils/+blueprint/BlueprintFeasibilityValidator.m
+% +csrd/+pipeline/+blueprint/BlueprintFeasibilityValidator.m
 classdef BlueprintFeasibilityValidator < handle
     % BLUEPRINTFEASIBILITYVALIDATOR Static-only feasibility validator for
     % ScenarioBlueprint structs. Returns a structured ValidationReport
@@ -520,7 +520,7 @@ function report = validate(blueprint)
 
     report = struct( ...
         'IsFeasible',      isempty(rejects), ...
-        'BlueprintHash',   csrd.utils.blueprint.computeBlueprintHash(blueprint), ...
+        'BlueprintHash',   csrd.pipeline.blueprint.computeBlueprintHash(blueprint), ...
         'NumChecksPassed', numel(checkList) - numel(failures), ...
         'NumChecksFailed', numel(failures), ...
         'FailedChecks',    rejects, ...
@@ -613,7 +613,7 @@ while true
         step(obj.communicationBehaviorSimulator, frameId, entities);
 
     blueprint = obj.assembleBlueprint(txConfigs, rxConfigs, communicationLayout);  % §3.4.3
-    report = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(blueprint);
+    report = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(blueprint);
     if report.IsFeasible
         break;
     end
@@ -688,7 +688,7 @@ record.Header.Runtime.ValidatorVersion   = report.Provenance.ValidatorVersion;
 
 #### 3.4.5 isScenarioSkipException 白名单更新
 
-`+csrd/+utils/+scenario/isScenarioSkipException.m` 加入：
+`+csrd/+pipeline/+scenario/isScenarioSkipException.m` 加入：
 
 ```matlab
 'CSRD:Blueprint:Unsamplable'
@@ -810,23 +810,23 @@ error('CSRD:Blueprint:ChannelModelMismatch', ...
 
 | 路径 | 角色 | 来源 |
 |------|------|------|
-| `+csrd/+utils/+profile/profileLoader.m` | Profile 唯一入口 | §3.1.2 |
-| `+csrd/+utils/+profile/+bands/Broadcast_FM_VHF.m` | Band profile | §3.1.3.A |
-| `+csrd/+utils/+profile/+bands/Broadcast_AM_MW.m` | Band profile | 同上 |
-| `+csrd/+utils/+profile/+bands/ISM24_WiFi24.m` | Band profile | 同上 |
-| `+csrd/+utils/+profile/+bands/ISM58_WiFi5.m` | Band profile | 同上 |
-| `+csrd/+utils/+profile/+bands/NR_n28.m` | Band profile | 同上 |
-| `+csrd/+utils/+profile/+bands/NR_n78.m` | Band profile | 同上 |
-| `+csrd/+utils/+profile/+bands/NR_n79.m` | Band profile | 同上 |
-| `+csrd/+utils/+profile/+receivers/PortableMonitor_40MHz.m` | Receiver profile | §3.1.3.B |
-| `+csrd/+utils/+profile/+receivers/LabAnalyzer_160MHz.m` | Receiver profile | 同上 |
-| `+csrd/+utils/+profile/+receivers/DenseArrayStation_200MHz.m` | Receiver profile | 同上 |
-| `+csrd/+utils/+profile/+phaseNoise/Low.m` | PhaseNoise level | §3.1.3.C |
-| `+csrd/+utils/+profile/+phaseNoise/Mid.m` | PhaseNoise level | 同上 |
-| `+csrd/+utils/+profile/+phaseNoise/High.m` | PhaseNoise level | 同上 |
-| `+csrd/+utils/+profile/+antennaCompat/AntennaModulationMatrix.m` | Antenna 兼容矩阵 | §3.1.3.D |
-| `+csrd/+utils/+blueprint/computeBlueprintHash.m` | BlueprintHash 入口 | §3.2 |
-| `+csrd/+utils/+blueprint/BlueprintFeasibilityValidator.m` | Validator 类 | §3.3 |
+| `+csrd/+catalog/+profile/profileLoader.m` | Profile 唯一入口 | §3.1.2 |
+| `+csrd/+catalog/+profile/+bands/Broadcast_FM_VHF.m` | Band profile | §3.1.3.A |
+| `+csrd/+catalog/+profile/+bands/Broadcast_AM_MW.m` | Band profile | 同上 |
+| `+csrd/+catalog/+profile/+bands/ISM24_WiFi24.m` | Band profile | 同上 |
+| `+csrd/+catalog/+profile/+bands/ISM58_WiFi5.m` | Band profile | 同上 |
+| `+csrd/+catalog/+profile/+bands/NR_n28.m` | Band profile | 同上 |
+| `+csrd/+catalog/+profile/+bands/NR_n78.m` | Band profile | 同上 |
+| `+csrd/+catalog/+profile/+bands/NR_n79.m` | Band profile | 同上 |
+| `+csrd/+catalog/+profile/+receivers/PortableMonitor_40MHz.m` | Receiver profile | §3.1.3.B |
+| `+csrd/+catalog/+profile/+receivers/LabAnalyzer_160MHz.m` | Receiver profile | 同上 |
+| `+csrd/+catalog/+profile/+receivers/DenseArrayStation_200MHz.m` | Receiver profile | 同上 |
+| `+csrd/+catalog/+profile/+phaseNoise/Low.m` | PhaseNoise level | §3.1.3.C |
+| `+csrd/+catalog/+profile/+phaseNoise/Mid.m` | PhaseNoise level | 同上 |
+| `+csrd/+catalog/+profile/+phaseNoise/High.m` | PhaseNoise level | 同上 |
+| `+csrd/+catalog/+profile/+antennaCompat/AntennaModulationMatrix.m` | Antenna 兼容矩阵 | §3.1.3.D |
+| `+csrd/+pipeline/+blueprint/computeBlueprintHash.m` | BlueprintHash 入口 | §3.2 |
+| `+csrd/+pipeline/+blueprint/BlueprintFeasibilityValidator.m` | Validator 类 | §3.3 |
 
 总计：**14 个 profile + 2 个 blueprint = 17 个新 `.m`**
 
@@ -887,7 +887,7 @@ case 'phase2'
 
 | Step | 范围 | 估时 | 验证 |
 |------|------|------|------|
-| **S1** | 落地 14 个 profile `.m`（§3.1）；不改任何下游 | 4h | `which csrd.utils.profile.profileLoader` 命中；14 个 file glob 全在 |
+| **S1** | 落地 14 个 profile `.m`（§3.1）；不改任何下游 | 4h | `which csrd.catalog.profile.profileLoader` 命中；14 个 file glob 全在 |
 | **S2** | 写 ProfileLoaderTest（§3.1.5）；跑通 | 1.5h | 0 失败；20 用例全过 |
 | **S3** | 落地 `computeBlueprintHash.m` + canonicalizeBlueprint helper（§3.2）；写 ComputeBlueprintHashTest | 2.5h | 8 用例全过 |
 | **S4** | 落地 `BlueprintFeasibilityValidator.m` 类骨架 + 21 条 check（§3.3）；写 BlueprintFeasibilityValidatorTest（42 用例）+ ValidationReportTest（4 用例）| 6h | 46 用例全过 |
@@ -959,23 +959,23 @@ case 'phase2'
 
 | 类别 | 路径 | 角色 / 关联 step |
 |------|------|----------------|
-| Profile loader | `+csrd/+utils/+profile/profileLoader.m` | §3.1.2 唯一入口 / S1 |
-| Band profile (×7) | `+csrd/+utils/+profile/+bands/Broadcast_AM_MW.m` | §3.1.3.A / S1 |
-| Band profile | `+csrd/+utils/+profile/+bands/Broadcast_FM_VHF.m` | 同上 |
-| Band profile | `+csrd/+utils/+profile/+bands/ISM24_WiFi24.m` | 同上 |
-| Band profile | `+csrd/+utils/+profile/+bands/ISM58_WiFi5.m` | 同上 |
-| Band profile | `+csrd/+utils/+profile/+bands/NR_n28.m` | 同上 |
-| Band profile | `+csrd/+utils/+profile/+bands/NR_n78.m` | 同上 |
-| Band profile | `+csrd/+utils/+profile/+bands/NR_n79.m` | 同上 |
-| Receiver profile (×3) | `+csrd/+utils/+profile/+receivers/PortableMonitor_40MHz.m` | §3.1.3.B / S1 |
-| Receiver profile | `+csrd/+utils/+profile/+receivers/LabAnalyzer_160MHz.m` | 同上 |
-| Receiver profile | `+csrd/+utils/+profile/+receivers/DenseArrayStation_200MHz.m` | 同上 |
-| PhaseNoise level (×3) | `+csrd/+utils/+profile/+phaseNoise/Low.m` | §3.1.3.C / S1 |
-| PhaseNoise level | `+csrd/+utils/+profile/+phaseNoise/Mid.m` | 同上 |
-| PhaseNoise level | `+csrd/+utils/+profile/+phaseNoise/High.m` | 同上 |
-| Antenna 兼容矩阵 | `+csrd/+utils/+profile/+antennaCompat/AntennaModulationMatrix.m` | §3.1.3.D / S1 |
-| BlueprintHash | `+csrd/+utils/+blueprint/computeBlueprintHash.m`（含 6 个 local `canonicalize*` helpers）| §3.2 / S3 |
-| Validator + ValidationReport schema | `+csrd/+utils/+blueprint/BlueprintFeasibilityValidator.m`（21 条静态 check + ValidationReport 由 `validate` 直接构造，**无独立 .m**）| §3.3 / S4 |
+| Profile loader | `+csrd/+catalog/+profile/profileLoader.m` | §3.1.2 唯一入口 / S1 |
+| Band profile (×7) | `+csrd/+catalog/+profile/+bands/Broadcast_AM_MW.m` | §3.1.3.A / S1 |
+| Band profile | `+csrd/+catalog/+profile/+bands/Broadcast_FM_VHF.m` | 同上 |
+| Band profile | `+csrd/+catalog/+profile/+bands/ISM24_WiFi24.m` | 同上 |
+| Band profile | `+csrd/+catalog/+profile/+bands/ISM58_WiFi5.m` | 同上 |
+| Band profile | `+csrd/+catalog/+profile/+bands/NR_n28.m` | 同上 |
+| Band profile | `+csrd/+catalog/+profile/+bands/NR_n78.m` | 同上 |
+| Band profile | `+csrd/+catalog/+profile/+bands/NR_n79.m` | 同上 |
+| Receiver profile (×3) | `+csrd/+catalog/+profile/+receivers/PortableMonitor_40MHz.m` | §3.1.3.B / S1 |
+| Receiver profile | `+csrd/+catalog/+profile/+receivers/LabAnalyzer_160MHz.m` | 同上 |
+| Receiver profile | `+csrd/+catalog/+profile/+receivers/DenseArrayStation_200MHz.m` | 同上 |
+| PhaseNoise level (×3) | `+csrd/+catalog/+profile/+phaseNoise/Low.m` | §3.1.3.C / S1 |
+| PhaseNoise level | `+csrd/+catalog/+profile/+phaseNoise/Mid.m` | 同上 |
+| PhaseNoise level | `+csrd/+catalog/+profile/+phaseNoise/High.m` | 同上 |
+| Antenna 兼容矩阵 | `+csrd/+catalog/+profile/+antennaCompat/AntennaModulationMatrix.m` | §3.1.3.D / S1 |
+| BlueprintHash | `+csrd/+pipeline/+blueprint/computeBlueprintHash.m`（含 6 个 local `canonicalize*` helpers）| §3.2 / S3 |
+| Validator + ValidationReport schema | `+csrd/+pipeline/+blueprint/BlueprintFeasibilityValidator.m`（21 条静态 check + ValidationReport 由 `validate` 直接构造，**无独立 .m**）| §3.3 / S4 |
 
 > 实施时偏离设计：§4 表格曾把 `ValidationReport` 列为独立 `.m`，落地时改为 `validate()` 返回的 plain struct（不需要类）—— 既满足 §16.7.2 字段契约又减少一个无值类型层。
 
@@ -991,7 +991,7 @@ case 'phase2'
 | `+csrd/+factories/ChannelFactory.m` | 删除 `modelNames{1}` silent fallback（D5）；增 Hidden static helper `resolveChannelModelName` 暴露给单测；缺 model 直接 throw `CSRD:Blueprint:ChannelModelMismatch` | S7 |
 | `+csrd/+core/@ChangShuo/ChangShuo.m` | 加 Hidden public `getScenarioBlueprintProvenance()` 方法（从 `Factories.Scenario.LastValidationReport` 读 hash/resamples/version）；修复 `report.Provenance.ValidatorVersion` 字段路径 | S5 / S9 |
 | `+csrd/SimulationRunner.m` | `executeScenario` 调用 `getScenarioBlueprintProvenance` 并通过 `injectBlueprintProvenance` 注入 `Header.Runtime.{BlueprintHash, BlueprintResamples, ValidatorVersion}`（**注**：本字段集设计阶段 §10 Q-extra-implementation-note 原列入 Phase 3，S9 baseline coverage 验收时拉回 Phase 2 一并落地，因此 BlueprintProvenanceCoverage=1.0 已可在 baseline JSON 中验证）；移除 `ismethod` 守卫（MATLAB 对 Hidden 方法返回 false）改 try/catch | S5 / S9 |
-| `+csrd/+utils/+scenario/isScenarioSkipException.m` | 加 `CSRD:Blueprint:Unsamplable` 到白名单（resample 耗尽时 sweep 不崩） | S5 |
+| `+csrd/+pipeline/+scenario/isScenarioSkipException.m` | 加 `CSRD:Blueprint:Unsamplable` 到白名单（resample 耗尽时 sweep 不崩） | S5 |
 | `tests/run_all_tests.m` | 新增 `'phase2'` subset，含 10 个测试套（§5.3） | S8 |
 | `tests/regression/baseline_recipe_v0.m` | **Phase 2 限制**：所有 cohort `RxRange = [1, 1]`（避开 Validator #13 ReceiverViewProjectionPresent 拒绝 multi-Rx 蓝图）；含说明性长 comment 标注 Phase 3 解除条件；Recipe SHA 由 Phase 0 的 `fca271f0…` → Phase 2 的 `873b0cc8…` | S9 |
 | `tests/regression/test_baseline_sweep_200.m` | 每场景独立 session 目录（`reset()`+`initialize(perScenarioDir)`）避免 annotation 互相覆盖；改用 `scenario_000001_annotation.json` 固定文件名（runner 内部恒以 sid=1 处理）；`localCountLogLinesForScenario` 改按 newline 数量计；`BlueprintProvenanceCoverage` 改按 `BlueprintHash` 与 `ValidatorVersion` 双非空率统计；新增 `requiredKeys` 列表中四项 provenance metric 断言 | S5 / S9 |

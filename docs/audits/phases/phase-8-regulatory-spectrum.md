@@ -151,7 +151,7 @@ is built.
 
 The Phase 8 closure rule is therefore tightened:
 
-- `+csrd/+utils/+spectrum/{RegionSpectrumCatalog,RegionSpectrumSelector,RegulatoryValidator}.m`
+- `+csrd/+catalog/+spectrum/{RegionSpectrumCatalog,RegionSpectrumSelector,RegulatoryValidator}.m`
   is part of the mandatory runtime surface, not optional research data.
 - `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/allocateFrequenciesFromRegulatoryPlan.m`
   is part of the mandatory scenario allocation surface.

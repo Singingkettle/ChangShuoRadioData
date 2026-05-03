@@ -37,7 +37,7 @@ runtime hard gate for normal release readiness.
   contracts.
 - Receiver-view projection is persisted per source per receiver.
 - Doppler and measured truth are recorded in annotation v2.
-- `csrd.utils.annotation.readAnnotationV2` validates annotation v2.
+- `csrd.pipeline.annotation.readAnnotationV2` validates annotation v2.
 - `tools/convert_csrd_to_coco.m` exports a minimal receiver-frequency COCO
   representation.
 - Release readiness and release CI readiness tools are available under

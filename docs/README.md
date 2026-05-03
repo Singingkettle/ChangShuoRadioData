@@ -8,11 +8,25 @@ The CSRD framework supports a modular configuration system that provides configu
 
 ```matlab
 % Load the complete modular configuration
-config = csrd.utils.config_loader('csrd2025/csrd2025.m');
+config = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
 % Use in simulation  
 simulation(1, 1, 'csrd2025/csrd2025.m');
 ```
+
+## Runtime Contract Notes
+
+Phase 17 makes `Factories.Scenario.Global.FrameNumSamples` the only frame-length authority. Do not set `Runner.FixedFrameLength` or `Factories.Scenario.Global.FrameLength`; both are rejected. When a config changes receiver sample rate, frame sample count, or frame count, keep the four frame fields numerically consistent:
+
+```matlab
+config.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate = 20e6;
+config.Factories.Scenario.Global.NumFramesPerScenario = 1;
+config.Factories.Scenario.Global.FrameNumSamples = 262144;
+config.Factories.Scenario.Global.FrameDuration = 262144 / 20e6;
+config.Factories.Scenario.Global.ObservationDuration = 262144 / 20e6;
+```
+
+The loader stamps derived runtime metadata after validation. Execution blocks must not fill missing bandwidth, sample-rate, antenna-count, message-length, or channel-seed fields with defaults.
 
 ## Directory Structure
 
@@ -42,10 +56,10 @@ config/
 
 ```matlab
 % Use default configuration  
-config = csrd.utils.config_loader();
+config = csrd.runtime.config_loader();
 
 % Use specific configuration
-config = csrd.utils.config_loader('csrd2025/csrd2025.m');
+config = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 ```
 
 ### 2. Configuration Inheritance
@@ -124,7 +138,7 @@ To create new modular configurations:
 1. **Start with the example**: Use `csrd2025/csrd2025.m` as a template
 2. **Choose base configs**: Select appropriate base configurations from `_base_/`
 3. **Customize parameters**: Override specific parameters for your use case
-4. **Test your config**: Use `csrd.utils.config_loader('your_config.m')`
+4. **Test your config**: Use `csrd.runtime.config_loader('your_config.m')`
 5. **Use in simulation**: Call `simulation(1, 1, 'your_config.m')`
 
 ### Framework Integration
@@ -168,4 +182,4 @@ Use `csrd2025/csrd2025.m` as a template for creating your own configurations.
 3. **Inheritance System**: Reuse and extend configurations efficiently
 4. **Clear Examples**: `csrd2025` provides a complete working example
 5. **Easy Maintenance**: Modular organization makes configs easier to understand and modify
-6. **Full CSRD Support**: Complete coverage of all framework components and factories 
+6. **Full CSRD Support**: Complete coverage of all framework components and factories

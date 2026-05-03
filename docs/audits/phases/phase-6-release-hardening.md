@@ -241,7 +241,7 @@ S5 converter 对本地 final-v04 样例 annotation 做只读回放时发现：
 | S1 | ✅ | 新增本文件，明确 Phase 6 是 release hardening / performance diagnostics / annotation v2 toolchain，不是 truth contract 续改 |
 | S2 | ✅ | 顶层 audit 升 `Draft v0.5.0`，README 增 Phase 6 Draft 入口；S8 已统一改为 Frozen |
 | S3 | ✅ | 新增 `tools/release/run_csrd_release_readiness.m`，只读校验 final-v04、Phase 0-6 文档、CI static gates 与可选 git clean |
-| S4 | ✅ | 新增 `+csrd/+utils/+annotation/readAnnotationV2.m`、`tests/unit/ReadAnnotationV2Test.m`、`tests/regression/test_phase6_release_readiness.m`；`tests/run_all_tests.m` 增 `phase6` selector |
+| S4 | ✅ | 新增 `+csrd/+pipeline/+annotation/readAnnotationV2.m`、`tests/unit/ReadAnnotationV2Test.m`、`tests/regression/test_phase6_release_readiness.m`；`tests/run_all_tests.m` 增 `phase6` selector |
 | S5 | ✅ | `tools/convert_csrd_to_coco.m` 改为 annotation v2-only minimal converter；采用 receiver-frequency canvas，不生成虚构时域 bbox；新增 `tests/unit/ConvertCsrdToCocoTest.m` 与 `tests/regression/test_phase6_coco_converter_fixture.m`；真实 smoke 回放发现并修复 `Truth.Design` 传播断点 |
 | S6 | ✅ | 新增 `tools/phase6/run_phase6_performance_diagnostics.m` 与 `docs/audits/reports/phase-6-performance-diagnostics.md`；默认只读 baseline + static hotspot，不跑仿真；microbench 必须显式 opt-in |
 | S7 | ✅ | 新增 `tools/release/run_csrd_release_ci_readiness.m` 与 `docs/audits/reports/phase-6-ci-readiness.md`；聚合 release readiness、phase6 suite、performance diagnostics、CI smoke；quick regression 明确记录 long-check skip |

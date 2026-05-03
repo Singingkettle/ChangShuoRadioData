@@ -15,7 +15,7 @@ tools/simulation.m
 
 Earlier Phase 8 tests exercised `SimulationRunner` and lower-level factories
 directly. This phase adds a higher-level gate: generated configs are loaded
-through `csrd.utils.config_loader`, then executed by `simulation(1, 1, path)`.
+through `csrd.runtime.config_loader`, then executed by `simulation(1, 1, path)`.
 The resulting annotation v2 files must prove that the generated signal, scene
 state, and annotation still describe the same event.
 

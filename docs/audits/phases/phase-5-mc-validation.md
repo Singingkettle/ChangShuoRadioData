@@ -81,7 +81,7 @@ Phase 5 启动时发现的事实：
 - `README.md` 仍写 Phase 1 为 Next、Phase 2-4 Pending，Phase 5 包含 migration tooling（S2 已修）。
 - 顶层 audit §17.7 仍写 `tools/migrate_annotation_v1_to_v2.m` 和迁移 roundtrip 出口条件（S2 已修）。
 - `docs/audits/phases/phase-4-measurement.md` 已明确 owner 决议 `A_full_replace`，不做迁移工具。
-- `+csrd/+utils/+scenario/isScenarioSkipException.m` 文档和 token 列表只有 `CSRD:Annotation:`，缺 `CSRD:Measurement:`（S3 已修）。
+- `+csrd/+pipeline/+scenario/isScenarioSkipException.m` 文档和 token 列表只有 `CSRD:Annotation:`，缺 `CSRD:Measurement:`（S3 已修）。
 - `processChannelPropagation.m` 中非 skip channel error 被记录后继续（S4 已修）。
 - `ChannelFactory.m` 中 channel block step 失败会返回带 `Error='ChannelBlockStepFailed'` 的信号结构（S4 已修）。
 - `processReceiverProcessing.m` 中 receiver error 会写 `Status='Error'` annotation 继续（S5 已修）。

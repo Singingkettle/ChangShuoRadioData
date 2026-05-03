@@ -4,7 +4,7 @@ Status: Phase 7 validated, aligned with Phase 4-6 Frozen contracts.
 
 This document describes the frozen annotation v2 shape used by the refactored
 CSRD pipeline. Annotation v2 is not a compatibility layer for legacy v1 fields.
-Consumers should read it through `csrd.utils.annotation.readAnnotationV2`.
+Consumers should read it through `csrd.pipeline.annotation.readAnnotationV2`.
 
 ## Core Rule
 
@@ -30,7 +30,7 @@ The root annotation contains `Frames`. A runtime header is expected for release
 artifacts:
 
 ```matlab
-reader = csrd.utils.annotation.readAnnotationV2(annotationPath, ...
+reader = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
     'RequireSources', true, ...
     'RequireRuntimeHeader', true);
 ```
@@ -103,11 +103,19 @@ It is not inferred from IQ.
 | `DopplerShiftHz` | Hz | Applied Doppler shift if external Doppler is used |
 | `RadialVelocityMps` | m/s | Link radial velocity |
 | `GeometrySnapshot` | struct | Tx/Rx positions, velocities, and distance in meters |
+| `MapProfile` | struct | Optional RayTracing/OSM execution map profile |
+| `RayCount` | count | Optional number of ray paths returned by RayTracing |
+| `ChannelFallback` | text | Optional explicit fallback used by RayTracing, such as flat-terrain free-space attenuation |
 
 `GeometrySnapshot` contains `TxPositionM`, `TxVelocityMps`, `RxPositionM`,
 `RxVelocityMps`, and `LinkDistanceM`. `RadialVelocityMps` is computed from the
 relative velocity `TxVelocityMps - RxVelocityMps` projected onto the Tx-to-Rx
 line of sight, so receiver-only mobility is represented in both IQ and labels.
+
+When OSM RayTracing is used, `MapProfile` records whether the run used
+`OSMBuildings` or `FlatTerrain`, whether buildings were present, and the
+executed `ChannelModel`. Empty/no-building OSM cases must expose any
+`ChannelFallback` rather than silently claiming a richer path than was run.
 
 ## Truth.Measured
 

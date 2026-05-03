@@ -82,7 +82,7 @@ relevant result is recorded.
   hardening changes.
 - The diff against `bc3abc438fbd65363db102efb23ba36a4296a392` includes the
   mandatory Phase 8 runtime files:
-  `+csrd/+utils/+spectrum/{RegionSpectrumCatalog,RegionSpectrumSelector,RegulatoryValidator}.m`
+  `+csrd/+catalog/+spectrum/{RegionSpectrumCatalog,RegionSpectrumSelector,RegulatoryValidator}.m`
   and
   `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/allocateFrequenciesFromRegulatoryPlan.m`.
 - `git diff --check bc3abc438fbd65363db102efb23ba36a4296a392` reported no
@@ -177,4 +177,9 @@ spectrum / relative-Doppler hardening are wired through the project-level
 entrypoints available in this workspace. The full gate set passed with one
 documented environment limitation: building OSM ray-tracing coverage is skipped
 because this MATLAB runtime lacks RF propagation site functions, while the
-flat-terrain OSM fallback path is covered and explicitly logged.
+  flat-terrain OSM fallback path is covered and explicitly logged.
+
+> Phase 15 correction: the building OSM skip reason above was later proven to
+> be an overly strict capability check. On the same runtime, `siteviewer`
+> exists as p-code and the building OSM smoke path executes. Phase 15 replaces
+> the old check with `csrd.runtime.capabilities.rfPropagationCapabilities`.

@@ -32,7 +32,7 @@
 | **P3-3** | `2.5 × plannedBW` magic factor | `processTransmitImpairments.m` L55-75 当 segment 无 SampleRate 时 derive；Phase 1 后 modulator 已强制 set SampleRate（processSingleSegment L75-84 throw `CSRD:Core:MissingSampleRate`），此 derive 路径已是死代码 | §3.2.B（直接删 `localResolvePlannedBandwidth` 与 derive 分支）|
 | **P3-4** | `processChannelPropagation` 三级 SampleRate fallback + Planned 透传 | `processChannelPropagation.m` L107-118 channel/segment/rxInfo 三级回落 + warning；L135-137 `if isfield(channelOutput,'Planned') component.Planned = ...`（M8 字段错位，Phase 1 附录 B 已记） | §3.2.C（收敛到 channelOutput.SampleRate 唯一来源；删 Planned 透传）|
 | **P3-5** | Receiver / Entity / Mobility magic 默认 | `setupReceivers.m` L51-61 `50e6/[-25e6,25e6]/0/2.4e9` 当 rxPlan.Observation 缺失时塞入；`createEntity.m` L98-103 boundaries 缺失时 ±1000 + warning，L32 `cell(1, 100)` 100 帧硬上限；`assignMobilityModel.m` L14-16 Tx 端 `models{randi(length(models))}` 随机 mobility | §3.3（统一改成 fail-fast；Mobility 由 PhysicalEnvironment 子树字段显式指定）|
-| **P3-6** | catch swallow + Error 字段塞入 | `processTransmitters.m` L23-31 / `processTransmitterSegments.m` L27-33 / `processTransmitImpairments.m` L85-89 / `ReceiveFactory.m` L149-158 都把任意非 Skip 异常吞成 `Status='Error_*'` / `Error='*Failed'` 字段继续 | §3.4（统一接 `csrd.utils.scenario.isScenarioSkipException` 白名单 + rethrow / 删伪继续路径）|
+| **P3-6** | catch swallow + Error 字段塞入 | `processTransmitters.m` L23-31 / `processTransmitterSegments.m` L27-33 / `processTransmitImpairments.m` L85-89 / `ReceiveFactory.m` L149-158 都把任意非 Skip 异常吞成 `Status='Error_*'` / `Error='*Failed'` 字段继续 | §3.4（统一接 `csrd.pipeline.scenario.isScenarioSkipException` 白名单 + rethrow / 删伪继续路径）|
 | **P3-7** | Provenance dataflow 经 Hidden method | `SimulationRunner.m` L327-336 `try changShuoEngine.getScenarioBlueprintProvenance() catch ...`；`ChangShuo.m` Hidden method 读 `Factories.Scenario.LastValidationReport` —— 三层耦合 + ismethod 检测不到 + try/catch 兜底，正是 Phase 2 §9.4 P3-followup-2 列出的债务 | §3.5（让 `processScenarioInstantiation` return globalLayout，annotation 阶段直接读 `ChangShuo.LastGlobalLayout`；删 Hidden method）|
 | **P3-8** | Phase 3 测试基础设施缺失 | `tests/run_all_tests.m` 只有 `phase0/phase1` selector，无 `phase2/phase3`；无 `test_no_dead_code_phase3` | §3.6（补 selector + 6 单测 + 2 回归 + dead-code grep）|
 
@@ -153,7 +153,7 @@ txPlan.ReceiverViews(m) = struct( ...
 
 ```matlab
 catch ME
-    if csrd.utils.scenario.isScenarioSkipException(ME)
+    if csrd.pipeline.scenario.isScenarioSkipException(ME)
         rethrow(ME);
     end
     obj.logger.error('...: %s', ME.message);
@@ -171,7 +171,7 @@ end
 | `ReceiveFactory.m` | L149-158 | 删除塞 `Error='ReceiverBlockStepFailed'`，rethrow |
 
 > 所有 rethrow 最终被 SimulationRunner 在 `executeScenario` try/catch 里捕获 → 走 `isScenarioSkipException` 决定是否跳过整 scenario。
-> Phase 3 同步把 `CSRD:Construction:Missing*` 系列 errorId 加入 `+csrd/+utils/+scenario/isScenarioSkipException.m` 白名单（非致命：scenario skip；致命：crash）。
+> Phase 3 同步把 `CSRD:Construction:Missing*` 系列 errorId 加入 `+csrd/+pipeline/+scenario/isScenarioSkipException.m` 白名单（非致命：scenario skip；致命：crash）。
 
 ### 3.5 P3-7 Provenance dataflow 重构
 
@@ -229,7 +229,7 @@ end
 | `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/performScenarioFrequencyAllocation.m` | 调用点同步 rxConfigs 透传 |
 | `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/generateScenarioTransmitterConfigurations.m` | 调用点同步 rxConfigs 透传到 performScenarioFrequencyAllocation |
 | `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/CommunicationBehaviorSimulator.m` | private method 签名声明同步 |
-| `+csrd/+utils/+blueprint/BlueprintFeasibilityValidator.m` | check #3 升级为 ReceiverView-aware；check #13 字段引用统一 ProjectedCenterOffsetHz |
+| `+csrd/+pipeline/+blueprint/BlueprintFeasibilityValidator.m` | check #3 升级为 ReceiverView-aware；check #13 字段引用统一 ProjectedCenterOffsetHz |
 | `tests/unit/BlueprintFeasibilityValidatorTest.m` | check #3 / #13 测试样本字段名同步 |
 | `+csrd/+core/@ChangShuo/private/processSingleSegment.m` | L116-148 改 fail-fast；buildSegmentConfig 读 ReceiverView 而非 emitter-global FrequencyOffset |
 | `+csrd/+core/@ChangShuo/private/processTransmitImpairments.m` | 删 derive 分支 + helper |
@@ -243,7 +243,7 @@ end
 | `+csrd/+core/@ChangShuo/ChangShuo.m` | 增加 LastGlobalLayout property；删 getScenarioBlueprintProvenance Hidden method；stepImpl 写 LastGlobalLayout |
 | `+csrd/+core/@ChangShuo/private/generateSingleFrame.m` | 把 globalLayout 暴露给外层（写入 obj.LastGlobalLayout） |
 | `+csrd/SimulationRunner.m` | 改读 LastGlobalLayout；删 try/catch 兜底 |
-| `+csrd/+utils/+scenario/isScenarioSkipException.m` | 加入 `CSRD:Construction:Missing*` 白名单 |
+| `+csrd/+pipeline/+scenario/isScenarioSkipException.m` | 加入 `CSRD:Construction:Missing*` 白名单 |
 | `tests/run_all_tests.m` | 加 `phase2` / `phase3` selector |
 | `tests/regression/baseline_recipe_v0.m` | 解除 cohort 1/2/3 RxRange=[1,2] |
 | `docs/baselines/2026-04-baseline-v0.json` | 重新生成（RecipeSha + 全部 metrics）|
@@ -353,7 +353,7 @@ end
 | `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/generateScenarioTransmitterConfigurations.m` | 调用点同步 `rxConfigs` 传参 | S2 |
 | `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/performScenarioFrequencyAllocation.m` | 同步 ReceiverViews schema 流转 | S2 |
 | `+csrd/+blocks/+scenario/@CommunicationBehaviorSimulator/private/calculateTransmissionState.m` / `generateFrameConfigurations.m` / `getDefaultConfiguration.m` | 配套同步 ReceiverViews schema | S2 |
-| `+csrd/+utils/+blueprint/BlueprintFeasibilityValidator.m` | check #3 `TxBwInsideRxWindow` 升级为 ReceiverView-aware（用 ProjectedLowerEdge/Upper 比对 Rx ObservableRange）；check #13 `ReceiverViewProjectionPresent` 字段名统一 ProjectedCenterOffsetHz；新增 `extractTxOffsetAndHalfBw` / `resolveObservableRange` 私有助手 | S1 |
+| `+csrd/+pipeline/+blueprint/BlueprintFeasibilityValidator.m` | check #3 `TxBwInsideRxWindow` 升级为 ReceiverView-aware（用 ProjectedLowerEdge/Upper 比对 Rx ObservableRange）；check #13 `ReceiverViewProjectionPresent` 字段名统一 ProjectedCenterOffsetHz；新增 `extractTxOffsetAndHalfBw` / `resolveObservableRange` 私有助手 | S1 |
 | `+csrd/+core/@ChangShuo/ChangShuo.m` | 新增 public read-only property `LastGlobalLayout`；声明 5 个 `Static, Hidden` 方法（`buildSegmentConfigFromTxScenario` / `assertSegmentSignalReadyForImpairments` / `assertChannelOutputSampleRate` / `lookupReceiverViewOffset` / `validateRxPlanIntoRxInfo` / `extractProvenanceFromGlobalLayout`）；**删** `getScenarioBlueprintProvenance` Hidden 方法 | S4 + S5 + S7 |
 | `+csrd/+core/@ChangShuo/private/generateSingleFrame.m` | `processScenarioInstantiation` 输出的 `globalLayout` 直接写入 `obj.LastGlobalLayout`（取代 Phase 2 隐式经由 ScenarioFactory 的 read-back） | S7 |
 | `+csrd/+core/@ChangShuo/private/processScenarioInstantiation.m` | `globalLayout` 出参流向 `LastGlobalLayout` | S7 |
@@ -370,10 +370,10 @@ end
 | `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/PhysicalEnvironmentSimulator.m` | 新增 `Static, Hidden` `assignMobilityModel(entityType, entityConfig)`：从 `entityConfig.Mobility.Model` 显式读取，缺即 `CSRD:Construction:MissingMobilityModel`；**删** `private/assignMobilityModel.m`（旧签名内含 `models{randi(length(models))}` 随机选择，D11/H8） | S5 |
 | `+csrd/+factories/ChannelFactory.m` | 接 ReceiverView 视角的 `txInfo.FrequencyOffset`（Phase 1 已有该字段，Phase 3 确保它来自 ReceiverViews 而非 emitter-global）；catch 块沿用 Phase 2 `isScenarioSkipException` 白名单（不变） | S3 |
 | `+csrd/+factories/ReceiveFactory.m` | catch 块改 rethrow with `isScenarioSkipException` 白名单；**删** `Error='ReceiverBlockStepFailed'` 字段塞入 silent-continue 路径 | S6 |
-| `+csrd/+factories/ScenarioFactory.m` | `setup(physicalEnvironmentSimulator)` catch 块改用 `csrd.utils.scenario.isScenarioSkipException` 共享谓词，删 `contains(identifier,'NoBuildingData')` magic-string 翻译为 `ScenarioFactory:SkipScenario` 的多余 hop | S6 + S9 |
+| `+csrd/+factories/ScenarioFactory.m` | `setup(physicalEnvironmentSimulator)` catch 块改用 `csrd.pipeline.scenario.isScenarioSkipException` 共享谓词，删 `contains(identifier,'NoBuildingData')` magic-string 翻译为 `ScenarioFactory:SkipScenario` 的多余 hop | S6 + S9 |
 | `+csrd/+factories/TransmitFactory.m` | 同步 segment-level FrequencyOffset 接收 Phase 3 schema | S3 |
 | `+csrd/SimulationRunner.m` | 改读 `changShuoEngine.LastGlobalLayout`；调 `csrd.core.ChangShuo.extractProvenanceFromGlobalLayout` 静态助手；**删** Phase 2 `try/catch` + `ismethod` 兜底 | S7 |
-| `+csrd/+utils/+scenario/isScenarioSkipException.m` | 白名单加入 `CSRD:Construction:` token 前缀（涵盖所有 P3-2 / P3-3 / P3-4 / P3-5 fail-fast 错误） | S6 |
+| `+csrd/+pipeline/+scenario/isScenarioSkipException.m` | 白名单加入 `CSRD:Construction:` token 前缀（涵盖所有 P3-2 / P3-3 / P3-4 / P3-5 fail-fast 错误） | S6 |
 | `tests/run_all_tests.m` | 新增 `phase2` / `phase3` selector + 配套 `runPhase2Suite` / `runPhase3Suite` / `appendUnittestClasses` / `appendRegressionTests` 助手 | S8 |
 | `tests/regression/baseline_recipe_v0.m` | 解除 cohort 1/2/3 (Sub-3GHz 三组共 120 场景) `RxRange = [1, 1]` → `[1, 2]`（§10 Q2 = B 保守恢复）；保留 cohort 4/5/6/7 (RT + 广播 80 场景) `[1, 1]`；Recipe SHA：Phase 2 `873b0cc8…` → Phase 3 `db6d4bed…` | S8 |
 | `tests/regression/Phase0FakeEngine.m` | 新增 `LastGlobalLayout = struct()` public read-only 占位，保持 `test_simulation_runner_startup_hooks` 与 Phase 3 SimulationRunner 接口一致 | S9 |
@@ -438,7 +438,7 @@ end
 | **P4-followup-1** | `test_baseline_sweep_200` 的 `localScoreSource` 在 Phase 1 annotation 拆 Planned/Realized 子树后未跟进，`RealizedVsPlannedBwAbsRelDiffP95` 收成 `[]`；Phase 4 annotation v2 namespace 与该 metric 一并修 | `tests/regression/test_baseline_sweep_200.m:401-468` |
 | **P4-followup-2** | multi-Rx 场景比例由 `randi([Min, Max])` 控制，120 场景上分布有 ±1 σ 统计抖动（实测 55 vs 期望 60）；可考虑加 `RxRange = [2, 2]` 强制 cohort 让 ratio 严格可控 | `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/initializeEntities.m` |
 | **P4-followup-3** | `Emitter.ReceiverViews` 5 字段当前只在 blueprint / globalLayout 内活动，未持久化到 annotation JSON；Phase 4 annotation v2 namespace（audit §11 / §16.10.3）落地时一并写到 `Annotation.V2.Emitters[k].ReceiverViews[m]` | `+csrd/+core/@ChangShuo/private/processReceiverProcessing.m`（annotation builder） |
-| **P4-followup-4** | `MeasurementCompleteness` / `DopplerSelfConsistency` 两条 stub check 仍 `Severity='Skip'`，依赖 Phase 4 MeasuredTruth 落地后切 `Severity='Reject'` | `+csrd/+utils/+blueprint/BlueprintFeasibilityValidator.m` |
+| **P4-followup-4** | `MeasurementCompleteness` / `DopplerSelfConsistency` 两条 stub check 仍 `Severity='Skip'`，依赖 Phase 4 MeasuredTruth 落地后切 `Severity='Reject'` | `+csrd/+pipeline/+blueprint/BlueprintFeasibilityValidator.m` |
 | **P4-followup-5** | `OverlapAnnotationConsistent` Phase 2 列为 stub，Phase 3 未涉及；Phase 4 真实化 segment-level overlap annotation | 同上 |
 
 ---
