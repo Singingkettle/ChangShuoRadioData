@@ -1,4 +1,5 @@
 # Phase 0 详细设计：基线 + 底座
+> Historical snapshot / 历史快照：本文记录当时的审计或交接状态，可能保留旧路径、旧 TODO 或过渡期说明。当前目录结构以 `README.md` 和 `docs/architecture/source-layout.md` 为准。
 
 **关联顶层 audit**: [`docs/audits/2026-04-spectrum-blueprint-construction-refactor.md`](../2026-04-spectrum-blueprint-construction-refactor.md) §17.2
 **版本**: Phase 0 design v0.1（同 audit v0.4.1 一并交付）

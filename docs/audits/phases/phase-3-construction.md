@@ -1,4 +1,5 @@
 # Phase 3 详细设计 —— 施工层严格化（ReceiverViews + Fail-Fast + Provenance Dataflow）
+> Historical snapshot / 历史快照：本文记录当时的审计或交接状态，可能保留旧路径、旧 TODO 或过渡期说明。当前目录结构以 `README.md` 和 `docs/architecture/source-layout.md` 为准。
 
 | 字段 | 值 |
 |------|----|

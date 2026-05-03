@@ -1,162 +1,69 @@
-# Weather Configuration Guide for PhysicalEnvironment
+# Weather Configuration Guide / 天气配置指南
 
-This guide explains how to configure weather conditions for the `PhysicalEnvironmentSimulator` in the CSRD framework.
+Weather is part of the physical-environment plan produced by
+`PhysicalEnvironmentSimulator`. It is configured under:
 
-## Configuration Structure
-
-The weather configuration is organized under the PhysicalEnvironment section:
-
-```matlab
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.*
-```
-
-## Configuration Sections
-
-### 1. Enable/Disable Weather Simulation
+天气属于 `PhysicalEnvironmentSimulator` 负责的物理环境规划，配置路径为：
 
 ```matlab
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Enable = true;
+config.Factories.Scenario.PhysicalEnvironment.Environment.Weather
 ```
 
-### 2. Initial Weather Conditions
+Default values live in:
 
-Set the starting weather conditions for the simulation:
+- `config/_base_/factories/scenario_factory.m`
+- `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/getDefaultConfiguration.m`
+
+Runtime handling lives in:
+
+- `initializeEnvironment.m`
+- `updateEnvironmentalConditions.m`
+- `updateWeatherConditions.m`
+
+## Fields / 字段
 
 ```matlab
-% Temperature in Celsius
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Temperature = 20; 
+weather.Enable = true;
 
-% Humidity percentage (0-100)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Humidity = 50; 
+weather.InitialConditions.Temperature = 20;   % Celsius / 摄氏度
+weather.InitialConditions.Humidity = 50;      % percent / 百分比
+weather.InitialConditions.Pressure = 1013;    % hPa
+weather.InitialConditions.WindSpeed = 0;      % m/s
+weather.InitialConditions.WindDirection = 0;  % degrees / 度
 
-% Atmospheric pressure in hPa
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Pressure = 1013; 
+weather.Evolution.TemperatureVariation = 0.1;
+weather.Evolution.HumidityVariation = 0.5;
+weather.Evolution.PressureVariation = 0.1;
+weather.Evolution.WindSpeedVariation = 0.2;
+weather.Evolution.WindDirectionVariation = 5;
 
-% Wind speed in m/s
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.WindSpeed = 0; 
-
-% Wind direction in degrees (0-360)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.WindDirection = 0; 
+weather.Constraints.TemperatureRange = [-40, 60];
+weather.Constraints.HumidityRange = [0, 100];
+weather.Constraints.PressureRange = [900, 1100];
+weather.Constraints.WindSpeedRange = [0, 50];
 ```
 
-### 3. Weather Evolution Parameters
+## Example / 示例
 
-Control how weather conditions change over time (standard deviation for random variations):
+Use the checked-in example as a starting point:
+
+使用已有示例作为模板：
 
 ```matlab
-% Temperature variation (°C)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.TemperatureVariation = 0.1; 
+cfg = csrd.runtime.config_loader('csrd2025/weather_example.m');
 
-% Humidity variation (%)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.HumidityVariation = 0.5; 
-
-% Pressure variation (hPa)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.PressureVariation = 0.1; 
-
-% Wind speed variation (m/s)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.WindSpeedVariation = 0.2; 
-
-% Wind direction variation (degrees)
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.WindDirectionVariation = 5; 
+addpath(fullfile(pwd, 'tools'))
+simulation(1, 1, 'csrd2025/weather_example.m')
 ```
 
-### 4. Weather Constraints
+## Modeling Notes / 建模说明
 
-Set physical limits for weather parameters:
+- Weather evolution currently uses random variations around the current state.
+- Constraints clamp values to physically reasonable ranges.
+- Wind direction is kept in degree units.
+- Weather state is part of the physical environment; it should not be used to
+  silently alter RF/channel metadata unless that effect is explicitly modeled
+  and annotated.
 
-```matlab
-% Temperature range [min, max] in Celsius
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.TemperatureRange = [-40, 60]; 
-
-% Humidity range [min, max] in percentage
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.HumidityRange = [0, 100]; 
-
-% Pressure range [min, max] in hPa
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.PressureRange = [900, 1100]; 
-
-% Wind speed range [min, max] in m/s
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.WindSpeedRange = [0, 50]; 
-```
-
-## Example Weather Scenarios
-
-### Tropical Climate
-```matlab
-% Hot and humid conditions
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Temperature = 35;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Humidity = 85;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Pressure = 1010;
-
-% More dynamic variations
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.TemperatureVariation = 0.5;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.HumidityVariation = 2.0;
-
-% Tropical constraints
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.TemperatureRange = [25, 45];
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.HumidityRange = [60, 95];
-```
-
-### Arctic Climate
-```matlab
-% Cold and dry conditions
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Temperature = -20;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Humidity = 30;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Pressure = 1020;
-
-% High wind variations
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.WindSpeedVariation = 2.0;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.WindDirectionVariation = 20;
-
-% Arctic constraints
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.TemperatureRange = [-40, 10];
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.HumidityRange = [10, 70];
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.WindSpeedRange = [0, 30];
-```
-
-### Stable Indoor Environment
-```matlab
-% Controlled indoor conditions
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Temperature = 22;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Humidity = 45;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.Pressure = 1013;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.InitialConditions.WindSpeed = 0;
-
-% Minimal variations
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.TemperatureVariation = 0.05;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.HumidityVariation = 0.1;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.PressureVariation = 0.01;
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Evolution.WindSpeedVariation = 0;
-
-% Tight indoor constraints
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.TemperatureRange = [18, 26];
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.HumidityRange = [30, 60];
-config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.WindSpeedRange = [0, 1];
-```
-
-## Usage
-
-1. Create your configuration file (e.g., `my_weather_config.m`)
-2. Set the weather parameters as shown above
-3. Run your simulation with the configuration:
-
-```matlab
-config = my_weather_config();
-runner = csrd.SimulationRunner(config);
-runner.run();
-```
-
-## Notes
-
-- All weather parameters have sensible defaults if not specified
-- Weather evolution uses Gaussian random variations
-- Constraints are enforced to prevent unrealistic values
-- Wind direction is automatically kept within 0-360 degree range
-- The weather system is designed to be extensible for future enhancements
-
-## Files Modified
-
-- `config/_base_/factories/scenario_factory.m` - Base weather configuration
-- `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/updateWeatherConditions.m` - Weather evolution logic
-- `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/initializeEnvironment.m` - Weather initialization
-- `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/getDefaultConfiguration.m` - Default weather settings
-- `config/csrd2025/weather_example.m` - Complete weather configuration example 
+当前天气演化是环境状态的一部分。任何天气对传播或信道的影响，都应当显式建模并写入元数据，
+不能悄悄改变信号或标注。

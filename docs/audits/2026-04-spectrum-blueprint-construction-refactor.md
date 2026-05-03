@@ -1,4 +1,5 @@
 # 频谱感知仿真项目重构审计与实施计划
+> Historical snapshot / 历史快照：本文记录当时的审计或交接状态，可能保留旧路径、旧 TODO 或过渡期说明。当前目录结构以 `README.md` 和 `docs/architecture/source-layout.md` 为准。
 
 **状态**: Draft v0.6.0（Phase 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 已 Frozen）
 **日期**: 2026-04-27

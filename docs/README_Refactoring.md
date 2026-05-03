@@ -1,130 +1,59 @@
-# CommunicationBehaviorSimulator 重构总结
+# Refactoring Status Index / 重构状态索引
 
-## 重构概述
+This page is an index, not a design source of truth. Current source layout is
+documented in `docs/architecture/source-layout.md`; current runtime contracts
+are summarized in `docs/configuration.md`.
 
-原来的 `CommunicationBehaviorSimulator.m` 文件包含 923 行代码，过于庞大，不便于阅读和维护。按照 `PhysicalEnvironmentSimulator` 的组织方式，已将其重构为模块化结构。
+本页只作为重构状态索引。当前目录结构以 `docs/architecture/source-layout.md` 为准；
+当前运行合同以 `docs/configuration.md` 为准。
 
-## 新的文件结构
+## Current State / 当前状态
 
-```
-@CommunicationBehaviorSimulator/
-├── CommunicationBehaviorSimulator.m     # 主类文件 (180行)
-├── setupImpl.m                          # 设置实现 (27行)
-├── stepImpl.m                           # 步骤实现 (42行)
-└── private/                             # 私有方法目录 (30个文件)
-    ├── 场景配置方法
-    │   ├── initializeScenarioConfigurations.m
-    │   ├── generateFrameConfigurations.m
-    │   └── getDefaultConfiguration.m
-    ├── 实体处理方法
-    │   ├── separateEntitiesByType.m
-    │   ├── generateScenarioReceiverConfigurations.m
-    │   └── generateScenarioTransmitterConfigurations.m
-    ├── 频率分配方法
-    │   ├── performScenarioFrequencyAllocation.m
-    │   ├── allocateFrequenciesReceiverCentric.m
-    │   ├── allocateFrequenciesOptimized.m
-    │   └── allocateFrequenciesRandom.m
-    ├── 传输状态方法
-    │   ├── calculateTransmissionState.m
-    │   ├── updateBurstState.m
-    │   ├── updateScheduledState.m
-    │   ├── generateTransmissionPattern.m
-    │   ├── selectTransmissionPatternType.m
-    │   └── generateBurstParameters.m
-    ├── 配置生成方法
-    │   ├── selectReceiverType.m
-    │   ├── selectSampleRate.m
-    │   ├── selectSensitivity.m
-    │   ├── selectNoiseFigure.m
-    │   ├── selectTransmitterType.m
-    │   ├── selectTransmitPower.m
-    │   ├── calculateAntennaGain.m
-    │   ├── generateMessageConfiguration.m
-    │   ├── generateModulationConfiguration.m
-    │   └── calculateRequiredBandwidth.m
-    ├── 系统优化方法
-    │   └── optimizeSystemConfiguration.m
-    ├── 工具方法
-    │   ├── randomInRange.m
-    │   ├── checkFrequencyOverlap.m
-    │   └── initializeTransmissionScheduler.m
-```
+- Phase 0-18 have been merged into `main`.
+- Phase 18 hardened runtime truth contracts across frame/time, sample rate,
+  carrier frequency, bandwidth, power/noise, receiver view, TRF resampling, and
+  annotation measurement visibility.
+- Phase 19 realigns documentation so current docs no longer describe removed
+  paths or historical transitional states.
 
-## 重构要点
+## Handover Documents / 交接文档
 
-### 1. 方法调用规范
-- **重要**: 所有私有方法调用都使用 `fun(obj, args)` 格式，而不是 `obj.fun(args)`
-- 这符合 MATLAB 类设计的最佳实践
+- `docs/audits/HANDOVER_2026-04-26.md`: first major handover snapshot.
+- `docs/audits/HANDOVER_2026-05-03.md`: second handover snapshot before Phase 17/18 closure.
 
-### 2. 文件组织原则
-- **主类文件**: 只包含类定义、属性、构造函数和方法声明
-- **实现文件**: `setupImpl.m` 和 `stepImpl.m` 包含核心逻辑
-- **私有方法**: 按功能分组，每个方法一个文件
+Both files are historical records. They intentionally preserve past state and
+may mention paths that have since moved.
 
-### 3. 代码行数对比
-- **原文件**: 923 行 (单个文件)
-- **重构后**: 
-  - 主类文件: 180 行
-  - setupImpl.m: 27 行
-  - stepImpl.m: 42 行
-  - 私有方法: 30个文件，每个文件 5-76 行
+两份交接文档是历史记录，可能保留当时有效但现在已迁移的路径。
 
-### 4. 维护性改进
-- **模块化**: 每个功能独立成文件，便于单独维护
-- **可读性**: 文件结构清晰，方法职责明确
-- **扩展性**: 新增功能只需添加新的私有方法文件
-- **调试性**: 问题定位更精确，可以快速找到相关方法
+## Phase Documents / 阶段文档
 
-## 方法分类说明
+| Phase | Document |
+| --- | --- |
+| 0 | `docs/audits/phases/phase-0-baseline.md` |
+| 1 | `docs/audits/phases/phase-1-dataflow.md` |
+| 2 | `docs/audits/phases/phase-2-blueprint.md` |
+| 3 | `docs/audits/phases/phase-3-construction.md` |
+| 4 | `docs/audits/phases/phase-4-measurement.md` |
+| 5 | `docs/audits/phases/phase-5-mc-validation.md` |
+| 6 | `docs/audits/phases/phase-6-release-hardening.md` |
+| 7 | `docs/audits/phases/phase-7-downstream-release.md` |
+| 8 | `docs/audits/phases/phase-8-regulatory-spectrum.md` |
+| 9 | `docs/audits/phases/phase-9-simulation-entry-coverage.md` |
+| 10 | `docs/audits/phases/phase-10-full-coverage-verification.md` |
+| 11 | `docs/audits/phases/phase-11-config-and-dead-code-cleanup.md` |
+| 12 | `docs/audits/phases/phase-12-config-field-consumption-audit.md` |
+| 13 | `docs/audits/phases/phase-13-full-generation-and-comment-audit.md` |
+| 14 | `docs/audits/phases/phase-14-production-bilingual-comment-audit.md` |
+| 15 | `docs/audits/phases/phase-15-osm-raytracing-and-architecture-reorg.md` |
+| 16 | `docs/audits/phases/phase-16-osm-raytracing-stress-and-artifact-governance.md` |
+| 17 | `docs/audits/phases/phase-17-config-contract-unification.md` |
+| 18 | `docs/audits/phases/phase-18-runtime-truth-contract-hardening.md` |
 
-### 场景配置方法
-负责初始化和管理整个场景的固定配置参数。
+## Validation Evidence / 验证证据
 
-### 实体处理方法
-处理发射机和接收机实体的分离、配置生成等。
+Durable summaries belong in Markdown phase docs. Large generated manifests and
+runtime outputs belong under ignored `data/` or `artifacts/`.
 
-### 频率分配方法
-实现不同策略的频率分配算法。
-
-### 传输状态方法
-管理传输模式和状态更新逻辑。
-
-### 配置生成方法
-生成各种通信参数的配置。
-
-### 系统优化方法
-实现系统级别的性能优化。
-
-### 工具方法
-提供通用的工具函数。
-
-## 使用方式
-
-重构后的类使用方式完全不变：
-
-```matlab
-% 创建实例
-config = struct();
-config.FrequencyAllocation.Strategy = 'ReceiverCentric';
-simulator = csrd.blocks.scenario.CommunicationBehaviorSimulator('Config', config);
-
-% 使用方式相同
-[txConfigs, rxConfigs, globalLayout] = simulator(frameId, entities, factoryConfigs);
-```
-
-## 优势总结
-
-1. **可维护性**: 代码结构清晰，便于维护和修改
-2. **可读性**: 每个文件职责单一，易于理解
-3. **可扩展性**: 新增功能只需添加新的私有方法
-4. **可测试性**: 每个方法可以独立测试
-5. **团队协作**: 多人可以同时修改不同的方法文件
-6. **版本控制**: Git 等版本控制系统能更好地跟踪变更
-
-## 注意事项
-
-1. 所有私有方法文件都必须放在 `private/` 目录下
-2. 私有方法调用必须使用 `fun(obj, args)` 格式
-3. 主类文件中的方法声明必须与私有方法文件名匹配
-4. Phase 17 之后，运行合同字段不再追求旧别名兼容：`Runner.FixedFrameLength`、`Factories.Scenario.Global.FrameLength`、`SegmentID`、`SeedValue` 等旧入口应 fail-fast，避免信号、场景和标注三者描述不同事件。
+长期证据写入 Markdown 阶段文档；大型生成清单和运行输出写入 ignored 的 `data/` 或
+`artifacts/`。

@@ -1,4 +1,5 @@
 # Phase 13: Full Generation Config And Production Comment Audit
+> Historical snapshot / 历史快照：本文记录当时的审计或交接状态，可能保留旧路径、旧 TODO 或过渡期说明。当前目录结构以 `README.md` 和 `docs/architecture/source-layout.md` 为准。
 
 ## Scope
 
@@ -48,9 +49,11 @@ stay real instead of drifting back to random sampling.
   per-case config generation, public-entry simulation calls, annotation checks,
   worker sharding, and JSON summary output.
 - `csrd.support.docs.auditProductionComments` owns production file enumeration,
-  bilingual header checks, reference heading normalization, and manifest output.
-- The production comment audit manifest is written to
-  `docs/audits/reports/phase-13-production-comment-audit.json`.
+  bilingual header checks, reference heading normalization, and optional
+  manifest output.
+- The generated production comment audit manifest is no longer committed. It can
+  be regenerated with `WriteManifest=true`; the default output path is under
+  ignored `artifacts/audits/reports/`.
 
 ## Verification Log
 
