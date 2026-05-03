@@ -24,7 +24,7 @@ classdef EntitySyncFailFastTest < matlab.unittest.TestCase
                     'CSRD:Scenario:EmptyEntities', ...
                     'Identifier must be CSRD:Scenario:EmptyEntities.');
                 testCase.verifyTrue( ...
-                    csrd.utils.scenario.isScenarioSkipException(ME), ...
+                    csrd.pipeline.scenario.isScenarioSkipException(ME), ...
                     'EmptyEntities must be on the scenario-skip whitelist.');
             end
         end
@@ -32,19 +32,19 @@ classdef EntitySyncFailFastTest < matlab.unittest.TestCase
         function emptyEntitiesIdentifierIsWhitelisted(testCase)
             ME = MException('CSRD:Scenario:EmptyEntities', 'sample');
             testCase.verifyTrue( ...
-                csrd.utils.scenario.isScenarioSkipException(ME));
+                csrd.pipeline.scenario.isScenarioSkipException(ME));
         end
 
         function entityDriftIdentifierIsWhitelisted(testCase)
             ME = MException('CSRD:Scenario:EntityDriftDetected', 'sample');
             testCase.verifyTrue( ...
-                csrd.utils.scenario.isScenarioSkipException(ME));
+                csrd.pipeline.scenario.isScenarioSkipException(ME));
         end
 
         function nonRecognisedIdentifierStaysOff(testCase)
             ME = MException('Some:Other:Error', 'sample');
             testCase.verifyFalse( ...
-                csrd.utils.scenario.isScenarioSkipException(ME), ...
+                csrd.pipeline.scenario.isScenarioSkipException(ME), ...
                 'Unrelated identifiers must not become scenario-skip.');
         end
 

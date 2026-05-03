@@ -10,7 +10,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
                     'a',     NaN, ...
                     'b',     1 + 2i), ...
                 'sibling',   'ok');
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(payload);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(payload);
 
             testCase.verifyTrue(isempty(clean.outer.inner.a));
             testCase.verifyEqual(clean.outer.inner.b.Real, 1);
@@ -26,7 +26,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
             payload(1).x = NaN;
             payload(2).x = 7;
             payload(3).x = Inf;
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(payload);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(payload);
 
             testCase.verifyEqual(numel(clean), 3);
             testCase.verifyTrue(isempty(clean(1).x));
@@ -40,7 +40,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
 
         function cellArrayIsCleanedElementWise(testCase)
             payload = {1, NaN, struct('z', Inf), 'literal'};
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(payload);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(payload);
             testCase.verifyEqual(clean{1}, 1);
             testCase.verifyTrue(isempty(clean{2}));
             testCase.verifyTrue(isempty(clean{3}.z));
@@ -55,7 +55,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
             m = containers.Map( ...
                 {'alpha', 'beta'}, {NaN, 42});
             payload.config = m;
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(payload);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(payload);
             testCase.verifyTrue(isstruct(clean.config));
             testCase.verifyTrue(isempty(clean.config.alpha));
             testCase.verifyEqual(clean.config.beta, 42);
@@ -72,7 +72,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
                         'level3', struct( ...
                             'leafNan', NaN, ...
                             'leafComplex', 3 - 4i))));
-            [clean, ~] = csrd.utils.annotation.sanitizeForJson(payload);
+            [clean, ~] = csrd.pipeline.annotation.sanitizeForJson(payload);
             txt = jsonencode(clean);
             d = jsondecode(txt);
             testCase.verifyTrue(isempty(d.level1.level2.level3.leafNan));
@@ -85,7 +85,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
             % truncation marker shows up.
             payload = struct('a', struct('b', struct('c', struct('d', 'leaf'))));
             opts = struct('MaxDepth', uint32(3));
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson( ...
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson( ...
                 payload, opts);
 
             % Walk down and check that one of the leaves is the
@@ -103,7 +103,7 @@ classdef SanitizeForJsonRecursiveTest < matlab.unittest.TestCase
 
         function manifestSchemaIsStable(testCase)
             payload.x = NaN;
-            [~, manifest] = csrd.utils.annotation.sanitizeForJson(payload);
+            [~, manifest] = csrd.pipeline.annotation.sanitizeForJson(payload);
             testCase.verifyEqual(manifest.Schema, 'csrd.sanitize-manifest.v1');
             testCase.verifyTrue(isfield(manifest, 'NumericPolicy'));
             testCase.verifyTrue(isfield(manifest, 'Entries'));

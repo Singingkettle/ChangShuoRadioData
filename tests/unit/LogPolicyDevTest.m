@@ -17,7 +17,7 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
         function setupGlobalLogger(testCase)
             % Reset to a clean state, then initialise into a temp dir.
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             testCase.TempDir = tempname;
             mkdir(testCase.TempDir);
             cfg = struct( ...
@@ -25,7 +25,7 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
                 'Level', 'DEBUG', ...
                 'SaveToFile', true, ...
                 'DisplayInConsole', true);
-            csrd.utils.logger.GlobalLogManager.initialize(cfg, testCase.TempDir);
+            csrd.runtime.logger.GlobalLogManager.initialize(cfg, testCase.TempDir);
         end
     end
 
@@ -34,18 +34,18 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
             % Restore previous thresholds if we captured them.
             if ~isempty(testCase.PreviousSnapshot)
                 try
-                    csrd.utils.logger.policy.LogPolicy.restore( ...
+                    csrd.runtime.logger.policy.LogPolicy.restore( ...
                         testCase.PreviousSnapshot);
                 catch
                 end
             end
             % Hard-reset for isolation of the next test case.
             try
-                logger = csrd.utils.logger.GlobalLogManager.getLogger();
+                logger = csrd.runtime.logger.GlobalLogManager.getLogger();
                 logger.fcloseLogFile();
             catch
             end
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             % rmdir is best-effort: on Windows the singleton mlog file
             % handle may still hold an exclusive lock for a few ms after
             % reset(), and a lingering temp directory does not invalidate
@@ -61,17 +61,17 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
 
     methods (Test)
         function applySetsDebugBothChannels(testCase)
-            import csrd.utils.logger.mlog.Level
-            policy = csrd.utils.logger.policy.LogPolicy('Dev');
+            import csrd.runtime.logger.mlog.Level
+            policy = csrd.runtime.logger.policy.LogPolicy('Dev');
             testCase.PreviousSnapshot = policy.apply();
-            logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             testCase.verifyEqual(logger.CommandWindowThreshold, Level.DEBUG);
             testCase.verifyEqual(logger.FileThreshold, Level.DEBUG);
         end
 
         function describeReportsExpectedShape(testCase)
-            policy = csrd.utils.logger.policy.LogPolicy('Dev');
+            policy = csrd.runtime.logger.policy.LogPolicy('Dev');
             desc = policy.describe();
             testCase.verifyEqual(desc.Level, 'Dev');
             testCase.verifyEqual(desc.ConsoleThreshold, 'DEBUG');
@@ -80,9 +80,9 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
         end
 
         function debugMessageHitsLogFile(testCase)
-            policy = csrd.utils.logger.policy.LogPolicy('Dev');
+            policy = csrd.runtime.logger.policy.LogPolicy('Dev');
             testCase.PreviousSnapshot = policy.apply();
-            logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             marker = sprintf('CSRD-DEV-MARKER-%s', char(java.util.UUID.randomUUID));
             logger.debug('phase0 unit-test marker: %s', marker);
@@ -113,8 +113,8 @@ classdef LogPolicyDevTest < matlab.unittest.TestCase
         end
 
         function caseInsensitiveLevel(testCase)
-            p1 = csrd.utils.logger.policy.LogPolicy('dev');
-            p2 = csrd.utils.logger.policy.LogPolicy('DEV');
+            p1 = csrd.runtime.logger.policy.LogPolicy('dev');
+            p2 = csrd.runtime.logger.policy.LogPolicy('DEV');
             testCase.verifyEqual(p1.Level, p2.Level);
             testCase.verifyEqual(p1.Level, 'Dev');
         end

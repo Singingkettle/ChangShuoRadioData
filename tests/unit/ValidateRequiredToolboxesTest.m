@@ -17,13 +17,13 @@ classdef ValidateRequiredToolboxesTest < matlab.unittest.TestCase
 
     methods (Test)
         function defaultLevelIsStandard(testCase)
-            report = csrd.utils.toolbox.validateRequiredToolboxes();
+            report = csrd.runtime.toolbox.validateRequiredToolboxes();
             testCase.verifyEqual(report.Level, 'standard');
             testCase.verifyTrue(report.Ok);
         end
 
         function reportSchemaMatchesDoc(testCase)
-            report = csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+            report = csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
             expectedFields = {'Level', 'Required', 'Missing', ...
                 'Unlicensed', 'Ok', 'Diagnostics'};
             for k = 1:numel(expectedFields)
@@ -37,8 +37,8 @@ classdef ValidateRequiredToolboxesTest < matlab.unittest.TestCase
         end
 
         function tierMinimalSubsetOfStandard(testCase)
-            minR = csrd.utils.toolbox.validateRequiredToolboxes('minimal');
-            stdR = csrd.utils.toolbox.validateRequiredToolboxes('standard');
+            minR = csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
+            stdR = csrd.runtime.toolbox.validateRequiredToolboxes('standard');
             minNames = {minR.Required.Name};
             stdNames = {stdR.Required.Name};
             testCase.verifyGreaterThan(numel(stdNames), numel(minNames));
@@ -51,20 +51,20 @@ classdef ValidateRequiredToolboxesTest < matlab.unittest.TestCase
 
         function badLevelRaises(testCase)
             testCase.verifyError(...
-                @() csrd.utils.toolbox.validateRequiredToolboxes('bogus-tier'), ...
+                @() csrd.runtime.toolbox.validateRequiredToolboxes('bogus-tier'), ...
                 'CSRD:Phase0:InvalidToolboxLevel');
         end
 
         function caseInsensitiveLevel(testCase)
             % Lower/Upper variations should both resolve to the same tier.
-            r1 = csrd.utils.toolbox.validateRequiredToolboxes('standard');
-            r2 = csrd.utils.toolbox.validateRequiredToolboxes('STANDARD');
+            r1 = csrd.runtime.toolbox.validateRequiredToolboxes('standard');
+            r2 = csrd.runtime.toolbox.validateRequiredToolboxes('STANDARD');
             testCase.verifyEqual(r1.Level, r2.Level);
         end
 
         function diagnosticsTimestampIso8601Utc(testCase)
             % Smoke: ensure the timestamp parses back through datetime.
-            r = csrd.utils.toolbox.validateRequiredToolboxes('minimal');
+            r = csrd.runtime.toolbox.validateRequiredToolboxes('minimal');
             try
                 dt = datetime(r.Diagnostics.Timestamp, ...
                     'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z''', ...

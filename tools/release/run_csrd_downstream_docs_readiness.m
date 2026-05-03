@@ -1,5 +1,8 @@
 function results = run_csrd_downstream_docs_readiness(varargin)
 %RUN_CSRD_DOWNSTREAM_DOCS_READINESS Validate Phase 7 downstream docs.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 run_csrd_downstream_docs_readiness 实现。
 %
 %   RESULTS = run_csrd_downstream_docs_readiness() checks the release notes,
 %   annotation v2 schema docs, downstream example docs, and executable
@@ -39,6 +42,10 @@ end
 
 
 function docs = localRequiredDocs(projectRoot)
+    % localRequiredDocs - Production declaration in CSRD.
+    % 中文说明：localRequiredDocs 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 docs = {
     fullfile(projectRoot, 'docs', 'annotation-v2-schema.md'), ...
         {'Truth.Design', 'Truth.Execution', 'Truth.Measured', ...
@@ -62,6 +69,10 @@ end
 
 
 function checks = localValidateDocs(docs)
+    % localValidateDocs - Production declaration in CSRD.
+    % 中文说明：localValidateDocs 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 checks = repmat( ...
     struct('Path', '', 'Needles', {{}}, 'Matched', false), ...
     size(docs, 1), 1);

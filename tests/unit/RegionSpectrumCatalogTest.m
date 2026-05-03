@@ -3,10 +3,10 @@ classdef RegionSpectrumCatalogTest < matlab.unittest.TestCase
 
     methods (Test)
         function loadsAllSupportedRegions(testCase)
-            ids = csrd.utils.spectrum.RegionSpectrumCatalog.supportedRegionIds();
+            ids = csrd.catalog.spectrum.RegionSpectrumCatalog.supportedRegionIds();
             testCase.verifyEqual(ids, {'CN','US','EU','JP','KR'});
             for k = 1:numel(ids)
-                catalog = csrd.utils.spectrum.RegionSpectrumCatalog.load(ids{k});
+                catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load(ids{k});
                 testCase.verifyEqual(catalog.RegionId, ids{k});
                 testCase.verifyNotEmpty(catalog.Bands);
                 testCase.verifyNotEmpty(catalog.SourceRefs);
@@ -14,7 +14,7 @@ classdef RegionSpectrumCatalogTest < matlab.unittest.TestCase
         end
 
         function everyBandHasSourceRefsAndEvidence(testCase)
-            catalogs = csrd.utils.spectrum.RegionSpectrumCatalog.loadAll();
+            catalogs = csrd.catalog.spectrum.RegionSpectrumCatalog.loadAll();
             for c = 1:numel(catalogs)
                 bands = catalogs{c}.Bands;
                 for k = 1:numel(bands)
@@ -31,7 +31,7 @@ classdef RegionSpectrumCatalogTest < matlab.unittest.TestCase
         end
 
         function radarServicesAreExcludedFromCatalogs(testCase)
-            catalogs = csrd.utils.spectrum.RegionSpectrumCatalog.loadAll();
+            catalogs = csrd.catalog.spectrum.RegionSpectrumCatalog.loadAll();
             tokens = {'radar','radiolocation','radionavigation'};
             for c = 1:numel(catalogs)
                 bands = catalogs{c}.Bands;
@@ -48,7 +48,7 @@ classdef RegionSpectrumCatalogTest < matlab.unittest.TestCase
 
         function unsupportedRegionFailsFast(testCase)
             testCase.verifyError( ...
-                @() csrd.utils.spectrum.RegionSpectrumCatalog.load('NOPE'), ...
+                @() csrd.catalog.spectrum.RegionSpectrumCatalog.load('NOPE'), ...
                 'CSRD:Spectrum:UnsupportedRegion');
         end
     end

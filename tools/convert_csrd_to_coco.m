@@ -1,5 +1,8 @@
 function coco = convert_csrd_to_coco(annotationInput, outputPath, varargin)
 %CONVERT_CSRD_TO_COCO Convert CSRD annotation v2 to minimal COCO JSON.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 convert_csrd_to_coco 实现。
 %
 %   COCO = convert_csrd_to_coco(ANNOTATION_INPUT) validates a CSRD
 %   annotation v2 payload or JSON file and returns a COCO-style struct.
@@ -33,7 +36,7 @@ parse(p, varargin{:});
 imageWidth = double(p.Results.ImageWidth);
 imageHeight = double(p.Results.ImageHeight);
 
-reader = csrd.utils.annotation.readAnnotationV2(annotationInput, ...
+reader = csrd.pipeline.annotation.readAnnotationV2(annotationInput, ...
     'RequireSources', true);
 
 state = struct();
@@ -102,17 +105,29 @@ end
 
 
 function tf = isNameValueToken(value)
+    % isNameValueToken - Production declaration in CSRD.
+    % 中文说明：isNameValueToken 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 tf = (ischar(value) || isstring(value)) && ...
     any(strcmpi(char(value), {'ImageWidth', 'ImageHeight'}));
 end
 
 
 function tf = isPositiveScalar(value)
+    % isPositiveScalar - Production declaration in CSRD.
+    % 中文说明：isPositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 tf = isnumeric(value) && isscalar(value) && isfinite(value) && value > 0;
 end
 
 
 function items = localFlattenStructs(value, context)
+    % localFlattenStructs - Production declaration in CSRD.
+    % 中文说明：localFlattenStructs 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 items = {};
 if isempty(value)
     return;
@@ -137,6 +152,10 @@ end
 
 function [state, annotation] = convertSource(state, source, frame, imageId, ...
         observableRangeHz, imageWidth, imageHeight)
+            % convertSource - Production declaration in CSRD.
+            % 中文说明：convertSource 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 annotation = [];
 
 rv = source.ReceiverView;
@@ -170,6 +189,10 @@ end
 
 
 function tf = logicalScalar(value)
+    % logicalScalar - Production declaration in CSRD.
+    % 中文说明：logicalScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if islogical(value)
     tf = isscalar(value) && value;
 elseif isnumeric(value)
@@ -181,6 +204,10 @@ end
 
 
 function skipped = makeSkippedSource(source, frame)
+    % makeSkippedSource - Production declaration in CSRD.
+    % 中文说明：makeSkippedSource 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 skipped = struct( ...
     'frame_id', frame.FrameId, ...
     'receiver_id', char(frame.ReceiverID), ...
@@ -192,6 +219,10 @@ end
 
 
 function [state, categoryId] = ensureCategory(state, categoryName)
+    % ensureCategory - Production declaration in CSRD.
+    % 中文说明：ensureCategory 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 hit = find(strcmp(state.categoryNames, categoryName), 1);
 if ~isempty(hit)
     categoryId = hit;
@@ -210,6 +241,10 @@ end
 
 function [bbox, bboxHz] = makeFrequencyBbox(source, observableRangeHz, ...
         imageWidth, imageHeight)
+            % makeFrequencyBbox - Production declaration in CSRD.
+            % 中文说明：makeFrequencyBbox 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 rv = source.ReceiverView;
 sourcePlane = source.Truth.Measured.SourcePlane;
 
@@ -252,6 +287,10 @@ end
 
 
 function value = requireFiniteScalar(value, context)
+    % requireFiniteScalar - Production declaration in CSRD.
+    % 中文说明：requireFiniteScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
     error('CSRD:Tools:CocoMissingFiniteScalar', ...
         '%s must be a finite numeric scalar.', context);
@@ -261,6 +300,10 @@ end
 
 
 function metadata = makeAnnotationMetadata(source, frame, bboxHz)
+    % makeAnnotationMetadata - Production declaration in CSRD.
+    % 中文说明：makeAnnotationMetadata 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 truth = source.Truth;
 metadata = struct( ...
     'schema', 'annotation-v2-derived', ...
@@ -280,6 +323,10 @@ end
 
 
 function fieldSources = localFieldSources()
+    % localFieldSources - Production declaration in CSRD.
+    % 中文说明：localFieldSources 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 fieldSources = struct( ...
     'category', 'Truth.Design.ModulationFamily', ...
     'bbox_center_hz', 'ReceiverView.ProjectedCenterOffsetHz', ...
@@ -293,6 +340,10 @@ end
 
 
 function rangeHz = resolveObservableRange(frame)
+    % resolveObservableRange - Production declaration in CSRD.
+    % 中文说明：resolveObservableRange 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if isfield(frame, 'ObservableRange') && isnumeric(frame.ObservableRange) && ...
         numel(frame.ObservableRange) >= 2 && ...
         all(isfinite(frame.ObservableRange(1:2)))
@@ -316,6 +367,10 @@ end
 
 
 function value = getOptionalScalar(s, fieldName)
+    % getOptionalScalar - Production declaration in CSRD.
+    % 中文说明：getOptionalScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if isfield(s, fieldName) && isnumeric(s.(fieldName)) && isscalar(s.(fieldName))
     value = double(s.(fieldName));
 else
@@ -325,12 +380,20 @@ end
 
 
 function name = makeVirtualFileName(frame)
+    % makeVirtualFileName - Production declaration in CSRD.
+    % 中文说明：makeVirtualFileName 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 name = sprintf('frame_%06d_%s_frequency_canvas', ...
     double(frame.FrameId), sanitizeName(char(frame.ReceiverID)));
 end
 
 
 function out = sanitizeName(value)
+    % sanitizeName - Production declaration in CSRD.
+    % 中文说明：sanitizeName 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 out = regexprep(value, '[^A-Za-z0-9_=-]', '_');
 if isempty(out)
     out = 'receiver';
@@ -339,6 +402,10 @@ end
 
 
 function coco = writeCocoJson(coco, outputPath)
+    % writeCocoJson - Production declaration in CSRD.
+    % 中文说明：writeCocoJson 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 assert(ischar(outputPath) || isstring(outputPath), ...
     'CSRD:Tools:CocoInvalidOutputPath', ...
     'OUTPUT_PATH must be a character vector or string scalar.');
@@ -348,7 +415,7 @@ if ~isempty(outDir) && exist(outDir, 'dir') ~= 7
     mkdir(outDir);
 end
 
-[clean, manifest] = csrd.utils.annotation.sanitizeForJson(coco);
+[clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(coco);
 clean.csrd_export.sanitize_manifest = manifest;
 
 fid = fopen(outputPath, 'w');
@@ -362,6 +429,10 @@ end
 
 
 function out = localEmptyImages()
+    % localEmptyImages - Production declaration in CSRD.
+    % 中文说明：localEmptyImages 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 out = repmat(struct( ...
     'id', [], ...
     'file_name', '', ...
@@ -372,6 +443,10 @@ end
 
 
 function out = localEmptyAnnotations()
+    % localEmptyAnnotations - Production declaration in CSRD.
+    % 中文说明：localEmptyAnnotations 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 out = repmat(struct( ...
     'id', [], ...
     'image_id', [], ...
@@ -384,6 +459,10 @@ end
 
 
 function out = localEmptyCategories()
+    % localEmptyCategories - Production declaration in CSRD.
+    % 中文说明：localEmptyCategories 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 out = repmat(struct( ...
     'id', [], ...
     'name', '', ...
@@ -392,6 +471,10 @@ end
 
 
 function out = localEmptyLicenses()
+    % localEmptyLicenses - Production declaration in CSRD.
+    % 中文说明：localEmptyLicenses 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 out = repmat(struct( ...
     'id', [], ...
     'name', '', ...
@@ -400,6 +483,10 @@ end
 
 
 function out = localEmptySkippedSources()
+    % localEmptySkippedSources - Production declaration in CSRD.
+    % 中文说明：localEmptySkippedSources 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 out = repmat(struct( ...
     'frame_id', [], ...
     'receiver_id', '', ...

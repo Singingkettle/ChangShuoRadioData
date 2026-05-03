@@ -11,7 +11,7 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
     methods (Test)
         function complexArrayBecomesStruct(testCase)
             z = [1 + 2i, 3 + 4i; 5 - 6i, 7 + 8i];
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(z);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(z);
             testCase.verifyEqual(size(clean.Real), size(z));
             testCase.verifyEqual(clean.Real, real(z));
             testCase.verifyEqual(clean.Imag, imag(z));
@@ -25,7 +25,7 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
 
         function nanInfArrayBecomesCell(testCase)
             x = [1, NaN, 3, Inf, -Inf, 6];
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(x);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(x);
             testCase.verifyClass(clean, 'cell');
             testCase.verifyEqual(clean{1}, 1);
             testCase.verifyTrue(isempty(clean{2}));
@@ -40,14 +40,14 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
 
         function stringScalarBecomesChar(testCase)
             s = "hello";
-            [clean, ~] = csrd.utils.annotation.sanitizeForJson(s);
+            [clean, ~] = csrd.pipeline.annotation.sanitizeForJson(s);
             testCase.verifyClass(clean, 'char');
             testCase.verifyEqual(clean, 'hello');
         end
 
         function stringMissingBecomesNull(testCase)
             s = string(missing);
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(s);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(s);
             testCase.verifyTrue(isempty(clean));
             reasons = {manifest.Entries.Reason};
             testCase.verifyTrue(any(strcmp(reasons, 'missing->null')));
@@ -55,7 +55,7 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
 
         function categoricalBecomesText(testCase)
             c = categorical({'cat1', 'cat2', 'cat1'});
-            [clean, manifest] = csrd.utils.annotation.sanitizeForJson(c);
+            [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(c);
             testCase.verifyClass(clean, 'cell');
             testCase.verifyEqual(clean, {'cat1', 'cat2', 'cat1'});
             reasons = {manifest.Entries.Reason};
@@ -67,7 +67,7 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
                 error('CSRD:SanitizeForJsonTest:Synthetic', ...
                     'synthetic error for unit test');
             catch ME
-                [clean, manifest] = csrd.utils.annotation.sanitizeForJson(ME);
+                [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(ME);
             end
             % First confirm the cleaned value is a scalar struct so the
             % subsequent field accesses are well-defined.
@@ -110,7 +110,7 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
             f = figure('Visible', 'off');
             cleanup = onCleanup(@() close(f));
             try
-                [clean, manifest] = csrd.utils.annotation.sanitizeForJson(f);
+                [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(f);
             catch sanitizeErr
                 testCase.verifyFail(sprintf( ...
                     'Helper should not throw on unknown classes: %s', ...
@@ -125,7 +125,7 @@ classdef SanitizeForJsonComplexAllowlistTest < matlab.unittest.TestCase
 
         function badNumericPolicyRaises(testCase)
             opts = struct('NumericPolicy', 'mystery-mode');
-            testCase.verifyError(@() csrd.utils.annotation.sanitizeForJson( ...
+            testCase.verifyError(@() csrd.pipeline.annotation.sanitizeForJson( ...
                 NaN, opts), 'CSRD:Phase0:SanitizeBadOption');
         end
     end

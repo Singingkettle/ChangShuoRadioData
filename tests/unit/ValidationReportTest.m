@@ -1,6 +1,6 @@
 classdef ValidationReportTest < matlab.unittest.TestCase
     %VALIDATIONREPORTTEST Phase 2 unit tests for the ValidationReport
-    %struct returned by csrd.utils.blueprint.BlueprintFeasibilityValidator.validate.
+    %struct returned by csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate.
     %
     %   Maps to docs/audits/phases/phase-2-blueprint.md §3.3.6 / §5.2.C
     %   ValidationReportTest row.
@@ -11,7 +11,7 @@ classdef ValidationReportTest < matlab.unittest.TestCase
             % Phase 2 transitional schema: a totally empty blueprint
             % should pass because every check soft-skips when its required
             % field is missing.
-            r = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(struct());
+            r = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(struct());
             testCase.verifyTrue(r.IsFeasible);
             testCase.verifyEqual(r.NumChecksFailed, 0);
             testCase.verifyEqual(r.NumChecksRun, 20);
@@ -19,7 +19,7 @@ classdef ValidationReportTest < matlab.unittest.TestCase
         end
 
         function reportContainsBlueprintHash(testCase)
-            r = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(struct());
+            r = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(struct());
             testCase.verifyClass(r.BlueprintHash, 'char');
             testCase.verifySize(r.BlueprintHash, [1 16]);
         end
@@ -27,7 +27,7 @@ classdef ValidationReportTest < matlab.unittest.TestCase
         function singleRejectMakesReportInfeasibleAndPopulatesFailedChecks(testCase)
             bp = struct('Receivers', {{struct( ...
                 'SampleRate', 40e6, 'ObservableBandwidth', 80e6)}});
-            r = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(bp);
+            r = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(bp);
             testCase.verifyFalse(r.IsFeasible);
             testCase.verifyEqual(r.NumChecksFailed, 1);
             testCase.verifyNumElements(r.FailedChecks, 1);
@@ -42,7 +42,7 @@ classdef ValidationReportTest < matlab.unittest.TestCase
             % stub to enforced. The exact identifier is tracked in
             % BlueprintFeasibilityValidator.validate; pin it here so a
             % bump always reaches this guard.
-            r = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(struct());
+            r = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(struct());
             testCase.verifyTrue(isfield(r, 'Provenance'));
             testCase.verifyEqual(r.Provenance.ValidatorVersion, ...
                 'p4-measurement-doppler-v2');

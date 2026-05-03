@@ -12,9 +12,9 @@ classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
             cfg = localRegConfig('CN');
             rx = struct('SampleRate', 50e6);
             rng(11, 'twister');
-            p1 = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 4);
+            p1 = csrd.catalog.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 4);
             rng(11, 'twister');
-            p2 = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 4);
+            p2 = csrd.catalog.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 4);
             testCase.verifyEqual([p1.EmitterPlans.SelectedCenterFrequencyHz], ...
                 [p2.EmitterPlans.SelectedCenterFrequencyHz]);
             testCase.verifyEqual({p1.EmitterPlans.BandId}, {p2.EmitterPlans.BandId});
@@ -26,7 +26,7 @@ classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
             cfg = localRegConfig('CN');
             cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_FM_BROADCAST';
             rx = struct('SampleRate', 20e6);
-            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 3);
+            plan = csrd.catalog.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 3);
             for k = 1:numel(plan.EmitterPlans)
                 ep = plan.EmitterPlans(k);
                 testCase.verifyEqual(ep.BandId, 'CN_FM_BROADCAST');
@@ -38,7 +38,7 @@ classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
             cfg = localRegConfig('CN');
             cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_NR_N78';
             rx = struct('SampleRate', 100e6);
-            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 5);
+            plan = csrd.catalog.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 5);
             allowed = {'OFDM','QAM'};
             for k = 1:numel(plan.EmitterPlans)
                 ep = plan.EmitterPlans(k);
@@ -53,8 +53,8 @@ classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
             cfg = localRegConfig('CN');
             cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_NR_N78';
             rx = struct('SampleRate', 100e6);
-            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 8);
-            catalog = csrd.utils.spectrum.RegionSpectrumCatalog.load('CN');
+            plan = csrd.catalog.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 8);
+            catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load('CN');
             band = catalog.Bands(strcmp({catalog.Bands.BandId}, 'CN_NR_N78'));
             ref = band.FrequencyRangeHz(1);
             raster = band.ChannelRasterHz;
@@ -69,7 +69,7 @@ classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
             cfg.Regulatory.MonitoringBand.FixedBandId = 'KR_SRD_920';
             rx = struct('SampleRate', 50e6);
 
-            plan = csrd.utils.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 5);
+            plan = csrd.catalog.spectrum.RegionSpectrumSelector.selectScenarioPlan(cfg, rx, 5);
 
             testCase.verifyEqual(plan.Receiver.MonitoringBandId, 'KR_SRD_920');
             for k = 1:numel(plan.EmitterPlans)

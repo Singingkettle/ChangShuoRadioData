@@ -1,5 +1,8 @@
 function results = run_csrd_release_ci_readiness(varargin)
 %RUN_CSRD_RELEASE_CI_READINESS Aggregate Phase 6 release/CI gates.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 run_csrd_release_ci_readiness 实现。
 %
 %   RESULTS = run_csrd_release_ci_readiness() runs the release-owner gate:
 %   frozen baseline readiness, Phase 6 curated suite, performance
@@ -95,17 +98,29 @@ end
 
 
 function tf = isPositiveInteger(value)
+    % isPositiveInteger - Production declaration in CSRD.
+    % 中文说明：isPositiveInteger 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 tf = isnumeric(value) && isscalar(value) && isfinite(value) && value >= 1 ...
     && floor(value) == value;
 end
 
 
 function tf = isPositiveScalar(value)
+    % isPositiveScalar - Production declaration in CSRD.
+    % 中文说明：isPositiveScalar 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 tf = isnumeric(value) && isscalar(value) && isfinite(value) && value > 0;
 end
 
 
 function gate = runTimedGate(name, fn, verbose)
+    % runTimedGate - Production declaration in CSRD.
+    % 中文说明：runTimedGate 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if verbose
     fprintf('  %s ...\n', name);
 end
@@ -126,6 +141,10 @@ end
 
 
 function gate = makeSkippedGate(name, reason)
+    % makeSkippedGate - Production declaration in CSRD.
+    % 中文说明：makeSkippedGate 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 gate = struct( ...
     'Name', name, ...
     'Success', true, ...
@@ -138,6 +157,10 @@ end
 
 
 function results = localRunPhase6Suite()
+    % localRunPhase6Suite - Production declaration in CSRD.
+    % 中文说明：localRunPhase6Suite 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 results = run_all_tests('phase6');
 assert(results.Success, ...
     'CSRD:ReleaseCI:Phase6SuiteFailed', ...
@@ -146,6 +169,10 @@ end
 
 
 function text = passFail(tf)
+    % passFail - Production declaration in CSRD.
+    % 中文说明：passFail 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if tf
     text = 'PASSED';
 else

@@ -1,5 +1,6 @@
 function diag_phase4_rrc_obw()
 %DIAG_PHASE4_RRC_OBW Probe obwActual on RRC-shaped PSK and OFDM signals
+% 中文说明：提供 CSRD 生产链路中的 diag_phase4_rrc_obw 实现。
 %   to understand how the rolloff sidelobes interact with denoising.
 
 rng(42);
@@ -80,6 +81,10 @@ end
 
 
 function bw = peakOnlyObw(sig, fs, dbcRel)
+    % peakOnlyObw - Production declaration in CSRD.
+    % 中文说明：peakOnlyObw 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 sig = double(sig(:));
 N = numel(sig);
 winLen = max(64, 2^floor(log2(N / 8)));

@@ -1,5 +1,6 @@
 function diag_phase4_obw_invariance()
 %DIAG_PHASE4_OBW_INVARIANCE Probe whether obwActual depends on the
+% 中文说明：提供 CSRD 生产链路中的 diag_phase4_obw_invariance 实现。
 %   sample rate at which the same band-limited signal is observed.
 %
 %   This is the working hypothesis behind the C8 outliers: pre-channel
@@ -40,9 +41,9 @@ noiseFullBand = sigPow / 10^(snrDb / 10) / inBandFraction;
 noise = sqrt(noiseFullBand / 2) * (randn(numel(sigHigh), 1) + 1i * randn(numel(sigHigh), 1));
 sigHighNoisy = sigHigh + noise;
 
-bwCleanLow   = csrd.utils.measurement.obwActual(sigLow,       fsLow);
-bwCleanHigh  = csrd.utils.measurement.obwActual(sigHigh,      fsHigh);
-bwNoisyHigh  = csrd.utils.measurement.obwActual(sigHighNoisy, fsHigh);
+bwCleanLow   = csrd.pipeline.measurement.obwActual(sigLow,       fsLow);
+bwCleanHigh  = csrd.pipeline.measurement.obwActual(sigHigh,      fsHigh);
+bwNoisyHigh  = csrd.pipeline.measurement.obwActual(sigHighNoisy, fsHigh);
 
 fprintf('OBW invariance probe (true band-limit = %.0f Hz, in-band SNR = %.1f dB):\n', ...
     modBwHz, snrDb);

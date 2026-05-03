@@ -19,7 +19,7 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
 
     methods (TestMethodSetup)
         function setupGlobalLogger(testCase)
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             testCase.TempDir = tempname;
             mkdir(testCase.TempDir);
             cfg = struct( ...
@@ -27,7 +27,7 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
                 'Level', 'DEBUG', ...
                 'SaveToFile', true, ...
                 'DisplayInConsole', true);
-            csrd.utils.logger.GlobalLogManager.initialize(cfg, testCase.TempDir);
+            csrd.runtime.logger.GlobalLogManager.initialize(cfg, testCase.TempDir);
         end
     end
 
@@ -35,17 +35,17 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
         function teardownGlobalLogger(testCase)
             if ~isempty(testCase.PreviousSnapshot)
                 try
-                    csrd.utils.logger.policy.LogPolicy.restore( ...
+                    csrd.runtime.logger.policy.LogPolicy.restore( ...
                         testCase.PreviousSnapshot);
                 catch
                 end
             end
             try
-                logger = csrd.utils.logger.GlobalLogManager.getLogger();
+                logger = csrd.runtime.logger.GlobalLogManager.getLogger();
                 logger.fcloseLogFile();
             catch
             end
-            csrd.utils.logger.GlobalLogManager.reset();
+            csrd.runtime.logger.GlobalLogManager.reset();
             if ~isempty(testCase.TempDir) && isfolder(testCase.TempDir)
                 try
                     rmdir(testCase.TempDir, 's');
@@ -57,10 +57,10 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
 
     methods (Test)
         function applySetsExpectedThresholds(testCase)
-            import csrd.utils.logger.mlog.Level
-            policy = csrd.utils.logger.policy.LogPolicy('LargeMC');
+            import csrd.runtime.logger.mlog.Level
+            policy = csrd.runtime.logger.policy.LogPolicy('LargeMC');
             testCase.PreviousSnapshot = policy.apply();
-            logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             testCase.verifyEqual(logger.CommandWindowThreshold, Level.WARNING);
             testCase.verifyEqual(logger.FileThreshold, Level.INFO);
         end
@@ -72,9 +72,9 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
             % dir(getLogDirectory()) because the singleton can reuse a
             % previous test's directory; LogFile is always authoritative.
 
-            policy = csrd.utils.logger.policy.LogPolicy('LargeMC');
+            policy = csrd.runtime.logger.policy.LogPolicy('LargeMC');
             testCase.PreviousSnapshot = policy.apply();
-            logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             % Force at least one INFO line first so the file definitely
             % exists (info passes File threshold INFO).
@@ -108,9 +108,9 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
             % Sanity: INFO must still go to the file, otherwise we'd
             % have lost progress reporting.
 
-            policy = csrd.utils.logger.policy.LogPolicy('LargeMC');
+            policy = csrd.runtime.logger.policy.LogPolicy('LargeMC');
             testCase.PreviousSnapshot = policy.apply();
-            logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             marker = sprintf('LARGEMC-KEEP-%s', ...
                 char(java.util.UUID.randomUUID));
@@ -133,15 +133,15 @@ classdef LogPolicyLargeMCTest < matlab.unittest.TestCase
         end
 
         function applyWithoutInitRaises(testCase)
-            csrd.utils.logger.GlobalLogManager.reset();
-            policy = csrd.utils.logger.policy.LogPolicy('LargeMC');
+            csrd.runtime.logger.GlobalLogManager.reset();
+            policy = csrd.runtime.logger.policy.LogPolicy('LargeMC');
             testCase.verifyError(@() policy.apply(), ...
                 'CSRD:Phase0:LogPolicyNotInitialized');
         end
 
         function badLevelRaises(testCase)
             testCase.verifyError(...
-                @() csrd.utils.logger.policy.LogPolicy('NotARealTier'), ...
+                @() csrd.runtime.logger.policy.LogPolicy('NotARealTier'), ...
                 'CSRD:Phase0:InvalidLogPolicy');
         end
     end

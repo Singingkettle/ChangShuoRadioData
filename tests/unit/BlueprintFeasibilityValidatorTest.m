@@ -27,7 +27,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Global',    struct('FrameDuration', 1e-3, 'FrameNumSamples', 4e4), ...
                 'Receivers', {{struct('SampleRate', 4e7)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkFrameSampleConsistency(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkFrameSampleConsistency(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -35,7 +35,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Global',    struct('FrameDuration', 1e-3, 'FrameNumSamples', 4e4), ...
                 'Receivers', {{struct('SampleRate', 8e7)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkFrameSampleConsistency(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkFrameSampleConsistency(bp);
             testCase.verifyEqual(f.Code, 'FrameSampleConsistency');
             testCase.verifyEqual(f.Severity, 'Reject');
         end
@@ -43,14 +43,14 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
         function rxFsEqualsObservableBwPositive(testCase)
             bp = struct('Receivers', {{struct('SampleRate', 40e6, ...
                 'ObservableBandwidth', 40e6)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkRxFsEqualsObservableBw(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkRxFsEqualsObservableBw(bp);
             testCase.verifyEmpty(f);
         end
 
         function rxFsEqualsObservableBwNegative(testCase)
             bp = struct('Receivers', {{struct('SampleRate', 40e6, ...
                 'ObservableBandwidth', 80e6)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkRxFsEqualsObservableBw(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkRxFsEqualsObservableBw(bp);
             testCase.verifyEqual(f.Code, 'RxFsEqualsObservableBw');
             testCase.verifyEqual(f.Severity, 'Reject');
         end
@@ -62,7 +62,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Receivers', {{struct('SampleRate', 40e6, 'ObservableBandwidth', 40e6)}}, ...
                 'Emitters',  {{struct('Spectrum', struct('PlannedBandwidth', 10e6, ...
                                                           'PlannedFreqOffset', 5e6))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -71,7 +71,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Receivers', {{struct('SampleRate', 40e6, 'ObservableBandwidth', 40e6)}}, ...
                 'Emitters',  {{struct('Spectrum', struct('PlannedBandwidth', 60e6, ...
                                                           'PlannedFreqOffset', 0))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
             testCase.verifyEqual(f.Code, 'TxBwInsideRxWindow');
         end
 
@@ -93,7 +93,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                     'Spectrum',      struct('PlannedBandwidth', 10e6, ...
                                               'PlannedFreqOffset', 30e6), ...
                     'ReceiverViews', rv)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -115,7 +115,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                     'Spectrum',      struct('PlannedBandwidth', 10e6, ...
                                               'PlannedFreqOffset', 0), ...
                     'ReceiverViews', rv)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
             testCase.verifyEqual(f.Code, 'TxBwInsideRxWindow');
             testCase.verifySubstring(f.Field, 'ReceiverViews');
             testCase.verifySubstring(f.Hint,  'ProjectedCenterOffsetHz');
@@ -144,7 +144,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                     'Spectrum',      struct('PlannedBandwidth', 10e6, ...
                                               'PlannedFreqOffset', 0), ...
                     'ReceiverViews', rvs)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTxBwInsideRxWindow(bp);
             testCase.verifyEqual(f.Code, 'TxBwInsideRxWindow');
             testCase.verifySubstring(f.Message, 'Rx 2');
         end
@@ -153,7 +153,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'Modulation', struct('Family', 'OFDM'), ...
                 'Hardware',   struct('NumAntennas', 2))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkModulationAntennaCompatible(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkModulationAntennaCompatible(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -162,21 +162,21 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'Modulation', struct('Family', 'FM'), ...
                 'Hardware',   struct('NumAntennas', 2))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkModulationAntennaCompatible(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkModulationAntennaCompatible(bp);
             testCase.verifyEqual(f.Code, 'ModulationAntennaCompatible');
         end
 
         function rfImpairmentRangePositive(testCase)
             bp = struct('Emitters', {{struct('RFImpairment', struct( ...
                 'IIP3Dbm', 20, 'PhaseNoiseLevel', 'Mid', 'IQImbalanceDb', 0.5))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkRFImpairmentRange(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkRFImpairmentRange(bp);
             testCase.verifyEmpty(f);
         end
 
         function rfImpairmentRangeNegative(testCase)
             bp = struct('Emitters', {{struct('RFImpairment', struct( ...
                 'IIP3Dbm', 100))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkRFImpairmentRange(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkRFImpairmentRange(bp);
             testCase.verifyEqual(f.Code, 'RFImpairmentRange');
         end
 
@@ -185,7 +185,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',   struct('NumFrames', 4, 'FrameDuration', 1e-3), ...
                 'Emitters', {{struct('BurstSchedule', struct('Bursts', ...
                     struct('Duration', 1e-3, 'EndTime', 2e-3)))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkBurstTotalDurationFits(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkBurstTotalDurationFits(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -194,34 +194,34 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',   struct('NumFrames', 2, 'FrameDuration', 1e-3), ...
                 'Emitters', {{struct('BurstSchedule', struct('Bursts', ...
                     struct('Duration', 5e-3, 'EndTime', 10e-3)))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkBurstTotalDurationFits(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkBurstTotalDurationFits(bp);
             testCase.verifyEqual(f.Code, 'BurstTotalDurationFits');
         end
 
         function crossFrameSegmentMinSamplesPositive(testCase)
             bp = struct('Emitters', {{struct('PrecomputedSegments', ...
                 struct('VisibleSamples', 256))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkCrossFrameSegmentMinSamples(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkCrossFrameSegmentMinSamples(bp);
             testCase.verifyEmpty(f);
         end
 
         function crossFrameSegmentMinSamplesNegative(testCase)
             bp = struct('Emitters', {{struct('PrecomputedSegments', ...
                 struct('VisibleSamples', 32))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkCrossFrameSegmentMinSamples(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkCrossFrameSegmentMinSamples(bp);
             testCase.verifyEqual(f.Code, 'CrossFrameSegmentMinSamples');
         end
 
         function osmFileExistsAndBuildingsPositive(testCase)
             bp = struct('ChannelPreference', struct('Model', 'AWGN'));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOsmFileExistsAndBuildings(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOsmFileExistsAndBuildings(bp);
             testCase.verifyEmpty(f);
         end
 
         function osmFileExistsAndBuildingsNegative(testCase)
             bp = struct('ChannelPreference', struct( ...
                 'Model', 'RayTracing', 'OSMFile', 'C:\__definitely_not_exist__.osm'));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOsmFileExistsAndBuildings(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOsmFileExistsAndBuildings(bp);
             testCase.verifyEqual(f.Code, 'OsmFileExistsAndBuildings');
         end
 
@@ -229,7 +229,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'ChannelPreference',    struct('Model', 'AWGN'), ...
                 'ChannelModelRegistry', {{'AWGN', 'Rician', 'RayTracing'}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkChannelModelInRegistry(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkChannelModelInRegistry(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -237,7 +237,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'ChannelPreference',    struct('Model', 'BogusChannel'), ...
                 'ChannelModelRegistry', {{'AWGN', 'Rician'}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkChannelModelInRegistry(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkChannelModelInRegistry(bp);
             testCase.verifyEqual(f.Code, 'ChannelModelInRegistry');
         end
 
@@ -246,7 +246,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',   struct('NumFrames', 2, 'FrameDuration', 1e-3), ...
                 'Emitters', {{struct('Trajectory', struct( ...
                     'SampleTimes', [0 1e-3 2e-3 3e-3]))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTrajectoryMonotonicAndCovers(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTrajectoryMonotonicAndCovers(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -255,7 +255,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',   struct('NumFrames', 2, 'FrameDuration', 1e-3), ...
                 'Emitters', {{struct('Trajectory', struct( ...
                     'SampleTimes', [0 5e-3 4e-3]))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkTrajectoryMonotonicAndCovers(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkTrajectoryMonotonicAndCovers(bp);
             testCase.verifyEqual(f.Code, 'TrajectoryMonotonicAndCovers');
         end
 
@@ -263,7 +263,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Emitters',  {{struct('Position', [0 0 10])}}, ...
                 'Receivers', {{struct('Position', [50 0 10])}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkLinkDistanceAboveMin(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkLinkDistanceAboveMin(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -271,7 +271,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Emitters',  {{struct('Position', [0 0 10])}}, ...
                 'Receivers', {{struct('Position', [0.01 0 10])}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkLinkDistanceAboveMin(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkLinkDistanceAboveMin(bp);
             testCase.verifyEqual(f.Code, 'LinkDistanceAboveMin');
         end
 
@@ -279,7 +279,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Global',    struct('NumFrames', 2, 'FrameNumSamples', 4e4), ...
                 'Receivers', {{struct('Hardware', struct('NumAntennas', 1))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMemoryBudget(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMemoryBudget(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -288,7 +288,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',    struct('NumFrames', 1000, 'FrameNumSamples', 4e6), ...
                 'Receivers', {{struct('Hardware', struct('NumAntennas', 16))}}, ...
                 'Validator', struct('MemoryBudgetMB', 1024));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMemoryBudget(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMemoryBudget(bp);
             testCase.verifyEqual(f.Code, 'MemoryBudget');
         end
 
@@ -308,7 +308,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Receivers', {{struct('Hardware', struct('NumAntennas', 1)), ...
                                 struct('Hardware', struct('NumAntennas', 2))}}, ...
                 'Emitters',  {{struct('ReceiverViews', rv)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkReceiverViewProjectionPresent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkReceiverViewProjectionPresent(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -317,7 +317,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Receivers', {{struct('Hardware', struct('NumAntennas', 1)), ...
                                 struct('Hardware', struct('NumAntennas', 2))}}, ...
                 'Emitters',  {{struct('Modulation', struct('Family', 'OFDM'))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkReceiverViewProjectionPresent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkReceiverViewProjectionPresent(bp);
             testCase.verifyEqual(f.Code, 'ReceiverViewProjectionPresent');
             testCase.verifySubstring(f.Message, 'ProjectedCenterOffsetHz');
         end
@@ -326,7 +326,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bursts = struct('OverlappingFramesIds', {[1 2]}, ...
                             'ExpandedSegments',     {[struct('FrameId', 1) struct('FrameId', 2)]});
             bp = struct('Emitters', {{struct('BurstSchedule', struct('Bursts', bursts))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkBurstOverlapsFrameExpansion(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkBurstOverlapsFrameExpansion(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -334,7 +334,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bursts = struct('OverlappingFramesIds', {[1 2 3]}, ...
                             'ExpandedSegments',     {[struct('FrameId', 1)]});
             bp = struct('Emitters', {{struct('BurstSchedule', struct('Bursts', bursts))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkBurstOverlapsFrameExpansion(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkBurstOverlapsFrameExpansion(bp);
             testCase.verifyEqual(f.Code, 'BurstOverlapsFrameExpansion');
         end
 
@@ -342,7 +342,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('MeasurementPolicy', struct( ...
                 'MaxVisibleSourcesPerFrame', 4, ...
                 'Planes', {{'SourcePlane', 'FramePlane'}}));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMeasurementPlanesSeparated(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMeasurementPlanesSeparated(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -350,19 +350,19 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('MeasurementPolicy', struct( ...
                 'MaxVisibleSourcesPerFrame', 4, ...
                 'Planes', {{'FramePlane'}}));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMeasurementPlanesSeparated(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMeasurementPlanesSeparated(bp);
             testCase.verifyEqual(f.Code, 'MeasurementPlanesSeparated');
         end
 
         function geometryGranularityDeclaredPositive(testCase)
             bp = struct('AnnotationPolicy', struct('GeometryGranularity', 'Frame'));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkGeometryGranularityDeclared(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkGeometryGranularityDeclared(bp);
             testCase.verifyEmpty(f);
         end
 
         function geometryGranularityDeclaredNegative(testCase)
             bp = struct('AnnotationPolicy', struct('GeometryGranularity', 'Bogus'));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkGeometryGranularityDeclared(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkGeometryGranularityDeclared(bp);
             testCase.verifyEqual(f.Code, 'GeometryGranularityDeclared');
         end
 
@@ -371,7 +371,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',       struct('FrameNumSamples', 4e4), ...
                 'OutputPolicy', struct('OutputWindowPolicy', 'ExactFrameClip', ...
                                         'OutputLengthSamples', 4e4));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkReceiverOutputWindowConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkReceiverOutputWindowConsistent(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -380,7 +380,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
                 'Global',       struct('FrameNumSamples', 4e4), ...
                 'OutputPolicy', struct('OutputWindowPolicy', 'ExactFrameClip', ...
                                         'OutputLengthSamples', 8e4));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkReceiverOutputWindowConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkReceiverOutputWindowConsistent(bp);
             testCase.verifyEqual(f.Code, 'ReceiverOutputWindowConsistent');
         end
 
@@ -395,7 +395,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'BurstSchedule',      struct('Bursts', bursts), ...
                 'FrameExecutionPlan', fep)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -406,7 +406,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'BurstSchedule',      struct('Bursts', bursts), ...
                 'FrameExecutionPlan', fep)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
             testCase.verifyEqual(f.Code, 'OverlapAnnotationConsistent');
         end
 
@@ -420,7 +420,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             % SimulationRunner.saveScenarioData via
             % csrd.core.ChangShuo.validateMeasurementCompleteness.
             bp = struct();
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -431,19 +431,19 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Truth', struct('Measured', struct( ...
                 'SourcePlane', struct('OccupiedBandwidthHz', NaN), ...
                 'FramePlane',  struct('OccupiedBandwidthHz', NaN))));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(bp);
             testCase.verifyEmpty(f);
         end
 
         function measurementCompletenessIgnoresMissingMeasurementPolicy(testCase)
             bp = struct('Emitters', {{struct('Mobility', struct('MaxSpeedMps', 100))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(bp);
             testCase.verifyEmpty(f);
         end
 
         function measurementCompletenessIgnoresEmptyBlueprint(testCase)
             % Defensive: even an empty struct must be handled gracefully.
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(struct());
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkMeasurementCompleteness(struct());
             testCase.verifyEmpty(f);
         end
 
@@ -457,7 +457,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             % required is fine.
             bp = struct( ...
                 'Emitters', {{struct('Mobility', struct('MaxSpeedMps', 0))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -467,7 +467,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Emitters', {{struct('Mobility', struct('MaxSpeedMps', 200))}}, ...
                 'MeasurementPolicy', struct('RequireDopplerShiftHz', true));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -475,7 +475,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             % High-velocity Tx + RequireDopplerShiftHz absent => REJECT.
             bp = struct( ...
                 'Emitters', {{struct('Mobility', struct('MaxSpeedMps', 200))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
             testCase.verifyEqual(f.Code, 'DopplerSelfConsistency');
             testCase.verifyEqual(f.Severity, 'Reject');
             testCase.verifySubstring(f.Message, 'RequireDopplerShiftHz');
@@ -486,7 +486,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct( ...
                 'Emitters', {{struct('Mobility', struct('MaxSpeedMps', 100))}}, ...
                 'MeasurementPolicy', struct('RequireDopplerShiftHz', false));
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkDopplerSelfConsistency(bp);
             testCase.verifyEqual(f.Code, 'DopplerSelfConsistency');
             testCase.verifyEqual(f.Severity, 'Reject');
         end
@@ -508,7 +508,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'BurstSchedule',      struct('Bursts', bursts), ...
                 'FrameExecutionPlan', fep)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -523,7 +523,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'BurstSchedule',      struct('Bursts', bursts), ...
                 'FrameExecutionPlan', fep)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
             testCase.verifyEqual(f.Code, 'OverlapAnnotationConsistent');
             testCase.verifyEqual(f.Severity, 'Reject');
             testCase.verifySubstring(f.Message, 'ActiveIntervalIndices');
@@ -539,7 +539,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bp = struct('Emitters', {{struct( ...
                 'BurstSchedule',      struct('Bursts', bursts), ...
                 'FrameExecutionPlan', fep)}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
             testCase.verifyEqual(f.Code, 'OverlapAnnotationConsistent');
             testCase.verifyEqual(f.Severity, 'Reject');
         end
@@ -550,7 +550,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             bursts = struct('OverlappingFramesIds', {[1 2]});
             bp = struct('Emitters', {{struct( ...
                 'BurstSchedule', struct('Bursts', bursts))}});
-            f = csrd.utils.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
+            f = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkOverlapAnnotationConsistent(bp);
             testCase.verifyEmpty(f);
         end
 
@@ -563,7 +563,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             % There is no static method for this check; it lives in
             % tests/regression/test_channel_state_continuity.m.
             testCase.verifyEmpty(meta.class.fromName( ...
-                'csrd.utils.blueprint.BlueprintFeasibilityValidator').MethodList.findobj( ...
+                'csrd.pipeline.blueprint.BlueprintFeasibilityValidator').MethodList.findobj( ...
                 'Name', 'checkChannelStateContinuity'));
         end
 
@@ -571,7 +571,7 @@ classdef BlueprintFeasibilityValidatorTest < matlab.unittest.TestCase
             % validate() must NOT execute ChannelStateContinuity; the
             % regression test owns it. Smoke: validate runs to completion
             % with NumChecksRun==20.
-            report = csrd.utils.blueprint.BlueprintFeasibilityValidator.validate(struct());
+            report = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.validate(struct());
             testCase.verifyEqual(report.NumChecksRun, 20);
         end
 

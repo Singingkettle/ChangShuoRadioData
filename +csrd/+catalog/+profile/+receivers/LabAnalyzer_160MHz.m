@@ -1,0 +1,19 @@
+function profile = LabAnalyzer_160MHz()
+%LABANALYZER_160MHZ v0 receiver profile: lab-grade analyzer up to 160 MHz Fs.
+% Inputs / 输入: see signature arguments and local validation.
+% 输出 / Outputs: see signature return values and contract fields.
+% 中文说明：提供 CSRD 生产链路中的 LabAnalyzer_160MHz 实现。
+%
+% Source numbers: docs/audits/2026-04-...refactor.md §5.bis B (row 2).
+% Schema:        docs/audits/phases/phase-2-blueprint.md §3.1.3.B.
+%
+% Hard constraint (§5.bis B): SampleRate == ObservableBandwidth.
+
+    profile = struct( ...
+        'SampleRateChoicesHz',     {{40e6, 80e6, 160e6}}, ...
+        'ObservableBandwidthHz',   [], ...
+        'NumAntennasRange',        [1 4], ...
+        'NoiseFigureRangeDb',      [5 7], ...
+        'SensitivityDbm',          -110, ...
+        'CarrierFrequencyRangeHz', [9e3 8e9]);
+end

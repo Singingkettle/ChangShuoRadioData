@@ -1,5 +1,6 @@
 function diag_phase4_c8()
 %DIAG_PHASE4_C8 Walk the latest baseline session for each scenario and
+% 中文说明：提供 CSRD 生产链路中的 diag_phase4_c8 实现。
 %   list bandwidth-difference outliers driving the C8 metric.
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
@@ -113,6 +114,10 @@ end
 
 
 function records = scanFrame(records, frame, sname)
+    % scanFrame - Production declaration in CSRD.
+    % 中文说明：scanFrame 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isstruct(frame), return; end
 if ~isfield(frame, 'SignalSources'), return; end
 srcs = frame.SignalSources;
@@ -129,6 +134,10 @@ end
 
 
 function records = scanSource(records, src, sname)
+    % scanSource - Production declaration in CSRD.
+    % 中文说明：scanSource 在 CSRD 生产链路中执行对应处理。
+    % Inputs / 输入: see signature arguments and local validation.
+    % 输出 / Outputs: see signature return values and contract fields.
 if ~isstruct(src) || ~isfield(src, 'Truth'), return; end
 truth = src.Truth;
 if ~isstruct(truth), return; end

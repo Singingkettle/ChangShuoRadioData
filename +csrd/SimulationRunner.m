@@ -1,5 +1,6 @@
 classdef SimulationRunner < matlab.System
     % SimulationRunner - Scenario-driven radio data collection simulation manager
+    % 中文说明：提供 CSRD 生产链路中的 SimulationRunner 实现。
     %
     % This class manages multiple communication scenarios in a radio data collection
     % simulation. For each scenario, it instantiates a ChangShuo engine that generates
@@ -55,7 +56,8 @@ classdef SimulationRunner < matlab.System
         % and parallel processing parameters. Structure includes:
         %   .NumScenarios (integer): Number of scenarios to execute
         %   .NumFrames (integer): Total frames (calculated by summing all scenario frame counts)
-        %   .FixedFrameLength (integer): Consistent frame size in samples
+        %   .FixedFrameLength: removed; use
+        %     Factories.Scenario.Global.FrameNumSamples instead
         %   .RandomSeed (integer|'shuffle'): Random seed for reproducibility
         %   .Data (struct): Data storage configuration with output directories
         %   .Log (struct): Logging configuration with levels and output options
@@ -90,7 +92,7 @@ classdef SimulationRunner < matlab.System
         toolboxLevel
 
         % logPolicyDescription: cached struct returned by
-        % csrd.utils.logger.policy.LogPolicy.describe(); appended to every
+        % csrd.runtime.logger.policy.LogPolicy.describe(); appended to every
         % annotation under Header.Runtime.LogPolicy so post-hoc analyses
         % can tell which logging tier produced a given annotation file.
         logPolicyDescription
@@ -100,6 +102,9 @@ classdef SimulationRunner < matlab.System
 
         function obj = SimulationRunner(varargin)
             % SimulationRunner - Constructor for scenario-driven simulation runner
+            % 中文说明：SimulationRunner 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates a new SimulationRunner instance with specified configuration.
             % The constructor accepts name-value pairs for setting object properties.
@@ -126,6 +131,9 @@ classdef SimulationRunner < matlab.System
 
         function setupImpl(obj)
             % setupImpl - Initialize simulation environment for scenario-driven execution
+            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method performs complete simulation environment initialization including:
             % - Configuration validation and scenario count retrieval from NumScenarios
@@ -139,7 +147,7 @@ classdef SimulationRunner < matlab.System
             % creates necessary directories, and prepares for scenario-based execution.
 
             % Initialize logger from GlobalLogManager
-            obj.logger = csrd.utils.logger.GlobalLogManager.getLogger();
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
             % --- Phase 0 change #2: apply LogPolicy ---
             % Order matters: apply BEFORE the first debug() so the very
@@ -148,6 +156,9 @@ classdef SimulationRunner < matlab.System
             obj.applyLogPolicyFromConfig();
 
             obj.logger.debug('SimulationRunner setupImpl started. Initializing scenario-driven execution...');
+
+            obj.validateConfiguration();
+            obj.normalizeAndValidateFactoryRuntimeContracts();
 
             % --- Phase 0 change #1: validate required toolboxes ---
             % Fail-fast on missing toolboxes so a long sweep does not
@@ -186,6 +197,9 @@ classdef SimulationRunner < matlab.System
 
         function stepImpl(obj, workerId, numWorkers)
             % stepImpl - Execute scenarios with distributed worker processing
+            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Executes scenario-based simulation for a specific worker. Each worker
             % processes a subset of scenarios based on worker ID and total number
@@ -280,6 +294,9 @@ classdef SimulationRunner < matlab.System
 
         function executeScenario(obj, scenarioId, workerId)
             % executeScenario - Execute a single scenario using ChangShuo engine
+            % 中文说明：executeScenario 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method handles the complete lifecycle of a single scenario:
             % 1. Instantiate ChangShuo engine
@@ -329,7 +346,7 @@ classdef SimulationRunner < matlab.System
                 obj.logger.debug('Worker %d, Scenario %d: Data saved successfully', workerId, scenarioId);
 
             catch engineError
-                if csrd.utils.scenario.isScenarioSkipException(engineError)
+                if csrd.pipeline.scenario.isScenarioSkipException(engineError)
                     obj.logger.warning('Worker %d, Scenario %d: Scenario skipped - %s', ...
                         workerId, scenarioId, engineError.message);
                     return;
@@ -354,6 +371,9 @@ classdef SimulationRunner < matlab.System
 
         function configureChangShuoEngine(obj, engine, scenarioId)
             % configureChangShuoEngine - Configure ChangShuo engine for specific scenario
+            % 中文说明：configureChangShuoEngine 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % DESIGN PRINCIPLE:
             %   - Each factory receives ONLY its own configuration
@@ -367,9 +387,27 @@ classdef SimulationRunner < matlab.System
             obj.logger.debug('ChangShuo engine configured for scenario %d', scenarioId);
         end
 
+        function normalizeAndValidateFactoryRuntimeContracts(obj)
+            %NORMALIZEANDVALIDATEFACTORYRUNTIMECONTRACTS Enforce Phase 18 contracts.
+            % 中文说明：直传 FactoryConfigs 的路径也必须走配置加载后的同一合同。
+            if isempty(obj.FactoryConfigs)
+                error('SimulationRunner:ConfigError', ...
+                    'FactoryConfigs are required before SimulationRunner setup.');
+            end
+            wrappedConfig = struct();
+            wrappedConfig.Runner = obj.RunnerConfig;
+            wrappedConfig.Factories = obj.FactoryConfigs;
+            wrappedConfig.Metadata = struct();
+            wrappedConfig = csrd.pipeline.runtime.normalizeRuntimeContracts(wrappedConfig);
+            obj.FactoryConfigs = wrappedConfig.Factories;
+        end
+
         function saveScenarioData(obj, scenarioData, scenarioAnnotation, ...
                 scenarioId, workerId, blueprintProvenance)
             % saveScenarioData - Save scenario data and annotation to files
+            % 中文说明：saveScenarioData 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Phase 2 (audit C4) added the optional `blueprintProvenance`
             % argument carrying BlueprintHash / BlueprintResamples /
@@ -415,7 +453,7 @@ classdef SimulationRunner < matlab.System
             % Phase 0 carried for "v2 migration" has been dropped to
             % keep the annotation schema unambiguous.
             [cleanAnnotation, sanitizeManifest] = ...
-                csrd.utils.annotation.sanitizeForJson(scenarioAnnotation);
+                csrd.pipeline.annotation.sanitizeForJson(scenarioAnnotation);
 
             cleanAnnotation = obj.stampRuntimeHeader( ...
                 cleanAnnotation, sanitizeManifest, scenarioId, workerId, ...
@@ -458,6 +496,9 @@ classdef SimulationRunner < matlab.System
 
         function validateToolboxesFromConfig(obj)
             % Phase 0: resolve tier from RunnerConfig.Toolbox.Level (or
+            % 中文说明：validateToolboxesFromConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % default to 'standard'), then call the shared validator.
 
             obj.toolboxLevel = 'standard';
@@ -469,7 +510,7 @@ classdef SimulationRunner < matlab.System
             end
 
             try
-                report = csrd.utils.toolbox.validateRequiredToolboxes( ...
+                report = csrd.runtime.toolbox.validateRequiredToolboxes( ...
                     obj.toolboxLevel);
                 obj.logger.info(['Toolbox validation passed at level ', ...
                     '"%s" (%d toolboxes checked).'], ...
@@ -486,6 +527,9 @@ classdef SimulationRunner < matlab.System
 
         function applyLogPolicyFromConfig(obj)
             % Phase 0: read RunnerConfig.Log.Policy (default 'Standard'),
+            % 中文说明：applyLogPolicyFromConfig 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % apply via LogPolicy, and cache the description for later
             % stamping into annotations.
 
@@ -497,7 +541,7 @@ classdef SimulationRunner < matlab.System
                 policyLevel = char(obj.RunnerConfig.Log.Policy);
             end
 
-            policy = csrd.utils.logger.policy.LogPolicy(policyLevel);
+            policy = csrd.runtime.logger.policy.LogPolicy(policyLevel);
             policy.apply();
             obj.logPolicyDescription = policy.describe();
         end
@@ -506,6 +550,9 @@ classdef SimulationRunner < matlab.System
                 obj, annotation, sanitizeManifest, scenarioId, workerId, ...
                 blueprintProvenance)
             %STAMPRUNTIMEHEADER Wrap and stamp scenario annotation metadata.
+            % 中文说明：stampRuntimeHeader 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             %   The saved annotation JSON is always shaped as
             %       {
@@ -566,6 +613,9 @@ classdef SimulationRunner < matlab.System
 
         function [startScenario, endScenario, scenarioCount] = calculateScenarioDistribution(obj, workerId, numWorkers)
             % calculateScenarioDistribution - Calculate scenario range for specific worker
+            % 中文说明：calculateScenarioDistribution 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if numWorkers > obj.totalScenarios
                 % More workers than scenarios
@@ -603,12 +653,15 @@ classdef SimulationRunner < matlab.System
 
         function setupDirectories(obj)
             % setupDirectories - Create necessary directory structure for data storage
+            % 中文说明：setupDirectories 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % Creates subdirectories using the global log directory as the base output directory.
             % This ensures data and logs are stored in the same session-based directory structure.
 
             % Get the log directory from global log manager as base output directory
-            logDirectory = csrd.utils.logger.GlobalLogManager.getLogDirectory();
+            logDirectory = csrd.runtime.logger.GlobalLogManager.getLogDirectory();
 
             if isempty(logDirectory)
                 % Fallback to default directory structure
@@ -658,6 +711,9 @@ classdef SimulationRunner < matlab.System
 
         function displayProgress(obj, workerId, currentScenario, totalScenarios, scenarioId, scenarioTime, isFailed)
             % displayProgress - Display detailed scenario processing progress with time information
+            % 中文说明：displayProgress 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             %
             % This method displays comprehensive progress information including:
             % - Current scenario completion time
@@ -713,6 +769,9 @@ classdef SimulationRunner < matlab.System
 
         function timeStr = formatDuration(obj, seconds)
             % formatDuration - Format duration in seconds to human-readable string
+            % 中文说明：formatDuration 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             if seconds < 60
                 timeStr = sprintf('%.0fs', seconds);
@@ -730,6 +789,9 @@ classdef SimulationRunner < matlab.System
 
         function logCompletionStatistics(obj, workerId, successfulScenarios, failedScenarios, startTime)
             % logCompletionStatistics - Log simulation completion statistics
+            % 中文说明：logCompletionStatistics 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
             totalTime = toc(startTime);
             totalProcessed = successfulScenarios + failedScenarios;
@@ -750,9 +812,13 @@ classdef SimulationRunner < matlab.System
 
         function validateConfiguration(obj)
             % validateConfiguration - Validate all configuration structures
+            % 中文说明：validateConfiguration 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
 
-            % Validate RunnerConfig - Frame management is delegated to ChangShuo
-            requiredRunnerFields = {'NumScenarios', 'FixedFrameLength', 'Data', 'Engine'};
+            % Validate RunnerConfig - frame shape is owned by
+            % Factories.Scenario.Global.FrameNumSamples.
+            requiredRunnerFields = {'NumScenarios', 'Data', 'Engine'};
 
             for i = 1:length(requiredRunnerFields)
                 field = requiredRunnerFields{i};
@@ -770,9 +836,10 @@ classdef SimulationRunner < matlab.System
                 'NumScenarios must be a positive integer.');
             end
 
-            if obj.RunnerConfig.FixedFrameLength <= 0
+            if isfield(obj.RunnerConfig, 'FixedFrameLength')
                 error('SimulationRunner:ConfigError', ...
-                'FixedFrameLength must be a positive integer.');
+                    ['Runner.FixedFrameLength is forbidden after Phase 17; ', ...
+                     'set Factories.Scenario.Global.FrameNumSamples instead.']);
             end
 
             % Validate data configuration
@@ -794,6 +861,9 @@ classdef SimulationRunner < matlab.System
 
         function runtimeHeader = injectBlueprintProvenance(runtimeHeader, provenance)
             % injectBlueprintProvenance - Phase 2 (audit C4) helper that
+            % 中文说明：injectBlueprintProvenance 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % stamps the BlueprintHash / BlueprintResamples /
             % ValidatorVersion fields onto a Header.Runtime struct.
             %
@@ -826,6 +896,9 @@ classdef SimulationRunner < matlab.System
 
         function s = coerceProvenanceString(provenance, key)
             % Phase 2 helper: defensive string coercion so a malformed
+            % 中文说明：coerceProvenanceString 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % provenance struct cannot crash the annotation-save path.
             % Char rows and string scalars survive; everything else
             % collapses to ''.
@@ -843,6 +916,9 @@ classdef SimulationRunner < matlab.System
 
         function v = coerceProvenanceScalar(provenance, key)
             % Phase 2 helper: defensive scalar coercion that always
+            % 中文说明：coerceProvenanceScalar 在 CSRD 生产链路中执行对应处理。
+            % Inputs / 输入: see signature arguments and local validation.
+            % 输出 / Outputs: see signature return values and contract fields.
             % produces a finite double; non-finite or non-numeric values
             % collapse to 0 so JSON round-trip is safe.
             v = 0;
