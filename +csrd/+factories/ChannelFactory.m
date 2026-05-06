@@ -66,7 +66,8 @@ classdef ChannelFactory < matlab.System
             rxIdStr = string(getStructField(rxSpecificInfo, 'ID', 'Rx'));
 
             channelModelName = obj.resolveChannelModelName(channelLinkSpecificInfo);
-            cacheKey = obj.resolveChannelCacheKey(channelModelName, txIdStr, rxIdStr);
+            cacheKey = obj.resolveChannelCacheKey( ...
+                channelModelName, txIdStr, rxIdStr, channelLinkSpecificInfo);
             currentChannelBlock = obj.getChannelBlock(channelModelName, cacheKey);
             obj.selectedChannelModelName = channelModelName;
             obj.isRayTracingSelected = contains(class(currentChannelBlock), 'RayTracing', 'IgnoreCase', true);
@@ -222,15 +223,26 @@ classdef ChannelFactory < matlab.System
                 mode, obj.factoryConfig);
         end
 
-        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr) %#ok<INUSL>
-            % All channel models, including ray tracing, MUST be cached per
+        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr, channelLinkInfo) %#ok<INUSL>
+            % Statistical/fading channel models are cached per Tx-Rx link.
             % 中文说明：resolveChannelCacheKey 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
-            % Tx-Rx link. Sharing a single ray-tracing block across links
-            % causes per-link state (rays, channel filters, antenna sites,
-            % seed) to leak between transmitters/receivers and corrupts
-            % every link except the most recently configured one.
+            % RayTracing itself is stateless per link except for generated
+            % site handles used for diagnostics; the expensive siteviewer and
+            % propagation-model resources are map/profile-scoped, so Phase 21
+            % caches one RayTracing block per map profile instead of per link.
+            if obj.isRayTracingModelName(modelName)
+                mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
+                mode = char(string(getStructField(mapProfile, 'Mode', 'Unknown')));
+                osmFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
+                terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
+                material = char(string(getStructField(mapProfile, 'TerrainMaterial', '')));
+                maxRefl = getStructField(mapProfile, 'MaxNumReflections', []);
+                cacheKey = sprintf('%s|Map=%s|File=%s|Terrain=%s|Mat=%s|Refl=%s', ...
+                    modelName, mode, osmFile, terrain, material, mat2str(maxRefl));
+                return;
+            end
             cacheKey = sprintf('%s|Tx=%s|Rx=%s', modelName, char(txIdStr), char(rxIdStr));
         end
 

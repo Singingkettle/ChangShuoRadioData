@@ -40,6 +40,13 @@ classdef RRFSimulator < matlab.System
         ThermalNoise        % comm.ThermalNoise instance
         IQImbalance         % function handle applying iqimbal
         SampleShifter       % comm.SampleRateOffset instance
+        SampleRateOffsetInfo struct = struct()
+    end
+
+    properties (Access = private)
+        ThermalNoiseSampleRateHz double = NaN
+        ThermalNoiseTemperatureK double = NaN
+        SampleShifterOffsetPpm double = NaN
     end
 
     methods (Access = private)
@@ -209,6 +216,50 @@ classdef RRFSimulator < matlab.System
                 Offset = obj.SampleRateOffset);
         end
 
+        function ensureThermalNoiseObject(obj)
+            noiseTemperature = obj.ThermalNoiseConfig.NoiseTemperature;
+            needsObject = isempty(obj.ThermalNoise) || ...
+                ~isa(obj.ThermalNoise, 'comm.ThermalNoise') || ...
+                obj.ThermalNoiseSampleRateHz ~= obj.MasterClockRate || ...
+                obj.ThermalNoiseTemperatureK ~= noiseTemperature;
+
+            if ~needsObject
+                return;
+            end
+
+            if isa(obj.ThermalNoise, 'matlab.System') && isLocked(obj.ThermalNoise)
+                release(obj.ThermalNoise);
+            end
+            obj.ThermalNoise = obj.genThermalNoise();
+            obj.ThermalNoiseSampleRateHz = obj.MasterClockRate;
+            obj.ThermalNoiseTemperatureK = noiseTemperature;
+        end
+
+        function ensureSampleShifterObject(obj)
+            offsetPpm = double(obj.SampleRateOffset);
+            if offsetPpm == 0
+                if isa(obj.SampleShifter, 'matlab.System') && isLocked(obj.SampleShifter)
+                    release(obj.SampleShifter);
+                end
+                obj.SampleShifter = [];
+                obj.SampleShifterOffsetPpm = 0;
+                return;
+            end
+
+            needsObject = isempty(obj.SampleShifter) || ...
+                ~isa(obj.SampleShifter, 'comm.SampleRateOffset') || ...
+                obj.SampleShifterOffsetPpm ~= offsetPpm;
+            if ~needsObject
+                return;
+            end
+
+            if isa(obj.SampleShifter, 'matlab.System') && isLocked(obj.SampleShifter)
+                release(obj.SampleShifter);
+            end
+            obj.SampleShifter = obj.genSampleShifter();
+            obj.SampleShifterOffsetPpm = offsetPpm;
+        end
+
     end
 
     methods
@@ -233,9 +284,9 @@ classdef RRFSimulator < matlab.System
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
             obj.LowerPowerAmplifier = obj.genLowerPowerAmplifier;
-            obj.ThermalNoise = obj.genThermalNoise;
             obj.IQImbalance = obj.genIqImbalance;
-            obj.SampleShifter = obj.genSampleShifter;
+            obj.ensureThermalNoiseObject();
+            obj.ensureSampleShifterObject();
         end
 
         function outputSignal = stepImpl(obj, inputSignal)
@@ -251,10 +302,10 @@ classdef RRFSimulator < matlab.System
             %   3. IQ imbalance    (iqimbal)
             %   4. ADC sample-rate offset (comm.SampleRateOffset, ppm)
             %
-            % comm.SampleRateOffset is invoked unconditionally because
-            % an offset of 0 ppm is a deterministic identity. When the
-            % configured offset is non-zero the output length may
-            % differ from the input length by one sample (Farrow filter).
+            % comm.SampleRateOffset is constructed only for non-zero ppm.
+            % The 0 ppm path is an exact identity fast path; non-zero
+            % offsets may change the output length by one sample (Farrow
+            % filter) and are recorded in SampleRateOffsetInfo.
             %
             % Args:
             %   inputSignal: Pre-combined numeric signal array [samples x antennas]
@@ -263,13 +314,27 @@ classdef RRFSimulator < matlab.System
 
             x = obj.LowerPowerAmplifier(inputSignal);
 
-            release(obj.ThermalNoise);
+            obj.ensureThermalNoiseObject();
             xAwgn = obj.ThermalNoise(x);
 
             xIq = obj.IQImbalance(xAwgn);
 
-            release(obj.SampleShifter);
-            outputSignal = obj.SampleShifter(xIq);
+            obj.ensureSampleShifterObject();
+            if obj.SampleRateOffset == 0
+                outputSignal = xIq;
+                action = 'identity';
+                applied = false;
+            else
+                outputSignal = obj.SampleShifter(xIq);
+                action = 'sample-rate-offset';
+                applied = true;
+            end
+            obj.SampleRateOffsetInfo = struct( ...
+                'Applied', applied, ...
+                'OffsetPpm', double(obj.SampleRateOffset), ...
+                'InputSamples', size(xIq, 1), ...
+                'OutputSamples', size(outputSignal, 1), ...
+                'Action', action);
         end
 
     end

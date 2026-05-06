@@ -96,6 +96,13 @@ classdef SimulationRunner < matlab.System
         % annotation under Header.Runtime.LogPolicy so post-hoc analyses
         % can tell which logging tier produced a given annotation file.
         logPolicyDescription
+
+        % Phase 21 performance trace. Disabled by default; when enabled by
+        % Runner.Performance.EnableStageTiming it records low-overhead stage
+        % wallclock into ignored artifacts/performance/phase21/.
+        performanceEnabled logical = false
+        performanceTrace struct = struct()
+        performanceArtifactDirectory char = ''
     end
 
     methods
@@ -146,25 +153,34 @@ classdef SimulationRunner < matlab.System
             % calculates total frames automatically, accesses the global logging system,
             % creates necessary directories, and prepares for scenario-based execution.
 
+            setupStartTime = tic;
+
             % Initialize logger from GlobalLogManager
             obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
+            obj.configurePerformanceTracing();
 
             % --- Phase 0 change #2: apply LogPolicy ---
             % Order matters: apply BEFORE the first debug() so the very
             % next line is already filtered correctly when running under
             % LargeMC. See phase-0-baseline.md §6.2.
+            stageStart = tic;
             obj.applyLogPolicyFromConfig();
+            obj.recordPerformanceStage('Runner.ApplyLogPolicy', toc(stageStart), struct());
 
             obj.logger.debug('SimulationRunner setupImpl started. Initializing scenario-driven execution...');
 
+            stageStart = tic;
             obj.validateConfiguration();
             obj.normalizeAndValidateFactoryRuntimeContracts();
+            obj.recordPerformanceStage('Runner.ValidateConfiguration', toc(stageStart), struct());
 
             % --- Phase 0 change #1: validate required toolboxes ---
             % Fail-fast on missing toolboxes so a long sweep does not
             % crash 4 hours in with a cryptic factory error. See
             % phase-0-baseline.md §6.1.
+            stageStart = tic;
             obj.validateToolboxesFromConfig();
+            obj.recordPerformanceStage('Runner.ValidateToolboxes', toc(stageStart), struct());
 
             % Get total number of scenarios from RunnerConfig
             if isfield(obj.RunnerConfig, 'NumScenarios') && isnumeric(obj.RunnerConfig.NumScenarios) && obj.RunnerConfig.NumScenarios > 0
@@ -189,10 +205,13 @@ classdef SimulationRunner < matlab.System
 
             end
 
+            stageStart = tic;
             obj.setupDirectories();
+            obj.recordPerformanceStage('Runner.SetupDirectories', toc(stageStart), struct());
 
             obj.logger.info('SimulationRunner setup completed successfully.');
             obj.logger.debug('Ready for scenario-based execution: %d total scenarios', obj.totalScenarios);
+            obj.recordPerformanceStage('Runner.SetupTotal', toc(setupStartTime), struct());
         end
 
         function stepImpl(obj, workerId, numWorkers)
@@ -298,6 +317,14 @@ classdef SimulationRunner < matlab.System
             end
 
             % Log completion statistics
+            obj.recordPerformanceStage('Runner.WorkerTotal', toc(simulationStartTime), ...
+                struct('WorkerId', workerId, ...
+                       'SuccessfulScenarios', successfulScenarios, ...
+                       'FailedScenarios', failedScenarios, ...
+                       'SkippedScenarios', skippedScenarios));
+            obj.writePerformanceTrace(workerId, successfulScenarios, ...
+                failedScenarios, skippedScenarios, simulationStartTime);
+
             obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, ...
                 skippedScenarios, simulationStartTime);
         end
@@ -321,22 +348,32 @@ classdef SimulationRunner < matlab.System
 
             obj.logger.debug('Worker %d: Starting scenario %d execution', workerId, scenarioId);
             status = 'Success';
+            scenarioTotalStart = tic;
 
             % Instantiate ChangShuo engine for this scenario
             engineHandle = obj.RunnerConfig.Engine.Handle;
+            stageStart = tic;
             changShuoEngine = feval(engineHandle);
+            obj.recordPerformanceStage('Scenario.EngineInstantiate', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
             cleanupGuard = onCleanup(@() localCleanupChangShuoEngine(changShuoEngine));
 
             try
                 % Configure ChangShuo engine with factory configurations
+                stageStart = tic;
                 obj.configureChangShuoEngine(changShuoEngine, scenarioId);
+                obj.recordPerformanceStage('Scenario.ConfigureEngine', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
                 obj.logger.debug('Worker %d, Scenario %d: Delegating frame generation to ChangShuo engine', ...
                     workerId, scenarioId);
 
                 % Generate all frames for this scenario using ChangShuo engine
                 % ChangShuo determines frame count from scenario configuration internally
+                stageStart = tic;
                 [scenarioData, scenarioAnnotation] = step(changShuoEngine, scenarioId);
+                obj.recordPerformanceStage('Scenario.ChangShuoStep', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
                 % Phase 3 (audit §3.5 / §17.5 P3-7): capture blueprint
                 % provenance via the public read-only `LastGlobalLayout`
@@ -352,21 +389,31 @@ classdef SimulationRunner < matlab.System
                         changShuoEngine.LastGlobalLayout);
 
                 % Save scenario data and annotation
+                stageStart = tic;
                 obj.saveScenarioData(scenarioData, scenarioAnnotation, ...
                     scenarioId, workerId, blueprintProvenance);
+                obj.recordPerformanceStage('Scenario.SaveScenarioData', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
                 obj.logger.debug('Worker %d, Scenario %d: Data saved successfully', workerId, scenarioId);
+                obj.recordPerformanceStage('Scenario.Total', toc(scenarioTotalStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId, 'Status', status));
 
             catch engineError
                 if csrd.pipeline.scenario.isScenarioSkipException(engineError)
                     obj.logger.warning('Worker %d, Scenario %d: Scenario skipped - %s', ...
                         workerId, scenarioId, engineError.message);
                     status = 'Skipped';
+                    obj.recordPerformanceStage('Scenario.Total', toc(scenarioTotalStart), ...
+                        struct('WorkerId', workerId, 'ScenarioId', scenarioId, 'Status', status));
                     return;
                 end
 
                 obj.logger.error('Worker %d, Scenario %d: ChangShuo engine error: %s', ...
                     workerId, scenarioId, engineError.message);
+                obj.recordPerformanceStage('Scenario.Total', toc(scenarioTotalStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId, ...
+                           'Status', 'Failed', 'ErrorIdentifier', engineError.identifier));
                 rethrow(engineError);
             end
             clear cleanupGuard;
@@ -433,11 +480,14 @@ classdef SimulationRunner < matlab.System
 
             try
 
+                stageStart = tic;
                 if obj.RunnerConfig.Data.CompressData
                     save(scenarioDataPath, 'scenarioData', '-v7.3', '-nocompression');
                 else
                     save(scenarioDataPath, 'scenarioData', '-v7.3');
                 end
+                obj.recordPerformanceStage('Save.MatScenarioData', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
                 obj.logger.debug('Saved scenario data: %s', scenarioDataPath);
             catch saveError
@@ -455,31 +505,54 @@ classdef SimulationRunner < matlab.System
             % top-level ScenarioId / ProcessedBy / SavedAt mirror that
             % Phase 0 carried for "v2 migration" has been dropped to
             % keep the annotation schema unambiguous.
+            stageStart = tic;
             [cleanAnnotation, sanitizeManifest] = ...
                 csrd.pipeline.annotation.sanitizeForJson(scenarioAnnotation);
+            obj.recordPerformanceStage('Save.SanitizeAnnotation', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
+            stageStart = tic;
             cleanAnnotation = obj.stampRuntimeHeader( ...
                 cleanAnnotation, sanitizeManifest, scenarioId, workerId, ...
                 blueprintProvenance);
+            obj.recordPerformanceStage('Save.StampRuntimeHeader', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             % Phase 4 (audit §17.6 / §S7 / C4): annotation write-back
             % hook. The static helper raises CSRD:Annotation:* if any
             % SignalSources(k) is missing a v2 top-level key or any
             % Truth.Measured.{SourcePlane,FramePlane} required scalar.
             % We deliberately let it propagate OUT of saveScenarioData
-            % so the upstream `engineError` catch in `processScenario`
-            % can run it through `isScenarioSkipException` (Phase 4
-            % whitelisted the `CSRD:Annotation:` token) and demote the
-            % failure to a per-scenario skip instead of fatal-aborting
-            % the entire sweep. Wrapping it in a local try/catch here
-            % would silently swallow the contract violation, which is
-            % exactly the silent-fallback class of bug Phase 4 is
-            % designed to flush out -- so do NOT add try/catch around
-            % this call.
+            % so the upstream `engineError` catch can count annotation
+            % contract violations as hard scenario failures. Wrapping it
+            % in a local try/catch here would silently swallow the
+            % contract violation, which is exactly the silent-fallback
+            % class of bug Phase 4/20 flushed out -- so do NOT add
+            % try/catch around this call.
+            stageStart = tic;
             csrd.core.ChangShuo.validateMeasurementCompleteness(cleanAnnotation);
+            obj.recordPerformanceStage('Save.ValidateMeasurementCompleteness', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             try
-                jsonString = jsonencode(cleanAnnotation, 'PrettyPrint', true);
+                prettyPrintAnnotations = true;
+                if isfield(obj.RunnerConfig, 'Data') && ...
+                        isstruct(obj.RunnerConfig.Data) && ...
+                        isfield(obj.RunnerConfig.Data, 'PrettyPrintAnnotations') && ...
+                        ~isempty(obj.RunnerConfig.Data.PrettyPrintAnnotations)
+                    prettyPrintAnnotations = logical(obj.RunnerConfig.Data.PrettyPrintAnnotations);
+                end
+                if prettyPrintAnnotations
+                    stageStart = tic;
+                    jsonString = jsonencode(cleanAnnotation, 'PrettyPrint', true);
+                else
+                    stageStart = tic;
+                    jsonString = jsonencode(cleanAnnotation);
+                end
+                obj.recordPerformanceStage('Save.EncodeAnnotationJson', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId, ...
+                           'PrettyPrint', prettyPrintAnnotations));
+                stageStart = tic;
                 fid = fopen(annotationPath, 'w');
 
                 if fid == -1
@@ -489,6 +562,8 @@ classdef SimulationRunner < matlab.System
                     fclose(fid);
                     obj.logger.debug('Saved annotation: %s', annotationPath);
                 end
+                obj.recordPerformanceStage('Save.WriteAnnotationJson', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             catch saveError
                 obj.logger.error('Failed to save annotation for scenario %d: %s', ...
@@ -547,6 +622,101 @@ classdef SimulationRunner < matlab.System
             policy = csrd.runtime.logger.policy.LogPolicy(policyLevel);
             policy.apply();
             obj.logPolicyDescription = policy.describe();
+        end
+
+        function configurePerformanceTracing(obj)
+            %CONFIGUREPERFORMANCETRACING Resolve optional Phase 21 timing sink.
+            % 中文说明：默认关闭，仅在 Runner.Performance.EnableStageTiming=true 时写 artifact。
+            obj.performanceEnabled = false;
+            obj.performanceArtifactDirectory = '';
+            obj.performanceTrace = struct();
+
+            perfCfg = struct();
+            if isfield(obj.RunnerConfig, 'Performance') && ...
+                    isstruct(obj.RunnerConfig.Performance)
+                perfCfg = obj.RunnerConfig.Performance;
+            end
+
+            if ~isfield(perfCfg, 'EnableStageTiming') || ...
+                    ~localToLogical(perfCfg.EnableStageTiming)
+                return;
+            end
+
+            obj.performanceEnabled = true;
+            if isfield(perfCfg, 'ArtifactDirectory') && ...
+                    ~isempty(perfCfg.ArtifactDirectory)
+                artifactDir = char(string(perfCfg.ArtifactDirectory));
+                if ~localIsAbsolutePath(artifactDir)
+                    artifactDir = fullfile(localProjectRoot(), artifactDir);
+                end
+            else
+                artifactDir = fullfile(localProjectRoot(), 'artifacts', ...
+                    'performance', 'phase21');
+            end
+            if ~isfolder(artifactDir)
+                mkdir(artifactDir);
+            end
+            obj.performanceArtifactDirectory = artifactDir;
+            obj.performanceTrace = struct( ...
+                'Schema', 'csrd.phase21.stage-timing.v1', ...
+                'GeneratedAtUtc', char(datetime('now', 'TimeZone', 'UTC', ...
+                    'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z''')), ...
+                'ArtifactDirectory', artifactDir, ...
+                'Events', struct('Stage', {}, 'ElapsedSec', {}, ...
+                    'RecordedAtUtc', {}, 'Metadata', {}));
+        end
+
+        function recordPerformanceStage(obj, stageName, elapsedSec, metadata)
+            %RECORDPERFORMANCESTAGE Append a lightweight timing event.
+            % 中文说明：只写耗时和结构化元数据，不接触信号样本。
+            if ~obj.performanceEnabled
+                return;
+            end
+            if nargin < 4 || ~isstruct(metadata)
+                metadata = struct();
+            end
+            event = struct( ...
+                'Stage', char(string(stageName)), ...
+                'ElapsedSec', double(elapsedSec), ...
+                'RecordedAtUtc', char(datetime('now', 'TimeZone', 'UTC', ...
+                    'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')), ...
+                'Metadata', metadata);
+            obj.performanceTrace.Events(end + 1) = event;
+        end
+
+        function writePerformanceTrace(obj, workerId, successfulScenarios, ...
+                failedScenarios, skippedScenarios, workerTimer)
+            %WRITEPERFORMANCETRACE Persist ignored Phase 21 timing artifacts.
+            % 中文说明：保存到 artifacts/performance/phase21，不进入数据样本目录。
+            if ~obj.performanceEnabled
+                return;
+            end
+            try
+                totalElapsedSec = toc(workerTimer);
+                obj.performanceTrace.Summary = struct( ...
+                    'WorkerId', workerId, ...
+                    'SuccessfulScenarios', successfulScenarios, ...
+                    'FailedScenarios', failedScenarios, ...
+                    'SkippedScenarios', skippedScenarios, ...
+                    'TotalElapsedSec', totalElapsedSec);
+                ts = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+                baseName = sprintf('phase21-stage-timing-worker%03d-%s', ...
+                    workerId, ts);
+                matPath = fullfile(obj.performanceArtifactDirectory, ...
+                    [baseName, '.mat']);
+                jsonPath = fullfile(obj.performanceArtifactDirectory, ...
+                    [baseName, '.json']);
+                performanceTrace = obj.performanceTrace; %#ok<NASGU>
+                save(matPath, 'performanceTrace');
+                fid = fopen(jsonPath, 'w');
+                if fid ~= -1
+                    fprintf(fid, '%s', jsonencode(obj.performanceTrace));
+                    fclose(fid);
+                end
+            catch ME
+                obj.logger.warning('Could not write Phase 21 performance trace: %s', ...
+                    ME.message);
+            end
         end
 
         function annotation = stampRuntimeHeader( ...
@@ -958,4 +1128,27 @@ end
 if ismethod(engine, 'cleanup')
     engine.cleanup();
 end
+end
+
+function tf = localToLogical(value)
+%LOCALTOLOGICAL Conservative bool parsing for optional runner config.
+if islogical(value) && isscalar(value)
+    tf = value;
+elseif isnumeric(value) && isscalar(value) && isfinite(value)
+    tf = value ~= 0;
+elseif ischar(value) || (isstring(value) && isscalar(value))
+    tf = any(strcmpi(char(string(value)), {'true', 'on', 'yes', '1'}));
+else
+    tf = false;
+end
+end
+
+function projectRoot = localProjectRoot()
+%LOCALPROJECTROOT Resolve repository root from this package file.
+projectRoot = fileparts(fileparts(mfilename('fullpath')));
+end
+
+function tf = localIsAbsolutePath(pathText)
+%LOCALISABSOLUTEPATH Windows/Unix absolute path probe.
+tf = ~isempty(regexp(pathText, '^[A-Za-z]:[\\/]|^[/\\]', 'once'));
 end

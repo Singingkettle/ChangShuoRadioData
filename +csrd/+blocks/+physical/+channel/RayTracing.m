@@ -7,6 +7,8 @@ classdef RayTracing < matlab.System
         CarrierFrequency (1, 1) {mustBePositive, mustBeFinite} = 2.4e9
         PropagationModelConfig struct = struct()
         NoValidPathFallback char = 'FreeSpaceAttenuation'
+        UseGPU char = 'auto'
+        GpuMinSamples (1, 1) {mustBeNonnegative, mustBeFinite} = 8192
     end
 
     properties (SetAccess = private)
@@ -18,6 +20,8 @@ classdef RayTracing < matlab.System
         logger
         siteViewerCache
         siteViewerKey char = ''
+        propagationModelCache
+        propagationModelKey char = ''
     end
 
     methods
@@ -83,6 +87,7 @@ classdef RayTracing < matlab.System
 
                 rtChan = comm.RayTracingChannel(raySet, txSite, rxSite);
                 rtChan.SampleRate = obj.resolveSampleRate(x, rxInfo);
+                obj.configureGpuPolicy(rtChan, x.Signal);
                 out.Signal = rtChan(x.Signal);
                 out.RayCount = rayCount;
                 out.ChannelModel = 'RayTracing';
@@ -112,6 +117,8 @@ classdef RayTracing < matlab.System
             tryDeleteSiteViewer(obj.siteViewerCache);
             obj.siteViewerCache = [];
             obj.siteViewerKey = '';
+            obj.propagationModelCache = [];
+            obj.propagationModelKey = '';
         end
 
     end
@@ -234,6 +241,13 @@ classdef RayTracing < matlab.System
                 cfg.MaxNumDiffractions = 0;
             end
 
+            cacheKey = propagationCacheKey(cfg, mapProfile);
+            if strcmp(obj.propagationModelKey, cacheKey) && ...
+                    ~isempty(obj.propagationModelCache)
+                pm = obj.propagationModelCache;
+                return;
+            end
+
             pm = propagationModel('raytracing');
             setPropagationProperty(obj, pm, 'Method', cfg.Method);
             setPropagationProperty(obj, pm, 'MaxNumReflections', cfg.MaxNumReflections);
@@ -244,6 +258,34 @@ classdef RayTracing < matlab.System
                 if ~setPropagationProperty(obj, pm, 'TerrainMaterial', material) && strcmpi(material, 'seawater')
                     setPropagationProperty(obj, pm, 'TerrainMaterial', 'water');
                 end
+            end
+
+            obj.propagationModelCache = pm;
+            obj.propagationModelKey = cacheKey;
+        end
+
+        function configureGpuPolicy(obj, rtChan, signal)
+            % configureGpuPolicy - Enable comm.RayTracingChannel GPU only when useful.
+            % 中文说明：只在配置允许、样本量足够且 GPU 可用时启用 UseGPU。
+            if ~isprop(rtChan, 'UseGPU')
+                return;
+            end
+            policy = lower(char(string(obj.UseGPU)));
+            switch policy
+                case {'false', 'off', 'none', 'cpu'}
+                    rtChan.UseGPU = "off";
+                case {'true', 'on', 'gpu'}
+                    if gpuIsAvailable()
+                        rtChan.UseGPU = "on";
+                    else
+                        rtChan.UseGPU = "off";
+                    end
+                otherwise
+                    if gpuIsAvailable() && numel(signal) >= obj.GpuMinSamples
+                        rtChan.UseGPU = "auto";
+                    else
+                        rtChan.UseGPU = "off";
+                    end
             end
         end
 
@@ -413,6 +455,31 @@ function cfg = normalizePropagationConfig(cfg)
     end
     if ~isfield(cfg, 'MaxNumDiffractions') || isempty(cfg.MaxNumDiffractions)
         cfg.MaxNumDiffractions = 0;
+    end
+end
+
+function key = propagationCacheKey(cfg, mapProfile)
+    % propagationCacheKey - Stable key for map/profile scoped propagation model.
+    mode = char(string(getStructField(mapProfile, 'Mode', '')));
+    terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
+    material = char(string(getStructField(mapProfile, 'TerrainMaterial', '')));
+    maxReflections = getStructField(mapProfile, 'MaxNumReflections', cfg.MaxNumReflections);
+    key = sprintf('Method=%s|Mode=%s|Ref=%s|Diff=%s|Terrain=%s|Mat=%s', ...
+        char(string(cfg.Method)), mode, mat2str(maxReflections), ...
+        mat2str(cfg.MaxNumDiffractions), terrain, material);
+end
+
+function tf = gpuIsAvailable()
+    % gpuIsAvailable - Best-effort GPU availability probe without requiring one.
+    tf = false;
+    try
+        tf = gpuDeviceCount("available") > 0;
+    catch
+        try
+            tf = gpuDeviceCount > 0;
+        catch
+            tf = false;
+        end
     end
 end
 

@@ -39,6 +39,11 @@ function config = default()
     config.Runner.Engine.PerformanceMonitoring = true;
     config.Runner.Engine.InstancePerScenario = true;
 
+    % Phase 21 performance tracing is opt-in. It writes only runtime timing
+    % artifacts under ignored artifacts/performance/phase21/, never signal data.
+    config.Runner.Performance.EnableStageTiming = false;
+    config.Runner.Performance.ArtifactDirectory = fullfile('artifacts', 'performance', 'phase21');
+
     % Quality Assurance Configuration
     config.Runner.QualityAssurance.EnableValidation = true;
     config.Runner.QualityAssurance.ToleranceLevel = 1e-6;

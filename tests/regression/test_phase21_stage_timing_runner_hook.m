@@ -1,0 +1,79 @@
+function test_phase21_stage_timing_runner_hook()
+%TEST_PHASE21_STAGE_TIMING_RUNNER_HOOK Verify opt-in runner timing artifacts.
+% 中文说明：使用轻量 fake engine 验证阶段计时只写 ignored/runtime artifact。
+
+projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+addpath(projectRoot);
+addpath(fullfile(projectRoot, 'tests', 'regression'));
+
+csrd.runtime.logger.GlobalLogManager.reset();
+tempRoot = tempname;
+mkdir(tempRoot);
+cleanup = onCleanup(@() localCleanup(tempRoot));
+
+runnerCfg = struct();
+runnerCfg.NumScenarios = 1;
+runnerCfg.RandomSeed = 42;
+runnerCfg.Data.OutputDirectory = fullfile(tempRoot, 'phase21_stage_timing_out');
+runnerCfg.Data.CompressData = false;
+runnerCfg.Data.PrettyPrintAnnotations = false;
+runnerCfg.Engine.Handle = 'Phase0FakeEngine';
+runnerCfg.Toolbox.Level = 'minimal';
+runnerCfg.Log = struct( ...
+    'Name', 'CSRD-Phase21-StageTiming', ...
+    'Level', 'DEBUG', ...
+    'SaveToFile', true, ...
+    'DisplayInConsole', false, ...
+    'Policy', 'LargeMC');
+runnerCfg.Performance.EnableStageTiming = true;
+runnerCfg.Performance.ArtifactDirectory = fullfile(tempRoot, 'perf');
+
+csrd.runtime.logger.GlobalLogManager.initialize( ...
+    runnerCfg.Log, fullfile(tempRoot, 'logs'));
+
+runner = csrd.SimulationRunner( ...
+    'RunnerConfig', runnerCfg, 'FactoryConfigs', struct());
+setup(runner);
+step(runner, 1, 1);
+release(runner);
+
+matFiles = dir(fullfile(runnerCfg.Performance.ArtifactDirectory, ...
+    'phase21-stage-timing-worker*.mat'));
+jsonFiles = dir(fullfile(runnerCfg.Performance.ArtifactDirectory, ...
+    'phase21-stage-timing-worker*.json'));
+assert(~isempty(matFiles), ...
+    'CSRD:Phase21:MissingStageTimingMat', ...
+    'Expected stage timing MAT artifact.');
+assert(~isempty(jsonFiles), ...
+    'CSRD:Phase21:MissingStageTimingJson', ...
+    'Expected stage timing JSON artifact.');
+
+loaded = load(fullfile(matFiles(1).folder, matFiles(1).name), ...
+    'performanceTrace');
+trace = loaded.performanceTrace;
+stages = string({trace.Events.Stage});
+requiredStages = [
+    "Runner.SetupTotal"
+    "Scenario.ChangShuoStep"
+    "Save.EncodeAnnotationJson"
+    "Runner.WorkerTotal"
+];
+for k = 1:numel(requiredStages)
+    assert(any(stages == requiredStages(k)), ...
+        'CSRD:Phase21:MissingStageTimingEvent', ...
+        'Stage timing artifact missing event "%s".', requiredStages(k));
+end
+end
+
+function localCleanup(pathName)
+try
+    csrd.runtime.logger.GlobalLogManager.reset();
+catch
+end
+if isfolder(pathName)
+    try
+        rmdir(pathName, 's');
+    catch
+    end
+end
+end

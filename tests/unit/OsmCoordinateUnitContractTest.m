@@ -15,10 +15,11 @@ classdef OsmCoordinateUnitContractTest < matlab.unittest.TestCase
             testCase.verifyEqual(tx.PositionUnit, 'meters');
             testCase.verifyTrue(isnumeric(tx.Position) && numel(tx.Position) == 3);
             testCase.verifyTrue(isnumeric(tx.GeoPositionDeg) && numel(tx.GeoPositionDeg) == 3);
-            testCase.verifyGreaterThanOrEqual(tx.GeoPositionDeg(1), 30.995);
-            testCase.verifyLessThanOrEqual(tx.GeoPositionDeg(1), 31.005);
-            testCase.verifyGreaterThanOrEqual(tx.GeoPositionDeg(2), 120.995);
-            testCase.verifyLessThanOrEqual(tx.GeoPositionDeg(2), 121.005);
+            bounds = localExpectedBounds(31.0000, 121.0000, 1);
+            testCase.verifyGreaterThanOrEqual(tx.GeoPositionDeg(1), bounds.MinLatitude);
+            testCase.verifyLessThanOrEqual(tx.GeoPositionDeg(1), bounds.MaxLatitude);
+            testCase.verifyGreaterThanOrEqual(tx.GeoPositionDeg(2), bounds.MinLongitude);
+            testCase.verifyLessThanOrEqual(tx.GeoPositionDeg(2), bounds.MaxLongitude);
             testCase.verifyGreaterThan(abs(tx.Position(1)) + abs(tx.Position(2)), 0);
         end
 
@@ -73,4 +74,15 @@ cfg.Environment.Weather.Enable = false;
 cfg.Environment.Obstacles.Enable = false;
 cfg.Mobility.EnableCollisionAvoidance = false;
 cfg.Global.NumFramesPerScenario = 2;
+end
+
+function bounds = localExpectedBounds(latDeg, lonDeg, sizeKm)
+earthRadiusKm = 6371.0;
+deltaLatDeg = rad2deg((sizeKm / 2) / earthRadiusKm);
+deltaLonDeg = rad2deg((sizeKm / 2) / (earthRadiusKm * cos(deg2rad(latDeg))));
+bounds = struct( ...
+    'MinLatitude', latDeg - deltaLatDeg, ...
+    'MaxLatitude', latDeg + deltaLatDeg, ...
+    'MinLongitude', lonDeg - deltaLonDeg, ...
+    'MaxLongitude', lonDeg + deltaLonDeg);
 end

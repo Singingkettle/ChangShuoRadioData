@@ -501,18 +501,11 @@ classdef TRFSimulator < matlab.System
                         upsampleFactor, downsampleFactor, maxFactor);
                 end
 
-                if size(inputSignal, 2) == 1
-                    resampledSignal = resample(inputSignal, upsampleFactor, downsampleFactor);
-                else
-                    numAntennas = size(inputSignal, 2);
-                    outputLength = ceil(size(inputSignal, 1) * upsampleFactor / downsampleFactor);
-                    resampledSignal = zeros(outputLength, numAntennas);
-
-                    for antennaIdx = 1:numAntennas
-                        resampledSignal(:, antennaIdx) = resample(inputSignal(:, antennaIdx), upsampleFactor, downsampleFactor);
-                    end
-
-                end
+                % MATLAB resample operates along the first dimension for
+                % matrix inputs, treating columns as independent channels.
+                % Calling it once preserves per-antenna timing while avoiding
+                % repeated filter design and MATLAB-loop overhead.
+                resampledSignal = resample(inputSignal, upsampleFactor, downsampleFactor);
 
             end
 
