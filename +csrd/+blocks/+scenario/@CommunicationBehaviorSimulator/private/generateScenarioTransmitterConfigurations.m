@@ -88,6 +88,10 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
         % Physical group
         txPlan.Physical.Position = transmitter.Position;
+        txPlan.Physical.PositionUnit = getEntityPositionUnit(transmitter);
+        if isfield(transmitter, 'GeoPositionDeg')
+            txPlan.Physical.GeoPositionDeg = transmitter.GeoPositionDeg;
+        end
         txPlan.Physical.Velocity = requireEntityVelocity(transmitter, ...
             'Transmitter');
 
@@ -154,6 +158,16 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
     % Perform frequency allocation for all transmitters
     [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txConfigs, ...
         rxConfigs, observableRange, globalLayout);
+end
+
+function unit = getEntityPositionUnit(entity)
+    % getEntityPositionUnit - Return explicit physical coordinate unit.
+    % 中文说明：Position 是米制坐标，GeoPositionDeg 只用于地理传播模型。
+if isfield(entity, 'PositionUnit') && ~isempty(entity.PositionUnit)
+    unit = char(string(entity.PositionUnit));
+else
+    unit = 'meters';
+end
 end
 
 function velocity = requireEntityVelocity(entity, entityType)

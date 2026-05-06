@@ -539,8 +539,12 @@ classdef ChannelFactory < matlab.System
             mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
             mode = getStructField(mapProfile, 'Mode', '');
 
-            if any(strcmpi(mode, {'OSMBuildings', 'FlatTerrain'}))
-                linkDistance_m = geographicDistance(txPos, rxPos);
+            if localUsesMeterPosition(txInfo) && localUsesMeterPosition(rxInfo)
+                linkDistance_m = norm(txPos - rxPos);
+            elseif any(strcmpi(mode, {'OSMBuildings', 'FlatTerrain'}))
+                txGeo = localResolveGeoPosition(txInfo, txPos, 'Tx');
+                rxGeo = localResolveGeoPosition(rxInfo, rxPos, 'Rx');
+                linkDistance_m = geographicDistance(txGeo, rxGeo);
             else
                 linkDistance_m = norm(txPos - rxPos);
             end
@@ -819,16 +823,53 @@ function value = getStructField(s, fieldName, defaultValue)
     end
 end
 
-function distance_m = geographicDistance(txPos, rxPos)
+function tf = localUsesMeterPosition(info)
+    tf = isstruct(info) && isfield(info, 'PositionUnit') && ...
+        ~isempty(info.PositionUnit) && strcmpi(char(string(info.PositionUnit)), 'meters');
+end
+
+function geoPosition = localResolveGeoPosition(info, position, roleName)
+    if isstruct(info) && isfield(info, 'GeoPositionDeg') && ...
+            ~isempty(info.GeoPositionDeg)
+        geoPosition = double(info.GeoPositionDeg(:)).';
+        if numel(geoPosition) ~= 3 || any(~isfinite(geoPosition))
+            error('CSRD:Channel:InvalidGeoPosition', ...
+                '%s GeoPositionDeg must be a finite [lat lon height] vector.', roleName);
+        end
+        return;
+    end
+
+    if localUsesMeterPosition(info)
+        error('CSRD:Channel:MissingGeoPosition', ...
+            '%s uses meter Position and requires GeoPositionDeg for geographic distance.', roleName);
+    end
+
+    if ~isnumeric(position) || numel(position) < 2 || ...
+            any(~isfinite(position(1:min(3, numel(position)))))
+        error('CSRD:Channel:InvalidLegacyPosition', ...
+            '%s Position must be finite when GeoPositionDeg is absent.', roleName);
+    end
+    geoPosition = [position(2), position(1), getPositionHeight(position)];
+end
+
+function height = getPositionHeight(position)
+    if isnumeric(position) && numel(position) >= 3
+        height = position(3);
+    else
+        height = 0;
+    end
+end
+
+function distance_m = geographicDistance(txGeo, rxGeo)
     % geographicDistance - Production declaration in CSRD.
     % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
     % Inputs / 输入: see signature arguments and local validation.
     % 输出 / Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
-    lat1 = deg2rad(txPos(2));
-    lon1 = deg2rad(txPos(1));
-    lat2 = deg2rad(rxPos(2));
-    lon2 = deg2rad(rxPos(1));
+    lat1 = deg2rad(txGeo(1));
+    lon1 = deg2rad(txGeo(2));
+    lat2 = deg2rad(rxGeo(1));
+    lon2 = deg2rad(rxGeo(2));
 
     dLat = lat2 - lat1;
     dLon = lon2 - lon1;
@@ -837,8 +878,8 @@ function distance_m = geographicDistance(txPos, rxPos)
     horizontalDistance = earthRadius_m * c;
 
     dz = 0;
-    if numel(txPos) >= 3 && numel(rxPos) >= 3
-        dz = rxPos(3) - txPos(3);
+    if numel(txGeo) >= 3 && numel(rxGeo) >= 3
+        dz = rxGeo(3) - txGeo(3);
     end
     distance_m = sqrt(horizontalDistance.^2 + dz.^2);
 end

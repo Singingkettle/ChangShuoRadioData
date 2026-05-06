@@ -134,6 +134,16 @@ function mergedEntities = synchronizeScenarioEntities(previousEntities, currentE
             mergedEntity.Snapshots{frameId}.Physical = currentEntities(idx).Snapshots{frameId}.Physical;
         else
             mergedEntity.Snapshots{frameId}.Physical.Position = mergedEntity.Position;
+            if isfield(mergedEntity, 'PositionUnit')
+                mergedEntity.Snapshots{frameId}.Physical.PositionUnit = mergedEntity.PositionUnit;
+            else
+                mergedEntity.Snapshots{frameId}.Physical.PositionUnit = 'meters';
+            end
+            if isfield(mergedEntity, 'GeoPositionDeg')
+                mergedEntity.Snapshots{frameId}.Physical.GeoPositionDeg = mergedEntity.GeoPositionDeg;
+            else
+                mergedEntity.Snapshots{frameId}.Physical.GeoPositionDeg = [];
+            end
             mergedEntity.Snapshots{frameId}.Physical.Velocity = mergedEntity.Velocity;
             mergedEntity.Snapshots{frameId}.Physical.Orientation = mergedEntity.Orientation;
             mergedEntity.Snapshots{frameId}.Physical.AngularVelocity = mergedEntity.AngularVelocity;

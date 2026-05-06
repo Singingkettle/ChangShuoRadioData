@@ -48,6 +48,7 @@ function test_empty_osm_raytracing()
     physConfig.Entities.Transmitters.Count.Max = 1;
     physConfig.Entities.Receivers.Count.Min = 1;
     physConfig.Entities.Receivers.Count.Max = 1;
+    physConfig.TimeResolution = masterConfig.Factories.Scenario.Global.FrameDuration;
 
     simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physConfig);
     setup(simulator);

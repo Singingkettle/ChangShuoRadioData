@@ -13,7 +13,7 @@ function [entities, environment] = stepImpl(obj, frameId)
     %   entities - Updated entity states and positions
     %   environment - Current environmental state and conditions
 
-    obj.logger.debug('Frame %d: Updating physical environment (dt=%.3f)', frameId, obj.timeResolution);
+    obj.logger.debug('Frame %d: Updating physical environment (dt=%.9g)', frameId, obj.timeResolution);
 
     % Get previous state from internal history
     previousState = getPreviousState(obj, frameId);

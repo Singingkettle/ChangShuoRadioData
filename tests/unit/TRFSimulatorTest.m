@@ -161,6 +161,20 @@ classdef TRFSimulatorTest < matlab.unittest.TestCase
             testCase.verifyLessThanOrEqual(abs(numel(outSig) - expectedLen), 2);
         end
 
+        function phaseNoiseSampleRateTracksInputSampleRate(testCase)
+            trf = TRFSimulatorTest.makeSimulator(0, ...
+                'TargetSampleRate', 5e6, ...
+                'SampleRate', 1e6);
+            cleanupObj = onCleanup(@() release(trf)); %#ok<NASGU>
+
+            step(trf, ones(128, 1));
+            testCase.verifyEqual(trf.PhaseNoise.SampleRate, 1e6);
+
+            trf.SampleRate = 2e6;
+            step(trf, ones(128, 1));
+            testCase.verifyEqual(trf.PhaseNoise.SampleRate, 2e6);
+        end
+
         function intractableApproximateRatioFailsFast(testCase)
             trf = TRFSimulatorTest.makeSimulator(0, ...
                 'TargetSampleRate', sqrt(2) * 1e6, ...

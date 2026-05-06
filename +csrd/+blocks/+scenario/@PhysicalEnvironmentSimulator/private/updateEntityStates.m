@@ -44,6 +44,15 @@ function entities = updateEntityStates(obj, frameId, timeResolution, previousSta
         entity.Orientation(2) = max(-90, min(90, entity.Orientation(2)));
 
         entity.Position = applyBoundaryConstraints(obj, newPosition);
+        entity.PositionUnit = 'meters';
+        if isfield(obj.mapData, 'Boundaries') && ...
+                isstruct(obj.mapData.Boundaries) && ...
+                isfield(obj.mapData.Boundaries, 'MinLatitude')
+            entity.GeoPositionDeg = localMetersToGeo(entity.Position, ...
+                obj.mapData.Boundaries);
+        elseif ~isfield(entity, 'GeoPositionDeg')
+            entity.GeoPositionDeg = [];
+        end
 
         entity.FrameId = frameId;
         entity.LastUpdateTime = currentTime;
@@ -52,6 +61,8 @@ function entities = updateEntityStates(obj, frameId, timeResolution, previousSta
         stateSnapshot.frameId = frameId;
         stateSnapshot.time = currentTime;
         stateSnapshot.position = entity.Position;
+        stateSnapshot.positionUnit = entity.PositionUnit;
+        stateSnapshot.geoPositionDeg = entity.GeoPositionDeg;
         stateSnapshot.velocity = entity.Velocity;
         stateSnapshot.orientation = entity.Orientation;
         entity.StateHistory = [entity.StateHistory, stateSnapshot];
@@ -75,6 +86,8 @@ function entities = updateEntityStates(obj, frameId, timeResolution, previousSta
             entity.Snapshots{frameId}.FrameId = frameId;
             entity.Snapshots{frameId}.Timestamp = currentTime;
             entity.Snapshots{frameId}.Physical.Position = entity.Position;
+            entity.Snapshots{frameId}.Physical.PositionUnit = entity.PositionUnit;
+            entity.Snapshots{frameId}.Physical.GeoPositionDeg = entity.GeoPositionDeg;
             entity.Snapshots{frameId}.Physical.Velocity = entity.Velocity;
             entity.Snapshots{frameId}.Physical.Orientation = entity.Orientation;
             entity.Snapshots{frameId}.Physical.AngularVelocity = entity.AngularVelocity;

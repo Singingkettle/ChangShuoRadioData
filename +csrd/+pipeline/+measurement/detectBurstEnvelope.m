@@ -12,7 +12,8 @@ function info = detectBurstEnvelope(signal, sampleRate, options)
 %                 collapsed by sum across columns prior to envelope.
 %   sampleRate  : positive scalar (Hz)
 %   options     : optional struct with fields (all optional)
-%       .WindowSec    (double) window length in seconds (default 1e-4)
+%       .WindowSec    (double) window length in seconds
+%                     (default min(1e-4, signal duration))
 %       .ThresholdDb  (double) peak-relative threshold in dB (default -20)
 %
 % Outputs:
@@ -38,9 +39,7 @@ function info = detectBurstEnvelope(signal, sampleRate, options)
     if nargin < 3 || isempty(options)
         options = struct();
     end
-    if ~isfield(options, 'WindowSec')   || isempty(options.WindowSec)
-        options.WindowSec = 1e-4;
-    end
+    useDefaultWindow = ~isfield(options, 'WindowSec') || isempty(options.WindowSec);
     if ~isfield(options, 'ThresholdDb') || isempty(options.ThresholdDb)
         options.ThresholdDb = -20;
     end
@@ -69,6 +68,9 @@ function info = detectBurstEnvelope(signal, sampleRate, options)
     end
 
     totalDurationSec = length(signalCol) / double(sampleRate);
+    if useDefaultWindow
+        options.WindowSec = min(1e-4, totalDurationSec);
+    end
     if options.WindowSec <= 0 || options.WindowSec > totalDurationSec
         error('CSRD:Measurement:InvalidWindow', ...
             ['detectBurstEnvelope: WindowSec=%g must be in (0, total=%.6g] s.'], ...

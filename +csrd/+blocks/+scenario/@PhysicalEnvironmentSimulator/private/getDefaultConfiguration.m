@@ -51,6 +51,7 @@ function config = getDefaultConfiguration(obj)
 
     config.Environment.Obstacles.Enable = true;
 
-    % Time configuration
-    config.TimeResolution = 0.1; % seconds per frame
+    % Time configuration is owned by ScenarioFactory's frame contract.
+    % Standalone callers must set this explicitly before setup.
+    config.TimeResolution = [];
 end

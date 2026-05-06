@@ -246,6 +246,7 @@ classdef SimulationRunner < matlab.System
             simulationStartTime = tic;
             successfulScenarios = 0;
             failedScenarios = 0;
+            skippedScenarios = 0;
 
             % Initialize time tracking for this worker
             if isempty(obj.workerStartTimes)
@@ -263,16 +264,24 @@ classdef SimulationRunner < matlab.System
 
                 try
                     % Execute single scenario with ChangShuo engine
-                    obj.executeScenario(scenarioId, workerId);
-
-                    successfulScenarios = successfulScenarios + 1;
+                    scenarioStatus = obj.executeScenario(scenarioId, workerId);
                     scenarioTime = toc(scenarioStartTime);
 
-                    % Display detailed progress with time information
-                    obj.displayProgress(workerId, currentScenarioIndex, workerScenarioCount, scenarioId, scenarioTime, false);
+                    if strcmp(scenarioStatus, 'Skipped')
+                        skippedScenarios = skippedScenarios + 1;
+                        obj.displayProgress(workerId, currentScenarioIndex, workerScenarioCount, ...
+                            scenarioId, scenarioTime, false, 'SKIPPED');
 
-                    obj.logger.debug('Worker %d, Scenario %d: Completed successfully in %.2f seconds', ...
-                        workerId, scenarioId, scenarioTime);
+                        obj.logger.info('Worker %d, Scenario %d: Skipped in %.2f seconds', ...
+                            workerId, scenarioId, scenarioTime);
+                    else
+                        successfulScenarios = successfulScenarios + 1;
+                        obj.displayProgress(workerId, currentScenarioIndex, workerScenarioCount, ...
+                            scenarioId, scenarioTime, false, 'SUCCESS');
+
+                        obj.logger.debug('Worker %d, Scenario %d: Completed successfully in %.2f seconds', ...
+                            workerId, scenarioId, scenarioTime);
+                    end
 
                 catch scenarioError
                     failedScenarios = failedScenarios + 1;
@@ -289,10 +298,11 @@ classdef SimulationRunner < matlab.System
             end
 
             % Log completion statistics
-            obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, simulationStartTime);
+            obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, ...
+                skippedScenarios, simulationStartTime);
         end
 
-        function executeScenario(obj, scenarioId, workerId)
+        function status = executeScenario(obj, scenarioId, workerId)
             % executeScenario - Execute a single scenario using ChangShuo engine
             % 中文说明：executeScenario 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -310,10 +320,12 @@ classdef SimulationRunner < matlab.System
             %   workerId (integer) - Worker ID processing this scenario
 
             obj.logger.debug('Worker %d: Starting scenario %d execution', workerId, scenarioId);
+            status = 'Success';
 
             % Instantiate ChangShuo engine for this scenario
             engineHandle = obj.RunnerConfig.Engine.Handle;
             changShuoEngine = feval(engineHandle);
+            cleanupGuard = onCleanup(@() localCleanupChangShuoEngine(changShuoEngine));
 
             try
                 % Configure ChangShuo engine with factory configurations
@@ -349,6 +361,7 @@ classdef SimulationRunner < matlab.System
                 if csrd.pipeline.scenario.isScenarioSkipException(engineError)
                     obj.logger.warning('Worker %d, Scenario %d: Scenario skipped - %s', ...
                         workerId, scenarioId, engineError.message);
+                    status = 'Skipped';
                     return;
                 end
 
@@ -356,17 +369,7 @@ classdef SimulationRunner < matlab.System
                     workerId, scenarioId, engineError.message);
                 rethrow(engineError);
             end
-
-            % Clean up engine resources (always execute)
-            if exist('changShuoEngine', 'var') && ~isempty(changShuoEngine)
-
-                if ismethod(changShuoEngine, 'cleanup')
-                    changShuoEngine.cleanup();
-                end
-
-                clear changShuoEngine;
-            end
-
+            clear cleanupGuard;
         end
 
         function configureChangShuoEngine(obj, engine, scenarioId)
@@ -709,7 +712,7 @@ classdef SimulationRunner < matlab.System
             obj.logger.info('Data storage directories configured under: %s', baseOutputDir);
         end
 
-        function displayProgress(obj, workerId, currentScenario, totalScenarios, scenarioId, scenarioTime, isFailed)
+        function displayProgress(obj, workerId, currentScenario, totalScenarios, scenarioId, scenarioTime, isFailed, statusOverride)
             % displayProgress - Display detailed scenario processing progress with time information
             % 中文说明：displayProgress 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -723,6 +726,9 @@ classdef SimulationRunner < matlab.System
 
             if nargin < 7
                 isFailed = false;
+            end
+            if nargin < 8
+                statusOverride = '';
             end
 
             % Calculate elapsed time since worker started
@@ -752,7 +758,9 @@ classdef SimulationRunner < matlab.System
             remainingTimeStr = obj.formatDuration(estimatedRemainingTime);
 
             % Create status indicator
-            if isFailed
+            if ~isempty(statusOverride)
+                statusStr = sprintf('[%s]', char(string(statusOverride)));
+            elseif isFailed
                 statusStr = '[FAILED]';
             else
                 statusStr = '[SUCCESS]';
@@ -787,20 +795,26 @@ classdef SimulationRunner < matlab.System
 
         end
 
-        function logCompletionStatistics(obj, workerId, successfulScenarios, failedScenarios, startTime)
+        function logCompletionStatistics(obj, workerId, successfulScenarios, failedScenarios, skippedScenarios, startTime)
             % logCompletionStatistics - Log simulation completion statistics
             % 中文说明：logCompletionStatistics 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
 
             totalTime = toc(startTime);
-            totalProcessed = successfulScenarios + failedScenarios;
+            totalProcessed = successfulScenarios + failedScenarios + skippedScenarios;
 
             obj.logger.info('Worker %d simulation completed:', workerId);
             obj.logger.info('  Total scenarios processed: %d', totalProcessed);
             obj.logger.info('  Successful scenarios: %d', successfulScenarios);
             obj.logger.info('  Failed scenarios: %d', failedScenarios);
-            obj.logger.info('  Success rate: %.1f%%', (successfulScenarios / totalProcessed) * 100);
+            obj.logger.info('  Skipped scenarios: %d', skippedScenarios);
+            if totalProcessed > 0
+                successRate = (successfulScenarios / totalProcessed) * 100;
+            else
+                successRate = 0;
+            end
+            obj.logger.info('  Success rate: %.1f%%', successRate);
             obj.logger.info('  Total simulation time: %.2f seconds', totalTime);
 
             if totalProcessed > 0
@@ -933,4 +947,15 @@ classdef SimulationRunner < matlab.System
 
     end
 
+end
+
+
+function localCleanupChangShuoEngine(engine)
+%LOCALCLEANUPCHANGSHUOENGINE Release a scenario engine on every exit path.
+if isempty(engine)
+    return;
+end
+if ismethod(engine, 'cleanup')
+    engine.cleanup();
+end
 end

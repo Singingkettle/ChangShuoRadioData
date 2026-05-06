@@ -26,6 +26,10 @@ function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
 
         % Physical group
         rxPlan.Physical.Position = receiver.Position;
+        rxPlan.Physical.PositionUnit = getEntityPositionUnit(receiver);
+        if isfield(receiver, 'GeoPositionDeg')
+            rxPlan.Physical.GeoPositionDeg = receiver.GeoPositionDeg;
+        end
         rxPlan.Physical.Velocity = requireEntityVelocity(receiver, ...
             'Receiver');
 
@@ -58,6 +62,16 @@ function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
 
     obj.logger.debug('Scenario: All %d receivers configured with unified sample rate %.1f MHz', ...
         length(receivers), unifiedConfig.SampleRate / 1e6);
+end
+
+function unit = getEntityPositionUnit(entity)
+    % getEntityPositionUnit - Return explicit physical coordinate unit.
+    % 中文说明：Position 是米制坐标，GeoPositionDeg 只用于地理传播模型。
+if isfield(entity, 'PositionUnit') && ~isempty(entity.PositionUnit)
+    unit = char(string(entity.PositionUnit));
+else
+    unit = 'meters';
+end
 end
 
 function velocity = requireEntityVelocity(entity, entityType)

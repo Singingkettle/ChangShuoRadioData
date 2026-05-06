@@ -49,10 +49,16 @@ function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
                     ['Frame %d: Continuous pattern requires a positive ' ...
                      'ObservationDuration.'], frameId);
             end
-            transmissionState.IsActive = true;
-            transmissionState.ActiveIntervalIndices = uint32(1);
-            transmissionState.ActiveIntervals = [0, pattern.ObservationDuration];
-            transmissionState.FrameWindow = [0, pattern.ObservationDuration];
+            if ~isfield(pattern, 'Intervals') || isempty(pattern.Intervals)
+                pattern.Intervals = [0, pattern.ObservationDuration];
+            end
+            [activeIdx, activeIntervals, frameWindow] = ...
+                csrd.pipeline.scenario.findOverlappingTransmissionIntervals( ...
+                    frameId, pattern);
+            transmissionState.FrameWindow = frameWindow;
+            transmissionState.ActiveIntervalIndices = uint32(activeIdx);
+            transmissionState.ActiveIntervals = activeIntervals;
+            transmissionState.IsActive = ~isempty(activeIdx);
 
         case {'Burst', 'Scheduled', 'Random', 'Explicit'}
             if ~isfield(pattern, 'Intervals') || isempty(pattern.Intervals)

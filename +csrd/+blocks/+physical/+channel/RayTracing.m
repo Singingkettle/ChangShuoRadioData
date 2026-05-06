@@ -186,20 +186,22 @@ classdef RayTracing < matlab.System
             % 输出 / Outputs: see signature return values and contract fields.
             txPos = getStructField(txInfo, 'Position', [0, 0, 30]);
             rxPos = getStructField(rxInfo, 'Position', [0, 0, 10]);
+            txGeo = getSiteGeoPosition(txInfo, txPos, 'Tx');
+            rxGeo = getSiteGeoPosition(rxInfo, rxPos, 'Rx');
 
-            txHeight = max(getPositionComponent(txPos, 3, 30), 0.1);
-            rxHeight = max(getPositionComponent(rxPos, 3, 10), 0.1);
+            txHeight = max(getPositionComponent(txGeo, 3, 30), 0.1);
+            rxHeight = max(getPositionComponent(rxGeo, 3, 10), 0.1);
             txName = char(string(getStructField(txInfo, 'ID', 'Tx')));
             rxName = char(string(getStructField(rxInfo, 'ID', 'Rx')));
 
             txArgs = {'Name', txName, ...
-                      'Latitude', getPositionComponent(txPos, 2, 0), ...
-                      'Longitude', getPositionComponent(txPos, 1, 0), ...
+                      'Latitude', getPositionComponent(txGeo, 1, 0), ...
+                      'Longitude', getPositionComponent(txGeo, 2, 0), ...
                       'AntennaHeight', txHeight, ...
                       'TransmitterFrequency', carrierFrequency};
             rxArgs = {'Name', rxName, ...
-                      'Latitude', getPositionComponent(rxPos, 2, 0), ...
-                      'Longitude', getPositionComponent(rxPos, 1, 0), ...
+                      'Latitude', getPositionComponent(rxGeo, 1, 0), ...
+                      'Longitude', getPositionComponent(rxGeo, 2, 0), ...
                       'AntennaHeight', rxHeight};
 
             numTxAntennas = max(1, round(getStructField(txInfo, 'NumTransmitAntennas', 1)));
@@ -324,8 +326,11 @@ classdef RayTracing < matlab.System
             if isempty(pathLoss)
                 linkDistance = getStructField(channelLinkInfo, 'LinkDistance', []);
                 if isempty(linkDistance)
-                    linkDistance = geographicDistance(getStructField(txInfo, 'Position', [0, 0, 0]), ...
-                        getStructField(rxInfo, 'Position', [0, 0, 0]));
+                    txGeo = getSiteGeoPosition(txInfo, ...
+                        getStructField(txInfo, 'Position', [0, 0, 0]), 'Tx');
+                    rxGeo = getSiteGeoPosition(rxInfo, ...
+                        getStructField(rxInfo, 'Position', [0, 0, 0]), 'Rx');
+                    linkDistance = geographicDistance(txGeo, rxGeo);
                 end
                 pathLoss = fspl(max(linkDistance, 1), physconst('LightSpeed') / carrierFrequency);
             end
@@ -435,6 +440,41 @@ function value = getPositionComponent(position, idx, defaultValue)
     end
 end
 
+function geoPosition = getSiteGeoPosition(siteInfo, position, roleName)
+    % getSiteGeoPosition - Resolve [lat lon height] degrees for txsite/rxsite.
+    % 中文说明：RayTracing 只消费 GeoPositionDeg；米制 Position 留给距离/Doppler。
+    if isstruct(siteInfo) && isfield(siteInfo, 'GeoPositionDeg') && ...
+            ~isempty(siteInfo.GeoPositionDeg)
+        geoPosition = double(siteInfo.GeoPositionDeg(:)).';
+        if numel(geoPosition) ~= 3 || any(~isfinite(geoPosition))
+            error('CSRD:RayTracing:InvalidGeoPosition', ...
+                '%s GeoPositionDeg must be a finite [lat lon height] vector.', roleName);
+        end
+        return;
+    end
+
+    positionUnit = '';
+    if isstruct(siteInfo) && isfield(siteInfo, 'PositionUnit') && ...
+            ~isempty(siteInfo.PositionUnit)
+        positionUnit = char(string(siteInfo.PositionUnit));
+    end
+    if strcmpi(positionUnit, 'meters')
+        error('CSRD:RayTracing:MissingGeoPosition', ...
+            ['%s uses meter Position; RayTracing requires GeoPositionDeg ', ...
+             'for txsite/rxsite construction.'], roleName);
+    end
+
+    % Legacy direct RayTracing tests may still provide Position as
+    % [lon lat height]. Production OSM paths publish GeoPositionDeg.
+    if ~isnumeric(position) || numel(position) < 2 || ...
+            any(~isfinite(position(1:min(3, numel(position)))))
+        error('CSRD:RayTracing:InvalidLegacyPosition', ...
+            '%s Position must be finite when GeoPositionDeg is absent.', roleName);
+    end
+    height = getPositionComponent(position, 3, 0);
+    geoPosition = [position(2), position(1), height];
+end
+
 function pathLoss = extractMinimumPathLoss(raySet)
     % extractMinimumPathLoss - Production declaration in CSRD.
     % 中文说明：extractMinimumPathLoss 在 CSRD 生产链路中执行对应处理。
@@ -467,16 +507,16 @@ function txt = valueToText(value)
     end
 end
 
-function distance_m = geographicDistance(txPos, rxPos)
+function distance_m = geographicDistance(txGeo, rxGeo)
     % geographicDistance - Production declaration in CSRD.
     % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
     % Inputs / 输入: see signature arguments and local validation.
     % 输出 / Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
-    lat1 = deg2rad(txPos(2));
-    lon1 = deg2rad(txPos(1));
-    lat2 = deg2rad(rxPos(2));
-    lon2 = deg2rad(rxPos(1));
+    lat1 = deg2rad(txGeo(1));
+    lon1 = deg2rad(txGeo(2));
+    lat2 = deg2rad(rxGeo(1));
+    lon2 = deg2rad(rxGeo(2));
 
     dLat = lat2 - lat1;
     dLon = lon2 - lon1;
@@ -485,8 +525,8 @@ function distance_m = geographicDistance(txPos, rxPos)
     horizontalDistance = earthRadius_m * c;
 
     dz = 0;
-    if numel(txPos) >= 3 && numel(rxPos) >= 3
-        dz = rxPos(3) - txPos(3);
+    if numel(txGeo) >= 3 && numel(rxGeo) >= 3
+        dz = rxGeo(3) - txGeo(3);
     end
     distance_m = sqrt(horizontalDistance.^2 + dz.^2);
 end

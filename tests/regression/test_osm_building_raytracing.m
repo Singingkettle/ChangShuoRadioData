@@ -26,6 +26,7 @@ function test_osm_building_raytracing()
     physConfig.Entities.Transmitters.Count.Max = 1;
     physConfig.Entities.Receivers.Count.Min = 1;
     physConfig.Entities.Receivers.Count.Max = 1;
+    physConfig.TimeResolution = masterConfig.Factories.Scenario.Global.FrameDuration;
 
     physSim = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physConfig);
     physCleanup = onCleanup(@() release(physSim)); %#ok<NASGU>

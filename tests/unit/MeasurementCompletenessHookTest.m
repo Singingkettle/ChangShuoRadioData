@@ -268,10 +268,9 @@ classdef MeasurementCompletenessHookTest < matlab.unittest.TestCase
                 'A fully-valid annotation must NOT raise any error.');
         end
 
-        function skipExceptionPredicateRecognisesAnnotationToken(testCase)
-            % Phase 4 §S7 isScenarioSkipException must whitelist
-            % CSRD:Annotation:* so the SimulationRunner sweep can demote
-            % the hook failure to a per-scenario skip.
+        function skipExceptionPredicateRejectsAnnotationToken(testCase)
+            % Phase 20: annotation contract failures are hard failures, not
+            % successful scenario skips.
             annotation = struct('Header', struct(), 'Frames', struct( ...
                 'SomeOtherField', 42));
             isSkip = false;
@@ -280,24 +279,21 @@ classdef MeasurementCompletenessHookTest < matlab.unittest.TestCase
             catch ME
                 isSkip = csrd.pipeline.scenario.isScenarioSkipException(ME);
             end
-            testCase.verifyTrue(isSkip, ...
-                ['CSRD:Annotation:* identifiers must be whitelisted ', ...
-                 'by isScenarioSkipException so the sweep can recover.']);
+            testCase.verifyFalse(isSkip, ...
+                'CSRD:Annotation:* identifiers must count as failed scenarios.');
         end
 
-        function skipExceptionPredicateRecognisesMeasurementToken(testCase)
-            % Phase 5: measurement helper failures use CSRD:Measurement:*
-            % and must share the same central skip predicate.
+        function skipExceptionPredicateRejectsMeasurementToken(testCase)
+            % Phase 20: measurement helper failures expose signal/label
+            % inconsistency and must not be hidden as skips.
             try
                 error('CSRD:Measurement:InvalidSignal', ...
                     'Synthetic measurement failure for predicate test.');
             catch ME
                 isSkip = csrd.pipeline.scenario.isScenarioSkipException(ME);
             end
-            testCase.verifyTrue(isSkip, ...
-                ['CSRD:Measurement:* identifiers must be whitelisted ', ...
-                 'by isScenarioSkipException so measurement-layer ', ...
-                 'contract failures do not write partial annotations.']);
+            testCase.verifyFalse(isSkip, ...
+                'CSRD:Measurement:* identifiers must count as failed scenarios.');
         end
 
     end

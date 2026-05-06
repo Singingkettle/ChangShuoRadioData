@@ -39,6 +39,10 @@ function [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj,
         [entityIdx, entity] = findEntityById(entities, txConfig.EntityID);
         if entityIdx > 0
             txConfig.Physical.Position = entity.Position;
+            txConfig.Physical.PositionUnit = getEntityPositionUnit(entity);
+            if isfield(entity, 'GeoPositionDeg')
+                txConfig.Physical.GeoPositionDeg = entity.GeoPositionDeg;
+            end
             if isfield(entity, 'Velocity')
                 txConfig.Physical.Velocity = entity.Velocity;
             end
@@ -84,6 +88,10 @@ function [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj,
         [~, rxEntity] = findEntityById(entities, rxConfig.EntityID);
         if ~isempty(rxEntity)
             rxConfig.Physical.Position = rxEntity.Position;
+            rxConfig.Physical.PositionUnit = getEntityPositionUnit(rxEntity);
+            if isfield(rxEntity, 'GeoPositionDeg')
+                rxConfig.Physical.GeoPositionDeg = rxEntity.GeoPositionDeg;
+            end
             if isfield(rxEntity, 'Velocity')
                 rxConfig.Physical.Velocity = rxEntity.Velocity;
             end
@@ -99,6 +107,16 @@ function [txConfigs, rxConfigs, globalLayout] = generateFrameConfigurations(obj,
     obj.logger.debug('Frame %d: Updated transmission states for %d transmitters', ...
         frameId, length(txConfigs));
     globalLayout.Entities = entities;
+end
+
+function unit = getEntityPositionUnit(entity)
+    % getEntityPositionUnit - Return explicit physical coordinate unit.
+    % 中文说明：生产链路统一使用米制 Position；GeoPositionDeg 仅供 RayTracing。
+if isfield(entity, 'PositionUnit') && ~isempty(entity.PositionUnit)
+    unit = char(string(entity.PositionUnit));
+else
+    unit = 'meters';
+end
 end
 
 function [idx, entity] = findEntityById(entities, entityId)

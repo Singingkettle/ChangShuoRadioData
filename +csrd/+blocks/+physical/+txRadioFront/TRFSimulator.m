@@ -139,6 +139,10 @@ classdef TRFSimulator < matlab.System
         % - DUC (replaced by complex exponential frequency translation)
     end
 
+    properties (Access = private)
+        PhaseNoiseSampleRateHz double = NaN
+    end
+
     methods (Access = protected)
 
         % Note: genDUC method removed - no longer needed with complex exponential approach
@@ -366,6 +370,7 @@ classdef TRFSimulator < matlab.System
             % Initialize RF impairment models
             obj.IQImbalance = obj.genIqImbalance;
             obj.PhaseNoise = obj.genPhaseNoise;
+            obj.PhaseNoiseSampleRateHz = obj.SampleRate;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
         end
 
@@ -571,7 +576,7 @@ classdef TRFSimulator < matlab.System
             processedSignal = processedSignal + 10 ^ (obj.DCOffset / 10);
 
             % Step 3: Apply phase noise to simulate oscillator imperfections
-            release(obj.PhaseNoise);
+            obj.ensurePhaseNoiseSampleRate(inputSampleRate);
             processedSignal = obj.PhaseNoise(processedSignal);
 
             % Step 4: Apply memoryless nonlinearity to model power amplifier characteristics
@@ -601,6 +606,22 @@ classdef TRFSimulator < matlab.System
 
             outputSignal = finalSignal;
 
+        end
+
+        function ensurePhaseNoiseSampleRate(obj, inputSampleRate)
+            % ensurePhaseNoiseSampleRate - Keep phase noise object on input grid.
+            % 中文说明：PhaseNoise 的 SampleRate 必须跟调制器输出采样率一致，且不能每帧重建。
+            if isempty(obj.PhaseNoise) || ...
+                    ~isfinite(obj.PhaseNoiseSampleRateHz) || ...
+                    abs(obj.PhaseNoiseSampleRateHz - inputSampleRate) > ...
+                        max(1e-9, 1e-12 * inputSampleRate)
+                if ~isempty(obj.PhaseNoise) && isa(obj.PhaseNoise, 'matlab.System') && ...
+                        isLocked(obj.PhaseNoise)
+                    release(obj.PhaseNoise);
+                end
+                obj.PhaseNoise = obj.genPhaseNoise;
+                obj.PhaseNoiseSampleRateHz = inputSampleRate;
+            end
         end
 
     end

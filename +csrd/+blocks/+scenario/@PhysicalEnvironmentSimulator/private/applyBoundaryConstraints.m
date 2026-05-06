@@ -8,28 +8,19 @@ function constrainedPosition = applyBoundaryConstraints(obj, position)
     % Output Arguments:
     %   constrainedPosition - Position constrained within map boundaries
 
-    % Check if boundaries exist, if not use default
-    if isfield(obj.mapData, 'Boundaries') && ~isempty(obj.mapData.Boundaries)
-        bounds = obj.mapData.Boundaries;
-    else
-        % Use default boundaries if not set
-        obj.logger.warning('Map boundaries not set, using default boundaries for position constraints');
-        bounds = struct( ...
-            'MinLatitude', -1000, ...
-            'MaxLatitude', 1000, ...
-            'MinLongitude', -1000, ...
-            'MaxLongitude', 1000);
+    if ~isfield(obj.mapData, 'Boundaries') || isempty(obj.mapData.Boundaries)
+        error('CSRD:Construction:MissingMapBoundaries', ...
+            'applyBoundaryConstraints requires explicit map boundaries.');
     end
+    bounds = obj.mapData.Boundaries;
 
     constrainedPosition = position;
 
-    % For statistical maps, use the boundaries directly
     if isfield(bounds, 'MinLatitude')
-        % OSM-style boundaries (lat/lon)
-        constrainedPosition(1) = max(bounds.MinLongitude, min(bounds.MaxLongitude, position(1)));
-        constrainedPosition(2) = max(bounds.MinLatitude, min(bounds.MaxLatitude, position(2)));
+        meterBounds = geoBoundsToLocalMeterBounds(bounds);
+        constrainedPosition(1) = max(meterBounds(1), min(meterBounds(2), position(1)));
+        constrainedPosition(2) = max(meterBounds(3), min(meterBounds(4), position(2)));
     else
-        % Grid-style boundaries (x/y)
         constrainedPosition(1) = max(bounds(1), min(bounds(2), position(1)));
         constrainedPosition(2) = max(bounds(3), min(bounds(4), position(2)));
     end

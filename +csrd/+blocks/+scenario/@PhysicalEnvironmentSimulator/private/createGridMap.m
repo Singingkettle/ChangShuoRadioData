@@ -5,20 +5,13 @@ function grid = createGridMap(obj)
     % Output Arguments:
     %   grid - Grid map structure
 
-    % Check if boundaries exist, if not use default
-    if isfield(obj.mapData, 'Boundaries') && ~isempty(obj.mapData.Boundaries)
-        bounds = obj.mapData.Boundaries;
-
-        % Handle both OSM-style and grid-style boundaries
-        if isfield(bounds, 'MinLatitude')
-            % OSM-style boundaries - convert to grid format
-            bounds = [bounds.MinLongitude, bounds.MaxLongitude, bounds.MinLatitude, bounds.MaxLatitude];
-        end
-
-    else
-        % Use default grid boundaries if not set
-        obj.logger.warning('Map boundaries not set, using default boundaries for grid map');
-        bounds = [-1000, 1000, -1000, 1000]; % [xmin, xmax, ymin, ymax]
+    if ~isfield(obj.mapData, 'Boundaries') || isempty(obj.mapData.Boundaries)
+        error('CSRD:Construction:MissingMapBoundaries', ...
+            'createGridMap requires explicit map boundaries.');
+    end
+    bounds = obj.mapData.Boundaries;
+    if isfield(bounds, 'MinLatitude')
+        bounds = geoBoundsToLocalMeterBounds(bounds);
     end
 
     resolution = 100; % meters per grid cell

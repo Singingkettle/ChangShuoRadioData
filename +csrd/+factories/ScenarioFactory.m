@@ -597,17 +597,19 @@ classdef ScenarioFactory < matlab.System
             % Set map boundaries for compatibility
             physicalEnvConfig.Map.Boundaries = physicalEnvConfig.Environment.MapBoundaries;
 
-            % Time resolution
-            if ~isfield(physicalEnvConfig, 'TimeResolution')
-                physicalEnvConfig.TimeResolution = 0.1;
-            end
-
             % Phase 3 (audit §17.5 P3-5): pass through Global so
             % createEntity can size its Snapshot pre-allocation by the
             % real per-scenario frame count instead of the legacy 100.
             if isfield(obj.factoryConfig, 'Global')
                 physicalEnvConfig.Global = obj.factoryConfig.Global;
             end
+
+            % Physical state evolves once per receiver frame. Reusing an
+            % unrelated TimeResolution silently desynchronizes mobility,
+            % Doppler, signal placement, and annotation execution truth.
+            frameContract = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
+                struct('Scenario', obj.factoryConfig), struct());
+            physicalEnvConfig.TimeResolution = frameContract.FrameDurationSec;
         end
 
         function commBehaviorConfig = getCommunicationBehaviorConfig(obj)
@@ -635,11 +637,47 @@ classdef ScenarioFactory < matlab.System
                 commBehaviorConfig.FrequencyAllocation.MinSeparation = 100e3;
             end
 
+            commBehaviorConfig.Runtime = obj.resolveCommunicationRuntimeCapabilities( ...
+                commBehaviorConfig);
+
             if ~isfield(commBehaviorConfig, 'PowerControl')
                 commBehaviorConfig.PowerControl = struct();
             end
             if ~isfield(commBehaviorConfig.PowerControl, 'MaxPower')
                 commBehaviorConfig.PowerControl.MaxPower = 30;
+            end
+        end
+
+        function runtime = resolveCommunicationRuntimeCapabilities(obj, commBehaviorConfig)
+            % resolveCommunicationRuntimeCapabilities - Publish map/channel limits to planning.
+            % 中文说明：把当前场景选择的传播模型能力传给通信规划层，避免下游失败后 fallback。
+            % Inputs / 输入: selected map type and communication config.
+            % 输出 / Outputs: runtime capability struct for CommunicationBehavior.
+            runtime = struct();
+            runtime.ChannelModel = '';
+            runtime.RequiredCarrierFrequencyRangeHz = [];
+
+            mapConfig = struct();
+            if isfield(obj.factoryConfig, 'PhysicalEnvironment') && ...
+                    isfield(obj.factoryConfig.PhysicalEnvironment, 'Map')
+                mapConfig = obj.factoryConfig.PhysicalEnvironment.Map;
+            end
+
+            if strcmp(obj.selectedMapType, 'OSM')
+                runtime.ChannelModel = localMapChannelModel(mapConfig, ...
+                    'OSM', 'RayTracing');
+            else
+                runtime.ChannelModel = localMapChannelModel(mapConfig, ...
+                    'Statistical', 'Statistical');
+            end
+
+            if strcmpi(runtime.ChannelModel, 'RayTracing')
+                runtime.RequiredCarrierFrequencyRangeHz = [100e6, 100e9];
+            end
+
+            if isfield(commBehaviorConfig, 'Runtime') && ...
+                    isstruct(commBehaviorConfig.Runtime)
+                runtime = obj.mergeConfigs(runtime, commBehaviorConfig.Runtime);
             end
         end
 
@@ -837,4 +875,20 @@ classdef ScenarioFactory < matlab.System
 
     end
 
+end
+
+
+function model = localMapChannelModel(mapConfig, mapType, defaultModel)
+%LOCALMAPCHANNELMODEL Resolve explicit map-specific channel model.
+% 中文说明：读取当前 map 类型声明的传播模型；缺失时使用调用者给出的场景默认值。
+model = char(string(defaultModel));
+if ~isstruct(mapConfig) || ~isfield(mapConfig, mapType)
+    return;
+end
+
+typedConfig = mapConfig.(mapType);
+if isstruct(typedConfig) && isfield(typedConfig, 'ChannelModel') && ...
+        ~isempty(typedConfig.ChannelModel)
+    model = char(string(typedConfig.ChannelModel));
+end
 end

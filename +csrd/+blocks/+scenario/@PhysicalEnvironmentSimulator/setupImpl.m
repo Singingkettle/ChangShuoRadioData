@@ -16,14 +16,18 @@ function setupImpl(obj)
         obj.Config = getDefaultConfiguration(obj);
     end
 
-    % Initialize timeResolution from configuration
-    if isfield(obj.Config, 'TimeResolution')
-        obj.timeResolution = obj.Config.TimeResolution;
-        obj.logger.debug('Time resolution set from config: %.3f seconds', obj.timeResolution);
-    else
+    % Initialize timeResolution from the scenario frame contract.
+    if ~isfield(obj.Config, 'TimeResolution') || isempty(obj.Config.TimeResolution)
         error('CSRD:PhysicalEnvironment:MissingTimeResolution', ...
             'PhysicalEnvironmentSimulator.Config.TimeResolution is required.');
     end
+    obj.timeResolution = double(obj.Config.TimeResolution);
+    if ~isnumeric(obj.timeResolution) || ~isscalar(obj.timeResolution) || ...
+            ~isfinite(obj.timeResolution) || obj.timeResolution <= 0
+        error('CSRD:PhysicalEnvironment:InvalidTimeResolution', ...
+            'PhysicalEnvironmentSimulator.Config.TimeResolution must be a positive finite scalar seconds.');
+    end
+    obj.logger.debug('Time resolution set from frame contract: %.9g seconds', obj.timeResolution);
 
     % Initialize core components
     obj.entityRegistry = containers.Map('KeyType', 'char', 'ValueType', 'any');
