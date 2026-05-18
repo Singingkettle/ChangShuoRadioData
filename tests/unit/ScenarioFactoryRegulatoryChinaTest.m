@@ -76,7 +76,8 @@ classdef ScenarioFactoryRegulatoryChinaTest < matlab.unittest.TestCase
                 'Order', 4, ...
                 'SymbolRate', 1.6e6, ...
                 'SamplesPerSymbol', 4, ...
-                'RolloffFactor', 0.25);
+                'RolloffFactor', 0.25, ...
+                'NumTransmitAntennas', 1);
             placement = struct('TargetBandwidth', 2e6);
 
             out = step(modFactory, inputData, 1, 'Tx1', 1, modulation, placement);
@@ -102,6 +103,7 @@ classdef ScenarioFactoryRegulatoryChinaTest < matlab.unittest.TestCase
                 'SymbolRate', 32e6, ...
                 'SamplesPerSymbol', 4, ...
                 'RolloffFactor', 0.25, ...
+                'NumTransmitAntennas', 1, ...
                 'ModulatorConfig', struct('beta', 0.25, 'ostbcSymbolRate', 1));
             placement = struct('TargetBandwidth', 40e6);
 
@@ -139,7 +141,7 @@ cfg.Modulation.RolloffFactor = 0.25;
 cfg.Modulation.SamplesPerSymbol = 4;
 cfg.FrequencyAllocation.Strategy = 'ReceiverCentric';
 cfg.FrequencyAllocation.MinSeparation = 50e3;
-cfg.FrequencyAllocation.AllowOverlap = true;
+cfg.FrequencyAllocation.AllowOverlap = false;
 cfg.FrequencyAllocation.MaxOverlap = 0.3;
 cfg.TransmissionPattern.DefaultType = 'Continuous';
 cfg.Regulatory.Enable = true;

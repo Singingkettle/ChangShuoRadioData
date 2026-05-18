@@ -78,6 +78,43 @@ classdef RegionSpectrumSelectorTest < matlab.unittest.TestCase
                 testCase.verifyEqual(ep.ServiceClass, 'ShortRangeDevice');
             end
         end
+
+        function partialReceiverWindowFiltersBandwidthChoices(testCase)
+            cfg = localRegConfig('CN');
+            cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_LAND_MOBILE_UHF';
+            cfg.Regulatory.MonitoringBand.CenterFrequencyHz = 408.09e6;
+            cfg.Regulatory.MonitoringBand.RestrictEmittersToFixedBand = false;
+            cfg.Regulatory.MonitoringBand.AllowIntersectingServices = true;
+            rx = struct('SampleRate', 50e6);
+
+            rng(20260513, 'twister');
+            plan = csrd.catalog.spectrum.RegionSpectrumSelector ...
+                .selectScenarioPlan(cfg, rx, 200);
+            catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load('CN');
+            sawSrd433 = false;
+
+            for k = 1:numel(plan.EmitterPlans)
+                ep = plan.EmitterPlans(k);
+                band = catalog.Bands(strcmp({catalog.Bands.BandId}, ep.BandId));
+                lowerEdge = ep.SelectedCenterFrequencyHz - ep.BandwidthHz / 2;
+                upperEdge = ep.SelectedCenterFrequencyHz + ep.BandwidthHz / 2;
+                testCase.verifyGreaterThanOrEqual(lowerEdge, ...
+                    band.FrequencyRangeHz(1) - 1);
+                testCase.verifyLessThanOrEqual(upperEdge, ...
+                    band.FrequencyRangeHz(2) + 1);
+                testCase.verifyGreaterThanOrEqual(lowerEdge, ...
+                    plan.Receiver.MonitoringRangeHz(1) - 1);
+                testCase.verifyLessThanOrEqual(upperEdge, ...
+                    plan.Receiver.MonitoringRangeHz(2) + 1);
+                if strcmp(ep.BandId, 'CN_SRD_433')
+                    sawSrd433 = true;
+                    testCase.verifyLessThanOrEqual(ep.BandwidthHz, 25e3);
+                end
+            end
+
+            testCase.verifyTrue(sawSrd433, ...
+                'The fixture should exercise the partially visible CN_SRD_433 band.');
+        end
     end
 end
 

@@ -61,6 +61,22 @@ classdef ConstructionFailFastTest < matlab.unittest.TestCase
             testCase.verifyEqual(seg.Message.LengthDerivation, 'PerSegmentDuration');
         end
 
+        function subSampleClippedDurationReturnsEmpty(testCase)
+            tx = ConstructionFailFastTest.makeMinimalTxScenario();
+            tx.Spectrum.ReceiverSampleRate = 50e6;
+            tx.Temporal.Intervals = [0.00, 0.05];
+            tx.TransmissionState.ActiveIntervalIndices = uint32(1);
+            tx.TransmissionState.ActiveIntervals = [0.010000000000000, ...
+                0.010000000002000];
+            tx.TransmissionState.FrameWindow = [0.01, 0.01002048];
+
+            seg = csrd.core.ChangShuo.buildSegmentConfigFromTxScenario(tx, 1);
+
+            testCase.verifyEmpty(seg, ...
+                ['A positive floating-point overlap that resolves to zero ', ...
+                 'receiver samples must not create a live signal segment.']);
+        end
+
         % ---------- buildSegmentConfigFromTxScenario : Message ---------
 
         function missingMessageRaisesMissingMessageConfig(testCase)

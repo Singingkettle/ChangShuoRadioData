@@ -35,6 +35,28 @@ classdef ModulationFactoryNoExecutionFallbackTest < matlab.unittest.TestCase
             testCase.verifyError(@() localStep(factory), ...
                 'CSRD:Modulation:MissingBandwidth');
         end
+
+        function antennasBySamplesOutputIsNormalized(testCase)
+            factory = localFactory('AntennasBySamples', ...
+                'csrd.test_support.BadModulatorAntennasBySamples');
+            cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
+
+            out = localStep(factory);
+
+            testCase.verifySize(out.Signal, [8, 2]);
+            testCase.verifyEqual(out.SamplePerFrame, 8);
+            testCase.verifyEqual(out.TimeDuration, 8 / out.SampleRate, ...
+                'AbsTol', eps);
+        end
+
+        function wrongAntennaColumnsFailsFast(testCase)
+            factory = localFactory('WrongAntennaColumns', ...
+                'csrd.test_support.BadModulatorWrongAntennaColumns');
+            cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
+
+            testCase.verifyError(@() localStep(factory), ...
+                'CSRD:Modulation:SignalAntennaColumnMismatch');
+        end
     end
 end
 

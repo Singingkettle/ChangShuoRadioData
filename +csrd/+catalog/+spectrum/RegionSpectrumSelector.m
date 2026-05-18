@@ -361,14 +361,8 @@ for k = 1:numel(allBands)
     if restrictToBand && ~strcmpi(b.BandId, fixedId)
         continue;
     end
-    bwChoices = usableBandwidths(b, receiverPlan.SampleRateHz, regulatory);
-    if isempty(bwChoices)
-        continue;
-    end
-    minBw = min(bwChoices);
-    low = max(b.FrequencyRangeHz(1) + minBw / 2, rxWindow(1) + minBw / 2);
-    high = min(b.FrequencyRangeHz(2) - minBw / 2, rxWindow(2) - minBw / 2);
-    keep(k) = low <= high;
+    bwChoices = usableBandwidthsForReceiverWindow(b, receiverPlan, regulatory);
+    keep(k) = ~isempty(bwChoices);
 end
 bands = allBands(keep);
 end
@@ -379,10 +373,11 @@ function plan = selectEmitterPlan(band, receiverPlan, catalog, regulatory)
     % 中文说明：selectEmitterPlan 在 CSRD 生产链路中执行对应处理。
     % Inputs / 输入: see signature arguments and local validation.
     % 输出 / Outputs: see signature return values and contract fields.
-bwChoices = usableBandwidths(band, receiverPlan.SampleRateHz, regulatory);
+bwChoices = usableBandwidthsForReceiverWindow(band, receiverPlan, regulatory);
 if isempty(bwChoices)
     error('CSRD:Spectrum:NoUsableBandwidth', ...
-        'Band %s has no bandwidth that fits receiver sample rate %.0f Hz.', ...
+        ['Band %s has no bandwidth/channel center that fits receiver ', ...
+        'sample rate %.0f Hz and monitoring window.'], ...
         band.BandId, receiverPlan.SampleRateHz);
 end
 bw = bwChoices(randi(numel(bwChoices)));
@@ -432,6 +427,49 @@ for k = 1:numel(band.RecommendedBandwidthsHz)
 end
 maxBw = min(diff(band.FrequencyRangeHz), sampleRateHz * regulatory.MaxBandwidthFractionOfSampleRate);
 bwChoices = raw(raw > 0 & raw <= maxBw);
+end
+
+
+function bwChoices = usableBandwidthsForReceiverWindow(band, receiverPlan, regulatory)
+    % usableBandwidthsForReceiverWindow - Candidate bandwidths that can be placed.
+    % 中文说明：只保留在接收机当前监测窗口内存在合法中心频点的带宽。
+raw = usableBandwidths(band, receiverPlan.SampleRateHz, regulatory);
+keep = false(size(raw));
+for k = 1:numel(raw)
+    keep(k) = canPlaceBandwidthInReceiverWindow(band, raw(k), receiverPlan);
+end
+bwChoices = raw(keep);
+end
+
+
+function tf = canPlaceBandwidthInReceiverWindow(band, bandwidthHz, receiverPlan)
+    % canPlaceBandwidthInReceiverWindow - Validate center feasibility.
+    % 中文说明：带宽只有在 band 与接收窗口交集内存在合法中心频点时才可随机选择。
+rxWindow = receiverPlan.MonitoringRangeHz;
+centerMin = max(band.FrequencyRangeHz(1) + bandwidthHz / 2, ...
+    rxWindow(1) + bandwidthHz / 2);
+centerMax = min(band.FrequencyRangeHz(2) - bandwidthHz / 2, ...
+    rxWindow(2) - bandwidthHz / 2);
+if centerMin > centerMax
+    tf = false;
+    return;
+end
+
+if ~isempty(band.ExplicitChannelCentersHz)
+    centers = band.ExplicitChannelCentersHz(:)';
+    tf = any(centers >= centerMin & centers <= centerMax);
+    return;
+end
+
+if band.ChannelRasterHz > 0
+    ref = band.FrequencyRangeHz(1);
+    kMin = ceil((centerMin - ref) / band.ChannelRasterHz);
+    kMax = floor((centerMax - ref) / band.ChannelRasterHz);
+    tf = kMin <= kMax;
+    return;
+end
+
+tf = true;
 end
 
 

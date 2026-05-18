@@ -238,7 +238,7 @@ function config = scenario_factory()
     % ===================== FREQUENCY ALLOCATION =====================
     config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.Strategy = 'ReceiverCentric';
     config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.MinSeparation = 50e3;
-    config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.AllowOverlap = true;
+    config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.AllowOverlap = false;
     config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.MaxOverlap = 0.3;
     
     config.Factories.Scenario.LogDetails = true;

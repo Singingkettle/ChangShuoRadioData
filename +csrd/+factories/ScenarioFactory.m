@@ -49,6 +49,10 @@ classdef ScenarioFactory < matlab.System
         % Map selection state
         selectedMapType char = ''
         selectedOSMFile char = ''
+        selectedOSMSelectionPolicy char = ''
+        selectedOSMFileSizeMB (1, 1) double = NaN
+        selectedOSMOrdinal (1, 1) double = NaN
+        selectedOSMCandidateCount (1, 1) double = NaN
 
         % Initialization flag
         isSimulatorsInitialized logical = false
@@ -261,6 +265,10 @@ classdef ScenarioFactory < matlab.System
             obj.isSimulatorsInitialized = false;
             obj.selectedMapType = '';
             obj.selectedOSMFile = '';
+            obj.selectedOSMSelectionPolicy = '';
+            obj.selectedOSMFileSizeMB = NaN;
+            obj.selectedOSMOrdinal = NaN;
+            obj.selectedOSMCandidateCount = NaN;
             obj.currentScenarioConfig = struct();
 
             % Release cached blocks
@@ -302,6 +310,10 @@ classdef ScenarioFactory < matlab.System
             % Reset map type selection for new scenario
             obj.selectedMapType = '';
             obj.selectedOSMFile = '';
+            obj.selectedOSMSelectionPolicy = '';
+            obj.selectedOSMFileSizeMB = NaN;
+            obj.selectedOSMOrdinal = NaN;
+            obj.selectedOSMCandidateCount = NaN;
             obj.currentScenarioConfig = struct();
         end
 
@@ -316,7 +328,7 @@ classdef ScenarioFactory < matlab.System
             % Select map type and OSM file (if applicable)
             obj.selectedMapType = obj.selectMapTypeByRatio();
             if strcmp(obj.selectedMapType, 'OSM')
-                obj.selectedOSMFile = obj.selectRandomOSMFile();
+                obj.selectedOSMFile = obj.selectBalancedOSMFile();
                 if isempty(obj.selectedOSMFile)
                     error('CSRD:Scenario:MissingOSMFile', ...
                         ['Map type OSM was selected but no OSM file was found. ', ...
@@ -366,6 +378,8 @@ classdef ScenarioFactory < matlab.System
             %   Statistical: Virtual scene + statistical channel models
             %   OSM: Real OpenStreetMap + ray tracing channel models
 
+            obj.selectedOSMOrdinal = NaN;
+
             % Default: Statistical only
             types = {'Statistical'};
             ratios = [1.0];
@@ -386,10 +400,23 @@ classdef ScenarioFactory < matlab.System
             % Normalize ratios
             ratios = ratios / sum(ratios);
 
-            % Random selection based on cumulative distribution
-            r = rand();
-            cumRatios = cumsum(ratios);
-            idx = find(r <= cumRatios, 1, 'first');
+            runtime = localGetScenarioRuntime(obj.factoryConfig);
+            scenarioId = localRuntimePositiveInteger(runtime, 'ScenarioId', NaN);
+            totalScenarios = localRuntimePositiveInteger(runtime, 'TotalScenarios', NaN);
+            if isfinite(scenarioId) && isfinite(totalScenarios) && ...
+                    totalScenarios >= 1
+                seedValue = localRuntimeSeedValue(runtime);
+                [idx, osmOrdinal] = localBalancedMapTypeIndex( ...
+                    types, ratios, scenarioId, totalScenarios, seedValue);
+                obj.selectedOSMOrdinal = osmOrdinal;
+            else
+                % Direct component tests may instantiate ScenarioFactory
+                % without SimulationRunner runtime context. Preserve the
+                % legacy stochastic behavior for those non-production calls.
+                r = rand();
+                cumRatios = cumsum(ratios);
+                idx = find(r <= cumRatios, 1, 'first');
+            end
             if isempty(idx)
                 idx = 1;
             end
@@ -408,6 +435,15 @@ classdef ScenarioFactory < matlab.System
             end
 
             mapConfig = obj.factoryConfig.PhysicalEnvironment.Map;
+            if isfield(mapConfig, 'OSM') && isstruct(mapConfig.OSM) && ...
+                    isfield(mapConfig.OSM, 'MaxFileSizeMB') && ...
+                    ~isempty(mapConfig.OSM.MaxFileSizeMB)
+                error('CSRD:Scenario:DeprecatedOsmSizeCap', ...
+                    ['PhysicalEnvironment.Map.OSM.MaxFileSizeMB is deprecated. ', ...
+                     'OSM file selection is now file-level balanced coverage; ', ...
+                     'remove the size cap from the configuration.']);
+            end
+
             if ~isfield(mapConfig, 'Types') || isempty(mapConfig.Types)
                 error('ScenarioFactory:ConfigError', 'PhysicalEnvironment.Map.Types must not be empty.');
             end
@@ -422,16 +458,16 @@ classdef ScenarioFactory < matlab.System
                     error('ScenarioFactory:ConfigError', ...
                         'PhysicalEnvironment.Map.Ratio must be numeric and match Map.Types length.');
                 end
-                if any(ratios < 0) || sum(ratios) <= 0
+                if any(~isfinite(ratios)) || any(ratios < 0) || sum(ratios) <= 0
                     error('ScenarioFactory:ConfigError', ...
                         'PhysicalEnvironment.Map.Ratio must be non-negative and have positive sum.');
                 end
             end
         end
 
-        function osmFile = selectRandomOSMFile(obj)
-            % selectRandomOSMFile - Randomly select an OSM file
-            % 中文说明：selectRandomOSMFile 在 CSRD 生产链路中执行对应处理。
+        function osmFile = selectBalancedOSMFile(obj)
+            % selectBalancedOSMFile - Select OSM file by deterministic coverage order.
+            % 中文说明：OSM 默认选择按文件级均匀覆盖，不按文件大小分级或过滤。
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
             %
@@ -441,6 +477,7 @@ classdef ScenarioFactory < matlab.System
             %   Map.OSM.FilePattern - Pattern for finding OSM files
 
             osmFile = '';
+            obj.selectedOSMCandidateCount = NaN;
             
             % Get OSM config from Map.OSM
             osmConfig = struct();
@@ -452,10 +489,17 @@ classdef ScenarioFactory < matlab.System
 
             % Check for specific OSM file override
             if isfield(osmConfig, 'SpecificFile') && ~isempty(osmConfig.SpecificFile)
-                if isfile(osmConfig.SpecificFile)
-                    osmFile = osmConfig.SpecificFile;
+                specificFile = obj.resolveOsmPath(osmConfig.SpecificFile);
+                if isfile(specificFile)
+                    osmFile = specificFile;
+                    obj.selectedOSMOrdinal = 1;
+                    obj.selectedOSMCandidateCount = 1;
+                    obj.recordOsmSelection(osmFile, 'SpecificFile');
                     return;
                 end
+                error('CSRD:Scenario:MissingSpecificOsmFile', ...
+                    'PhysicalEnvironment.Map.OSM.SpecificFile does not exist: %s', ...
+                    specificFile);
             end
 
             % Determine OSM data directory
@@ -481,8 +525,42 @@ classdef ScenarioFactory < matlab.System
             % Find and select random OSM file
             allFiles = obj.findOSMFiles(osmDataDir, filePattern);
             if ~isempty(allFiles)
-                osmFile = allFiles{randi(length(allFiles))};
+                obj.selectedOSMCandidateCount = numel(allFiles);
+                runtime = localGetScenarioRuntime(obj.factoryConfig);
+                seedValue = localRuntimeSeedValue(runtime);
+                relativeFiles = cellfun(@(p) localRelativePath(osmDataDir, p), ...
+                    allFiles, 'UniformOutput', false);
+                order = localDeterministicOrder(relativeFiles, seedValue, ...
+                    'osm-file-coverage');
+                ordinal = obj.selectedOSMOrdinal;
+                if ~isfinite(ordinal) || ordinal < 1
+                    scenarioId = localRuntimePositiveInteger(runtime, 'ScenarioId', 1);
+                    ordinal = scenarioId;
+                end
+                selectedIndex = order(mod(round(ordinal) - 1, numel(allFiles)) + 1);
+                osmFile = allFiles{selectedIndex};
+                obj.recordOsmSelection(osmFile, 'BalancedUniformCoverage');
             end
+        end
+
+        function resolvedPath = resolveOsmPath(obj, pathText)
+            %RESOLVEOSMPATH Resolve SpecificFile relative to project root.
+            resolvedPath = char(string(pathText));
+            if obj.isAbsolutePath(resolvedPath)
+                return;
+            end
+            currentFilePath = fileparts(mfilename('fullpath'));
+            projectRoot = fileparts(fileparts(currentFilePath));
+            projectPath = fullfile(projectRoot, resolvedPath);
+            if isfile(projectPath)
+                resolvedPath = projectPath;
+            end
+        end
+
+        function recordOsmSelection(obj, osmFile, policy)
+            %RECORDOSMSELECTION Persist OSM selection metadata for MapProfile.
+            obj.selectedOSMSelectionPolicy = char(string(policy));
+            obj.selectedOSMFileSizeMB = localFileSizeMB(osmFile);
         end
 
         function osmFiles = findOSMFiles(obj, baseDir, pattern)
@@ -505,30 +583,23 @@ classdef ScenarioFactory < matlab.System
                 return;
             end
 
-            % Get all subdirectories (scene categories)
-            dirInfo = dir(baseDir);
-            categories = {dirInfo([dirInfo.isdir] & ~startsWith({dirInfo.name}, '.')).name};
-
-            for i = 1:length(categories)
-                categoryPath = fullfile(baseDir, categories{i});
-
-                % Find OSM files in this category
-                filePattern = fullfile(categoryPath, pattern);
-                fileList = dir(filePattern);
-
-                for j = 1:length(fileList)
-                    fullPath = fullfile(categoryPath, fileList(j).name);
-                    osmFiles{end + 1} = fullPath;
+            fileList = dir(fullfile(baseDir, '**', pattern));
+            for j = 1:length(fileList)
+                if fileList(j).isdir
+                    continue;
                 end
-
-                obj.logger.debug('Category "%s": Found %d OSM files', categories{i}, length(fileList));
+                osmFiles{end + 1} = fullfile(fileList(j).folder, fileList(j).name);
             end
 
-            % Shuffle the list for better randomness across categories
             if ~isempty(osmFiles)
-                randomOrder = randperm(length(osmFiles));
-                osmFiles = osmFiles(randomOrder);
+                relativePaths = cellfun(@(p) localRelativePath(baseDir, p), ...
+                    osmFiles, 'UniformOutput', false);
+                [~, order] = sort(string(relativePaths));
+                osmFiles = osmFiles(order);
             end
+
+            obj.logger.debug('OSM search found %d files under %s', ...
+                numel(osmFiles), baseDir);
 
         end
 
@@ -559,6 +630,14 @@ classdef ScenarioFactory < matlab.System
                 if ~isempty(obj.selectedOSMFile)
                     physicalEnvConfig.Environment.OSMMapFile = obj.selectedOSMFile;
                     physicalEnvConfig.Map.OSMFile = obj.selectedOSMFile;
+                    physicalEnvConfig.Map.OSM.SelectionPolicy = ...
+                        obj.selectedOSMSelectionPolicy;
+                    physicalEnvConfig.Map.OSM.SelectedFileSizeMB = ...
+                        obj.selectedOSMFileSizeMB;
+                    physicalEnvConfig.Map.OSM.CoverageOrdinal = ...
+                        obj.selectedOSMOrdinal;
+                    physicalEnvConfig.Map.OSM.CandidateFileCount = ...
+                        obj.selectedOSMCandidateCount;
                 end
                 
                 % Get channel model from OSM config
@@ -890,5 +969,174 @@ typedConfig = mapConfig.(mapType);
 if isstruct(typedConfig) && isfield(typedConfig, 'ChannelModel') && ...
         ~isempty(typedConfig.ChannelModel)
     model = char(string(typedConfig.ChannelModel));
+end
+end
+
+function sizeMB = localFileSizeMB(pathText)
+%LOCALFILESIZEMB Return file size in MB without touching file contents.
+% 中文说明：只读取文件元数据；用于 OSM 选择证据和性能诊断。
+sizeMB = NaN;
+if isempty(pathText)
+    return;
+end
+info = dir(char(string(pathText)));
+if ~isempty(info)
+    sizeMB = double(info.bytes) / 1024 / 1024;
+end
+end
+
+function runtime = localGetScenarioRuntime(factoryConfig)
+%LOCALGETSCENARIORUNTIME Return SimulationRunner-injected planning context.
+runtime = struct();
+if isstruct(factoryConfig) && isfield(factoryConfig, 'Runtime') && ...
+        isstruct(factoryConfig.Runtime)
+    runtime = factoryConfig.Runtime;
+end
+end
+
+function value = localRuntimePositiveInteger(runtime, fieldName, defaultValue)
+%LOCALRUNTIMEPOSITIVEINTEGER Read a positive integer runtime field.
+value = defaultValue;
+if ~isstruct(runtime) || ~isfield(runtime, fieldName) || ...
+        isempty(runtime.(fieldName))
+    return;
+end
+candidate = runtime.(fieldName);
+if isnumeric(candidate) && isscalar(candidate) && isfinite(candidate) && ...
+        candidate >= 1
+    value = floor(double(candidate));
+end
+end
+
+function seedValue = localRuntimeSeedValue(runtime)
+%LOCALRUNTIMESEEDVALUE Stable numeric seed for balanced schedules.
+seedValue = 0;
+if ~isstruct(runtime) || ~isfield(runtime, 'RandomSeed') || ...
+        isempty(runtime.RandomSeed)
+    return;
+end
+seed = runtime.RandomSeed;
+if isnumeric(seed) && isscalar(seed) && isfinite(seed)
+    seedValue = double(seed);
+elseif ischar(seed) || isstring(seed)
+    seedValue = localStableHash(char(string(seed)));
+end
+seedValue = mod(abs(floor(seedValue)), 2^31 - 1);
+end
+
+function [idx, osmOrdinal] = localBalancedMapTypeIndex(types, ratios, ...
+        scenarioId, totalScenarios, seedValue)
+%LOCALBALANCEDMAPTYPEINDEX Deterministic map schedule preserving ratios.
+types = cellstr(string(types));
+ratios = double(ratios(:));
+ratios = ratios ./ sum(ratios);
+totalScenarios = max(1, floor(double(totalScenarios)));
+scenarioId = max(1, floor(double(scenarioId)));
+
+positive = ratios > 0;
+desired = ratios .* totalScenarios;
+if totalScenarios >= sum(positive)
+    % Do not starve any explicitly configured positive-ratio map type in
+    % small default runs. The remaining slots still follow the requested
+    % ratio as closely as the integer scenario count allows.
+    counts = zeros(size(ratios));
+    counts(positive) = 1;
+    remaining = totalScenarios - sum(counts);
+    residual = max(desired - counts, 0);
+    if sum(residual) <= 0
+        residual = ratios;
+    end
+    residual = residual ./ sum(residual);
+    extraDesired = residual .* remaining;
+    extra = floor(extraDesired);
+    counts = counts + extra;
+    remaining = totalScenarios - sum(counts);
+    remainders = extraDesired - extra;
+else
+    counts = floor(desired);
+    remaining = totalScenarios - sum(counts);
+    remainders = desired - counts;
+end
+if remaining > 0
+    [~, addOrder] = sortrows([-remainders(:), (1:numel(ratios))']);
+    for n = 1:remaining
+        counts(addOrder(n)) = counts(addOrder(n)) + 1;
+    end
+end
+
+schedule = zeros(1, totalScenarios);
+cursor = 1;
+for typeIdx = 1:numel(types)
+    n = counts(typeIdx);
+    if n <= 0
+        continue;
+    end
+    schedule(cursor:(cursor + n - 1)) = typeIdx;
+    cursor = cursor + n;
+end
+if cursor <= totalScenarios
+    schedule(cursor:end) = 1;
+end
+
+scheduleOrder = localDeterministicOrder(num2cell(schedule), seedValue, ...
+    'map-type-coverage');
+schedule = schedule(scheduleOrder);
+positionInCycle = mod(scenarioId - 1, totalScenarios) + 1;
+cycleIndex = floor((scenarioId - 1) / totalScenarios);
+idx = schedule(positionInCycle);
+
+isOsm = strcmpi(types(schedule), 'OSM');
+osmPerCycle = sum(isOsm);
+if strcmpi(types{idx}, 'OSM')
+    osmOrdinal = cycleIndex * osmPerCycle + sum(isOsm(1:positionInCycle));
+else
+    osmOrdinal = NaN;
+end
+end
+
+function order = localDeterministicOrder(items, seedValue, label)
+%LOCALDETERMINISTICORDER Stable pseudo-random order without touching global RNG.
+n = numel(items);
+keys = zeros(n, 1);
+for idx = 1:n
+    keys(idx) = localStableHash(sprintf('%s|%.0f|%d|%s', ...
+        label, seedValue, idx, char(string(items{idx}))));
+end
+[~, order] = sortrows([keys, (1:n)']);
+order = order(:)';
+end
+
+function value = localStableHash(text)
+%LOCALSTABLEHASH Java-free deterministic 31-bit djb2-style hash.
+bytes = uint8(unicode2native(char(string(text)), 'UTF-8'));
+hash = 5381;
+modulus = 2^31 - 1;
+for idx = 1:numel(bytes)
+    hash = mod(hash * 33 + double(bytes(idx)), modulus);
+end
+value = double(hash);
+end
+
+function relPath = localRelativePath(baseDir, fullPath)
+%LOCALRELATIVEPATH Return a normalized path relative to baseDir when possible.
+baseDir = localNormalizePath(baseDir);
+fullPath = localNormalizePath(fullPath);
+baseForMatch = baseDir;
+if ~endsWith(baseForMatch, '/')
+    baseForMatch = [baseForMatch '/'];
+end
+if startsWith(lower(fullPath), lower(baseForMatch))
+    relPath = extractAfter(fullPath, strlength(baseForMatch));
+    relPath = char(relPath);
+else
+    relPath = fullPath;
+end
+end
+
+function pathText = localNormalizePath(pathText)
+pathText = strrep(char(string(pathText)), '\', '/');
+pathText = regexprep(pathText, '/+', '/');
+if strlength(pathText) > 1
+    pathText = regexprep(pathText, '/$', '');
 end
 end

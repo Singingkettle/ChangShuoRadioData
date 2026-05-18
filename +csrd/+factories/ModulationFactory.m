@@ -395,6 +395,12 @@ classdef ModulationFactory < matlab.System
                             double(outputSignalStruct.NumTransmitAntennas), ...
                             requestedAntennas);
                     end
+                    outputSignalStruct.Signal = normalizeSignalAntennaShape( ...
+                        outputSignalStruct.Signal, requestedAntennas, ...
+                        class(currentModulator));
+                    outputSignalStruct.SamplePerFrame = size(outputSignalStruct.Signal, 1);
+                    outputSignalStruct.TimeDuration = ...
+                        outputSignalStruct.SamplePerFrame / outputSignalStruct.SampleRate;
                 end
 
                 outputSignalStruct.ModulationTypeID = modulatorTypeID;
@@ -456,6 +462,58 @@ classdef ModulationFactory < matlab.System
 
     end
 
+end
+
+function signal = normalizeSignalAntennaShape(signal, expectedAntennas, modulatorClass)
+    % normalizeSignalAntennaShape - Enforce [samples x txAntennas].
+    % 中文说明：调制器输出必须按“采样点 x 发射天线”组织，禁止把天线维误当时间维。
+    if nargin < 3 || isempty(modulatorClass)
+        modulatorClass = '<unknown>';
+    end
+    if isempty(signal) || ~isnumeric(signal)
+        error('CSRD:Modulation:InvalidSignal', ...
+            'Modulator %s output Signal must be a non-empty numeric array.', ...
+            modulatorClass);
+    end
+    if ndims(signal) ~= 2
+        error('CSRD:Modulation:InvalidSignalShape', ...
+            ['Modulator %s output Signal must be a 2-D matrix in ', ...
+             '[samples x txAntennas] shape. Got ndims=%d.'], ...
+            modulatorClass, ndims(signal));
+    end
+    expectedAntennas = double(expectedAntennas);
+    if ~isscalar(expectedAntennas) || ~isfinite(expectedAntennas) || ...
+            expectedAntennas < 1 || expectedAntennas ~= round(expectedAntennas)
+        error('CSRD:Modulation:InvalidNumTransmitAntennas', ...
+            'Modulator %s expected antenna count must be a positive integer.', ...
+            modulatorClass);
+    end
+    expectedAntennas = round(expectedAntennas);
+
+    if size(signal, 2) == expectedAntennas
+        return;
+    end
+
+    if expectedAntennas == 1 && isrow(signal)
+        signal = signal(:);
+        return;
+    end
+
+    if expectedAntennas > 1 && size(signal, 1) == expectedAntennas
+        candidate = signal.';
+        if size(candidate, 2) == expectedAntennas
+            signal = candidate;
+            return;
+        end
+    end
+
+    signalSize = size(signal);
+    error('CSRD:Modulation:SignalAntennaColumnMismatch', ...
+        ['Modulator %s output Signal size [%d %d], but ', ...
+         'NumTransmitAntennas=%d requires exactly %d columns. ', ...
+         'Use [samples x txAntennas] throughout modulation/TRF/channel.'], ...
+        modulatorClass, signalSize(1), signalSize(2), ...
+        expectedAntennas, expectedAntennas);
 end
 
 function summary = summarizeModulatorForLog(modulator)
