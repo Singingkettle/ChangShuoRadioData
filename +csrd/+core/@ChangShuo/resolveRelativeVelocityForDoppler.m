@@ -10,20 +10,21 @@ function [relativeVelocityMps, txVelocityMps, rxVelocityMps] = ...
     %   been composed for a stationary receiver, so the channel propagation
     %   path must pass TxVelocity - RxVelocity here.
 
-    txVelocityMps = localVelocityOrZero(txInfo, 'txInfo.Velocity');
-    rxVelocityMps = localVelocityOrZero(rxInfo, 'rxInfo.Velocity');
+    txVelocityMps = localRequireVelocity(txInfo, 'txInfo.Velocity');
+    rxVelocityMps = localRequireVelocity(rxInfo, 'rxInfo.Velocity');
     relativeVelocityMps = txVelocityMps - rxVelocityMps;
 end
 
 
-function velocity = localVelocityOrZero(info, context)
-    % localVelocityOrZero - Production declaration in CSRD.
-    % 中文说明：localVelocityOrZero 在 CSRD 生产链路中执行对应处理。
+function velocity = localRequireVelocity(info, context)
+    % localRequireVelocity - Production declaration in CSRD.
+    % 中文说明：多普勒真值必须显式接收 Tx/Rx 米制速度，不能静默补零。
     % Inputs / 输入: see signature arguments and local validation.
     % 输出 / Outputs: see signature return values and contract fields.
     if ~isstruct(info) || ~isfield(info, 'Velocity') || isempty(info.Velocity)
-        velocity = [0, 0, 0];
-        return;
+        error('CSRD:Channel:DopplerInvalidGeometryVector', ...
+            'resolveRelativeVelocityForDoppler: %s is required and must not be silently zeroed.', ...
+            context);
     end
 
     velocity = info.Velocity;

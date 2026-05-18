@@ -22,6 +22,8 @@ classdef RayTracing < matlab.System
         siteViewerKey char = ''
         propagationModelCache
         propagationModelKey char = ''
+        sitePairCache
+        raySetCache
     end
 
     methods
@@ -32,6 +34,149 @@ classdef RayTracing < matlab.System
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
+        end
+
+        function precomputeFrameRays(obj, txInfos, rxInfos, channelLinkInfos, frameId)
+            %PRECOMPUTEFRAMERAYS Batch raytrace stable Tx/Rx geometry for a frame.
+            % 中文说明：按帧批量计算 Tx×Rx rays，segment 处理时复用 raySetCache。
+            obj.ensureRuntimeCaches();
+            if nargin < 5 || isempty(frameId)
+                frameId = NaN;
+            end
+            if nargin < 4 || isempty(channelLinkInfos) || ...
+                    isempty(txInfos) || isempty(rxInfos)
+                return;
+            end
+            if ~iscell(channelLinkInfos)
+                channelLinkInfos = {channelLinkInfos};
+            end
+
+            mapProfile = obj.resolveMapProfile(channelLinkInfos{1});
+
+            txSiteCells = {};
+            rxSiteCells = {};
+            txKeyToIndex = containers.Map('KeyType', 'char', 'ValueType', 'double');
+            rxKeyToIndex = containers.Map('KeyType', 'char', 'ValueType', 'double');
+            pending = struct('RayCacheKey', {}, 'TxIndex', {}, 'RxIndex', {});
+
+            linkIdx = 0;
+            for txIdx = 1:numel(txInfos)
+                txInfo = localCellOrArrayEntry(txInfos, txIdx);
+                if ~isstruct(txInfo) || localHasErrorStatus(txInfo)
+                    continue;
+                end
+                for rxIdx = 1:numel(rxInfos)
+                    rxInfo = localCellOrArrayEntry(rxInfos, rxIdx);
+                    if ~isstruct(rxInfo) || localHasErrorStatus(rxInfo)
+                        continue;
+                    end
+                    linkIdx = linkIdx + 1;
+                    if numel(channelLinkInfos) >= linkIdx
+                        linkInfo = channelLinkInfos{linkIdx};
+                    else
+                        linkInfo = channelLinkInfos{1};
+                    end
+                    carrierFrequency = obj.resolveCarrierFrequency( ...
+                        txInfo, rxInfo, linkInfo);
+                    [txSite, rxSite] = obj.createSites(txInfo, rxInfo, carrierFrequency);
+                    rayKey = raySetCacheKey(txSite, rxSite, mapProfile);
+                    if isa(obj.raySetCache, 'containers.Map') && ...
+                            isKey(obj.raySetCache, rayKey)
+                        continue;
+                    end
+
+                    txKey = siteKeyPart(txSite, true);
+                    rxKey = siteKeyPart(rxSite, false);
+                    if isKey(txKeyToIndex, txKey)
+                        txUniqueIdx = txKeyToIndex(txKey);
+                    else
+                        txSiteCells{end + 1} = txSite; %#ok<AGROW>
+                        txUniqueIdx = numel(txSiteCells);
+                        txKeyToIndex(txKey) = txUniqueIdx;
+                    end
+                    if isKey(rxKeyToIndex, rxKey)
+                        rxUniqueIdx = rxKeyToIndex(rxKey);
+                    else
+                        rxSiteCells{end + 1} = rxSite; %#ok<AGROW>
+                        rxUniqueIdx = numel(rxSiteCells);
+                        rxKeyToIndex(rxKey) = rxUniqueIdx;
+                    end
+                    pending(end + 1) = struct( ... %#ok<AGROW>
+                        'RayCacheKey', rayKey, ...
+                        'TxIndex', txUniqueIdx, ...
+                        'RxIndex', rxUniqueIdx);
+                end
+            end
+
+            if isempty(pending)
+                return;
+            end
+
+            try
+                pm = obj.createPropagationModel(mapProfile);
+                mapArg = obj.resolveMapArgument(mapProfile);
+                txSiteArray = [txSiteCells{:}];
+                rxSiteArray = [rxSiteCells{:}];
+                batchMeta = localMapProfileTraceMetadata(mapProfile, ...
+                    'NumTxSites', numel(txSiteCells), ...
+                    'NumRxSites', numel(rxSiteCells), ...
+                    'NumRequestedLinks', numel(pending), ...
+                    'FrameId', frameId);
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.BatchedRaytraceCall', 'begin', batchMeta);
+                batchStart = tic;
+                if isempty(mapArg)
+                    rays = raytrace(txSiteArray, rxSiteArray, pm);
+                else
+                    rays = raytrace(txSiteArray, rxSiteArray, pm, 'Map', mapArg);
+                end
+                elapsedSec = toc(batchStart);
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.BatchedRaytraceCall');
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.BatchedRaytraceCall', elapsedSec, batchMeta);
+                batchMeta.ElapsedSec = elapsedSec;
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.BatchedRaytraceCall', 'end', batchMeta);
+
+                for idx = 1:numel(pending)
+                    linkRays = localBatchedRayCell(rays, pending(idx).TxIndex, ...
+                        pending(idx).RxIndex);
+                    [raySet, rayCount, pathLoss] = normalizeRaytraceOutput(linkRays);
+                    obj.raySetCache(pending(idx).RayCacheKey) = struct( ...
+                        'RaySet', raySet, 'RayCount', rayCount, ...
+                        'PathLoss', pathLoss);
+                    csrd.runtime.performance.trace('event', ...
+                        'RayTracing.RaySetPrecomputeStore', 0, ...
+                        localMapProfileTraceMetadata(mapProfile, ...
+                            'FrameId', frameId, ...
+                            'KeyHash', rayKeyHash(pending(idx).RayCacheKey), ...
+                            'RayCount', rayCount, ...
+                            'CacheSize', raySetCacheSize(obj.raySetCache)));
+                end
+            catch ME
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.BatchedRaytraceFailed', 0, ...
+                    localMapProfileTraceMetadata(mapProfile, ...
+                        'ErrorIdentifier', ME.identifier, ...
+                        'ErrorMessage', ME.message, ...
+                        'NumRequestedLinks', numel(pending), ...
+                        'FrameId', frameId));
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.BatchedRaytraceCall', 'failed', ...
+                    localMapProfileTraceMetadata(mapProfile, ...
+                        'ErrorIdentifier', ME.identifier, ...
+                        'ErrorMessage', ME.message, ...
+                        'NumRequestedLinks', numel(pending), ...
+                        'FrameId', frameId));
+                if ~isempty(obj.logger)
+                    obj.logger.debug('Batched RayTracing precompute skipped: %s', ...
+                        ME.message);
+                end
+                if ~localRayTraceErrorAllowsFallback(ME)
+                    rethrow(ME);
+                end
+            end
         end
 
     end
@@ -45,6 +190,7 @@ classdef RayTracing < matlab.System
             % 输出 / Outputs: see signature return values and contract fields.
             obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             obj.PropagationModelConfig = normalizePropagationConfig(obj.PropagationModelConfig);
+            obj.ensureRuntimeCaches();
         end
 
         function validateInputsImpl(~, ~, ~, ~, ~)
@@ -76,19 +222,55 @@ classdef RayTracing < matlab.System
             obj.GeneratedTxSites = txSite;
             obj.GeneratedRxSites = rxSite;
 
+            executionStage = 'RayTrace';
             try
                 pm = obj.createPropagationModel(mapProfile);
-                [raySet, rayCount, rayPathLoss] = obj.computeRays(txSite, rxSite, pm, mapProfile);
+                [raySet, rayCount, rayPathLoss, rayFailure] = ...
+                    obj.computeRays(txSite, rxSite, pm, mapProfile);
 
                 if rayCount == 0
-                    out = obj.applyNoPathFallback(out, txInfo, rxInfo, channelLinkInfo, mapProfile, carrierFrequency, []);
+                    out = obj.applyNoPathFallback(out, txInfo, rxInfo, ...
+                        channelLinkInfo, mapProfile, carrierFrequency, rayFailure);
                     return;
                 end
 
+                executionStage = 'ChannelConstruct';
+                constructMeta = localMapProfileTraceMetadata(mapProfile, ...
+                    'RayCount', rayCount);
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.RayTracingChannelConstruct', 'begin', ...
+                    constructMeta);
+                rtChannelStart = tic;
                 rtChan = comm.RayTracingChannel(raySet, txSite, rxSite);
+                constructElapsed = toc(rtChannelStart);
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.RayTracingChannelConstruct');
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.RayTracingChannelConstruct', ...
+                    constructElapsed, constructMeta);
+                constructMeta.ElapsedSec = constructElapsed;
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.RayTracingChannelConstruct', 'end', ...
+                    constructMeta);
                 rtChan.SampleRate = obj.resolveSampleRate(x, rxInfo);
+                obj.assertInputAntennaColumns(x, txInfo, rxInfo, channelLinkInfo);
                 obj.configureGpuPolicy(rtChan, x.Signal);
+                executionStage = 'ChannelApply';
+                applyMeta = localMapProfileTraceMetadata(mapProfile, ...
+                    'InputSamples', size(x.Signal, 1), ...
+                    'InputColumns', size(x.Signal, 2));
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.RayTracingChannelApply', 'begin', ...
+                    applyMeta);
+                channelApplyStart = tic;
                 out.Signal = rtChan(x.Signal);
+                applyElapsed = toc(channelApplyStart);
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.RayTracingChannelApply', ...
+                    applyElapsed, applyMeta);
+                applyMeta.ElapsedSec = applyElapsed;
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.RayTracingChannelApply', 'end', applyMeta);
                 out.RayCount = rayCount;
                 out.ChannelModel = 'RayTracing';
                 out.ChannelFallback = '';
@@ -99,12 +281,20 @@ classdef RayTracing < matlab.System
                 out.ChannelInfo = obj.buildChannelInfo(mapProfile, carrierFrequency, rayCount, ...
                     getStructField(out, 'PathLoss', []), '');
             catch ME
-                if obj.shouldFallback(mapProfile, channelLinkInfo)
+                csrd.runtime.performance.trace('heartbeat', ...
+                    ['RayTracing.', executionStage], 'failed', ...
+                    localMapProfileTraceMetadata(mapProfile, ...
+                        'ErrorIdentifier', ME.identifier, ...
+                        'ErrorMessage', ME.message));
+                if strcmp(executionStage, 'RayTrace') && ...
+                        obj.shouldFallback(mapProfile, channelLinkInfo) && ...
+                        localRayTraceErrorAllowsFallback(ME)
                     obj.logger.warning('RayTracing failed for map mode %s; applying %s fallback. Error: %s', ...
                         string(getStructField(mapProfile, 'Mode', 'Unknown')), obj.NoValidPathFallback, ME.message);
                     out = obj.applyNoPathFallback(out, txInfo, rxInfo, channelLinkInfo, mapProfile, carrierFrequency, ME.message);
                 else
-                    error('RayTracing:ExecutionFailed', 'Ray tracing failed: %s', ME.message);
+                    error('RayTracing:ExecutionFailed', ...
+                        'Ray tracing %s failed: %s', executionStage, ME.message);
                 end
             end
         end
@@ -114,11 +304,13 @@ classdef RayTracing < matlab.System
             % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
-            tryDeleteSiteViewer(obj.siteViewerCache);
             obj.siteViewerCache = [];
             obj.siteViewerKey = '';
+            csrd.runtime.map.osmSiteViewerCache('release');
             obj.propagationModelCache = [];
             obj.propagationModelKey = '';
+            obj.sitePairCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            obj.raySetCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
         end
 
     end
@@ -142,9 +334,10 @@ classdef RayTracing < matlab.System
             if hasBuildings
                 mapProfile.Mode = 'OSMBuildings';
                 mapProfile.HasBuildings = true;
-                mapProfile.Terrain = 'gmted2010';
+                mapProfile.Terrain = 'none';
                 mapProfile.TerrainMaterial = 'auto';
                 mapProfile.MaxNumReflections = [];
+                mapProfile.TerrainPolicy = 'NoOnlineTerrainForBatchRayTracing';
             else
                 mapProfile.Mode = 'FlatTerrain';
                 mapProfile.HasBuildings = false;
@@ -186,7 +379,7 @@ classdef RayTracing < matlab.System
             end
         end
 
-        function [txSite, rxSite] = createSites(~, txInfo, rxInfo, carrierFrequency)
+        function [txSite, rxSite] = createSites(obj, txInfo, rxInfo, carrierFrequency)
             % createSites - Production declaration in CSRD.
             % 中文说明：createSites 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -213,6 +406,18 @@ classdef RayTracing < matlab.System
 
             numTxAntennas = max(1, round(getStructField(txInfo, 'NumTransmitAntennas', 1)));
             numRxAntennas = max(1, round(getStructField(rxInfo, 'NumAntennas', 1)));
+            cacheKey = sitePairCacheKey(txName, rxName, txGeo, rxGeo, ...
+                numTxAntennas, numRxAntennas, carrierFrequency);
+            if isa(obj.sitePairCache, 'containers.Map') && isKey(obj.sitePairCache, cacheKey)
+                pair = obj.sitePairCache(cacheKey);
+                txSite = pair.TxSite;
+                rxSite = pair.RxSite;
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.SitePairCacheHit');
+                return;
+            end
+            csrd.runtime.performance.trace('count', ...
+                'RayTracing.SitePairCacheMiss');
 
             try
                 txArgs = [txArgs, {'Antenna', arrayConfig('Size', [numTxAntennas, 1], 'ElementSpacing', 0.5)}];
@@ -221,8 +426,18 @@ classdef RayTracing < matlab.System
                 % txsite/rxsite can use default antennas if arrayConfig is unavailable.
             end
 
+            siteStart = tic;
             txSite = txsite(txArgs{:});
             rxSite = rxsite(rxArgs{:});
+            csrd.runtime.performance.trace('count', ...
+                'RayTracing.SitePairConstruct');
+            csrd.runtime.performance.trace('event', ...
+                'RayTracing.SitePairConstruct', toc(siteStart), struct( ...
+                    'TxId', txName, 'RxId', rxName, ...
+                    'CarrierFrequency', carrierFrequency));
+            if isa(obj.sitePairCache, 'containers.Map')
+                obj.sitePairCache(cacheKey) = struct('TxSite', txSite, 'RxSite', rxSite);
+            end
         end
 
         function pm = createPropagationModel(obj, mapProfile)
@@ -243,12 +458,27 @@ classdef RayTracing < matlab.System
 
             cacheKey = propagationCacheKey(cfg, mapProfile);
             if strcmp(obj.propagationModelKey, cacheKey) && ...
-                    ~isempty(obj.propagationModelCache)
+                    localIsUsablePropagationModel(obj.propagationModelCache)
                 pm = obj.propagationModelCache;
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.PropagationModelCacheHit');
                 return;
+            elseif strcmp(obj.propagationModelKey, cacheKey) && ...
+                    ~isempty(obj.propagationModelCache)
+                cachedClass = class(obj.propagationModelCache);
+                obj.propagationModelCache = [];
+                obj.propagationModelKey = '';
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.PropagationModelCacheInvalidated', 0, ...
+                    struct('CacheKey', cacheKey, ...
+                        'CachedClass', cachedClass));
             end
 
+            csrd.runtime.performance.trace('count', ...
+                'RayTracing.PropagationModelCacheMiss');
+            pmStart = tic;
             pm = propagationModel('raytracing');
+            localAssertUsablePropagationModel(pm);
             setPropagationProperty(obj, pm, 'Method', cfg.Method);
             setPropagationProperty(obj, pm, 'MaxNumReflections', cfg.MaxNumReflections);
             setPropagationProperty(obj, pm, 'MaxNumDiffractions', cfg.MaxNumDiffractions);
@@ -258,10 +488,35 @@ classdef RayTracing < matlab.System
                 if ~setPropagationProperty(obj, pm, 'TerrainMaterial', material) && strcmpi(material, 'seawater')
                     setPropagationProperty(obj, pm, 'TerrainMaterial', 'water');
                 end
+            elseif strcmpi(mode, 'OSMBuildings')
+                % OSM fixtures can contain empty/unsupported material names.
+                % MathWorks recommends explicitly overriding material use
+                % instead of depending on the file/table material catalog.
+                buildingsMaterial = getStructField(mapProfile, ...
+                    'BuildingsMaterial', 'concrete');
+                surfaceMaterial = getStructField(mapProfile, ...
+                    'SurfaceMaterial', 'plasterboard');
+                terrainMaterial = getStructField(mapProfile, ...
+                    'TerrainMaterial', 'concrete');
+                if isempty(buildingsMaterial) || strcmpi(buildingsMaterial, 'auto')
+                    buildingsMaterial = 'concrete';
+                end
+                if isempty(surfaceMaterial) || strcmpi(surfaceMaterial, 'auto')
+                    surfaceMaterial = 'plasterboard';
+                end
+                if isempty(terrainMaterial) || strcmpi(terrainMaterial, 'auto')
+                    terrainMaterial = 'concrete';
+                end
+                setPropagationProperty(obj, pm, 'BuildingsMaterial', buildingsMaterial);
+                setPropagationProperty(obj, pm, 'SurfaceMaterial', surfaceMaterial);
+                setPropagationProperty(obj, pm, 'TerrainMaterial', terrainMaterial);
             end
 
             obj.propagationModelCache = pm;
             obj.propagationModelKey = cacheKey;
+            csrd.runtime.performance.trace('event', ...
+                'RayTracing.PropagationModelConstruct', toc(pmStart), ...
+                struct('CacheKey', cacheKey));
         end
 
         function configureGpuPolicy(obj, rtChan, signal)
@@ -289,7 +544,7 @@ classdef RayTracing < matlab.System
             end
         end
 
-        function [raySet, rayCount, pathLoss] = computeRays(obj, txSite, rxSite, pm, mapProfile)
+        function [raySet, rayCount, pathLoss, failureMessage] = computeRays(obj, txSite, rxSite, pm, mapProfile)
             % computeRays - Production declaration in CSRD.
             % 中文说明：computeRays 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -297,25 +552,58 @@ classdef RayTracing < matlab.System
             raySet = [];
             rayCount = 0;
             pathLoss = [];
-            mapArg = obj.resolveMapArgument(mapProfile);
+            failureMessage = '';
+            cacheKey = raySetCacheKey(txSite, rxSite, mapProfile);
+            if isa(obj.raySetCache, 'containers.Map') && isKey(obj.raySetCache, cacheKey)
+                cached = obj.raySetCache(cacheKey);
+                raySet = cached.RaySet;
+                rayCount = cached.RayCount;
+                pathLoss = cached.PathLoss;
+                if isfield(cached, 'FailureMessage')
+                    failureMessage = cached.FailureMessage;
+                end
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.RaySetCacheHit');
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.RaySetCacheHit', 0, ...
+                    localMapProfileTraceMetadata(mapProfile, ...
+                        'KeyHash', rayKeyHash(cacheKey), ...
+                        'RayCount', rayCount, ...
+                        'CacheSize', raySetCacheSize(obj.raySetCache)));
+                return;
+            end
+            csrd.runtime.performance.trace('count', ...
+                'RayTracing.RaySetCacheMiss');
+            csrd.runtime.performance.trace('event', ...
+                'RayTracing.RaySetCacheMiss', 0, ...
+                localMapProfileTraceMetadata(mapProfile, ...
+                    'KeyHash', rayKeyHash(cacheKey), ...
+                    'CacheSize', raySetCacheSize(obj.raySetCache)));
 
+            mapArg = obj.resolveMapArgument(mapProfile);
+            raytraceMeta = localMapProfileTraceMetadata(mapProfile);
+            csrd.runtime.performance.trace('heartbeat', ...
+                'RayTracing.RaytraceCall', 'begin', raytraceMeta);
+            raytraceStart = tic;
             if isempty(mapArg)
                 rays = raytrace(txSite, rxSite, pm);
             else
                 rays = raytrace(txSite, rxSite, pm, 'Map', mapArg);
             end
+            raytraceElapsed = toc(raytraceStart);
+            csrd.runtime.performance.trace('count', 'RayTracing.RaytraceCall');
+            csrd.runtime.performance.trace('event', 'RayTracing.RaytraceCall', ...
+                raytraceElapsed, raytraceMeta);
+            raytraceMeta.ElapsedSec = raytraceElapsed;
+            csrd.runtime.performance.trace('heartbeat', ...
+                'RayTracing.RaytraceCall', 'end', raytraceMeta);
 
-            if iscell(rays)
-                if isempty(rays) || isempty(rays{1})
-                    return;
-                end
-                raySet = rays{1};
-            else
-                raySet = rays;
+            [raySet, rayCount, pathLoss] = normalizeRaytraceOutput(rays);
+            if isa(obj.raySetCache, 'containers.Map')
+                obj.raySetCache(cacheKey) = struct( ...
+                    'RaySet', raySet, 'RayCount', rayCount, ...
+                    'PathLoss', pathLoss);
             end
-
-            rayCount = numel(raySet);
-            pathLoss = extractMinimumPathLoss(raySet);
         end
 
         function mapArg = resolveMapArgument(obj, mapProfile)
@@ -329,16 +617,43 @@ classdef RayTracing < matlab.System
 
             if strcmpi(mode, 'FlatTerrain')
                 terrain = getStructField(mapProfile, 'Terrain', 'none');
+                if ~(ischar(terrain) || isstring(terrain))
+                    error('CSRD:RayTracing:InvalidMapArgument', ...
+                        ['FlatTerrain Map argument must be a terrain name ', ...
+                         'string, not %s.'], class(terrain));
+                end
                 mapArg = terrain;
             elseif strcmpi(mode, 'OSMBuildings') && ~isempty(osmFile) && isfile(osmFile)
                 key = sprintf('OSMBuildings:%s', osmFile);
                 if strcmp(obj.siteViewerKey, key) && ~isempty(obj.siteViewerCache)
-                    mapArg = obj.siteViewerCache;
-                    return;
+                    if localIsUsableMapArgument(obj.siteViewerCache)
+                        mapArg = obj.siteViewerCache;
+                        return;
+                    end
+                    csrd.runtime.performance.trace('event', ...
+                        'RayTracing.SiteviewerLocalCacheInvalidated', 0, ...
+                        localMapProfileTraceMetadata(mapProfile, ...
+                            'CachedClass', class(obj.siteViewerCache)));
+                    obj.siteViewerCache = [];
+                    obj.siteViewerKey = '';
                 end
 
-                obj.siteViewerCache = siteviewer('Basemap', 'openstreetmap', ...
-                    'Buildings', osmFile, 'Hidden', true);
+                siteviewerMeta = localMapProfileTraceMetadata(mapProfile);
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.SiteviewerGet', 'begin', siteviewerMeta);
+                siteviewerStart = tic;
+                [obj.siteViewerCache, ~] = ...
+                    csrd.runtime.map.osmSiteViewerCache('get', osmFile);
+                localAssertUsableMapArgument(obj.siteViewerCache, osmFile);
+                siteviewerElapsed = toc(siteviewerStart);
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.SiteviewerGet');
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.SiteviewerGet', siteviewerElapsed, ...
+                    siteviewerMeta);
+                siteviewerMeta.ElapsedSec = siteviewerElapsed;
+                csrd.runtime.performance.trace('heartbeat', ...
+                    'RayTracing.SiteviewerGet', 'end', siteviewerMeta);
                 obj.siteViewerKey = key;
                 mapArg = obj.siteViewerCache;
             end
@@ -419,24 +734,46 @@ classdef RayTracing < matlab.System
             end
         end
 
+        function ensureRuntimeCaches(obj)
+            %ENSURERUNTIMECACHES Lazily initialise caches for public precompute calls.
+            if isempty(obj.logger)
+                obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
+            end
+            obj.PropagationModelConfig = normalizePropagationConfig(obj.PropagationModelConfig);
+            if isempty(obj.sitePairCache) || ~isa(obj.sitePairCache, 'containers.Map')
+                obj.sitePairCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            end
+            if isempty(obj.raySetCache) || ~isa(obj.raySetCache, 'containers.Map')
+                obj.raySetCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            end
+        end
+
+        function assertInputAntennaColumns(~, x, txInfo, rxInfo, channelLinkInfo)
+            expectedColumns = max(1, round(getStructField(txInfo, 'NumTransmitAntennas', 1)));
+            actualColumns = size(x.Signal, 2);
+            if actualColumns == expectedColumns
+                return;
+            end
+
+            txId = char(string(getStructField(txInfo, 'ID', 'Tx')));
+            rxId = char(string(getStructField(rxInfo, 'ID', 'Rx')));
+            burstId = char(string(getStructField(channelLinkInfo, 'BurstId', '')));
+            signalSize = size(x.Signal);
+            if numel(signalSize) < 2
+                signalSize(2) = 1;
+            end
+
+            error('RayTracing:InputAntennaColumnMismatch', ...
+                ['RayTracing input signal columns=%d but Tx %s declares ', ...
+                 'NumTransmitAntennas=%d for Rx %s BurstId=%s. ', ...
+                 'SignalSize=[%d %d]. Upstream modulation/TRF must preserve ', ...
+                 'samples-by-antennas shape before channel application.'], ...
+                actualColumns, txId, expectedColumns, rxId, burstId, ...
+                signalSize(1), signalSize(2));
+        end
+
     end
 
-end
-
-function tryDeleteSiteViewer(viewerHandle)
-    % tryDeleteSiteViewer - Production declaration in CSRD.
-    % 中文说明：tryDeleteSiteViewer 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    if isempty(viewerHandle)
-        return;
-    end
-
-    try
-        delete(viewerHandle);
-    catch
-        % Best-effort cleanup only.
-    end
 end
 
 function cfg = normalizePropagationConfig(cfg)
@@ -463,10 +800,141 @@ function key = propagationCacheKey(cfg, mapProfile)
     mode = char(string(getStructField(mapProfile, 'Mode', '')));
     terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
     material = char(string(getStructField(mapProfile, 'TerrainMaterial', '')));
+    buildingsMaterial = char(string(getStructField(mapProfile, ...
+        'BuildingsMaterial', '')));
+    surfaceMaterial = char(string(getStructField(mapProfile, ...
+        'SurfaceMaterial', '')));
     maxReflections = getStructField(mapProfile, 'MaxNumReflections', cfg.MaxNumReflections);
-    key = sprintf('Method=%s|Mode=%s|Ref=%s|Diff=%s|Terrain=%s|Mat=%s', ...
+    key = sprintf(['Method=%s|Mode=%s|Ref=%s|Diff=%s|Terrain=%s|', ...
+        'Mat=%s|BuildMat=%s|SurfMat=%s'], ...
         char(string(cfg.Method)), mode, mat2str(maxReflections), ...
-        mat2str(cfg.MaxNumDiffractions), terrain, material);
+        mat2str(cfg.MaxNumDiffractions), terrain, material, ...
+        buildingsMaterial, surfaceMaterial);
+end
+
+function key = sitePairCacheKey(txName, rxName, txGeo, rxGeo, ...
+        numTxAntennas, numRxAntennas, carrierFrequency)
+    % sitePairCacheKey - Geometry-aware key for txsite/rxsite reuse.
+    key = sprintf(['Tx=%s|Rx=%s|TxGeo=%s|RxGeo=%s|TxAnt=%d|', ...
+        'RxAnt=%d|Fc=%.17g'], ...
+        txName, rxName, mat2str(double(txGeo), 17), ...
+        mat2str(double(rxGeo), 17), numTxAntennas, numRxAntennas, ...
+        double(carrierFrequency));
+end
+
+function key = raySetCacheKey(txSite, rxSite, mapProfile)
+    % raySetCacheKey - Stable key for rays reused across bursts on one link.
+    mode = char(string(getStructField(mapProfile, 'Mode', '')));
+    osmFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
+    terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
+    material = char(string(getStructField(mapProfile, 'TerrainMaterial', '')));
+    buildingsMaterial = char(string(getStructField(mapProfile, ...
+        'BuildingsMaterial', '')));
+    surfaceMaterial = char(string(getStructField(mapProfile, ...
+        'SurfaceMaterial', '')));
+    maxReflections = getStructField(mapProfile, 'MaxNumReflections', []);
+    key = sprintf(['Map=%s|File=%s|Terrain=%s|Mat=%s|BuildMat=%s|', ...
+        'SurfMat=%s|Refl=%s|Tx=%s|Rx=%s'], ...
+        mode, osmFile, terrain, material, buildingsMaterial, ...
+        surfaceMaterial, mat2str(maxReflections), ...
+        siteKeyPart(txSite, true), siteKeyPart(rxSite, false));
+end
+
+function hashValue = rayKeyHash(key)
+    hashValue = csrd.support.hash.shortInt32Hash(key);
+end
+
+function countValue = raySetCacheSize(cacheMap)
+    countValue = 0;
+    if isa(cacheMap, 'containers.Map')
+        countValue = cacheMap.Count;
+    end
+end
+
+function meta = localMapProfileTraceMetadata(mapProfile, varargin)
+    %LOCALMAPPROFILETRACEMETADATA Include OSM coverage metadata in perf traces.
+    % 中文说明：性能证据记录被选中的 OSM 文件和均匀覆盖序号，不再记录大小分级。
+    meta = struct();
+    meta.MapMode = char(string(getStructField(mapProfile, 'Mode', '')));
+    meta.OSMFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
+    meta.OSMFileSizeMB = getStructField(mapProfile, 'OSMFileSizeMB', NaN);
+    meta.SelectionPolicy = char(string(getStructField(mapProfile, ...
+        'SelectionPolicy', 'Unknown')));
+    meta.CoverageOrdinal = getStructField(mapProfile, 'CoverageOrdinal', NaN);
+    meta.CandidateFileCount = getStructField(mapProfile, 'CandidateFileCount', NaN);
+    for idx = 1:2:numel(varargin)
+        fieldName = char(string(varargin{idx}));
+        meta.(fieldName) = varargin{idx + 1};
+    end
+end
+
+function item = localCellOrArrayEntry(collection, idx)
+    if iscell(collection)
+        item = collection{idx};
+    else
+        item = collection(idx);
+    end
+end
+
+function tf = localHasErrorStatus(info)
+    tf = isstruct(info) && isfield(info, 'Status') && ...
+        contains(string(info.Status), "Error");
+end
+
+function [raySet, rayCount, pathLoss] = normalizeRaytraceOutput(rays)
+    raySet = [];
+    rayCount = 0;
+    pathLoss = [];
+    if iscell(rays)
+        if isempty(rays) || isempty(rays{1})
+            return;
+        end
+        raySet = rays{1};
+    else
+        if isempty(rays)
+            return;
+        end
+        raySet = rays;
+    end
+    rayCount = numel(raySet);
+    pathLoss = extractMinimumPathLoss(raySet);
+end
+
+function rays = localBatchedRayCell(allRays, txIdx, rxIdx)
+    rays = [];
+    if iscell(allRays)
+        if ndims(allRays) >= 2 && size(allRays, 1) >= txIdx && ...
+                size(allRays, 2) >= rxIdx
+            rays = allRays(txIdx, rxIdx);
+        elseif numel(allRays) >= txIdx
+            rays = allRays(txIdx);
+        end
+    elseif txIdx == 1 && rxIdx == 1
+        rays = allRays;
+    end
+end
+
+function part = siteKeyPart(siteObj, includeFrequency)
+    values = nan(1, 4);
+    try
+        values(1) = double(siteObj.Latitude);
+    catch
+    end
+    try
+        values(2) = double(siteObj.Longitude);
+    catch
+    end
+    try
+        values(3) = double(siteObj.AntennaHeight);
+    catch
+    end
+    if includeFrequency
+        try
+            values(4) = double(siteObj.TransmitterFrequency);
+        catch
+        end
+    end
+    part = mat2str(values, 17);
 end
 
 function tf = gpuIsAvailable()
@@ -481,6 +949,64 @@ function tf = gpuIsAvailable()
             tf = false;
         end
     end
+end
+
+function localAssertUsablePropagationModel(pm)
+    if localIsUsablePropagationModel(pm)
+        return;
+    end
+    error('CSRD:RayTracing:InvalidPropagationModelHandle', ...
+        ['propagationModel(''raytracing'') returned %s; raytrace ', ...
+         'requires a valid propagation model object.'], class(pm));
+end
+
+function tf = localIsUsablePropagationModel(pm)
+    tf = ~isempty(pm) && isobject(pm) && ~isstruct(pm);
+end
+
+function localAssertUsableMapArgument(mapArg, osmFile)
+    if localIsUsableMapArgument(mapArg)
+        return;
+    end
+    error('CSRD:RayTracing:InvalidMapArgument', ...
+        ['OSM RayTracing Map for "%s" resolved to %s; raytrace(Map=...) ', ...
+         'requires a valid siteviewer/map object.'], ...
+        char(string(osmFile)), class(mapArg));
+end
+
+function tf = localIsUsableMapArgument(mapArg)
+    tf = ~isempty(mapArg) && isobject(mapArg) && ~isstruct(mapArg);
+    if ~tf
+        return;
+    end
+    try
+        tf = isvalid(mapArg);
+    catch
+        % Some MATLAB value objects accepted by raytrace do not implement
+        % isvalid. They remain acceptable as long as they are real objects;
+        % the production bug guard is rejecting structs and stale handles.
+        tf = true;
+    end
+end
+
+function tf = localRayTraceErrorAllowsFallback(ME)
+    msg = lower(char(string(ME.message)));
+    id = lower(char(string(ME.identifier)));
+
+    % Internal type/handle errors are programming/configuration faults. They
+    % must surface as hard failures instead of being relabeled as no-path RF.
+    hardFragments = {'isvalid', 'undefined function', '未定义与', ...
+        'invalidmapargument', 'invalidpropagationmodelhandle', ...
+        'unable to access terrain', 'gmted2010', 'terrain data'};
+    if any(contains(msg, hardFragments)) || any(contains(id, hardFragments))
+        tf = false;
+        return;
+    end
+
+    noPathFragments = {'no valid path', 'no valid propagation path', ...
+        'no propagation path', 'no ray found', 'no rays were found', ...
+        'unable to find a propagation path', 'valid propagation paths'};
+    tf = contains(id, 'novalidpath') || any(contains(msg, noPathFragments));
 end
 
 function value = getStructField(s, fieldName, defaultValue)

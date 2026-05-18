@@ -181,7 +181,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
             %
-            % Returns the site viewer object if available (OSM mode)
+            % Returns a physical-environment viewer if available. Production
+            % OSM RayTracing keeps the heavy map handle in the channel block
+            % to avoid loading the same OSM file twice.
 
             if isfield(obj.Config, 'Map') && isfield(obj.Config.Map, 'Type') && ...
                     strcmp(obj.Config.Map.Type, 'OSM') && ~isempty(obj.siteViewer)
