@@ -40,7 +40,7 @@ function config = scenario_factory()
     
     config.Factories.Scenario.Global.ObservationDuration = 0.0002048; % seconds (10 frames * 1024 samples / 50 MHz)
     config.Factories.Scenario.Global.NumFramesPerScenario = 10;
-    config.Factories.Scenario.Global.TimeResolution = 0.001;         % seconds
+    config.Factories.Scenario.Global.TimeResolution = 2.048e-5;      % seconds per receiver frame
     config.Factories.Scenario.Global.FrameNumSamples = 1024;         % samples per receiver frame
     config.Factories.Scenario.Global.FrameDuration = 2.048e-5;       % seconds per receiver frame
     
@@ -238,7 +238,7 @@ function config = scenario_factory()
     % ===================== FREQUENCY ALLOCATION =====================
     config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.Strategy = 'ReceiverCentric';
     config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.MinSeparation = 50e3;
-    config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.AllowOverlap = true;
+    config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.AllowOverlap = false;
     config.Factories.Scenario.CommunicationBehavior.FrequencyAllocation.MaxOverlap = 0.3;
     
     config.Factories.Scenario.LogDetails = true;

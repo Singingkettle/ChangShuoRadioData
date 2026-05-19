@@ -27,6 +27,80 @@ classdef ChannelFactory < matlab.System
             obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
         end
 
+        function precomputeRayTracingFrame(obj, frameId, txInfos, rxInfos, ...
+                scenarioMapProfile, scenarioConfig)
+            %PRECOMPUTERAYTRACINGFRAME Batch per-frame RayTracing geometry.
+            % 中文说明：预先批量计算当前帧 Tx×Rx rays，segment 信道处理复用缓存。
+            obj.ensurePrecomputeReady();
+            if isempty(obj.factoryConfig) || ~isstruct(obj.factoryConfig) || ...
+                    isempty(txInfos) || isempty(rxInfos)
+                return;
+            end
+            if nargin < 6 || ~isstruct(scenarioConfig)
+                scenarioConfig = struct();
+            end
+
+            try
+                linkInfo = struct();
+                linkInfo.MapProfile = scenarioMapProfile;
+                linkInfo.ChannelModel = getStructField(scenarioMapProfile, ...
+                    'ChannelModel', '');
+                modelName = obj.resolveChannelModelName(linkInfo);
+                if ~obj.isRayTracingModelName(modelName)
+                    return;
+                end
+                cacheKey = obj.resolveChannelCacheKey(modelName, ...
+                    "Frame", "Batch", linkInfo);
+                channelBlock = obj.getChannelBlock(modelName, cacheKey);
+                if ~ismethod(channelBlock, 'precomputeFrameRays')
+                    return;
+                end
+
+                linkInfos = localBuildFrameLinkInfos( ...
+                    txInfos, rxInfos, scenarioMapProfile, scenarioConfig);
+                channelBlock.precomputeFrameRays(txInfos, rxInfos, linkInfos, frameId);
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.FramePrecomputeRequested', 1, ...
+                    struct('FrameId', frameId));
+            catch ME
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.FramePrecomputeFailed', 0, struct( ...
+                        'FrameId', frameId, ...
+                        'ErrorIdentifier', ME.identifier, ...
+                        'ErrorMessage', ME.message));
+                if ~isempty(obj.logger)
+                    obj.logger.debug('Frame %d RayTracing precompute skipped: %s', ...
+                        frameId, ME.message);
+                end
+            end
+        end
+
+    end
+
+    methods (Access = private)
+
+        function ensurePrecomputeReady(obj)
+            %ENSUREPRECOMPUTEREADY Initialise state for public precompute calls.
+            %
+            % MATLAB System objects run setupImpl before step(), but
+            % precomputeRayTracingFrame is a normal public method called before
+            % the first channel step in each frame. Without this guard the first
+            % frame of every scenario silently skipped batching and fell back to
+            % per-link raytrace.
+            if isempty(obj.factoryConfig) && isstruct(obj.Config) && ...
+                    isfield(obj.Config, 'ChannelModels')
+                obj.factoryConfig = obj.Config;
+            end
+            if isempty(obj.logger)
+                obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
+            end
+            if isempty(obj.cachedChannelBlock) || ...
+                    ~isa(obj.cachedChannelBlock, 'containers.Map')
+                obj.cachedChannelBlock = containers.Map( ...
+                    'KeyType', 'char', 'ValueType', 'any');
+            end
+        end
+
     end
 
     methods (Access = protected)
@@ -49,7 +123,14 @@ classdef ChannelFactory < matlab.System
 
             obj.factoryConfig = obj.Config;
             obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
-            obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            % Phase 22: frame-level RayTracing precompute may populate the
+            % channel block before the first step() call triggers setupImpl.
+            % Keep that block cache alive; releaseImpl owns teardown.
+            if isempty(obj.cachedChannelBlock) || ...
+                    ~isa(obj.cachedChannelBlock, 'containers.Map')
+                obj.cachedChannelBlock = containers.Map( ...
+                    'KeyType', 'char', 'ValueType', 'any');
+            end
             obj.logger.debug('ChannelFactory setup complete; channel model selection is scenario-driven.');
         end
 
@@ -66,7 +147,8 @@ classdef ChannelFactory < matlab.System
             rxIdStr = string(getStructField(rxSpecificInfo, 'ID', 'Rx'));
 
             channelModelName = obj.resolveChannelModelName(channelLinkSpecificInfo);
-            cacheKey = obj.resolveChannelCacheKey(channelModelName, txIdStr, rxIdStr);
+            cacheKey = obj.resolveChannelCacheKey( ...
+                channelModelName, txIdStr, rxIdStr, channelLinkSpecificInfo);
             currentChannelBlock = obj.getChannelBlock(channelModelName, cacheKey);
             obj.selectedChannelModelName = channelModelName;
             obj.isRayTracingSelected = contains(class(currentChannelBlock), 'RayTracing', 'IgnoreCase', true);
@@ -222,15 +304,32 @@ classdef ChannelFactory < matlab.System
                 mode, obj.factoryConfig);
         end
 
-        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr) %#ok<INUSL>
-            % All channel models, including ray tracing, MUST be cached per
+        function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr, channelLinkInfo) %#ok<INUSL>
+            % Statistical/fading channel models are cached per Tx-Rx link.
             % 中文说明：resolveChannelCacheKey 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
-            % Tx-Rx link. Sharing a single ray-tracing block across links
-            % causes per-link state (rays, channel filters, antenna sites,
-            % seed) to leak between transmitters/receivers and corrupts
-            % every link except the most recently configured one.
+            % RayTracing itself is stateless per link except for generated
+            % site handles used for diagnostics; the expensive siteviewer and
+            % propagation-model resources are map/profile-scoped, so Phase 21
+            % caches one RayTracing block per map profile instead of per link.
+            if obj.isRayTracingModelName(modelName)
+                mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
+                mode = char(string(getStructField(mapProfile, 'Mode', 'Unknown')));
+                osmFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
+                terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
+                material = char(string(getStructField(mapProfile, 'TerrainMaterial', '')));
+                buildingsMaterial = char(string(getStructField(mapProfile, ...
+                    'BuildingsMaterial', '')));
+                surfaceMaterial = char(string(getStructField(mapProfile, ...
+                    'SurfaceMaterial', '')));
+                maxRefl = getStructField(mapProfile, 'MaxNumReflections', []);
+                cacheKey = sprintf(['%s|Map=%s|File=%s|Terrain=%s|Mat=%s|', ...
+                    'BuildMat=%s|SurfMat=%s|Refl=%s'], ...
+                    modelName, mode, osmFile, terrain, material, ...
+                    buildingsMaterial, surfaceMaterial, mat2str(maxRefl));
+                return;
+            end
             cacheKey = sprintf('%s|Tx=%s|Rx=%s', modelName, char(txIdStr), char(rxIdStr));
         end
 
@@ -539,8 +638,12 @@ classdef ChannelFactory < matlab.System
             mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
             mode = getStructField(mapProfile, 'Mode', '');
 
-            if any(strcmpi(mode, {'OSMBuildings', 'FlatTerrain'}))
-                linkDistance_m = geographicDistance(txPos, rxPos);
+            if localUsesMeterPosition(txInfo) && localUsesMeterPosition(rxInfo)
+                linkDistance_m = norm(txPos - rxPos);
+            elseif any(strcmpi(mode, {'OSMBuildings', 'FlatTerrain'}))
+                txGeo = localResolveGeoPosition(txInfo, txPos, 'Tx');
+                rxGeo = localResolveGeoPosition(rxInfo, rxPos, 'Rx');
+                linkDistance_m = geographicDistance(txGeo, rxGeo);
             else
                 linkDistance_m = norm(txPos - rxPos);
             end
@@ -819,16 +922,53 @@ function value = getStructField(s, fieldName, defaultValue)
     end
 end
 
-function distance_m = geographicDistance(txPos, rxPos)
+function tf = localUsesMeterPosition(info)
+    tf = isstruct(info) && isfield(info, 'PositionUnit') && ...
+        ~isempty(info.PositionUnit) && strcmpi(char(string(info.PositionUnit)), 'meters');
+end
+
+function geoPosition = localResolveGeoPosition(info, position, roleName)
+    if isstruct(info) && isfield(info, 'GeoPositionDeg') && ...
+            ~isempty(info.GeoPositionDeg)
+        geoPosition = double(info.GeoPositionDeg(:)).';
+        if numel(geoPosition) ~= 3 || any(~isfinite(geoPosition))
+            error('CSRD:Channel:InvalidGeoPosition', ...
+                '%s GeoPositionDeg must be a finite [lat lon height] vector.', roleName);
+        end
+        return;
+    end
+
+    if localUsesMeterPosition(info)
+        error('CSRD:Channel:MissingGeoPosition', ...
+            '%s uses meter Position and requires GeoPositionDeg for geographic distance.', roleName);
+    end
+
+    if ~isnumeric(position) || numel(position) < 2 || ...
+            any(~isfinite(position(1:min(3, numel(position)))))
+        error('CSRD:Channel:InvalidLegacyPosition', ...
+            '%s Position must be finite when GeoPositionDeg is absent.', roleName);
+    end
+    geoPosition = [position(2), position(1), getPositionHeight(position)];
+end
+
+function height = getPositionHeight(position)
+    if isnumeric(position) && numel(position) >= 3
+        height = position(3);
+    else
+        height = 0;
+    end
+end
+
+function distance_m = geographicDistance(txGeo, rxGeo)
     % geographicDistance - Production declaration in CSRD.
     % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
     % Inputs / 输入: see signature arguments and local validation.
     % 输出 / Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
-    lat1 = deg2rad(txPos(2));
-    lon1 = deg2rad(txPos(1));
-    lat2 = deg2rad(rxPos(2));
-    lon2 = deg2rad(rxPos(1));
+    lat1 = deg2rad(txGeo(1));
+    lon1 = deg2rad(txGeo(2));
+    lat2 = deg2rad(rxGeo(1));
+    lon2 = deg2rad(rxGeo(2));
 
     dLat = lat2 - lat1;
     dLon = lon2 - lon1;
@@ -837,8 +977,41 @@ function distance_m = geographicDistance(txPos, rxPos)
     horizontalDistance = earthRadius_m * c;
 
     dz = 0;
-    if numel(txPos) >= 3 && numel(rxPos) >= 3
-        dz = rxPos(3) - txPos(3);
+    if numel(txGeo) >= 3 && numel(rxGeo) >= 3
+        dz = rxGeo(3) - txGeo(3);
     end
     distance_m = sqrt(horizontalDistance.^2 + dz.^2);
+end
+
+function linkInfos = localBuildFrameLinkInfos(txInfos, rxInfos, mapProfile, scenarioConfig)
+    nTx = numel(txInfos);
+    nRx = numel(rxInfos);
+    linkInfos = cell(1, nTx * nRx);
+    cursor = 0;
+    for txIdx = 1:nTx
+        for rxIdx = 1:nRx
+            cursor = cursor + 1;
+            linkInfo = struct();
+            linkInfo.TxScenarioConfig = localScenarioEntry( ...
+                scenarioConfig, 'Transmitters', txIdx);
+            linkInfo.RxScenarioConfig = localScenarioEntry( ...
+                scenarioConfig, 'Receivers', rxIdx);
+            linkInfo.MapProfile = mapProfile;
+            linkInfo.ChannelModel = getStructField(mapProfile, 'ChannelModel', '');
+            linkInfos{cursor} = linkInfo;
+        end
+    end
+end
+
+function entry = localScenarioEntry(scenarioConfig, fieldName, idx)
+    entry = struct();
+    if ~isstruct(scenarioConfig) || ~isfield(scenarioConfig, fieldName)
+        return;
+    end
+    collection = scenarioConfig.(fieldName);
+    if iscell(collection) && numel(collection) >= idx
+        entry = collection{idx};
+    elseif isstruct(collection) && numel(collection) >= idx
+        entry = collection(idx);
+    end
 end

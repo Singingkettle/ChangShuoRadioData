@@ -29,6 +29,15 @@ classdef RegionSpectrumSelector
             end
 
             sampleRateHz = resolveSampleRate(receiverConfig);
+            bands = filterBandsByRequiredCarrierRange(bands, sampleRateHz, regulatory);
+            if isempty(bands)
+                range = regulatory.RequiredCarrierFrequencyRangeHz;
+                error('CSRD:Spectrum:NoCarrierCompatibleBands', ...
+                    ['No regulatory bands in region %s tier %s can place ', ...
+                    'the receiver carrier in [%.0f, %.0f] Hz for the current channel model.'], ...
+                    regulatory.RegionId, regulatory.ServiceTier, range(1), range(2));
+            end
+
             anchor = selectMonitoringAnchor(bands, regulatory);
             monitoringCenterHz = selectMonitoringCenter(anchor, sampleRateHz, regulatory);
             receiverPlan = struct( ...
@@ -105,6 +114,20 @@ regulatory.MonitoringBand = struct();
 if isfield(raw, 'MonitoringBand') && isstruct(raw.MonitoringBand)
     regulatory.MonitoringBand = raw.MonitoringBand;
 end
+
+regulatory.RequiredCarrierFrequencyRangeHz = [];
+if isfield(config, 'Runtime') && isstruct(config.Runtime) && ...
+        isfield(config.Runtime, 'RequiredCarrierFrequencyRangeHz') && ...
+        ~isempty(config.Runtime.RequiredCarrierFrequencyRangeHz)
+    range = double(config.Runtime.RequiredCarrierFrequencyRangeHz);
+    if ~isnumeric(range) || numel(range) ~= 2 || ...
+            any(~isfinite(range)) || any(range <= 0) || range(1) >= range(2)
+        error('CSRD:Spectrum:InvalidRequiredCarrierRange', ...
+            'Runtime.RequiredCarrierFrequencyRangeHz must be [min max] positive finite Hz.');
+    end
+    regulatory.RequiredCarrierFrequencyRangeHz = reshape(range, 1, 2);
+end
+
 regulatory.RestrictEmittersToMonitoringBand = isfield(regulatory.MonitoringBand, 'FixedBandId') ...
     && ~isempty(regulatory.MonitoringBand.FixedBandId);
 if isfield(regulatory.MonitoringBand, 'RestrictEmittersToFixedBand') && ...
@@ -176,6 +199,39 @@ bands = allBands(keep);
 end
 
 
+function bands = filterBandsByRequiredCarrierRange(bands, sampleRateHz, regulatory)
+    % filterBandsByRequiredCarrierRange - Apply channel-model carrier support.
+    % 中文说明：按当前传播模型支持的接收机载波范围过滤 monitoring band。
+    % Inputs / 输入: regulatory bands, receiver sample rate, runtime range.
+    % 输出 / Outputs: bands that can place the receiver center in range.
+if isempty(regulatory.RequiredCarrierFrequencyRangeHz)
+    return;
+end
+
+keep = false(size(bands));
+for k = 1:numel(bands)
+    [centerMin, centerMax] = monitoringCenterBounds(bands(k), sampleRateHz, regulatory);
+    supportedRange = regulatory.RequiredCarrierFrequencyRangeHz;
+    keep(k) = max(centerMin, supportedRange(1)) <= min(centerMax, supportedRange(2));
+end
+
+if isfield(regulatory.MonitoringBand, 'FixedBandId') && ...
+        ~isempty(regulatory.MonitoringBand.FixedBandId)
+    fixedId = char(string(regulatory.MonitoringBand.FixedBandId));
+    fixedIdx = find(strcmpi({bands.BandId}, fixedId), 1, 'first');
+    if ~isempty(fixedIdx) && ~keep(fixedIdx)
+        supportedRange = regulatory.RequiredCarrierFrequencyRangeHz;
+        error('CSRD:Spectrum:MonitoringBandCarrierUnsupported', ...
+            ['Fixed monitoring BandId "%s" cannot place receiver carrier ', ...
+            'in [%.0f, %.0f] Hz required by the current channel model.'], ...
+            fixedId, supportedRange(1), supportedRange(2));
+    end
+end
+
+bands = bands(keep);
+end
+
+
 function rank = tierRank(tier)
     % tierRank - Production declaration in CSRD.
     % 中文说明：tierRank 在 CSRD 生产链路中执行对应处理。
@@ -223,23 +279,67 @@ if isfield(regulatory.MonitoringBand, 'CenterFrequencyHz') && ...
         isscalar(regulatory.MonitoringBand.CenterFrequencyHz) && ...
         isfinite(regulatory.MonitoringBand.CenterFrequencyHz)
     centerHz = regulatory.MonitoringBand.CenterFrequencyHz;
+    if ~isempty(regulatory.RequiredCarrierFrequencyRangeHz)
+        supportedRange = regulatory.RequiredCarrierFrequencyRangeHz;
+        if centerHz < supportedRange(1) || centerHz > supportedRange(2)
+            error('CSRD:Spectrum:MonitoringCarrierUnsupported', ...
+                ['MonitoringBand.CenterFrequencyHz %.0f is outside ', ...
+                '[%.0f, %.0f] Hz required by the current channel model.'], ...
+                centerHz, supportedRange(1), supportedRange(2));
+        end
+    end
     return;
 end
 
-window = anchor.FrequencyRangeHz;
+[centerMin, centerMax] = monitoringCenterBounds(anchor, sampleRateHz, regulatory);
+if ~isempty(regulatory.RequiredCarrierFrequencyRangeHz)
+    supportedRange = regulatory.RequiredCarrierFrequencyRangeHz;
+    centerMin = max(centerMin, supportedRange(1));
+    centerMax = min(centerMax, supportedRange(2));
+end
+
+if centerMin > centerMax
+    supportedText = 'unrestricted';
+    if ~isempty(regulatory.RequiredCarrierFrequencyRangeHz)
+        supportedText = sprintf('[%.0f, %.0f] Hz', ...
+            regulatory.RequiredCarrierFrequencyRangeHz(1), ...
+            regulatory.RequiredCarrierFrequencyRangeHz(2));
+    end
+    error('CSRD:Spectrum:NoMonitoringCarrier', ...
+        'Band %s cannot place a monitoring carrier for sample rate %.0f Hz and support %s.', ...
+        anchor.BandId, sampleRateHz, supportedText);
+end
+
+preferredCenterHz = mean(anchor.FrequencyRangeHz);
+if centerMin == centerMax
+    centerHz = centerMin;
+elseif diff(anchor.FrequencyRangeHz) <= sampleRateHz
+    centerHz = min(max(preferredCenterHz, centerMin), centerMax);
+else
+    centerHz = centerMin + rand() * (centerMax - centerMin);
+end
+end
+
+
+function [centerMin, centerMax] = monitoringCenterBounds(anchor, sampleRateHz, regulatory)
+    % monitoringCenterBounds - Receiver center bounds that cover the band.
+    % 中文说明：给定采样率，计算接收机中心频点可覆盖 monitoring band 的范围。
+    %#ok<INUSD> regulatory is kept for signature symmetry with callers.
+window = double(anchor.FrequencyRangeHz);
 if diff(window) <= sampleRateHz
-    centerHz = mean(window);
+    halfSpan = sampleRateHz / 2;
+    centerMin = window(2) - halfSpan;
+    centerMax = window(1) + halfSpan;
+    if centerMin > centerMax
+        centerMin = mean(window);
+        centerMax = centerMin;
+    end
     return;
 end
 
 margin = sampleRateHz / 2;
 centerMin = window(1) + margin;
 centerMax = window(2) - margin;
-if centerMin >= centerMax
-    centerHz = mean(window);
-else
-    centerHz = centerMin + rand() * (centerMax - centerMin);
-end
 end
 
 
@@ -261,14 +361,8 @@ for k = 1:numel(allBands)
     if restrictToBand && ~strcmpi(b.BandId, fixedId)
         continue;
     end
-    bwChoices = usableBandwidths(b, receiverPlan.SampleRateHz, regulatory);
-    if isempty(bwChoices)
-        continue;
-    end
-    minBw = min(bwChoices);
-    low = max(b.FrequencyRangeHz(1) + minBw / 2, rxWindow(1) + minBw / 2);
-    high = min(b.FrequencyRangeHz(2) - minBw / 2, rxWindow(2) - minBw / 2);
-    keep(k) = low <= high;
+    bwChoices = usableBandwidthsForReceiverWindow(b, receiverPlan, regulatory);
+    keep(k) = ~isempty(bwChoices);
 end
 bands = allBands(keep);
 end
@@ -279,10 +373,11 @@ function plan = selectEmitterPlan(band, receiverPlan, catalog, regulatory)
     % 中文说明：selectEmitterPlan 在 CSRD 生产链路中执行对应处理。
     % Inputs / 输入: see signature arguments and local validation.
     % 输出 / Outputs: see signature return values and contract fields.
-bwChoices = usableBandwidths(band, receiverPlan.SampleRateHz, regulatory);
+bwChoices = usableBandwidthsForReceiverWindow(band, receiverPlan, regulatory);
 if isempty(bwChoices)
     error('CSRD:Spectrum:NoUsableBandwidth', ...
-        'Band %s has no bandwidth that fits receiver sample rate %.0f Hz.', ...
+        ['Band %s has no bandwidth/channel center that fits receiver ', ...
+        'sample rate %.0f Hz and monitoring window.'], ...
         band.BandId, receiverPlan.SampleRateHz);
 end
 bw = bwChoices(randi(numel(bwChoices)));
@@ -332,6 +427,49 @@ for k = 1:numel(band.RecommendedBandwidthsHz)
 end
 maxBw = min(diff(band.FrequencyRangeHz), sampleRateHz * regulatory.MaxBandwidthFractionOfSampleRate);
 bwChoices = raw(raw > 0 & raw <= maxBw);
+end
+
+
+function bwChoices = usableBandwidthsForReceiverWindow(band, receiverPlan, regulatory)
+    % usableBandwidthsForReceiverWindow - Candidate bandwidths that can be placed.
+    % 中文说明：只保留在接收机当前监测窗口内存在合法中心频点的带宽。
+raw = usableBandwidths(band, receiverPlan.SampleRateHz, regulatory);
+keep = false(size(raw));
+for k = 1:numel(raw)
+    keep(k) = canPlaceBandwidthInReceiverWindow(band, raw(k), receiverPlan);
+end
+bwChoices = raw(keep);
+end
+
+
+function tf = canPlaceBandwidthInReceiverWindow(band, bandwidthHz, receiverPlan)
+    % canPlaceBandwidthInReceiverWindow - Validate center feasibility.
+    % 中文说明：带宽只有在 band 与接收窗口交集内存在合法中心频点时才可随机选择。
+rxWindow = receiverPlan.MonitoringRangeHz;
+centerMin = max(band.FrequencyRangeHz(1) + bandwidthHz / 2, ...
+    rxWindow(1) + bandwidthHz / 2);
+centerMax = min(band.FrequencyRangeHz(2) - bandwidthHz / 2, ...
+    rxWindow(2) - bandwidthHz / 2);
+if centerMin > centerMax
+    tf = false;
+    return;
+end
+
+if ~isempty(band.ExplicitChannelCentersHz)
+    centers = band.ExplicitChannelCentersHz(:)';
+    tf = any(centers >= centerMin & centers <= centerMax);
+    return;
+end
+
+if band.ChannelRasterHz > 0
+    ref = band.FrequencyRangeHz(1);
+    kMin = ceil((centerMin - ref) / band.ChannelRasterHz);
+    kMax = floor((centerMax - ref) / band.ChannelRasterHz);
+    tf = kMin <= kMax;
+    return;
+end
+
+tf = true;
 end
 
 

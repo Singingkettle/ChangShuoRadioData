@@ -143,7 +143,13 @@ classdef TransmitFactory < matlab.System
                 end
 
                 signalData = inputSignalStruct.Signal;
+                expectedAntennaColumns = resolveExpectedAntennaColumns( ...
+                    inputSignalStruct, txInfoThisTx, signalData);
+                assertAntennaColumns(signalData, expectedAntennaColumns, ...
+                    txIdStr, 'input');
                 processedSignal = step(currentTransmitterBlock, signalData);
+                assertAntennaColumns(processedSignal, expectedAntennaColumns, ...
+                    txIdStr, 'TRF output');
 
                 transmittedSignal = inputSignalStruct;
                 transmittedSignal.Signal = processedSignal;
@@ -157,6 +163,10 @@ classdef TransmitFactory < matlab.System
                 transmittedSignal.RFImpairments.DCOffset = currentTransmitterBlock.DCOffset;
                 transmittedSignal.RFImpairments.IQImbalanceConfig = currentTransmitterBlock.IqImbalanceConfig;
                 transmittedSignal.RFImpairments.PhaseNoiseConfig = currentTransmitterBlock.PhaseNoiseConfig;
+                if isprop(currentTransmitterBlock, 'PhaseNoiseBackend')
+                    transmittedSignal.RFImpairments.PhaseNoiseBackend = ...
+                        currentTransmitterBlock.PhaseNoiseBackend;
+                end
                 transmittedSignal.RFImpairments.NonlinearityConfig = currentTransmitterBlock.MemoryLessNonlinearityConfig;
 
                 obj.logger.debug('Frame %d, Tx %s: Transmission step successful.', frameId, txIdStr);
@@ -240,6 +250,9 @@ classdef TransmitFactory < matlab.System
                 end
 
                 txBlock.PhaseNoiseConfig = phaseConfig;
+                if isfield(phaseField, 'Backend') && isprop(txBlock, 'PhaseNoiseBackend')
+                    txBlock.PhaseNoiseBackend = char(phaseField.Backend);
+                end
                 obj.logger.debug('Set PhaseNoiseConfig: Level=[%s] dBc/Hz, FreqOffset=[%s] Hz', ...
                     num2str(phaseConfig.Level, '%.1f '), num2str(phaseConfig.FrequencyOffset, '%.0f '));
             end
@@ -519,6 +532,46 @@ classdef TransmitFactory < matlab.System
 
     end
 
+end
+
+function expectedColumns = resolveExpectedAntennaColumns(inputSignalStruct, txInfoThisTx, signalData)
+    if isstruct(inputSignalStruct) && isfield(inputSignalStruct, 'NumTransmitAntennas') && ...
+            ~isempty(inputSignalStruct.NumTransmitAntennas)
+        expectedColumns = inputSignalStruct.NumTransmitAntennas;
+    elseif isstruct(txInfoThisTx) && isfield(txInfoThisTx, 'NumTransmitAntennas') && ...
+            ~isempty(txInfoThisTx.NumTransmitAntennas)
+        expectedColumns = txInfoThisTx.NumTransmitAntennas;
+    else
+        expectedColumns = size(signalData, 2);
+    end
+
+    if ~isnumeric(expectedColumns) || ~isscalar(expectedColumns) || ...
+            ~isfinite(expectedColumns) || expectedColumns < 1 || ...
+            expectedColumns ~= round(expectedColumns)
+        error('CSRD:TransmitFactory:InvalidNumTransmitAntennas', ...
+            'TransmitFactory requires a positive integer NumTransmitAntennas.');
+    end
+    expectedColumns = round(double(expectedColumns));
+end
+
+function assertAntennaColumns(signalData, expectedColumns, txIdStr, stageName)
+    if isempty(signalData) || ~isnumeric(signalData) || ndims(signalData) ~= 2
+        error('CSRD:TransmitFactory:InvalidSignalShape', ...
+            'Tx %s %s signal must be a non-empty 2-D numeric matrix.', ...
+            char(string(txIdStr)), stageName);
+    end
+    actualColumns = size(signalData, 2);
+    if actualColumns == expectedColumns
+        return;
+    end
+    signalSize = size(signalData);
+    error('CSRD:TransmitFactory:AntennaColumnMismatch', ...
+        ['Tx %s %s signal has %d columns, but ', ...
+         'NumTransmitAntennas=%d requires exactly %d columns. ', ...
+         'TRF must preserve [samples x txAntennas] shape. ', ...
+         'SignalSize=[%d %d].'], ...
+        char(string(txIdStr)), stageName, actualColumns, ...
+        expectedColumns, expectedColumns, signalSize(1), signalSize(2));
 end
 
 function value = resolveField(s, flatName, nestedAlt)

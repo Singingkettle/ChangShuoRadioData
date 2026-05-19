@@ -114,6 +114,12 @@ classdef TRFSimulator < matlab.System
         %   .Seed - Random seed when using seeded random stream
         PhaseNoiseConfig struct
 
+        % PhaseNoiseBackend: implementation used for oscillator phase noise.
+        % 'FastSpectral' preserves the phase-noise PSD contract without paying
+        % the heavy per-shape initialization cost of comm.PhaseNoise on short
+        % Monte-Carlo frames. 'MathWorks' is retained for explicit comparison.
+        PhaseNoiseBackend char = 'FastSpectral'
+
         % MemoryLessNonlinearityConfig: Structure defining nonlinearity model
         % Contains fields for power amplifier nonlinearity modeling:
         %   .Method - Nonlinearity model type ('Cubic polynomial', 'Hyperbolic tangent', etc.)
@@ -130,13 +136,17 @@ classdef TRFSimulator < matlab.System
         % factory actually configured (e.g. that IIP3 was written to the
         % IIP3 property and not to OIP3).
         IQImbalance               % Function handle applying iqimbal
-        PhaseNoise                % comm.PhaseNoise instance
+        PhaseNoise                % comm.PhaseNoise instance or fast spectral state
         MemoryLessNonlinearity    % comm.MemorylessNonlinearity instance
 
         % Note: DUC-related properties removed in frequency translation upgrade
         % Legacy properties no longer needed:
         % - InterpolationFactor (replaced by flexible resampling)
         % - DUC (replaced by complex exponential frequency translation)
+    end
+
+    properties (Access = private)
+        PhaseNoiseSampleRateHz double = NaN
     end
 
     methods (Access = protected)
@@ -173,7 +183,7 @@ classdef TRFSimulator < matlab.System
                 obj.IqImbalanceConfig.P);
         end
 
-        function phaseNoiseObject = genPhaseNoise(obj)
+        function phaseNoiseObject = genPhaseNoise(obj, sampleRateHz)
             % genPhaseNoise - Generate phase noise system object
             % 中文说明：genPhaseNoise 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -202,21 +212,55 @@ classdef TRFSimulator < matlab.System
             % See also: comm.PhaseNoise (Communications Toolbox)
 
             % https://www.mathworks.com/help/comm/ref/comm.phasenoise-system-object.html
-            phaseNoiseObject = comm.PhaseNoise( ...
-                Level = obj.PhaseNoiseConfig.Level, ...
-                FrequencyOffset = obj.PhaseNoiseConfig.FrequencyOffset, ...
-                SampleRate = obj.SampleRate);
-
-            % Configure optional random stream settings for reproducibility
-            if isfield(obj.PhaseNoiseConfig, 'RandomStream')
-
-                if strcmp(obj.PhaseNoiseConfig.RandomStream, 'mt19937ar with seed')
-                    phaseNoiseObject.RandomStream = "mt19937ar with seed";
-                    phaseNoiseObject.Seed = obj.PhaseNoiseConfig.Seed;
-                end
-
+            if nargin < 2 || isempty(sampleRateHz)
+                sampleRateHz = obj.SampleRate;
             end
 
+            backend = char(obj.PhaseNoiseBackend);
+            if strcmpi(backend, 'MathWorks')
+                phaseNoiseObject = comm.PhaseNoise( ...
+                    Level = obj.PhaseNoiseConfig.Level, ...
+                    FrequencyOffset = obj.PhaseNoiseConfig.FrequencyOffset, ...
+                    SampleRate = sampleRateHz);
+
+                % Configure optional random stream settings for reproducibility
+                if isfield(obj.PhaseNoiseConfig, 'RandomStream')
+
+                    if strcmp(obj.PhaseNoiseConfig.RandomStream, 'mt19937ar with seed')
+                        phaseNoiseObject.RandomStream = "mt19937ar with seed";
+                        phaseNoiseObject.Seed = obj.PhaseNoiseConfig.Seed;
+                    end
+
+                end
+                return;
+            end
+
+            if ~strcmpi(backend, 'FastSpectral')
+                error('CSRD:TRF:UnknownPhaseNoiseBackend', ...
+                    'PhaseNoiseBackend must be ''FastSpectral'' or ''MathWorks'', got "%s".', ...
+                    backend);
+            end
+
+            phaseNoiseObject = struct( ...
+                'Backend', 'FastSpectral', ...
+                'SampleRate', double(sampleRateHz), ...
+                'Level', double(obj.PhaseNoiseConfig.Level(:).'), ...
+                'FrequencyOffset', double(obj.PhaseNoiseConfig.FrequencyOffset(:).'), ...
+                'RandomStream', '', ...
+                'Seed', [], ...
+                'Stream', []);
+
+            if isfield(obj.PhaseNoiseConfig, 'RandomStream') && ...
+                    strcmp(obj.PhaseNoiseConfig.RandomStream, 'mt19937ar with seed')
+                if ~isfield(obj.PhaseNoiseConfig, 'Seed') || isempty(obj.PhaseNoiseConfig.Seed)
+                    error('CSRD:TRF:MissingPhaseNoiseSeed', ...
+                        'PhaseNoiseConfig.Seed is required when RandomStream is mt19937ar with seed.');
+                end
+                phaseNoiseObject.RandomStream = 'mt19937ar with seed';
+                phaseNoiseObject.Seed = double(obj.PhaseNoiseConfig.Seed);
+                phaseNoiseObject.Stream = RandStream('mt19937ar', ...
+                    'Seed', phaseNoiseObject.Seed);
+            end
         end
 
         function nonlinearityObject = genMemoryLessNonlinearity(obj)
@@ -365,7 +409,8 @@ classdef TRFSimulator < matlab.System
 
             % Initialize RF impairment models
             obj.IQImbalance = obj.genIqImbalance;
-            obj.PhaseNoise = obj.genPhaseNoise;
+            obj.PhaseNoise = obj.genPhaseNoise(obj.SampleRate);
+            obj.PhaseNoiseSampleRateHz = obj.SampleRate;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
         end
 
@@ -496,17 +541,17 @@ classdef TRFSimulator < matlab.System
                         upsampleFactor, downsampleFactor, maxFactor);
                 end
 
-                if size(inputSignal, 2) == 1
-                    resampledSignal = resample(inputSignal, upsampleFactor, downsampleFactor);
+                % MATLAB resample operates along the first dimension for
+                % normal matrix inputs, treating columns as independent
+                % channels. A 1-by-N short-frame matrix is a special case:
+                % resample treats it as one row vector and expands the
+                % antenna axis, so preserve the columns explicitly there.
+                if size(inputSignal, 1) == 1
+                    resampledSignal = resampleOneSampleAntennaMatrix( ...
+                        inputSignal, upsampleFactor, downsampleFactor);
                 else
-                    numAntennas = size(inputSignal, 2);
-                    outputLength = ceil(size(inputSignal, 1) * upsampleFactor / downsampleFactor);
-                    resampledSignal = zeros(outputLength, numAntennas);
-
-                    for antennaIdx = 1:numAntennas
-                        resampledSignal(:, antennaIdx) = resample(inputSignal(:, antennaIdx), upsampleFactor, downsampleFactor);
-                    end
-
+                    resampledSignal = resample(inputSignal, ...
+                        upsampleFactor, downsampleFactor);
                 end
 
             end
@@ -563,30 +608,64 @@ classdef TRFSimulator < matlab.System
             basebandData = inputSignal;
             carrierFreq = obj.CarrierFrequency;
             inputSampleRate = obj.SampleRate;
+            traceMeta = struct( ...
+                'InputSamples', size(basebandData, 1), ...
+                'InputColumns', size(basebandData, 2), ...
+                'InputSampleRate', double(inputSampleRate), ...
+                'TargetSampleRate', double(obj.TargetSampleRate), ...
+                'CarrierFrequency', double(carrierFreq));
 
             % Step 1: Apply IQ imbalance to simulate quadrature imperfections
+            stageStart = tic;
             processedSignal = obj.IQImbalance(basebandData);
+            csrd.runtime.performance.trace('event', 'TRF.IQImbalance', ...
+                toc(stageStart), traceMeta);
 
             % Step 2: Add DC offset to model transmitter bias and LO leakage
+            stageStart = tic;
             processedSignal = processedSignal + 10 ^ (obj.DCOffset / 10);
+            csrd.runtime.performance.trace('event', 'TRF.DCOffset', ...
+                toc(stageStart), traceMeta);
 
-            % Step 3: Apply phase noise to simulate oscillator imperfections
-            release(obj.PhaseNoise);
-            processedSignal = obj.PhaseNoise(processedSignal);
+            % Step 3: Apply oscillator phase noise on the current baseband grid.
+            % 中文说明：PhaseNoise 与当前信号采样网格绑定；不要每帧重建，也不要为了
+            % “看起来统一”强行搬到目标采样率，实测会显著增加短帧 setup 成本。
+            obj.ensurePhaseNoiseSampleRate(inputSampleRate);
+            stageStart = tic;
+            processedSignal = obj.applyPhaseNoise(processedSignal);
+            phaseMeta = traceMeta;
+            phaseMeta.InputSamples = size(processedSignal, 1);
+            phaseMeta.InputSampleRate = double(inputSampleRate);
+            csrd.runtime.performance.trace('event', 'TRF.PhaseNoise', ...
+                toc(stageStart), phaseMeta);
 
             % Step 4: Apply memoryless nonlinearity to model power amplifier characteristics
-            processedSignal = obj.MemoryLessNonlinearity(processedSignal);
+            stageStart = tic;
+            processedSignal = obj.applyMemorylessNonlinearity(processedSignal);
+            csrd.runtime.performance.trace('event', 'TRF.MemorylessNonlinearity', ...
+                toc(stageStart), traceMeta);
 
-            % Step 5: Resample to the receiver observation rate first.
+            % Step 5: Resample to the receiver observation rate.
             % 中文说明：先升采样到接收机观测采样率，避免高频点在调制器低采样率下混叠。
+            stageStart = tic;
             resampledSignal = obj.resampleToTarget(processedSignal, inputSampleRate);
+            resampleMeta = traceMeta;
+            resampleMeta.OutputSamples = size(resampledSignal, 1);
+            csrd.runtime.performance.trace('event', 'TRF.ResampleToTarget', ...
+                toc(stageStart), resampleMeta);
 
             % Step 6: Translate on the target-rate grid used by ReceiverView.
             % 中文说明：频移必须在 TargetSampleRate 网格上执行，才能与标注中的频点一致。
+            stageStart = tic;
             frequencyTranslatedSignal = obj.frequencyTranslate( ...
                 resampledSignal, carrierFreq, obj.TargetSampleRate);
+            translateMeta = traceMeta;
+            translateMeta.InputSamples = size(resampledSignal, 1);
+            csrd.runtime.performance.trace('event', 'TRF.FrequencyTranslate', ...
+                toc(stageStart), translateMeta);
 
             % Step 7: Apply final power scaling to achieve desired transmission power
+            stageStart = tic;
             signalDuration = size(frequencyTranslatedSignal, 1) / obj.TargetSampleRate;
             signalPower = mean(abs(frequencyTranslatedSignal(:)) .^ 2);
 
@@ -598,9 +677,194 @@ classdef TRFSimulator < matlab.System
                 scalingFactor = 1;
             end
             finalSignal = frequencyTranslatedSignal * scalingFactor;
+            powerMeta = traceMeta;
+            powerMeta.OutputSamples = size(finalSignal, 1);
+            powerMeta.SignalDurationSec = signalDuration;
+            csrd.runtime.performance.trace('event', 'TRF.PowerScaling', ...
+                toc(stageStart), powerMeta);
 
             outputSignal = finalSignal;
 
+        end
+
+        function outputSignal = applyPhaseNoise(obj, inputSignal)
+            % applyPhaseNoise - Apply configured oscillator phase noise backend.
+            if isa(obj.PhaseNoise, 'matlab.System')
+                outputSignal = obj.PhaseNoise(inputSignal);
+                return;
+            end
+
+            outputSignal = obj.applyFastSpectralPhaseNoise(inputSignal);
+        end
+
+        function outputSignal = applyMemorylessNonlinearity(obj, inputSignal)
+            % applyMemorylessNonlinearity - Apply PA model per antenna column.
+            %
+            % comm.MemorylessNonlinearity is physically memoryless. Applying it
+            % column-by-column is equivalent for independent antenna streams and
+            % avoids a MATLAB internal matrix-input path that can throw
+            % "left and right sides have a different number of elements" for
+            % some Saleh/Ghorbani/Rapp configurations.
+            if size(inputSignal, 2) <= 1
+                outputSignal = obj.MemoryLessNonlinearity(inputSignal);
+                return;
+            end
+
+            outputSignal = zeros(size(inputSignal), 'like', inputSignal);
+            for col = 1:size(inputSignal, 2)
+                outputSignal(:, col) = obj.MemoryLessNonlinearity(inputSignal(:, col));
+            end
+        end
+
+        function outputSignal = applyFastSpectralPhaseNoise(obj, inputSignal)
+            % applyFastSpectralPhaseNoise - Fast PSD-mask phase noise synthesis.
+            %
+            % MathWorks comm.PhaseNoise models y_k = x_k exp(j phi_k), where
+            % phi_k is filtered Gaussian noise following the configured phase
+            % noise mask. For CSRD short frames, the official System object can
+            % spend minutes priming FIR/cascade filters for each sample-rate and
+            % channel shape. This implementation keeps the same exported RF
+            % contract by synthesizing phi_k directly in the frequency domain
+            % from the dBc/Hz mask, then applying exp(j phi_k).
+            numSamples = size(inputSignal, 1);
+            numChannels = size(inputSignal, 2);
+            if numSamples == 0 || numChannels == 0
+                outputSignal = inputSignal;
+                return;
+            end
+
+            phaseState = obj.PhaseNoise;
+            sampleRateHz = double(phaseState.SampleRate);
+            levelsDbcHz = double(phaseState.Level(:));
+            offsetsHz = double(phaseState.FrequencyOffset(:));
+            obj.validateFastPhaseNoiseMask(levelsDbcHz, offsetsHz, sampleRateHz);
+
+            positiveBins = floor(numSamples / 2);
+            spectrum = complex(zeros(numSamples, numChannels));
+
+            if positiveBins >= 1
+                binIdx = (2:(positiveBins + 1)).';
+                freqsHz = (binIdx - 1) * sampleRateHz / numSamples;
+                twoSidedPsd = obj.phaseNoiseTwoSidedPsd( ...
+                    freqsHz, offsetsHz, levelsDbcHz);
+                sigma = sqrt(twoSidedPsd * sampleRateHz * numSamples);
+                noiseSpec = obj.randnLikePhaseNoise(numel(binIdx), numChannels);
+                spectrum(binIdx, :) = sigma .* noiseSpec;
+
+                mirrorIdx = numSamples - binIdx + 2;
+                validMirror = mirrorIdx >= 1 & mirrorIdx <= numSamples & ...
+                    mirrorIdx ~= binIdx;
+                spectrum(mirrorIdx(validMirror), :) = ...
+                    conj(spectrum(binIdx(validMirror), :));
+            end
+
+            if mod(numSamples, 2) == 0
+                nyquistIdx = numSamples / 2 + 1;
+                nyquistFreq = sampleRateHz / 2;
+                twoSidedPsd = obj.phaseNoiseTwoSidedPsd( ...
+                    nyquistFreq, offsetsHz, levelsDbcHz);
+                sigma = sqrt(twoSidedPsd * sampleRateHz * numSamples);
+                spectrum(nyquistIdx, :) = sigma .* ...
+                    obj.randnLikePhaseNoise(1, numChannels, true);
+            end
+
+            phaseRad = real(ifft(spectrum, [], 1));
+            outputSignal = inputSignal .* exp(1j * phaseRad);
+        end
+
+        function noiseValues = randnLikePhaseNoise(obj, numRows, numCols, realOnly)
+            if nargin < 4
+                realOnly = false;
+            end
+            phaseState = obj.PhaseNoise;
+            if isstruct(phaseState) && isfield(phaseState, 'Stream') && ...
+                    ~isempty(phaseState.Stream)
+                if realOnly
+                    noiseValues = randn(phaseState.Stream, numRows, numCols);
+                else
+                    noiseValues = (randn(phaseState.Stream, numRows, numCols) + ...
+                        1j * randn(phaseState.Stream, numRows, numCols)) / sqrt(2);
+                end
+            else
+                if realOnly
+                    noiseValues = randn(numRows, numCols);
+                else
+                    noiseValues = (randn(numRows, numCols) + ...
+                        1j * randn(numRows, numCols)) / sqrt(2);
+                end
+            end
+        end
+
+        function validateFastPhaseNoiseMask(~, levelsDbcHz, offsetsHz, sampleRateHz)
+            if isempty(levelsDbcHz) || isempty(offsetsHz) || ...
+                    numel(levelsDbcHz) ~= numel(offsetsHz)
+                error('CSRD:TRF:InvalidPhaseNoiseMask', ...
+                    'PhaseNoise Level and FrequencyOffset must be nonempty vectors of equal length.');
+            end
+            if any(~isfinite(levelsDbcHz)) || any(levelsDbcHz >= 0)
+                error('CSRD:TRF:InvalidPhaseNoiseLevel', ...
+                    'PhaseNoise Level values must be finite negative dBc/Hz values.');
+            end
+            if any(~isfinite(offsetsHz)) || any(offsetsHz <= 0) || ...
+                    any(diff(offsetsHz) <= 0)
+                error('CSRD:TRF:InvalidPhaseNoiseOffset', ...
+                    'PhaseNoise FrequencyOffset values must be positive and strictly increasing.');
+            end
+            if sampleRateHz <= 2 * max(offsetsHz)
+                error('CSRD:TRF:InvalidPhaseNoiseSampleRate', ...
+                    ['PhaseNoise SampleRate %.15g Hz must be greater than ', ...
+                     'two times the maximum FrequencyOffset %.15g Hz.'], ...
+                    sampleRateHz, max(offsetsHz));
+            end
+        end
+
+        function twoSidedPsd = phaseNoiseTwoSidedPsd(~, freqsHz, offsetsHz, levelsDbcHz)
+            freqsHz = max(double(freqsHz), eps);
+            if numel(offsetsHz) == 1
+                % Scalar masks use the documented 1/f characteristic that
+                % passes through the configured offset/level point.
+                levelsAtFreq = levelsDbcHz(1) - ...
+                    10 * log10(freqsHz ./ offsetsHz(1));
+                twoSidedPsd = 10 .^ (levelsAtFreq ./ 10);
+                return;
+            end
+
+            levelsAtFreq = interp1(log10(offsetsHz), levelsDbcHz, ...
+                log10(freqsHz), 'linear', 'extrap');
+
+            below = freqsHz < offsetsHz(1);
+            if any(below)
+                % Match the documented low-frequency 1/f^3 behavior below
+                % the smallest mask point until the discrete frame resolution.
+                levelsAtFreq(below) = levelsDbcHz(1) - ...
+                    30 * log10(freqsHz(below) ./ offsetsHz(1));
+            end
+
+            above = freqsHz > offsetsHz(end);
+            if any(above)
+                levelsAtFreq(above) = levelsDbcHz(end);
+            end
+
+            % SSB phase noise L(f) relates to phase PSD by
+            % S_phi_one_sided(f) ~= 2*10^(L/10). The two-sided PSD used by
+            % the FFT synthesis is therefore 10^(L/10) rad^2/Hz.
+            twoSidedPsd = 10 .^ (levelsAtFreq ./ 10);
+        end
+
+        function ensurePhaseNoiseSampleRate(obj, inputSampleRate)
+            % ensurePhaseNoiseSampleRate - Keep phase noise object on active grid.
+            % 中文说明：PhaseNoise 的 SampleRate 必须跟当前处理网格一致，且不能每帧重建。
+            if isempty(obj.PhaseNoise) || ...
+                    ~isfinite(obj.PhaseNoiseSampleRateHz) || ...
+                    abs(obj.PhaseNoiseSampleRateHz - inputSampleRate) > ...
+                        max(1e-9, 1e-12 * inputSampleRate)
+                if ~isempty(obj.PhaseNoise) && isa(obj.PhaseNoise, 'matlab.System') && ...
+                        isLocked(obj.PhaseNoise)
+                    release(obj.PhaseNoise);
+                end
+                obj.PhaseNoise = obj.genPhaseNoise(inputSampleRate);
+                obj.PhaseNoiseSampleRateHz = inputSampleRate;
+            end
         end
 
     end
@@ -653,4 +917,22 @@ classdef TRFSimulator < matlab.System
 
     end
 
+end
+
+function y = resampleOneSampleAntennaMatrix(x, upsampleFactor, downsampleFactor)
+%RESAMPLEONESAMPLEANTENNAMATRIX Preserve antenna columns for 1-sample frames.
+% MATLAB resample treats a 1-by-N matrix as one row-vector channel. In this
+% edge case, resample each antenna stream independently so the output remains
+% samples-by-antennas for downstream channel objects.
+
+    numAntennas = size(x, 2);
+    firstColumn = resample(x(:, 1), upsampleFactor, downsampleFactor);
+    firstColumn = firstColumn(:);
+    y = zeros(numel(firstColumn), numAntennas, 'like', firstColumn);
+    y(:, 1) = firstColumn;
+    for colIdx = 2:numAntennas
+        resampledColumn = resample(x(:, colIdx), ...
+            upsampleFactor, downsampleFactor);
+        y(:, colIdx) = resampledColumn(:);
+    end
 end

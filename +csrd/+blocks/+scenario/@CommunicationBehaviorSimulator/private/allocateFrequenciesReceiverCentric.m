@@ -71,9 +71,27 @@ function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txC
             end
 
             if ~placed
-                % Force placement if no non-overlapping position found
-                centerFreq = randomInRange(obj, minCenter, maxCenter);
-                obj.logger.warning('Could not avoid overlap for transmitter %s', txConfig.EntityID);
+                centerFreq = localFindNonOverlappingCenter(obj, txBW, ...
+                    minCenter, maxCenter, usedRanges);
+                if isfinite(centerFreq)
+                    proposedRange = [centerFreq - txBW / 2, centerFreq + txBW / 2];
+                    usedRanges = [usedRanges; proposedRange]; %#ok<AGROW>
+                    placed = true;
+                elseif isfield(globalLayout, 'OverlapAllowed') && ...
+                        isequal(globalLayout.OverlapAllowed, true)
+                    centerFreq = randomInRange(obj, minCenter, maxCenter);
+                    globalLayout.OverlapOccurred = true;
+                    obj.logger.warning(['Could not avoid overlap for transmitter %s; ', ...
+                        'using explicit overlap policy "%s".'], ...
+                        txConfig.EntityID, ...
+                        string(getStructField(globalLayout, 'OverlapReason', '')));
+                else
+                    error('CSRD:Scenario:FrequencyPlacementFailed', ...
+                        ['Could not place transmitter %s without overlap after ', ...
+                         '%d random attempts plus deterministic gap search. ', ...
+                         'Default generation does not silently overlap spectrum.'], ...
+                        txConfig.EntityID, maxAttempts);
+                end
             end
 
         end
@@ -100,4 +118,48 @@ function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txC
             txConfig.Spectrum.UpperBound / 1e6, txConfig.EntityID, numel(txConfig.ReceiverViews));
     end
 
+end
+
+function centerFreq = localFindNonOverlappingCenter(obj, txBW, minCenter, ...
+        maxCenter, usedRanges)
+%LOCALFINDNONOVERLAPPINGCENTER Deterministic fallback for finite gap search.
+% 中文说明：随机放置失败时仍先精确找可行间隙，而不是直接制造频谱重叠。
+centerFreq = NaN;
+if isempty(usedRanges)
+    centerFreq = (minCenter + maxCenter) / 2;
+    return;
+end
+minSeparation = obj.Config.FrequencyAllocation.MinSeparation;
+candidateCenters = [minCenter, maxCenter, (minCenter + maxCenter) / 2];
+for idx = 1:size(usedRanges, 1)
+    candidateCenters(end + 1) = usedRanges(idx, 1) - minSeparation - txBW / 2; %#ok<AGROW>
+    candidateCenters(end + 1) = usedRanges(idx, 2) + minSeparation + txBW / 2; %#ok<AGROW>
+end
+candidateCenters = unique(candidateCenters(isfinite(candidateCenters)));
+candidateCenters = candidateCenters(candidateCenters >= minCenter & ...
+    candidateCenters <= maxCenter);
+candidateCenters = sort(candidateCenters);
+for idx = 1:numel(candidateCenters)
+    proposedRange = [candidateCenters(idx) - txBW / 2, ...
+        candidateCenters(idx) + txBW / 2];
+    hasOverlap = false;
+    for usedIdx = 1:size(usedRanges, 1)
+        if checkFrequencyOverlap(obj, proposedRange, usedRanges(usedIdx, :))
+            hasOverlap = true;
+            break;
+        end
+    end
+    if ~hasOverlap
+        centerFreq = candidateCenters(idx);
+        return;
+    end
+end
+end
+
+function value = getStructField(s, fieldName, defaultValue)
+if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
+    value = s.(fieldName);
+else
+    value = defaultValue;
+end
 end

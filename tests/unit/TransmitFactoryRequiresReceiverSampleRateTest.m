@@ -38,6 +38,22 @@ classdef TransmitFactoryRequiresReceiverSampleRateTest < matlab.unittest.TestCas
 
             testCase.verifyEqual(out.SampleRate, 2e6);
         end
+
+        function antennaColumnMismatchFailsFast(testCase)
+            cfg = localTxFactoryConfig();
+            factory = csrd.factories.TransmitFactory('Config', cfg);
+            cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
+
+            txScenario = struct('Type', 'Simulation', 'ID', 'Tx1', ...
+                'Spectrum', struct('ReceiverSampleRate', 2e6));
+            input = localInput();
+            input.NumTransmitAntennas = 2;
+            input.Signal = complex(ones(64, 3));
+
+            testCase.verifyError(@() step(factory, input, 1, ...
+                localTxInfo(), txScenario), ...
+                'CSRD:TransmitFactory:AntennaColumnMismatch');
+        end
     end
 end
 

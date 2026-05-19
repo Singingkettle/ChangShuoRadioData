@@ -5,18 +5,11 @@ function obstacles = generateStaticObstacles(obj)
     % Output Arguments:
     %   obstacles - Array of obstacle structures with position and size
 
-    % Check if boundaries exist, if not use default
-    if isfield(obj.mapData, 'Boundaries') && ~isempty(obj.mapData.Boundaries)
-        bounds = obj.mapData.Boundaries;
-    else
-        % Use default boundaries if not set
-        obj.logger.warning('Map boundaries not set, using default boundaries for obstacle generation');
-        bounds = struct( ...
-            'MinLatitude', -1000, ...
-            'MaxLatitude', 1000, ...
-            'MinLongitude', -1000, ...
-            'MaxLongitude', 1000);
+    if ~isfield(obj.mapData, 'Boundaries') || isempty(obj.mapData.Boundaries)
+        error('CSRD:Construction:MissingMapBoundaries', ...
+            'generateStaticObstacles requires explicit map boundaries.');
     end
+    bounds = obj.mapData.Boundaries;
 
     numObstacles = randi([5, 15]);
     obstacles = [];
@@ -25,17 +18,18 @@ function obstacles = generateStaticObstacles(obj)
         obstacle = struct();
 
         if isfield(bounds, 'MinLatitude')
-            % OSM-style boundaries
-            obstacle.center = [
-                               randomInRange(obj, bounds.MinLongitude, bounds.MaxLongitude),
-                               randomInRange(obj, bounds.MinLatitude, bounds.MaxLatitude)
-                               ];
+            latDeg = randomInRange(obj, bounds.MinLatitude, bounds.MaxLatitude);
+            lonDeg = randomInRange(obj, bounds.MinLongitude, bounds.MaxLongitude);
+            obstacle.center = geoToLocalMeters(latDeg, lonDeg, bounds);
+            obstacle.geoCenterDeg = [latDeg, lonDeg];
+            obstacle.PositionUnit = 'meters';
         else
-            % Grid-style boundaries
             obstacle.center = [
                                randomInRange(obj, bounds(1), bounds(2)),
                                randomInRange(obj, bounds(3), bounds(4))
                                ];
+            obstacle.geoCenterDeg = [];
+            obstacle.PositionUnit = 'meters';
         end
 
         obstacle.radius = randomInRange(obj, 20, 100); % meters

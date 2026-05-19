@@ -43,6 +43,7 @@ classdef ScenarioMapChannelModelPropagationTest < matlab.unittest.TestCase
             phys.Environment.MapType = 'OSM';
             phys.Environment.OSMMapFile = emptyOsm;
             phys.Environment.ChannelModel = 'AWGN';
+            phys.TimeResolution = cfg.Global.FrameDuration;
 
             simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator( ...
                 'Config', phys);

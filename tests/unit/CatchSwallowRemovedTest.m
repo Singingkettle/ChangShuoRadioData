@@ -121,7 +121,7 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
 
         % ---------- isScenarioSkipException contract -------------------
 
-        function constructionMissingIdentifiersAreScenarioSkippable(testCase)
+        function constructionMissingIdentifiersAreHardFailures(testCase)
             ids = { ...
                 'CSRD:Construction:MissingMessageConfig', ...
                 'CSRD:Construction:MissingModulationConfig', ...
@@ -148,8 +148,8 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
             for k = 1:numel(ids)
                 me = MException(ids{k}, 'phase3 contract probe');
                 tf = csrd.pipeline.scenario.isScenarioSkipException(me);
-                testCase.verifyTrue(tf, sprintf( ...
-                    'Phase 3 §3.4: %s must be on the scenario-skip whitelist.', ids{k}));
+                testCase.verifyFalse(tf, sprintf( ...
+                    'Phase 20: %s must be counted as failure, not scenario skip.', ids{k}));
             end
         end
 

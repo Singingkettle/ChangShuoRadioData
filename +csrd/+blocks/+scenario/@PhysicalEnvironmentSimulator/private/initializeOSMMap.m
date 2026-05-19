@@ -4,7 +4,9 @@ function initializeOSMMap(obj)
     % 输出 / Outputs: see signature return values and contract fields.
     % 中文说明：提供 CSRD 生产链路中的 initializeOSMMap 实现。
     %
-    % Loads OSM file and creates site viewer for ray tracing channel modeling
+    % Loads lightweight OSM metadata. The heavy siteviewer/map handle is
+    % owned by the RayTracing channel block so one OSM file is not loaded
+    % once by the physical layer and again by the propagation layer.
 
     osmFile = '';
 
@@ -70,9 +72,21 @@ function initializeOSMMap(obj)
         obj.mapData.Boundaries = defaultBoundaries;
     end
 
+    osmConfig = getOSMConfig(obj);
+    if isfield(osmConfig, 'MaxFileSizeMB') && ~isempty(osmConfig.MaxFileSizeMB)
+        error('CSRD:Scenario:DeprecatedOsmSizeCap', ...
+            ['PhysicalEnvironment.Map.OSM.MaxFileSizeMB is deprecated. ', ...
+             'OSM file selection must use file-level balanced coverage, not size caps.']);
+    end
+    osmFileSizeMB = getFieldOrDefault(osmConfig, ...
+        'SelectedFileSizeMB', localFileSizeMB(osmFile));
+    selectionPolicy = getFieldOrDefault(osmConfig, ...
+        'SelectionPolicy', 'Unknown');
+    coverageOrdinal = getFieldOrDefault(osmConfig, 'CoverageOrdinal', NaN);
+    candidateFileCount = getFieldOrDefault(osmConfig, 'CandidateFileCount', NaN);
+
     % Check if OSM file contains building data before loading
     hasBuildingData = checkOSMHasBuildings(obj, osmFile);
-    osmConfig = getOSMConfig(obj);
     emptyGeometryPolicy = getFieldOrDefault(osmConfig, 'EmptyGeometryPolicy', 'FlatTerrain');
     flatTerrainConfig = getFieldOrDefault(osmConfig, 'FlatTerrain', struct());
     flatTerrain = getFieldOrDefault(flatTerrainConfig, 'Terrain', 'none');
@@ -83,17 +97,23 @@ function initializeOSMMap(obj)
     try
 
         if hasBuildingData
-            obj.logger.debug('OSM file contains building data, loading with buildings');
-            obj.siteViewer = siteviewer('Basemap', 'openstreetmap', ...
-                'Buildings', osmFile, ...
-                'Hidden', true);
-            obj.logger.debug('OSM map loaded successfully with buildings');
+            obj.logger.debug(['OSM file contains building data; deferring ', ...
+                'heavy map handle creation to RayTracing.']);
+            obj.siteViewer = [];
             obj.Config.Map.Type = 'OSM';
             obj.Config.Map.OSMFile = osmFile;
             obj.Config.Map.HasBuildings = true;
 
             mapProfile = buildMapProfile('OSMBuildings', osmFile, true, ...
-                'gmted2010', 'auto', [], obj.mapData.Boundaries, channelModel);
+                'none', 'concrete', [], obj.mapData.Boundaries, channelModel);
+            mapProfile = stampOsmRuntimeMetadata(mapProfile, osmFileSizeMB, ...
+                selectionPolicy, coverageOrdinal, candidateFileCount);
+            mapProfile.MapResourcePolicy = 'LazyRayTracingSiteViewer';
+            mapProfile.TerrainPolicy = 'NoOnlineTerrainForBatchRayTracing';
+            mapProfile.MaterialPolicy = 'OverrideUnsupportedOsmMaterials';
+            mapProfile.MaterialSanitizationPolicy = 'UnsupportedOsmMaterialsBecomeConcreteCopy';
+            mapProfile.BuildingsMaterial = 'concrete';
+            mapProfile.SurfaceMaterial = 'plasterboard';
             obj.mapData.MapProfile = mapProfile;
             obj.Config.Map.MapProfile = mapProfile;
             obj.Config.Environment.MapProfile = mapProfile;
@@ -116,6 +136,9 @@ function initializeOSMMap(obj)
             mapProfile = buildMapProfile('FlatTerrain', osmFile, false, ...
                 flatTerrain, flatTerrainMaterial, flatMaxReflections, ...
                 obj.mapData.Boundaries, channelModel);
+            mapProfile = stampOsmRuntimeMetadata(mapProfile, osmFileSizeMB, ...
+                selectionPolicy, coverageOrdinal, candidateFileCount);
+            mapProfile.MapResourcePolicy = 'NoSiteViewer';
             obj.mapData.MapProfile = mapProfile;
             obj.Config.Map.MapProfile = mapProfile;
             obj.Config.Environment.MapProfile = mapProfile;
@@ -129,13 +152,13 @@ function initializeOSMMap(obj)
         end
 
         if strcmpi(channelModel, 'RayTracing')
-            error('PhysicalEnvironmentSimulator:OSMBuildingRayTracingUnavailable', ...
-                ['Failed to create OSM building site viewer for RayTracing: %s. ', ...
-                 'This environment limitation must be handled as an explicit skip ', ...
-                 'or annotated fallback by the caller.'], ME_viewer.message);
+            error('PhysicalEnvironmentSimulator:OSMMetadataUnavailable', ...
+                ['Failed to initialize OSM metadata for RayTracing: %s. ', ...
+                 'Do not silently downgrade a RayTracing scenario to ', ...
+                 'statistical propagation.'], ME_viewer.message);
         end
 
-        obj.logger.error('Failed to create site viewer: %s. Using configured statistical mode.', ME_viewer.message);
+        obj.logger.error('Failed to initialize OSM metadata: %s. Using configured statistical mode.', ME_viewer.message);
         initializeStatisticalMap(obj);
     end
 
@@ -198,4 +221,25 @@ function mapProfile = buildMapProfile(mode, osmFile, hasBuildings, ...
     mapProfile.MaxNumReflections = maxNumReflections;
     mapProfile.ChannelModel = channelModel;
     mapProfile.Boundaries = boundaries;
+end
+
+function mapProfile = stampOsmRuntimeMetadata(mapProfile, osmFileSizeMB, ...
+        selectionPolicy, coverageOrdinal, candidateFileCount)
+    %STAMPOSMRUNTIMEMETADATA Attach OSM file-coverage provenance.
+    % 中文说明：这些字段进入 MapProfile，供 RayTracing trace 和 annotation 使用。
+    mapProfile.OSMFileSizeMB = osmFileSizeMB;
+    mapProfile.SelectionPolicy = char(string(selectionPolicy));
+    mapProfile.CoverageOrdinal = coverageOrdinal;
+    mapProfile.CandidateFileCount = candidateFileCount;
+end
+
+function sizeMB = localFileSizeMB(pathText)
+    sizeMB = NaN;
+    if isempty(pathText)
+        return;
+    end
+    info = dir(char(string(pathText)));
+    if ~isempty(info)
+        sizeMB = double(info.bytes) / 1024 / 1024;
+    end
 end

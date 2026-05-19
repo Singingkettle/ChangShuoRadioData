@@ -96,6 +96,21 @@ classdef SimulationRunner < matlab.System
         % annotation under Header.Runtime.LogPolicy so post-hoc analyses
         % can tell which logging tier produced a given annotation file.
         logPolicyDescription
+
+        % Phase 21 performance trace. Disabled by default; when enabled by
+        % Runner.Performance.EnableStageTiming it records low-overhead stage
+        % wallclock into ignored artifacts/performance/phase21/.
+        performanceEnabled logical = false
+        performanceTrace struct = struct()
+        performanceArtifactDirectory char = ''
+        performanceRawEventLimit (1, 1) double = 5000
+        performancePartialWriteInterval (1, 1) double = 1
+        performanceHeartbeatEnabled logical = false
+
+        % Resolved seed used for deterministic scenario scheduling. For
+        % Runner.RandomSeed='shuffle' this is derived from the post-shuffle
+        % RNG state so file coverage order changes with the shuffled run.
+        resolvedRuntimeSeed (1, 1) double = 0
     end
 
     methods
@@ -146,25 +161,36 @@ classdef SimulationRunner < matlab.System
             % calculates total frames automatically, accesses the global logging system,
             % creates necessary directories, and prepares for scenario-based execution.
 
+            setupStartTime = tic;
+
             % Initialize logger from GlobalLogManager
             obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
+            obj.configurePerformanceTracing();
+            csrd.runtime.map.osmSiteViewerCache('clear');
+            csrd.runtime.map.osmSiteViewerCache('retain', true);
 
             % --- Phase 0 change #2: apply LogPolicy ---
             % Order matters: apply BEFORE the first debug() so the very
             % next line is already filtered correctly when running under
             % LargeMC. See phase-0-baseline.md §6.2.
+            stageStart = tic;
             obj.applyLogPolicyFromConfig();
+            obj.recordPerformanceStage('Runner.ApplyLogPolicy', toc(stageStart), struct());
 
             obj.logger.debug('SimulationRunner setupImpl started. Initializing scenario-driven execution...');
 
+            stageStart = tic;
             obj.validateConfiguration();
             obj.normalizeAndValidateFactoryRuntimeContracts();
+            obj.recordPerformanceStage('Runner.ValidateConfiguration', toc(stageStart), struct());
 
             % --- Phase 0 change #1: validate required toolboxes ---
             % Fail-fast on missing toolboxes so a long sweep does not
             % crash 4 hours in with a cryptic factory error. See
             % phase-0-baseline.md §6.1.
+            stageStart = tic;
             obj.validateToolboxesFromConfig();
+            obj.recordPerformanceStage('Runner.ValidateToolboxes', toc(stageStart), struct());
 
             % Get total number of scenarios from RunnerConfig
             if isfield(obj.RunnerConfig, 'NumScenarios') && isnumeric(obj.RunnerConfig.NumScenarios) && obj.RunnerConfig.NumScenarios > 0
@@ -181,18 +207,23 @@ classdef SimulationRunner < matlab.System
 
                 if strcmpi(obj.RunnerConfig.RandomSeed, 'shuffle')
                     rng('shuffle');
+                    obj.resolvedRuntimeSeed = localSeedFromRngState(rng);
                     obj.logger.debug('Random seed set to shuffle mode.');
                 else
                     rng(obj.RunnerConfig.RandomSeed);
+                    obj.resolvedRuntimeSeed = double(obj.RunnerConfig.RandomSeed);
                     obj.logger.debug('Random seed set to %d.', obj.RunnerConfig.RandomSeed);
                 end
 
             end
 
+            stageStart = tic;
             obj.setupDirectories();
+            obj.recordPerformanceStage('Runner.SetupDirectories', toc(stageStart), struct());
 
             obj.logger.info('SimulationRunner setup completed successfully.');
             obj.logger.debug('Ready for scenario-based execution: %d total scenarios', obj.totalScenarios);
+            obj.recordPerformanceStage('Runner.SetupTotal', toc(setupStartTime), struct());
         end
 
         function stepImpl(obj, workerId, numWorkers)
@@ -231,21 +262,30 @@ classdef SimulationRunner < matlab.System
                     'Worker ID (%d) cannot be greater than total workers (%d)', workerId, numWorkers);
             end
 
-            % Calculate scenario distribution for this specific worker
-            [startScenario, endScenario, workerScenarioCount] = obj.calculateScenarioDistribution(workerId, numWorkers);
+            % Calculate scenario distribution for this specific worker.
+            % Scenario IDs are assigned round-robin instead of as one
+            % contiguous range. That preserves every global ScenarioId and
+            % its deterministic seed while spreading slow OSM/RayTracing
+            % long tails across workers.
+            scenarioIds = obj.calculateScenarioIdsForWorker(workerId, numWorkers);
+            workerScenarioCount = numel(scenarioIds);
 
             if workerScenarioCount == 0
                 obj.logger.info('Worker %d: No scenarios assigned to process.', workerId);
                 return;
             end
+            startScenario = scenarioIds(1);
+            endScenario = scenarioIds(end);
 
-            obj.logger.info('Worker %d: Processing scenarios %d to %d (%d scenarios total)', ...
-                workerId, startScenario, endScenario, workerScenarioCount);
+            obj.logger.info(['Worker %d: Processing %d round-robin scenarios ', ...
+                '(first=%d, last=%d, stride=%d)'], ...
+                workerId, workerScenarioCount, startScenario, endScenario, numWorkers);
 
             % Initialize timing and progress tracking
             simulationStartTime = tic;
             successfulScenarios = 0;
             failedScenarios = 0;
+            skippedScenarios = 0;
 
             % Initialize time tracking for this worker
             if isempty(obj.workerStartTimes)
@@ -257,22 +297,32 @@ classdef SimulationRunner < matlab.System
             obj.workerScenarioCounts(workerId) = workerScenarioCount;
 
             % Process scenarios sequentially for this worker
-            for scenarioId = startScenario:endScenario
+            for scenarioListIndex = 1:workerScenarioCount
+                scenarioId = scenarioIds(scenarioListIndex);
                 scenarioStartTime = tic;
-                currentScenarioIndex = scenarioId - startScenario + 1;
+                currentScenarioIndex = scenarioListIndex;
 
                 try
                     % Execute single scenario with ChangShuo engine
-                    obj.executeScenario(scenarioId, workerId);
-
-                    successfulScenarios = successfulScenarios + 1;
+                    scenarioStatus = obj.executeScenario(scenarioId, ...
+                        workerId, currentScenarioIndex, workerScenarioCount);
                     scenarioTime = toc(scenarioStartTime);
 
-                    % Display detailed progress with time information
-                    obj.displayProgress(workerId, currentScenarioIndex, workerScenarioCount, scenarioId, scenarioTime, false);
+                    if strcmp(scenarioStatus, 'Skipped')
+                        skippedScenarios = skippedScenarios + 1;
+                        obj.displayProgress(workerId, currentScenarioIndex, workerScenarioCount, ...
+                            scenarioId, scenarioTime, false, 'SKIPPED');
 
-                    obj.logger.debug('Worker %d, Scenario %d: Completed successfully in %.2f seconds', ...
-                        workerId, scenarioId, scenarioTime);
+                        obj.logger.info('Worker %d, Scenario %d: Skipped in %.2f seconds', ...
+                            workerId, scenarioId, scenarioTime);
+                    else
+                        successfulScenarios = successfulScenarios + 1;
+                        obj.displayProgress(workerId, currentScenarioIndex, workerScenarioCount, ...
+                            scenarioId, scenarioTime, false, 'SUCCESS');
+
+                        obj.logger.debug('Worker %d, Scenario %d: Completed successfully in %.2f seconds', ...
+                            workerId, scenarioId, scenarioTime);
+                    end
 
                 catch scenarioError
                     failedScenarios = failedScenarios + 1;
@@ -286,13 +336,27 @@ classdef SimulationRunner < matlab.System
                     obj.logger.error('Stack trace: %s', getReport(scenarioError, 'extended', 'hyperlinks', 'off'));
                 end
 
+                obj.writePerformanceTrace(workerId, successfulScenarios, ...
+                    failedScenarios, skippedScenarios, simulationStartTime, false);
             end
 
             % Log completion statistics
-            obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, simulationStartTime);
+            obj.recordPerformanceStage('Runner.WorkerTotal', toc(simulationStartTime), ...
+                struct('WorkerId', workerId, ...
+                       'SuccessfulScenarios', successfulScenarios, ...
+                       'FailedScenarios', failedScenarios, ...
+                       'SkippedScenarios', skippedScenarios));
+            obj.writePerformanceTrace(workerId, successfulScenarios, ...
+                failedScenarios, skippedScenarios, simulationStartTime, true);
+            csrd.runtime.map.osmSiteViewerCache('retain', false);
+            csrd.runtime.map.osmSiteViewerCache('clear');
+
+            obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, ...
+                skippedScenarios, simulationStartTime);
         end
 
-        function executeScenario(obj, scenarioId, workerId)
+        function status = executeScenario(obj, scenarioId, workerId, ...
+                currentScenarioIndex, workerScenarioCount)
             % executeScenario - Execute a single scenario using ChangShuo engine
             % 中文说明：executeScenario 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -310,21 +374,73 @@ classdef SimulationRunner < matlab.System
             %   workerId (integer) - Worker ID processing this scenario
 
             obj.logger.debug('Worker %d: Starting scenario %d execution', workerId, scenarioId);
+            if nargin < 4 || isempty(currentScenarioIndex)
+                currentScenarioIndex = NaN;
+            end
+            if nargin < 5 || isempty(workerScenarioCount)
+                workerScenarioCount = NaN;
+            end
+            status = 'Success';
+            scenarioTotalStart = tic;
+            scenarioSeed = localScenarioSeed(obj.resolvedRuntimeSeed, scenarioId);
+            rng(scenarioSeed, 'twister');
+            scenarioStartedAtUtc = localNowUtcMs();
+            obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                currentScenarioIndex, workerScenarioCount, ...
+                'Scenario.Total', 'begin', scenarioStartedAtUtc, ...
+                struct('ScenarioSeed', scenarioSeed));
 
             % Instantiate ChangShuo engine for this scenario
             engineHandle = obj.RunnerConfig.Engine.Handle;
+            obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                currentScenarioIndex, workerScenarioCount, ...
+                'Scenario.EngineInstantiate', 'begin', scenarioStartedAtUtc, ...
+                struct('ScenarioSeed', scenarioSeed));
+            stageStart = tic;
             changShuoEngine = feval(engineHandle);
+            stageElapsed = toc(stageStart);
+            obj.recordPerformanceStage('Scenario.EngineInstantiate', stageElapsed, ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
+            obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                currentScenarioIndex, workerScenarioCount, ...
+                'Scenario.EngineInstantiate', 'end', scenarioStartedAtUtc, ...
+                struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', stageElapsed));
+            cleanupGuard = onCleanup(@() localCleanupChangShuoEngine(changShuoEngine));
 
             try
                 % Configure ChangShuo engine with factory configurations
-                obj.configureChangShuoEngine(changShuoEngine, scenarioId);
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.ConfigureEngine', 'begin', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed));
+                stageStart = tic;
+                obj.configureChangShuoEngine(changShuoEngine, scenarioId, workerId);
+                stageElapsed = toc(stageStart);
+                obj.recordPerformanceStage('Scenario.ConfigureEngine', stageElapsed, ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.ConfigureEngine', 'end', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', stageElapsed));
 
                 obj.logger.debug('Worker %d, Scenario %d: Delegating frame generation to ChangShuo engine', ...
                     workerId, scenarioId);
 
                 % Generate all frames for this scenario using ChangShuo engine
                 % ChangShuo determines frame count from scenario configuration internally
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.ChangShuoStep', 'begin', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed));
+                stageStart = tic;
                 [scenarioData, scenarioAnnotation] = step(changShuoEngine, scenarioId);
+                stageElapsed = toc(stageStart);
+                obj.recordPerformanceStage('Scenario.ChangShuoStep', stageElapsed, ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.ChangShuoStep', 'end', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', stageElapsed));
 
                 % Phase 3 (audit §3.5 / §17.5 P3-7): capture blueprint
                 % provenance via the public read-only `LastGlobalLayout`
@@ -340,36 +456,66 @@ classdef SimulationRunner < matlab.System
                         changShuoEngine.LastGlobalLayout);
 
                 % Save scenario data and annotation
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.SaveScenarioData', 'begin', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed));
+                stageStart = tic;
                 obj.saveScenarioData(scenarioData, scenarioAnnotation, ...
                     scenarioId, workerId, blueprintProvenance);
+                stageElapsed = toc(stageStart);
+                obj.recordPerformanceStage('Scenario.SaveScenarioData', stageElapsed, ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.SaveScenarioData', 'end', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', stageElapsed));
 
                 obj.logger.debug('Worker %d, Scenario %d: Data saved successfully', workerId, scenarioId);
+                totalElapsed = toc(scenarioTotalStart);
+                obj.recordPerformanceStage('Scenario.Total', totalElapsed, ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId, 'Status', status));
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.Total', 'end', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', totalElapsed, ...
+                    'Status', status));
 
             catch engineError
                 if csrd.pipeline.scenario.isScenarioSkipException(engineError)
                     obj.logger.warning('Worker %d, Scenario %d: Scenario skipped - %s', ...
                         workerId, scenarioId, engineError.message);
+                    status = 'Skipped';
+                    totalElapsed = toc(scenarioTotalStart);
+                    obj.recordPerformanceStage('Scenario.Total', totalElapsed, ...
+                        struct('WorkerId', workerId, 'ScenarioId', scenarioId, 'Status', status));
+                    obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                        currentScenarioIndex, workerScenarioCount, ...
+                        'Scenario.Total', 'skipped', scenarioStartedAtUtc, ...
+                        struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', totalElapsed, ...
+                        'Status', status, 'ErrorIdentifier', engineError.identifier, ...
+                        'ErrorMessage', engineError.message));
                     return;
                 end
 
                 obj.logger.error('Worker %d, Scenario %d: ChangShuo engine error: %s', ...
                     workerId, scenarioId, engineError.message);
+                totalElapsed = toc(scenarioTotalStart);
+                obj.recordPerformanceStage('Scenario.Total', totalElapsed, ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId, ...
+                           'Status', 'Failed', 'ErrorIdentifier', engineError.identifier));
+                obj.writePerformanceHeartbeat(workerId, scenarioId, ...
+                    currentScenarioIndex, workerScenarioCount, ...
+                    'Scenario.Total', 'failed', scenarioStartedAtUtc, ...
+                    struct('ScenarioSeed', scenarioSeed, 'ElapsedSec', totalElapsed, ...
+                    'Status', 'Failed', 'ErrorIdentifier', engineError.identifier, ...
+                    'ErrorMessage', engineError.message));
                 rethrow(engineError);
             end
-
-            % Clean up engine resources (always execute)
-            if exist('changShuoEngine', 'var') && ~isempty(changShuoEngine)
-
-                if ismethod(changShuoEngine, 'cleanup')
-                    changShuoEngine.cleanup();
-                end
-
-                clear changShuoEngine;
-            end
-
+            clear cleanupGuard;
         end
 
-        function configureChangShuoEngine(obj, engine, scenarioId)
+        function configureChangShuoEngine(obj, engine, scenarioId, workerId)
             % configureChangShuoEngine - Configure ChangShuo engine for specific scenario
             % 中文说明：configureChangShuoEngine 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -380,9 +526,41 @@ classdef SimulationRunner < matlab.System
             %   - ScenarioFactory: scenario blueprint (spatial, temporal, frequency)
             %   - Other factories: their specific implementation details
             %   - NO cross-factory dependencies in configuration
-            
-            % Single assignment - FactoryConfigs is the unified config source
-            engine.FactoryConfigs = obj.FactoryConfigs;
+            if nargin < 4 || isempty(workerId)
+                workerId = 1;
+            end
+
+            % Single assignment - FactoryConfigs is the unified config source.
+            % Runtime fields are scenario-local planning context, not a second
+            % authority for simulation facts. They let ScenarioFactory build a
+            % deterministic coverage schedule without drawing from global RNG.
+            factoryConfigs = obj.FactoryConfigs;
+            if isstruct(factoryConfigs) && isfield(factoryConfigs, 'Scenario') && ...
+                    isstruct(factoryConfigs.Scenario)
+                runtime = struct();
+                if isfield(factoryConfigs.Scenario, 'Runtime') && ...
+                        isstruct(factoryConfigs.Scenario.Runtime)
+                    runtime = factoryConfigs.Scenario.Runtime;
+                end
+                runtime.ScenarioId = double(scenarioId);
+                runtime.TotalScenarios = double(obj.totalScenarios);
+                runtime.WorkerId = double(workerId);
+                runtime.ScenarioSeed = localScenarioSeed( ...
+                    obj.resolvedRuntimeSeed, scenarioId);
+                if isfield(obj.RunnerConfig, 'RandomSeed')
+                    if ischar(obj.RunnerConfig.RandomSeed) || ...
+                            isstring(obj.RunnerConfig.RandomSeed)
+                        runtime.RandomSeed = obj.resolvedRuntimeSeed;
+                        runtime.RandomSeedMode = char(string(obj.RunnerConfig.RandomSeed));
+                    else
+                        runtime.RandomSeed = obj.RunnerConfig.RandomSeed;
+                        runtime.RandomSeedMode = 'fixed';
+                    end
+                end
+                factoryConfigs.Scenario.Runtime = runtime;
+            end
+
+            engine.FactoryConfigs = factoryConfigs;
 
             obj.logger.debug('ChangShuo engine configured for scenario %d', scenarioId);
         end
@@ -430,11 +608,14 @@ classdef SimulationRunner < matlab.System
 
             try
 
+                stageStart = tic;
                 if obj.RunnerConfig.Data.CompressData
                     save(scenarioDataPath, 'scenarioData', '-v7.3', '-nocompression');
                 else
                     save(scenarioDataPath, 'scenarioData', '-v7.3');
                 end
+                obj.recordPerformanceStage('Save.MatScenarioData', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
                 obj.logger.debug('Saved scenario data: %s', scenarioDataPath);
             catch saveError
@@ -452,31 +633,54 @@ classdef SimulationRunner < matlab.System
             % top-level ScenarioId / ProcessedBy / SavedAt mirror that
             % Phase 0 carried for "v2 migration" has been dropped to
             % keep the annotation schema unambiguous.
+            stageStart = tic;
             [cleanAnnotation, sanitizeManifest] = ...
                 csrd.pipeline.annotation.sanitizeForJson(scenarioAnnotation);
+            obj.recordPerformanceStage('Save.SanitizeAnnotation', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
+            stageStart = tic;
             cleanAnnotation = obj.stampRuntimeHeader( ...
                 cleanAnnotation, sanitizeManifest, scenarioId, workerId, ...
                 blueprintProvenance);
+            obj.recordPerformanceStage('Save.StampRuntimeHeader', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             % Phase 4 (audit §17.6 / §S7 / C4): annotation write-back
             % hook. The static helper raises CSRD:Annotation:* if any
             % SignalSources(k) is missing a v2 top-level key or any
             % Truth.Measured.{SourcePlane,FramePlane} required scalar.
             % We deliberately let it propagate OUT of saveScenarioData
-            % so the upstream `engineError` catch in `processScenario`
-            % can run it through `isScenarioSkipException` (Phase 4
-            % whitelisted the `CSRD:Annotation:` token) and demote the
-            % failure to a per-scenario skip instead of fatal-aborting
-            % the entire sweep. Wrapping it in a local try/catch here
-            % would silently swallow the contract violation, which is
-            % exactly the silent-fallback class of bug Phase 4 is
-            % designed to flush out -- so do NOT add try/catch around
-            % this call.
+            % so the upstream `engineError` catch can count annotation
+            % contract violations as hard scenario failures. Wrapping it
+            % in a local try/catch here would silently swallow the
+            % contract violation, which is exactly the silent-fallback
+            % class of bug Phase 4/20 flushed out -- so do NOT add
+            % try/catch around this call.
+            stageStart = tic;
             csrd.core.ChangShuo.validateMeasurementCompleteness(cleanAnnotation);
+            obj.recordPerformanceStage('Save.ValidateMeasurementCompleteness', toc(stageStart), ...
+                struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             try
-                jsonString = jsonencode(cleanAnnotation, 'PrettyPrint', true);
+                prettyPrintAnnotations = true;
+                if isfield(obj.RunnerConfig, 'Data') && ...
+                        isstruct(obj.RunnerConfig.Data) && ...
+                        isfield(obj.RunnerConfig.Data, 'PrettyPrintAnnotations') && ...
+                        ~isempty(obj.RunnerConfig.Data.PrettyPrintAnnotations)
+                    prettyPrintAnnotations = logical(obj.RunnerConfig.Data.PrettyPrintAnnotations);
+                end
+                if prettyPrintAnnotations
+                    stageStart = tic;
+                    jsonString = jsonencode(cleanAnnotation, 'PrettyPrint', true);
+                else
+                    stageStart = tic;
+                    jsonString = jsonencode(cleanAnnotation);
+                end
+                obj.recordPerformanceStage('Save.EncodeAnnotationJson', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId, ...
+                           'PrettyPrint', prettyPrintAnnotations));
+                stageStart = tic;
                 fid = fopen(annotationPath, 'w');
 
                 if fid == -1
@@ -486,6 +690,8 @@ classdef SimulationRunner < matlab.System
                     fclose(fid);
                     obj.logger.debug('Saved annotation: %s', annotationPath);
                 end
+                obj.recordPerformanceStage('Save.WriteAnnotationJson', toc(stageStart), ...
+                    struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             catch saveError
                 obj.logger.error('Failed to save annotation for scenario %d: %s', ...
@@ -546,6 +752,191 @@ classdef SimulationRunner < matlab.System
             obj.logPolicyDescription = policy.describe();
         end
 
+        function configurePerformanceTracing(obj)
+            %CONFIGUREPERFORMANCETRACING Resolve optional Phase 21 timing sink.
+            % 中文说明：默认关闭，仅在 Runner.Performance.EnableStageTiming=true 时写 artifact。
+            obj.performanceEnabled = false;
+            obj.performanceArtifactDirectory = '';
+            obj.performanceTrace = struct();
+            obj.performanceHeartbeatEnabled = false;
+
+            perfCfg = struct();
+            if isfield(obj.RunnerConfig, 'Performance') && ...
+                    isstruct(obj.RunnerConfig.Performance)
+                perfCfg = obj.RunnerConfig.Performance;
+            end
+
+            if ~isfield(perfCfg, 'EnableStageTiming') || ...
+                    ~localToLogical(perfCfg.EnableStageTiming)
+                csrd.runtime.performance.trace('reset');
+                return;
+            end
+
+            obj.performanceEnabled = true;
+            obj.performanceRawEventLimit = localPositiveIntegerField( ...
+                perfCfg, {'RawEventLimit', 'MaxRawEvents'}, 5000);
+            obj.performancePartialWriteInterval = localPositiveIntegerField( ...
+                perfCfg, {'PartialWriteInterval'}, 1);
+            obj.performanceHeartbeatEnabled = localLogicalField( ...
+                perfCfg, {'EnableHeartbeat', 'EnableStageHeartbeat'}, true);
+            if isfield(perfCfg, 'ArtifactDirectory') && ...
+                    ~isempty(perfCfg.ArtifactDirectory)
+                artifactDir = char(string(perfCfg.ArtifactDirectory));
+                if ~localIsAbsolutePath(artifactDir)
+                    artifactDir = fullfile(localProjectRoot(), artifactDir);
+                end
+            else
+                artifactDir = fullfile(localProjectRoot(), 'artifacts', ...
+                    'performance', 'phase21');
+            end
+            if ~isfolder(artifactDir)
+                mkdir(artifactDir);
+            end
+            obj.performanceArtifactDirectory = artifactDir;
+            csrd.runtime.performance.trace('start', artifactDir);
+            obj.performanceTrace = struct( ...
+                'Schema', 'csrd.phase22.stage-timing.v2', ...
+                'GeneratedAtUtc', char(datetime('now', 'TimeZone', 'UTC', ...
+                    'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z''')), ...
+                'ArtifactDirectory', artifactDir, ...
+                'RawEventLimit', obj.performanceRawEventLimit, ...
+                'DroppedEventCount', 0, ...
+                'StageSummary', struct(), ...
+                'Events', struct('Stage', {}, 'ElapsedSec', {}, ...
+                    'RecordedAtUtc', {}, 'Metadata', {}));
+        end
+
+        function recordPerformanceStage(obj, stageName, elapsedSec, metadata)
+            %RECORDPERFORMANCESTAGE Append a lightweight timing event.
+            % 中文说明：只写耗时和结构化元数据，不接触信号样本。
+            if ~obj.performanceEnabled
+                return;
+            end
+            if nargin < 4 || ~isstruct(metadata)
+                metadata = struct();
+            end
+            event = struct( ...
+                'Stage', char(string(stageName)), ...
+                'ElapsedSec', double(elapsedSec), ...
+                'RecordedAtUtc', char(datetime('now', 'TimeZone', 'UTC', ...
+                    'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')), ...
+                'Metadata', metadata);
+            key = localStageKey(stageName);
+            if ~isfield(obj.performanceTrace.StageSummary, key)
+                obj.performanceTrace.StageSummary.(key) = struct( ...
+                    'Stage', event.Stage, ...
+                    'Count', 0, ...
+                    'TotalElapsedSec', 0, ...
+                    'MaxElapsedSec', 0, ...
+                    'LastElapsedSec', 0);
+            end
+            summary = obj.performanceTrace.StageSummary.(key);
+            summary.Count = summary.Count + 1;
+            summary.TotalElapsedSec = summary.TotalElapsedSec + event.ElapsedSec;
+            summary.MaxElapsedSec = max(summary.MaxElapsedSec, event.ElapsedSec);
+            summary.LastElapsedSec = event.ElapsedSec;
+            obj.performanceTrace.StageSummary.(key) = summary;
+
+            if numel(obj.performanceTrace.Events) < obj.performanceRawEventLimit
+                obj.performanceTrace.Events(end + 1) = event;
+            else
+                obj.performanceTrace.DroppedEventCount = ...
+                    obj.performanceTrace.DroppedEventCount + 1;
+            end
+        end
+
+        function writePerformanceHeartbeat(obj, workerId, scenarioId, ...
+                currentScenarioIndex, workerScenarioCount, stageName, ...
+                stageState, scenarioStartedAtUtc, metadata)
+            %WRITEPERFORMANCEHEARTBEAT Persist the currently active stage.
+            % 中文说明：心跳只写 ignored performance artifact，便于长尾场景未结束时定位卡点。
+            if ~obj.performanceEnabled || ~obj.performanceHeartbeatEnabled
+                return;
+            end
+            if nargin < 10 || ~isstruct(metadata)
+                metadata = struct();
+            end
+            try
+                payload = struct( ...
+                    'Schema', 'csrd.phase28.scenario-heartbeat.v1', ...
+                    'WorkerId', double(workerId), ...
+                    'ScenarioId', double(scenarioId), ...
+                    'ScenarioIndex', double(currentScenarioIndex), ...
+                    'WorkerScenarioCount', double(workerScenarioCount), ...
+                    'StageName', char(string(stageName)), ...
+                    'StageState', char(string(stageState)), ...
+                    'ScenarioStartedAtUtc', char(string(scenarioStartedAtUtc)), ...
+                    'UpdatedAtUtc', localNowUtcMs(), ...
+                    'Metadata', metadata);
+                heartbeatPath = fullfile(obj.performanceArtifactDirectory, ...
+                    sprintf('phase28-heartbeat-worker%03d.json', workerId));
+                fid = fopen(heartbeatPath, 'w');
+                if fid ~= -1
+                    cleanup = onCleanup(@() fclose(fid));
+                    fprintf(fid, '%s', jsonencode(payload));
+                    clear cleanup;
+                end
+            catch
+                % Diagnostic artifacts must never change simulation outcome.
+            end
+        end
+
+        function writePerformanceTrace(obj, workerId, successfulScenarios, ...
+                failedScenarios, skippedScenarios, workerTimer, finalizeTrace)
+            %WRITEPERFORMANCETRACE Persist ignored Phase 21 timing artifacts.
+            % 中文说明：保存到 artifacts/performance/phase21，不进入数据样本目录。
+            if ~obj.performanceEnabled
+                return;
+            end
+            if nargin < 7
+                finalizeTrace = true;
+            end
+            try
+                processedScenarios = successfulScenarios + failedScenarios + ...
+                    skippedScenarios;
+                if ~finalizeTrace && obj.performancePartialWriteInterval > 1 && ...
+                        mod(max(1, processedScenarios), ...
+                        obj.performancePartialWriteInterval) ~= 0
+                    return;
+                end
+                totalElapsedSec = toc(workerTimer);
+                obj.performanceTrace.Summary = struct( ...
+                    'WorkerId', workerId, ...
+                    'SuccessfulScenarios', successfulScenarios, ...
+                    'FailedScenarios', failedScenarios, ...
+                    'SkippedScenarios', skippedScenarios, ...
+                    'TotalElapsedSec', totalElapsedSec);
+                obj.performanceTrace.OsmSiteViewerCache = ...
+                    csrd.runtime.map.osmSiteViewerCache('snapshot');
+                obj.performanceTrace.RuntimePerformance = ...
+                    csrd.runtime.performance.trace('snapshot');
+                if finalizeTrace
+                    traceKind = 'final';
+                else
+                    traceKind = 'partial';
+                end
+                baseName = sprintf('phase21-stage-timing-worker%03d-%s', ...
+                    workerId, traceKind);
+                matPath = fullfile(obj.performanceArtifactDirectory, ...
+                    [baseName, '.mat']);
+                jsonPath = fullfile(obj.performanceArtifactDirectory, ...
+                    [baseName, '.json']);
+                performanceTrace = obj.performanceTrace; %#ok<NASGU>
+                save(matPath, 'performanceTrace');
+                fid = fopen(jsonPath, 'w');
+                if fid ~= -1
+                    fprintf(fid, '%s', jsonencode(obj.performanceTrace));
+                    fclose(fid);
+                end
+                if finalizeTrace
+                    csrd.runtime.performance.trace('stop');
+                end
+            catch ME
+                obj.logger.warning('Could not write runtime performance trace: %s', ...
+                    ME.message);
+            end
+        end
+
         function annotation = stampRuntimeHeader( ...
                 obj, annotation, sanitizeManifest, scenarioId, workerId, ...
                 blueprintProvenance)
@@ -601,6 +992,8 @@ classdef SimulationRunner < matlab.System
             annotation.Header.Runtime.ToolboxLevel     = obj.toolboxLevel;
             annotation.Header.Runtime.ScenarioId       = scenarioId;
             annotation.Header.Runtime.WorkerId         = workerId;
+            annotation.Header.Runtime.ScenarioSeed     = ...
+                localScenarioSeed(obj.resolvedRuntimeSeed, scenarioId);
             annotation.Header.Runtime.SavedAt          = char(datetime('now', ...
                 'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z''', 'TimeZone', 'UTC'));
             annotation.Header.Runtime.SanitizeManifest = sanitizeManifest;
@@ -649,6 +1042,12 @@ classdef SimulationRunner < matlab.System
 
             end
 
+        end
+
+        function scenarioIds = calculateScenarioIdsForWorker(obj, workerId, numWorkers)
+            %CALCULATESCENARIOIDSFORWORKER Round-robin global scenario IDs.
+            scenarioIds = localScenarioIdsForWorker( ...
+                obj.totalScenarios, workerId, numWorkers);
         end
 
         function setupDirectories(obj)
@@ -709,7 +1108,7 @@ classdef SimulationRunner < matlab.System
             obj.logger.info('Data storage directories configured under: %s', baseOutputDir);
         end
 
-        function displayProgress(obj, workerId, currentScenario, totalScenarios, scenarioId, scenarioTime, isFailed)
+        function displayProgress(obj, workerId, currentScenario, totalScenarios, scenarioId, scenarioTime, isFailed, statusOverride)
             % displayProgress - Display detailed scenario processing progress with time information
             % 中文说明：displayProgress 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
@@ -723,6 +1122,9 @@ classdef SimulationRunner < matlab.System
 
             if nargin < 7
                 isFailed = false;
+            end
+            if nargin < 8
+                statusOverride = '';
             end
 
             % Calculate elapsed time since worker started
@@ -752,7 +1154,9 @@ classdef SimulationRunner < matlab.System
             remainingTimeStr = obj.formatDuration(estimatedRemainingTime);
 
             % Create status indicator
-            if isFailed
+            if ~isempty(statusOverride)
+                statusStr = sprintf('[%s]', char(string(statusOverride)));
+            elseif isFailed
                 statusStr = '[FAILED]';
             else
                 statusStr = '[SUCCESS]';
@@ -787,20 +1191,26 @@ classdef SimulationRunner < matlab.System
 
         end
 
-        function logCompletionStatistics(obj, workerId, successfulScenarios, failedScenarios, startTime)
+        function logCompletionStatistics(obj, workerId, successfulScenarios, failedScenarios, skippedScenarios, startTime)
             % logCompletionStatistics - Log simulation completion statistics
             % 中文说明：logCompletionStatistics 在 CSRD 生产链路中执行对应处理。
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
 
             totalTime = toc(startTime);
-            totalProcessed = successfulScenarios + failedScenarios;
+            totalProcessed = successfulScenarios + failedScenarios + skippedScenarios;
 
             obj.logger.info('Worker %d simulation completed:', workerId);
             obj.logger.info('  Total scenarios processed: %d', totalProcessed);
             obj.logger.info('  Successful scenarios: %d', successfulScenarios);
             obj.logger.info('  Failed scenarios: %d', failedScenarios);
-            obj.logger.info('  Success rate: %.1f%%', (successfulScenarios / totalProcessed) * 100);
+            obj.logger.info('  Skipped scenarios: %d', skippedScenarios);
+            if totalProcessed > 0
+                successRate = (successfulScenarios / totalProcessed) * 100;
+            else
+                successRate = 0;
+            end
+            obj.logger.info('  Success rate: %.1f%%', successRate);
             obj.logger.info('  Total simulation time: %.2f seconds', totalTime);
 
             if totalProcessed > 0
@@ -858,6 +1268,18 @@ classdef SimulationRunner < matlab.System
     end
 
     methods (Static, Hidden)
+
+        function seedValue = deriveScenarioSeed(baseSeed, scenarioId)
+            %DERIVESCENARIOSEED Stable per-scenario RNG seed.
+            seedValue = localScenarioSeed(baseSeed, scenarioId);
+        end
+
+        function scenarioIds = deriveScenarioIdsForWorker( ...
+                totalScenarios, workerId, numWorkers)
+            %DERIVESCENARIOIDSFORWORKER Test hook for worker scheduling.
+            scenarioIds = localScenarioIdsForWorker( ...
+                totalScenarios, workerId, numWorkers);
+        end
 
         function runtimeHeader = injectBlueprintProvenance(runtimeHeader, provenance)
             % injectBlueprintProvenance - Phase 2 (audit C4) helper that
@@ -933,4 +1355,156 @@ classdef SimulationRunner < matlab.System
 
     end
 
+end
+
+
+function localCleanupChangShuoEngine(engine)
+%LOCALCLEANUPCHANGSHUOENGINE Release a scenario engine on every exit path.
+if isempty(engine)
+    return;
+end
+if ismethod(engine, 'cleanup')
+    engine.cleanup();
+end
+end
+
+function tf = localToLogical(value)
+%LOCALTOLOGICAL Conservative bool parsing for optional runner config.
+if islogical(value) && isscalar(value)
+    tf = value;
+elseif isnumeric(value) && isscalar(value) && isfinite(value)
+    tf = value ~= 0;
+elseif ischar(value) || (isstring(value) && isscalar(value))
+    tf = any(strcmpi(char(string(value)), {'true', 'on', 'yes', '1'}));
+else
+    tf = false;
+end
+end
+
+function value = localLogicalField(source, names, defaultValue)
+%LOCALLOGICALFIELD Resolve optional boolean config fields.
+value = logical(defaultValue);
+if ~isstruct(source)
+    return;
+end
+for idx = 1:numel(names)
+    name = names{idx};
+    if isfield(source, name)
+        value = localToLogical(source.(name));
+        return;
+    end
+end
+end
+
+function stamp = localNowUtcMs()
+%LOCALNOWUTCMS Return an ISO-8601 UTC timestamp with millisecond resolution.
+stamp = char(datetime('now', 'TimeZone', 'UTC', ...
+    'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'''));
+end
+
+function projectRoot = localProjectRoot()
+%LOCALPROJECTROOT Resolve repository root from this package file.
+projectRoot = fileparts(fileparts(mfilename('fullpath')));
+end
+
+function tf = localIsAbsolutePath(pathText)
+%LOCALISABSOLUTEPATH Windows/Unix absolute path probe.
+tf = ~isempty(regexp(pathText, '^[A-Za-z]:[\\/]|^[/\\]', 'once'));
+end
+
+function value = localPositiveIntegerField(source, names, defaultValue)
+%LOCALPOSITIVEINTEGERFIELD Resolve optional positive integer config fields.
+value = defaultValue;
+if ~isstruct(source)
+    return;
+end
+for idx = 1:numel(names)
+    name = names{idx};
+    if isfield(source, name) && isnumeric(source.(name)) && ...
+            isscalar(source.(name)) && isfinite(source.(name)) && ...
+            source.(name) > 0
+        value = max(1, floor(double(source.(name))));
+        return;
+    end
+end
+end
+
+function key = localStageKey(stageName)
+%LOCALSTAGEKEY Convert a stage name to a valid struct field.
+key = regexprep(char(string(stageName)), '[^A-Za-z0-9_]', '_');
+if isempty(key)
+    key = 'UnnamedStage';
+elseif ~isletter(key(1))
+    key = ['Stage_', key];
+end
+end
+
+function seedValue = localSeedFromRngState(state)
+%LOCALSEEDFROMRNGSTATE Derive a stable schedule seed from MATLAB RNG state.
+seedValue = 0;
+if ~isstruct(state) || ~isfield(state, 'State') || isempty(state.State)
+    return;
+end
+values = double(state.State(:));
+sampleCount = min(numel(values), 128);
+modulus = 2^31 - 1;
+hash = 5381;
+for idx = 1:sampleCount
+    hash = mod(hash * 33 + values(idx), modulus);
+end
+seedValue = double(hash);
+end
+
+function seedValue = localScenarioSeed(baseSeed, scenarioId)
+%LOCALSCENARIOSEED Derive a stable global-RNG seed for one scenario.
+% The seed is a function of the run-level seed and global ScenarioId only,
+% so parallel workers cannot duplicate random sequences merely because each
+% worker process starts from the same Runner.RandomSeed.
+modulus = 2^31 - 1;
+if nargin < 1 || isempty(baseSeed) || ~isnumeric(baseSeed) || ...
+        ~isscalar(baseSeed) || ~isfinite(baseSeed)
+    baseSeed = 0;
+end
+if nargin < 2 || isempty(scenarioId) || ~isnumeric(scenarioId) || ...
+        ~isscalar(scenarioId) || ~isfinite(scenarioId) || scenarioId < 1
+    scenarioId = 1;
+end
+text = sprintf('csrd-scenario-seed|%.0f|%.0f', ...
+    floor(double(baseSeed)), floor(double(scenarioId)));
+bytes = uint8(unicode2native(text, 'UTF-8'));
+hash = 1;
+for idx = 1:numel(bytes)
+    hash = mod(hash * 48271 + double(bytes(idx)) + idx, modulus);
+end
+hash = mod(hash * 69621 + floor(double(baseSeed)) + ...
+    104729 * floor(double(scenarioId)), modulus);
+hash = mod(hash * 48271 + 1, modulus);
+seedValue = double(mod(hash, modulus - 1)) + 1;
+if seedValue < 1
+    seedValue = 1;
+end
+end
+
+function scenarioIds = localScenarioIdsForWorker(totalScenarios, workerId, numWorkers)
+%LOCALSCENARIOIDSFORWORKER Assign global IDs by stride to balance long tails.
+if nargin < 1 || isempty(totalScenarios) || ~isnumeric(totalScenarios) || ...
+        ~isscalar(totalScenarios) || ~isfinite(totalScenarios)
+    totalScenarios = 0;
+end
+if nargin < 2 || isempty(workerId) || ~isnumeric(workerId) || ...
+        ~isscalar(workerId) || ~isfinite(workerId)
+    workerId = 1;
+end
+if nargin < 3 || isempty(numWorkers) || ~isnumeric(numWorkers) || ...
+        ~isscalar(numWorkers) || ~isfinite(numWorkers)
+    numWorkers = 1;
+end
+totalScenarios = max(0, floor(double(totalScenarios)));
+workerId = max(1, floor(double(workerId)));
+numWorkers = max(1, floor(double(numWorkers)));
+if workerId > numWorkers || workerId > totalScenarios
+    scenarioIds = zeros(1, 0);
+else
+    scenarioIds = workerId:numWorkers:totalScenarios;
+end
 end

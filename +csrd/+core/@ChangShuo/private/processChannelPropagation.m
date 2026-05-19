@@ -26,6 +26,13 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
             isfield(obj.ScenarioConfig, 'Layout')
         scenarioMapProfile = getMapProfileFromLayout(obj.ScenarioConfig.Layout);
     end
+    if isstruct(scenarioMapProfile) && ...
+            isfield(scenarioMapProfile, 'ChannelModel') && ...
+            strcmpi(char(string(scenarioMapProfile.ChannelModel)), 'RayTracing') && ...
+            ismethod(obj.Factories.Channel, 'precomputeRayTracingFrame')
+        obj.Factories.Channel.precomputeRayTracingFrame( ...
+            FrameId, TxInfos, RxInfos, scenarioMapProfile, obj.ScenarioConfig);
+    end
 
     % Initialize received signals structure for each receiver
     for rxIdx = 1:numRx
@@ -68,6 +75,9 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     if isempty(segmentSignal) || ~isfield(segmentSignal, 'Signal')
                         continue;
                     end
+
+                    localAssertSegmentAntennaColumns( ...
+                        segmentSignal, txInfo, rxInfo, FrameId, segIdx);
 
                     channelInputStruct = segmentSignal;
                     channelInputStruct.TxInfo = txInfo;
@@ -156,6 +166,8 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     [component.Signal, component.DopplerShiftHz, ...
                      component.RadialVelocityMps] = applyDopplerForComponent( ...
                         channelOutput, txInfo, rxInfo);
+                    component.ChannelOutputWasEmptyBeforeGating = ...
+                        isfield(channelOutput, 'Signal') && isempty(channelOutput.Signal);
                     component = csrd.pipeline.signal.gateToDuration( ...
                         component, localComponentDurationSec(segmentSignal), ...
                         'ChannelOutput');
@@ -205,6 +217,13 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                         measureModulatedBandwidth(segmentSignal);
                     component.AnalyticalBandwidthHz = ...
                         coerceScalarBandwidth(channelOutput.Bandwidth);
+                    if ~isfinite(component.ModulatedBandwidthHz) || ...
+                            component.ModulatedBandwidthHz <= 0
+                        csrd.runtime.performance.trace('event', ...
+                            'Measurement.NonPositiveCleanObw', ...
+                            NaN, localCleanObwDiagnostic( ...
+                                component, segmentSignal));
+                    end
                     if isfield(channelOutput, 'StartTime')
                         component.StartTime = channelOutput.StartTime;
                     elseif isfield(segmentSignal, 'StartTime')
@@ -332,6 +351,60 @@ function durationSec = localComponentDurationSec(segmentSignal)
     end
 end
 
+function localAssertSegmentAntennaColumns(segmentSignal, txInfo, rxInfo, frameId, segIdx)
+    signalData = segmentSignal.Signal;
+    if isempty(signalData)
+        return;
+    end
+
+    expectedColumns = localResolveTxAntennaColumns(segmentSignal, txInfo);
+    actualColumns = size(signalData, 2);
+    if actualColumns ~= expectedColumns
+        txId = localIdText(txInfo, 'Tx');
+        rxId = localIdText(rxInfo, 'Rx');
+        burstId = '';
+        if isstruct(segmentSignal) && isfield(segmentSignal, 'BurstId') && ...
+                ~isempty(segmentSignal.BurstId)
+            burstId = char(string(segmentSignal.BurstId));
+        end
+        error('CSRD:Channel:SegmentAntennaColumnMismatch', ...
+            ['Frame %d, Tx %s -> Rx %s, Segment %d, BurstId=%s: ', ...
+             'channel input signal has %d columns but declares %d transmit antennas. ', ...
+             'Signals must remain samples-by-antennas through modulation, TRF, and gating. SignalSize=%s.'], ...
+            frameId, txId, rxId, segIdx, burstId, actualColumns, ...
+            expectedColumns, mat2str(size(signalData)));
+    end
+end
+
+function expectedColumns = localResolveTxAntennaColumns(segmentSignal, txInfo)
+    expectedColumns = [];
+    if isstruct(segmentSignal) && isfield(segmentSignal, 'NumTransmitAntennas') && ...
+            isnumeric(segmentSignal.NumTransmitAntennas) && ...
+            isscalar(segmentSignal.NumTransmitAntennas) && ...
+            isfinite(segmentSignal.NumTransmitAntennas) && ...
+            segmentSignal.NumTransmitAntennas > 0
+        expectedColumns = double(segmentSignal.NumTransmitAntennas);
+    elseif isstruct(txInfo) && isfield(txInfo, 'NumTransmitAntennas') && ...
+            isnumeric(txInfo.NumTransmitAntennas) && ...
+            isscalar(txInfo.NumTransmitAntennas) && ...
+            isfinite(txInfo.NumTransmitAntennas) && ...
+            txInfo.NumTransmitAntennas > 0
+        expectedColumns = double(txInfo.NumTransmitAntennas);
+    else
+        error('CSRD:Channel:MissingAntennaAuthority', ...
+            'Channel propagation requires a positive NumTransmitAntennas on the segment or TxInfo.');
+    end
+    expectedColumns = round(expectedColumns);
+end
+
+function idText = localIdText(infoStruct, fallbackPrefix)
+    if isstruct(infoStruct) && isfield(infoStruct, 'ID') && ~isempty(infoStruct.ID)
+        idText = char(string(infoStruct.ID));
+    else
+        idText = char(string(fallbackPrefix));
+    end
+end
+
 function mapProfile = getMapProfileFromLayout(layout)
     % getMapProfileFromLayout - Production declaration in CSRD.
     % 中文说明：getMapProfileFromLayout 在 CSRD 生产链路中执行对应处理。
@@ -373,6 +446,12 @@ function [shiftedSignal, dopplerHz, radialVelMps] = ...
     shiftedSignal = channelOutput.Signal;
     dopplerHz    = 0;
     radialVelMps = 0;
+
+    if isempty(channelOutput.Signal)
+        csrd.runtime.performance.trace('count', ...
+            'Channel.EmptyOutputBeforeDoppler');
+        return;
+    end
 
     if isfield(channelOutput, 'ChannelInfo') && ...
             isstruct(channelOutput.ChannelInfo) && ...
@@ -450,10 +529,65 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
     end
 
     try
-        bwHz = csrd.pipeline.measurement.obwActual( ...
+        bwHz = csrd.pipeline.measurement.obwAntennaMax( ...
             sig, double(segmentSignal.SampleRate));
     catch
         bwHz = NaN;
+    end
+end
+
+function diagnostic = localCleanObwDiagnostic(component, segmentSignal)
+    diagnostic = struct();
+    diagnostic.TxID = localStructText(component, 'TxID');
+    diagnostic.BurstId = localStructText(component, 'BurstId');
+    diagnostic.SegmentId = localStructText(component, 'SegmentId');
+    diagnostic.ModulatedBandwidthHz = localStructNumber( ...
+        component, 'ModulatedBandwidthHz');
+    diagnostic.AnalyticalBandwidthHz = localStructNumber( ...
+        component, 'AnalyticalBandwidthHz');
+    diagnostic.SignalSamples = 0;
+    diagnostic.SignalColumns = 0;
+    diagnostic.SignalEnergy = NaN;
+    diagnostic.SignalPeakAbs = NaN;
+    diagnostic.SampleRate = NaN;
+    if isstruct(segmentSignal)
+        diagnostic.SampleRate = localStructNumber(segmentSignal, 'SampleRate');
+        if isfield(segmentSignal, 'Signal') && isnumeric(segmentSignal.Signal)
+            sig = segmentSignal.Signal;
+            diagnostic.SignalSamples = size(sig, 1);
+            diagnostic.SignalColumns = size(sig, 2);
+            if ~isempty(sig)
+                diagnostic.SignalEnergy = double(sum(abs(sig(:)).^2));
+                diagnostic.SignalPeakAbs = double(max(abs(sig(:))));
+            end
+        end
+        if isfield(segmentSignal, 'Planned') && isstruct(segmentSignal.Planned)
+            planned = segmentSignal.Planned;
+            diagnostic.ModulationFamily = localStructText( ...
+                planned, 'ModulationFamily');
+            diagnostic.ModulationOrder = localStructNumber( ...
+                planned, 'ModulationOrder');
+            diagnostic.PlannedBandwidthHz = localStructNumber( ...
+                planned, 'PlannedBandwidthHz');
+            diagnostic.PlannedDurationSec = localStructNumber( ...
+                planned, 'DurationSec');
+        end
+    end
+end
+
+function textValue = localStructText(s, fieldName)
+    textValue = '';
+    if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
+        textValue = char(string(s.(fieldName)));
+    end
+end
+
+function numericValue = localStructNumber(s, fieldName)
+    numericValue = NaN;
+    if isstruct(s) && isfield(s, fieldName) && ...
+            isnumeric(s.(fieldName)) && isscalar(s.(fieldName)) && ...
+            isfinite(s.(fieldName))
+        numericValue = double(s.(fieldName));
     end
 end
 

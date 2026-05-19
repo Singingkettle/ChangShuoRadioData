@@ -12,7 +12,8 @@ function config = getDefaultConfiguration(obj)
     % CSRD:Scenario:UnsupportedFrequencyStrategy at execution time.
     config.FrequencyAllocation.Strategy = 'ReceiverCentric';
     config.FrequencyAllocation.MinSeparation = 100e3; % 100 kHz
-    config.FrequencyAllocation.MaxOverlap = 0.1; % 10 % overlap allowed
+    config.FrequencyAllocation.AllowOverlap = false;
+    config.FrequencyAllocation.MaxOverlap = 0.1; % only used by explicit overlap tests
 
     % Modulation selection configuration
     config.ModulationSelection.Strategy = 'Random';

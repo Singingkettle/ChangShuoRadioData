@@ -25,6 +25,18 @@ function TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentT
     requireNumericVector(currentTxScenario.Physical, 'Velocity', 3, ...
         'CSRD:Construction:TxMissingPhysical', FrameId, currentTxId);
     TxInfo.Position = double(currentTxScenario.Physical.Position(:)).';
+    if isfield(currentTxScenario.Physical, 'PositionUnit') && ...
+            ~isempty(currentTxScenario.Physical.PositionUnit)
+        TxInfo.PositionUnit = char(string(currentTxScenario.Physical.PositionUnit));
+    else
+        TxInfo.PositionUnit = 'meters';
+    end
+    if isfield(currentTxScenario.Physical, 'GeoPositionDeg') && ...
+            ~isempty(currentTxScenario.Physical.GeoPositionDeg)
+        requireNumericVector(currentTxScenario.Physical, 'GeoPositionDeg', 3, ...
+            'CSRD:Construction:TxMissingPhysical', FrameId, currentTxId);
+        TxInfo.GeoPositionDeg = double(currentTxScenario.Physical.GeoPositionDeg(:)).';
+    end
     TxInfo.Velocity = double(currentTxScenario.Physical.Velocity(:)).';
 
     % Hardware group

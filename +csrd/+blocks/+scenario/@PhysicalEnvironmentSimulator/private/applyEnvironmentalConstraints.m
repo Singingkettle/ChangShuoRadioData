@@ -20,6 +20,15 @@ function entities = applyEnvironmentalConstraints(obj, entities, environment)
 
         % Apply terrain constraints
         entity.Position(3) = max(entity.Position(3), getTerrainHeight(obj, entity.Position(1:2)) + 5);
+        entity.PositionUnit = 'meters';
+        if isfield(obj.mapData, 'Boundaries') && ...
+                isstruct(obj.mapData.Boundaries) && ...
+                isfield(obj.mapData.Boundaries, 'MinLatitude')
+            entity.GeoPositionDeg = localMetersToGeo(entity.Position, ...
+                obj.mapData.Boundaries);
+        elseif ~isfield(entity, 'GeoPositionDeg')
+            entity.GeoPositionDeg = [];
+        end
 
         entities(i) = entity;
     end

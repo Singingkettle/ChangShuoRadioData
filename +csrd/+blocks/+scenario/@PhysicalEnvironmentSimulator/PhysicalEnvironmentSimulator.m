@@ -45,7 +45,7 @@ classdef PhysicalEnvironmentSimulator < matlab.System
     %   config.Entities.Transmitters.Count = [2, 6];
     %   config.Entities.Receivers.Count = [1, 3];
     %   config.Mobility.DefaultModel = 'RandomWalk';
-    %   config.TimeResolution = 0.1; % seconds per frame
+    %   config.TimeResolution = frameDurationSec; % seconds per receiver frame
     %
     %   simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', config);
     %   [entities, environment] = simulator(1, 0.1, []);
@@ -101,7 +101,7 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         % timeResolution - Time resolution for simulation updates (seconds per frame)
         % This value is initialized from configuration and used internally
-        timeResolution double = 0.1
+        timeResolution double = NaN
 
         % stateHistory - Cell array storing historical states for scenario replay
         % Used for future scenario replay functionality and debugging
@@ -181,7 +181,9 @@ classdef PhysicalEnvironmentSimulator < matlab.System
             % Inputs / 输入: see signature arguments and local validation.
             % 输出 / Outputs: see signature return values and contract fields.
             %
-            % Returns the site viewer object if available (OSM mode)
+            % Returns a physical-environment viewer if available. Production
+            % OSM RayTracing keeps the heavy map handle in the channel block
+            % to avoid loading the same OSM file twice.
 
             if isfield(obj.Config, 'Map') && isfield(obj.Config.Map, 'Type') && ...
                     strcmp(obj.Config.Map.Type, 'OSM') && ~isempty(obj.siteViewer)

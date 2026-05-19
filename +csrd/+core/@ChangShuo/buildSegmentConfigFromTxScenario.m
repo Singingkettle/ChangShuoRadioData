@@ -60,6 +60,10 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
         end
     end
     duration = endTime - startTime;
+    if localDurationResolvesToNoSamples(txScenario, duration)
+        segmentConfig = [];
+        return;
+    end
 
     % --- Message ---------------------------------------------------------
     % Upstream contract (generateScenarioTransmitterConfigurations ->
@@ -196,6 +200,32 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
              'is required (received empty / non-positive).']);
     end
     segmentConfig.Placement.TargetBandwidth = txScenario.Spectrum.PlannedBandwidth;
+end
+
+function tf = localDurationResolvesToNoSamples(txScenario, durationSec)
+    tf = false;
+    if isempty(durationSec) || ~isnumeric(durationSec) || ...
+            ~isscalar(durationSec) || ~isfinite(durationSec) || ...
+            durationSec < 0
+        return;
+    end
+    if durationSec == 0
+        tf = true;
+        return;
+    end
+    sampleRate = NaN;
+    if isfield(txScenario, 'Spectrum') && isstruct(txScenario.Spectrum) && ...
+            isfield(txScenario.Spectrum, 'ReceiverSampleRate') && ...
+            isnumeric(txScenario.Spectrum.ReceiverSampleRate) && ...
+            isscalar(txScenario.Spectrum.ReceiverSampleRate) && ...
+            isfinite(txScenario.Spectrum.ReceiverSampleRate) && ...
+            txScenario.Spectrum.ReceiverSampleRate > 0
+        sampleRate = double(txScenario.Spectrum.ReceiverSampleRate);
+    end
+    if ~isfinite(sampleRate)
+        return;
+    end
+    tf = round(double(durationSec) * sampleRate) == 0;
 end
 
 function lengthBits = localPerSegmentMessageLength(messageConfig, modulationConfig, durationSec)

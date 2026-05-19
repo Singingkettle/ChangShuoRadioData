@@ -51,6 +51,8 @@ function entity = createEntity(obj, entityType, entityID, frameId)
     entity.Snapshots{frameId} = initialSnapshot;
 
     entity.Position = initialSnapshot.Physical.Position;
+    entity.PositionUnit = initialSnapshot.Physical.PositionUnit;
+    entity.GeoPositionDeg = initialSnapshot.Physical.GeoPositionDeg;
     entity.Velocity = initialSnapshot.Physical.Velocity;
     entity.Orientation = initialSnapshot.Physical.Orientation;
     entity.AngularVelocity = initialSnapshot.Physical.AngularVelocity;
@@ -96,17 +98,21 @@ function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
     bounds = obj.mapData.Boundaries;
 
     if isstruct(bounds) && isfield(bounds, 'MinLatitude')
-        snapshot.Physical.Position = [
-            randomInRange(obj, bounds.MinLongitude, bounds.MaxLongitude), ...
-            randomInRange(obj, bounds.MinLatitude, bounds.MaxLatitude), ...
-            randomInRange(obj, 10, 100) ...
-        ];
+        latDeg = randomInRange(obj, bounds.MinLatitude, bounds.MaxLatitude);
+        lonDeg = randomInRange(obj, bounds.MinLongitude, bounds.MaxLongitude);
+        heightMeters = randomInRange(obj, 10, 100);
+        xyMeters = geoToLocalMeters(latDeg, lonDeg, bounds);
+        snapshot.Physical.Position = [xyMeters, heightMeters];
+        snapshot.Physical.GeoPositionDeg = [latDeg, lonDeg, heightMeters];
+        snapshot.Physical.PositionUnit = 'meters';
     elseif isnumeric(bounds) && numel(bounds) >= 4
         snapshot.Physical.Position = [
             randomInRange(obj, bounds(1), bounds(2)), ...
             randomInRange(obj, bounds(3), bounds(4)), ...
             randomInRange(obj, 10, 100) ...
         ];
+        snapshot.Physical.GeoPositionDeg = [];
+        snapshot.Physical.PositionUnit = 'meters';
     else
         error('CSRD:Construction:MissingMapBoundaries', ...
             ['createEntity: obj.mapData.Boundaries has unsupported ', ...

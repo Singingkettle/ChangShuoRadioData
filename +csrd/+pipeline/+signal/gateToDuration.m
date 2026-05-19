@@ -1,4 +1,4 @@
-function signalStruct = gateToDuration(signalStruct, durationSec, stageName)
+function signalStruct = gateToDuration(signalStruct, durationSec, stageName, varargin)
 %GATETODURATION Align a signal struct to an explicit duration.
 %
 %   signalStruct = csrd.pipeline.signal.gateToDuration(signalStruct,
@@ -10,6 +10,23 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName)
 
     if nargin < 3 || isempty(stageName)
         stageName = 'unspecified';
+    end
+    minPositiveSamples = false;
+    if ~isempty(varargin)
+        for argIdx = 1:2:numel(varargin)
+            name = char(string(varargin{argIdx}));
+            if argIdx + 1 > numel(varargin)
+                error('CSRD:Signal:GatingInvalidOption', ...
+                    'gateToDuration option "%s" is missing a value.', name);
+            end
+            switch lower(name)
+                case 'minpositivesamples'
+                    minPositiveSamples = logical(varargin{argIdx + 1});
+                otherwise
+                    error('CSRD:Signal:GatingInvalidOption', ...
+                        'Unsupported gateToDuration option "%s".', name);
+            end
+        end
     end
 
     if ~isstruct(signalStruct) || ~isfield(signalStruct, 'Signal')
@@ -29,7 +46,7 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName)
     end
 
     sampleRate = double(signalStruct.SampleRate);
-    targetSamples = max(0, round(double(durationSec) * sampleRate));
+    requestedSamples = max(0, round(double(durationSec) * sampleRate));
 
     x = signalStruct.Signal;
     if isempty(x)
@@ -38,10 +55,14 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName)
         x = complex(zeros(0, 1));
     else
         inputSamples = size(x, 1);
-        if isvector(x)
-            x = x(:);
-        end
         numCols = size(x, 2);
+    end
+    targetSamples = requestedSamples;
+    minimumPositiveSamplesApplied = false;
+    if targetSamples == 0 && durationSec > 0 && minPositiveSamples && ...
+            inputSamples > 0
+        targetSamples = 1;
+        minimumPositiveSamplesApplied = true;
     end
 
     action = 'none';
@@ -63,11 +84,13 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName)
     info = struct( ...
         'Stage', char(string(stageName)), ...
         'TargetDurationSec', double(durationSec), ...
+        'RequestedSamples', requestedSamples, ...
         'TargetSamples', targetSamples, ...
         'InputSamples', inputSamples, ...
         'OutputSamples', size(y, 1), ...
         'SampleRate', sampleRate, ...
-        'Action', action);
+        'Action', action, ...
+        'MinimumPositiveSamplesApplied', minimumPositiveSamplesApplied);
 
     if ~isfield(signalStruct, 'SignalGating') || ...
             ~isstruct(signalStruct.SignalGating)

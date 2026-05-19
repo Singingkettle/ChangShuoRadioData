@@ -35,7 +35,9 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         end
 
         % Step 2: Process scenario (using already instantiated ScenarioFactory)
+        stageStart = tic;
         [instantiatedTxs, instantiatedRxs, globalLayout] = processScenarioInstantiation(obj, FrameId);
+        localTraceFrameStage('Frame.ScenarioInstantiation', stageStart, FrameId);
 
         % Phase 3 (audit §3.5 / §17.5 P3-7): expose the freshly-built
         % globalLayout as a public read-only property so SimulationRunner
@@ -65,19 +67,31 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         end
 
         % Step 3: Process all transmitters (message generation and modulation)
+        stageStart = tic;
         [txsSignalSegments, TxInfos] = processTransmitters(obj, FrameId, numTxThisFrame);
+        localTraceFrameStage('Frame.ProcessTransmitters', stageStart, FrameId, ...
+            struct('NumTransmitters', numTxThisFrame));
 
         % Step 4: Apply transmitter frontend impairments
+        stageStart = tic;
         txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalSegments, TxInfos);
+        localTraceFrameStage('Frame.TransmitImpairments', stageStart, FrameId);
 
         % Step 5: Setup receivers
+        stageStart = tic;
         RxInfos = setupReceivers(obj, FrameId, numRxThisFrame);
+        localTraceFrameStage('Frame.SetupReceivers', stageStart, FrameId, ...
+            struct('NumReceivers', numRxThisFrame));
 
         % Step 6: Process channel propagation
+        stageStart = tic;
         signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalSegments, TxInfos, RxInfos);
+        localTraceFrameStage('Frame.ChannelPropagation', stageStart, FrameId);
 
         % Step 7: Process receiver processing and generate final outputs
+        stageStart = tic;
         [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, signalsAtReceivers, RxInfos);
+        localTraceFrameStage('Frame.ReceiverProcessing', stageStart, FrameId);
 
         obj.logger.debug("Scenario frame %d: Single frame generation completed successfully.", FrameId);
 
@@ -90,4 +104,12 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         rethrow(ME);
     end
 
+end
+
+function localTraceFrameStage(stageName, startTick, frameId, metadata)
+if nargin < 4 || ~isstruct(metadata)
+    metadata = struct();
+end
+metadata.FrameId = frameId;
+csrd.runtime.performance.trace('event', stageName, toc(startTick), metadata);
 end

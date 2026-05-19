@@ -32,6 +32,7 @@ scenarioConfig.Global.NumFramesPerScenario = double(numFrames);
 scenarioConfig.Global.FrameNumSamples = frameSamples;
 scenarioConfig.Global.FrameDuration = frameDurationSec;
 scenarioConfig.Global.ObservationDuration = canonicalObservationDurationSec;
+scenarioConfig.Global.TimeResolution = frameDurationSec;
 
 switch target
     case 'master'

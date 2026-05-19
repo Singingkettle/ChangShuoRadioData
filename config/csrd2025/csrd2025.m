@@ -34,6 +34,8 @@ function config = csrd2025()
     config.Runner.Data.RetentionPolicy = 'Keep'; % Data retention policy
     config.Runner.Data.VersionControl = true; % Enable version control
     config.Runner.Data.ScenarioGrouping = true; % Group data by scenario
+    config.Runner.Data.PrettyPrintAnnotations = false; % Compact JSON for production speed
+    config.Runner.Log.Policy = 'LargeMC'; % Suppress hot-path debug/info formatting
 
     % Parallel Processing Configuration
     config.Runner.Parallel.UseParallel = false; % Enable parallel processing
@@ -51,6 +53,11 @@ function config = csrd2025()
     config.Runner.Engine.ErrorRecovery = 'Graceful'; % Error recovery strategy
     config.Runner.Engine.PerformanceMonitoring = true; % Enable monitoring
     config.Runner.Engine.InstancePerScenario = true; % Create new instance per scenario
+
+    % Phase 21 performance tracing. Production default stays off; profiling
+    % tools turn this on and write ignored artifacts/performance/phase21/.
+    config.Runner.Performance.EnableStageTiming = false;
+    config.Runner.Performance.ArtifactDirectory = fullfile('artifacts', 'performance', 'phase21');
 
     % Quality Assurance Configuration
     config.Runner.QualityAssurance.EnableValidation = true; % Enable validation

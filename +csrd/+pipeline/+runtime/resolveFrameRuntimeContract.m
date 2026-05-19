@@ -53,6 +53,13 @@ if isfield(globalConfig, 'FrameDuration') && ~isempty(globalConfig.FrameDuration
         sampleRateHz, 'Factories.Scenario.Global.FrameDuration');
     frameDurationSec = declaredFrameDuration;
 end
+if isfield(globalConfig, 'TimeResolution') && ~isempty(globalConfig.TimeResolution)
+    declaredTimeResolution = localRequirePositiveScalar(globalConfig.TimeResolution, ...
+        'Factories.Scenario.Global.TimeResolution', ...
+        'CSRD:Frame:InvalidTimeResolution');
+    localAssertDurationMatchesSamples(declaredTimeResolution, frameNumSamples, ...
+        sampleRateHz, 'Factories.Scenario.Global.TimeResolution');
+end
 
 observationDurationSec = frameDurationSec * numFrames;
 if isfield(globalConfig, 'ObservationDuration') && ~isempty(globalConfig.ObservationDuration)

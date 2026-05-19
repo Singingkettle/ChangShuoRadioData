@@ -104,6 +104,28 @@ classdef ChannelPropagationFailFastTest < matlab.unittest.TestCase
             end
         end
 
+        function rayTracingChannelApplyErrorsDoNotFallback(testCase)
+            here = fileparts(mfilename('fullpath'));
+            target = fullfile(here, '..', '..', '+csrd', '+blocks', ...
+                '+physical', '+channel', 'RayTracing.m');
+            target = char(java.io.File(target).getCanonicalPath());
+            text = fileread(target);
+
+            testCase.verifyNotEmpty(strfind(text, ...
+                "executionStage = 'ChannelApply'"), ...
+                ['RayTracing must tag the comm.RayTracingChannel apply ', ...
+                 'stage so signal-shape errors cannot be mistaken for ', ...
+                 'no-path raytrace failures.']);
+            testCase.verifyNotEmpty(strfind(text, ...
+                "strcmp(executionStage, 'RayTrace')"), ...
+                ['RayTracing fallback must be restricted to the raytrace ', ...
+                 'stage; channel construction/apply errors are hard ', ...
+                 'execution failures.']);
+            testCase.verifyNotEmpty(strfind(text, ...
+                'RayTracing:ExecutionFailed'), ...
+                'RayTracing channel execution failures must fail fast.');
+        end
+
         function lookupReceiverViewOffsetMissingReceiverViewsRaises(testCase)
             txCfg = struct('EntityID', 'Tx1');
             rxInfo = struct('ID', 'Rx1');
@@ -180,6 +202,17 @@ classdef ChannelPropagationFailFastTest < matlab.unittest.TestCase
         function dopplerRelativeVelocityRejectsInvalidReceiverVelocity(testCase)
             txInfo = struct('Velocity', [0, 0, 0]);
             rxInfo = struct('Velocity', [1, 2]);
+
+            f = @() csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
+                txInfo, rxInfo);
+
+            testCase.verifyError(f, ...
+                'CSRD:Channel:DopplerInvalidGeometryVector');
+        end
+
+        function dopplerRelativeVelocityRejectsMissingVelocity(testCase)
+            txInfo = struct();
+            rxInfo = struct('Velocity', [0, 0, 0]);
 
             f = @() csrd.core.ChangShuo.resolveRelativeVelocityForDoppler( ...
                 txInfo, rxInfo);

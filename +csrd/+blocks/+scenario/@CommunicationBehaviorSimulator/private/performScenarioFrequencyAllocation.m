@@ -15,6 +15,26 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
     obj.logger.debug('Scenario: Starting frequency allocation for %d transmitters', ...
         length(txConfigs));
 
+    % Calculate available bandwidth
+    availableBW = observableRange(2) - observableRange(1);
+
+    if isfield(globalLayout, 'Regulatory') && ...
+            isstruct(globalLayout.Regulatory) && ...
+            isfield(globalLayout.Regulatory, 'Enable') && ...
+            isequal(globalLayout.Regulatory.Enable, true)
+        globalLayout.AllocationStrategy = 'RegulatoryCatalog';
+        globalLayout.OverlapRatio = 0;
+        globalLayout.OverlapAllowed = false;
+        globalLayout.OverlapReason = '';
+        globalLayout.OverlapOccurred = false;
+        globalLayout.ObservableRange = observableRange;
+        globalLayout.TotalBandwidth = availableBW;
+        [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan( ...
+            obj, txConfigs, rxConfigs, observableRange, globalLayout);
+        obj.logger.debug('Scenario: Frequency allocation completed from regulatory catalog');
+        return;
+    end
+
     % Calculate total required bandwidth
     totalRequiredBW = 0;
 
@@ -26,8 +46,6 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
         end
     end
 
-    % Calculate available bandwidth
-    availableBW = observableRange(2) - observableRange(1);
     minSeparation = obj.Config.FrequencyAllocation.MinSeparation;
     separationBW = (length(txConfigs) - 1) * minSeparation;
     totalNeededBW = totalRequiredBW + separationBW;
@@ -36,15 +54,32 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
         totalRequiredBW / 1e6, availableBW / 1e6);
 
     % Determine allocation strategy
+    allowOverlap = isfield(obj.Config.FrequencyAllocation, 'AllowOverlap') && ...
+        isequal(obj.Config.FrequencyAllocation.AllowOverlap, true);
+
     if totalNeededBW > availableBW
+        if ~allowOverlap
+            error('CSRD:Scenario:FrequencyAllocationInsufficientBandwidth', ...
+                ['Required bandwidth plus separation is %.6g Hz, but the ', ...
+                 'receiver observable range only provides %.6g Hz. ', ...
+                 'Widen the receiver range, reduce transmitter count/bandwidth, ', ...
+                 'or use an explicit overlap test config with AllowOverlap=true.'], ...
+                totalNeededBW, availableBW);
+        end
         strategy = 'Overlapping';
         overlapRatio = min(obj.Config.FrequencyAllocation.MaxOverlap, ...
             (totalNeededBW - availableBW) / availableBW);
+        globalLayout.OverlapAllowed = true;
+        globalLayout.OverlapReason = 'ExplicitFrequencyAllocationAllowOverlap';
+        globalLayout.OverlapOccurred = false;
         obj.logger.warning('Scenario: Insufficient bandwidth, using overlapping allocation (%.1f%% overlap)', ...
             overlapRatio * 100);
     else
         strategy = 'NonOverlapping';
         overlapRatio = 0;
+        globalLayout.OverlapAllowed = false;
+        globalLayout.OverlapReason = '';
+        globalLayout.OverlapOccurred = false;
         obj.logger.debug('Scenario: Using non-overlapping frequency allocation');
     end
 
@@ -52,17 +87,6 @@ function [txConfigs, globalLayout] = performScenarioFrequencyAllocation(obj, txC
     globalLayout.OverlapRatio = overlapRatio;
     globalLayout.ObservableRange = observableRange;
     globalLayout.TotalBandwidth = availableBW;
-
-    if isfield(globalLayout, 'Regulatory') && ...
-            isstruct(globalLayout.Regulatory) && ...
-            isfield(globalLayout.Regulatory, 'Enable') && ...
-            isequal(globalLayout.Regulatory.Enable, true)
-        globalLayout.AllocationStrategy = 'RegulatoryCatalog';
-        [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan( ...
-            obj, txConfigs, rxConfigs, observableRange, globalLayout);
-        obj.logger.debug('Scenario: Frequency allocation completed from regulatory catalog');
-        return;
-    end
 
     % Perform actual frequency allocation.
     %

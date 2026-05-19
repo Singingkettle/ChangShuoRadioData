@@ -239,6 +239,13 @@ function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
         end
     end
 
-    binWidth = mean(diff(fAxis));
-    bwHz = double((rBest - lBest + 1) * binWidth);
+    if nBins == 1
+        % A single nonzero sample is an impulse on the sample grid. Its
+        % discrete spectrum occupies the full observable Nyquist span, and
+        % this must match measureSignalSummary's short-signal semantics.
+        bwHz = sampleRate;
+    else
+        binWidth = median(diff(fAxis));
+        bwHz = double(max(0, (fAxis(rBest) - fAxis(lBest)) + abs(binWidth)));
+    end
 end

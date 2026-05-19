@@ -31,9 +31,9 @@ function profile = AntennaModulationMatrix()
 
     m('PSK')     = {'Allowed','Allowed','Allowed','Conditional','Forbidden'};
     m('QAM')     = {'Allowed','Allowed','Allowed','Conditional','Forbidden'};
-    m('PAM')     = {'Allowed','Allowed','Allowed','Conditional','Forbidden'};
+    m('PAM')     = {'Allowed','Forbidden','Forbidden','Forbidden','Forbidden'};
     m('APSK')    = {'Allowed','Allowed','Allowed','Conditional','Forbidden'};
-    m('OOK')     = {'Allowed','Allowed','Allowed','Conditional','Forbidden'};
+    m('OOK')     = {'Allowed','Forbidden','Forbidden','Forbidden','Forbidden'};
     m('ASK')     = {'Allowed','Allowed','Allowed','Conditional','Forbidden'};
 
     m('OFDM')    = {'Allowed','Allowed','Allowed','Allowed','Conditional'};

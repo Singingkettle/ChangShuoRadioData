@@ -29,8 +29,7 @@ function RxInfo = validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx)
     %   guarantee these fields exist on every accepted blueprint, so any
     %   missing data here is a planner-side bug.
     %
-    %   Errors (all on the scenario-skip whitelist in
-    %   +csrd/+pipeline/+scenario/isScenarioSkipException.m):
+%   Errors (all hard failures in Phase 20, not scenario skips):
     %     CSRD:Construction:RxMissingPhysical
     %     CSRD:Construction:RxMissingHardware
     %     CSRD:Construction:RxMissingObservation
@@ -69,6 +68,25 @@ function RxInfo = validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx)
              '3-element vectors.'], FrameId, rxIdx, char(string(RxInfo.ID)));
     end
     RxInfo.Position = double(rxPlan.Physical.Position(:)).';
+    if isfield(rxPlan.Physical, 'PositionUnit') && ...
+            ~isempty(rxPlan.Physical.PositionUnit)
+        RxInfo.PositionUnit = char(string(rxPlan.Physical.PositionUnit));
+    else
+        RxInfo.PositionUnit = 'meters';
+    end
+    if isfield(rxPlan.Physical, 'GeoPositionDeg') && ...
+            ~isempty(rxPlan.Physical.GeoPositionDeg)
+        if ~isnumeric(rxPlan.Physical.GeoPositionDeg) || ...
+                numel(rxPlan.Physical.GeoPositionDeg) ~= 3 || ...
+                any(~isfinite(rxPlan.Physical.GeoPositionDeg(:)))
+            error('CSRD:Construction:RxMissingPhysical', ...
+                ['validateRxPlanIntoRxInfo: Frame %d, Rx %d (%s): ', ...
+                 'rxPlan.Physical.GeoPositionDeg must be a finite ', ...
+                 '3-element [lat lon height] vector.'], ...
+                FrameId, rxIdx, char(string(RxInfo.ID)));
+        end
+        RxInfo.GeoPositionDeg = double(rxPlan.Physical.GeoPositionDeg(:)).';
+    end
     RxInfo.Velocity = double(rxPlan.Physical.Velocity(:)).';
 
     if ~isfield(rxPlan, 'Hardware') || ~isstruct(rxPlan.Hardware) ...

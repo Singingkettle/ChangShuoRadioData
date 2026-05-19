@@ -168,15 +168,28 @@ classdef ProfileLoaderTest < matlab.unittest.TestCase
         end
 
         function antennaCompatPskQamFollowsThreeStateRule(testCase)
-            % PSK/QAM @ 1/2/4 Tx -> Allowed; @ 8 -> Conditional; @ 16 -> Forbidden
+            % Families with implemented OSTBC/MIMO support follow 3-state rows.
             p = csrd.catalog.profile.profileLoader('antennaCompat', ...
                 'AntennaModulationMatrix');
-            for fam = {'PSK','QAM','PAM','APSK','OOK','ASK'}
+            for fam = {'PSK','QAM','APSK','ASK'}
                 row = p.Matrix(fam{1});
                 testCase.verifyEqual(row{1}, 'Allowed');
                 testCase.verifyEqual(row{2}, 'Allowed');
                 testCase.verifyEqual(row{3}, 'Allowed');
                 testCase.verifyEqual(row{4}, 'Conditional');
+                testCase.verifyEqual(row{5}, 'Forbidden');
+            end
+        end
+
+        function antennaCompatSingleAntennaImplementedFamiliesAreStrict(testCase)
+            p = csrd.catalog.profile.profileLoader('antennaCompat', ...
+                'AntennaModulationMatrix');
+            for fam = {'PAM','OOK'}
+                row = p.Matrix(fam{1});
+                testCase.verifyEqual(row{1}, 'Allowed');
+                testCase.verifyEqual(row{2}, 'Forbidden');
+                testCase.verifyEqual(row{3}, 'Forbidden');
+                testCase.verifyEqual(row{4}, 'Forbidden');
                 testCase.verifyEqual(row{5}, 'Forbidden');
             end
         end

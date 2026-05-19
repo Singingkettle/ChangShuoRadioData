@@ -11,14 +11,12 @@ function msg = constructMessage(obj, argA, argB, varargin)
 % Default new message to empty
 msg = obj.MessageBuffer([]);
 
-% Get caller information from call stack
-callerInfo = getCallerInfo();
-
 % Check input format
 if nargin == 3 && ( ischar(argB) || isStringScalar(argB) )
     %logObj.write(Level, MessageText)
 
     if obj.isLevelLogged(argA)
+        callerInfo = getCallerInfo();
         msg = obj.MessageConstructor();
         msg.Level = argA;
         msg.Text = argB;
@@ -29,6 +27,7 @@ elseif nargin > 3
     %logObj.write(Level, MessageText, sprintf_args...)
 
     if obj.isLevelLogged(argA)
+        callerInfo = getCallerInfo();
         msg = obj.MessageConstructor();
         msg.Level = argA;
         msg.Text = sprintf(argB, varargin{:});
@@ -39,6 +38,7 @@ elseif nargin == 2 && isa(argA, "csrd.runtime.logger.mlog.Message")
     %logObj.write(csrd.runtime.logger.mlog.Message)
 
     if obj.isLevelLogged(argA.Level)
+        callerInfo = getCallerInfo();
         msg = argA;
         % Keep existing caller info if already set, otherwise use current
         if strlength(msg.Caller) == 0
@@ -50,6 +50,7 @@ elseif nargin == 2 && isa(argA,'MException')
     %logObj.write(MException)
 
     if obj.isLevelLogged(csrd.runtime.logger.mlog.Level.ERROR)
+        callerInfo = getCallerInfo();
         msg = obj.MessageConstructor();
         msg.Level = csrd.runtime.logger.mlog.Level.ERROR;
         msg.Text = obj.convertExceptionText(argA);
@@ -60,6 +61,7 @@ elseif nargin == 3 && isa(argB,'MException')
     %logObj.write(Level, MException)
 
     if obj.isLevelLogged(argA)
+        callerInfo = getCallerInfo();
         msg = obj.MessageConstructor();
         msg.Level = argA;
         msg.Text = obj.convertExceptionText(argB);
