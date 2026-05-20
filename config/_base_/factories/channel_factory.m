@@ -37,6 +37,13 @@ function config = channel_factory()
     config.Factories.Channel.ChannelModels.RayTracing.Config.NumRaysPerSource = 1000;
     config.Factories.Channel.ChannelModels.RayTracing.Config.UseGPU = 'auto';
     config.Factories.Channel.ChannelModels.RayTracing.Config.GpuMinSamples = 8192;
+    % Geometry cache tolerance (meters) for RayTracing site/ray keys.
+    % The default frame duration is microseconds, so moving endpoints often
+    % drift below OSM geometry precision between adjacent frames. This
+    % tolerance avoids full-map raytrace repeats for numerically
+    % indistinguishable geometry while exporting the value in ChannelInfo.
+    config.Factories.Channel.ChannelModels.RayTracing.Config.RayCachePositionToleranceM = 0.01;
+    config.Factories.Channel.ChannelModels.RayTracing.Config.SlowStageInfoThresholdSec = 30;
     config.Factories.Channel.ChannelModels.RayTracing.Config.PropagationModelConfig.Method = 'sbr';
     config.Factories.Channel.ChannelModels.RayTracing.Config.PropagationModelConfig.MaxNumReflections = 3;
     config.Factories.Channel.ChannelModels.RayTracing.Config.PropagationModelConfig.MaxNumDiffractions = 0;

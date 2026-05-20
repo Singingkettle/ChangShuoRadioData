@@ -30,8 +30,17 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
             isfield(scenarioMapProfile, 'ChannelModel') && ...
             strcmpi(char(string(scenarioMapProfile.ChannelModel)), 'RayTracing') && ...
             ismethod(obj.Factories.Channel, 'precomputeRayTracingFrame')
-        obj.Factories.Channel.precomputeRayTracingFrame( ...
-            FrameId, TxInfos, RxInfos, scenarioMapProfile, obj.ScenarioConfig);
+        activeTxInfos = localActiveTxInfosForChannelPrecompute( ...
+            txsSignalSegments, TxInfos);
+        activeRxInfos = localActiveRxInfosForChannelPrecompute(RxInfos);
+        if isempty(activeTxInfos) || isempty(activeRxInfos)
+            obj.logger.debug(['Frame %d: skipped RayTracing precompute ', ...
+                'because no live Tx/Rx links exist.'], FrameId);
+        else
+            obj.Factories.Channel.precomputeRayTracingFrame( ...
+                FrameId, activeTxInfos, activeRxInfos, scenarioMapProfile, ...
+                obj.ScenarioConfig);
+        end
     end
 
     % Initialize received signals structure for each receiver
@@ -418,6 +427,49 @@ function mapProfile = getMapProfileFromLayout(layout)
         elseif isfield(env, 'MapProfile')
             mapProfile = env.MapProfile;
         end
+    end
+end
+
+function activeTxInfos = localActiveTxInfosForChannelPrecompute(txsSignalSegments, TxInfos)
+    activeTxInfos = {};
+    numTx = min(numel(txsSignalSegments), numel(TxInfos));
+    for txIdx = 1:numTx
+        txInfo = TxInfos{txIdx};
+        if ~isstruct(txInfo) || ~isfield(txInfo, 'ID') || ...
+                (isfield(txInfo, 'Status') && contains(txInfo.Status, 'Error'))
+            continue;
+        end
+        if ~localTxHasLiveSignalSegment(txsSignalSegments{txIdx})
+            continue;
+        end
+        activeTxInfos{end + 1} = txInfo; %#ok<AGROW>
+    end
+end
+
+function tf = localTxHasLiveSignalSegment(txSegments)
+    tf = false;
+    if isempty(txSegments) || ~iscell(txSegments)
+        return;
+    end
+    for segIdx = 1:numel(txSegments)
+        segmentSignal = txSegments{segIdx};
+        if isstruct(segmentSignal) && isfield(segmentSignal, 'Signal') && ...
+                ~isempty(segmentSignal.Signal)
+            tf = true;
+            return;
+        end
+    end
+end
+
+function activeRxInfos = localActiveRxInfosForChannelPrecompute(RxInfos)
+    activeRxInfos = {};
+    for rxIdx = 1:numel(RxInfos)
+        rxInfo = RxInfos{rxIdx};
+        if ~isstruct(rxInfo) || ~isfield(rxInfo, 'ID') || ...
+                (isfield(rxInfo, 'Status') && contains(rxInfo.Status, 'Error'))
+            continue;
+        end
+        activeRxInfos{end + 1} = rxInfo; %#ok<AGROW>
     end
 end
 function channelModel = resolveChannelModelFromScenario(mapProfile)
