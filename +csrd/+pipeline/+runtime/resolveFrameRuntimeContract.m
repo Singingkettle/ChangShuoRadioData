@@ -5,9 +5,12 @@ function contract = resolveFrameRuntimeContract(factoryConfigs, runnerConfig, va
 % Canonical input:
 %   FactoryConfigs.Scenario.Global.FrameNumSamples
 %
-% Legacy aliases are rejected here:
+% Legacy aliases and derived raw-config fields are rejected here:
 %   FactoryConfigs.Scenario.Global.FrameLength
 %   RunnerConfig.FixedFrameLength
+%   FactoryConfigs.Scenario.Global.FrameDuration
+%   FactoryConfigs.Scenario.Global.ObservationDuration
+%   FactoryConfigs.Scenario.Global.TimeResolution
 %
 % Units:
 %   FrameNumSamples          samples per receiver frame
@@ -46,36 +49,21 @@ end
 
 frameDurationSec = frameNumSamples / sampleRateHz;
 if isfield(globalConfig, 'FrameDuration') && ~isempty(globalConfig.FrameDuration)
-    declaredFrameDuration = localRequirePositiveScalar(globalConfig.FrameDuration, ...
-        'Factories.Scenario.Global.FrameDuration', ...
-        'CSRD:Frame:InvalidFrameDuration');
-    localAssertDurationMatchesSamples(declaredFrameDuration, frameNumSamples, ...
-        sampleRateHz, 'Factories.Scenario.Global.FrameDuration');
-    frameDurationSec = declaredFrameDuration;
+    error('CSRD:Frame:DeprecatedDerivedFrameDuration', ...
+        ['Factories.Scenario.Global.FrameDuration is a derived runtime fact. ', ...
+         'Use RuntimePlan.Frame.FrameDurationSec.']);
 end
 if isfield(globalConfig, 'TimeResolution') && ~isempty(globalConfig.TimeResolution)
-    declaredTimeResolution = localRequirePositiveScalar(globalConfig.TimeResolution, ...
-        'Factories.Scenario.Global.TimeResolution', ...
-        'CSRD:Frame:InvalidTimeResolution');
-    localAssertDurationMatchesSamples(declaredTimeResolution, frameNumSamples, ...
-        sampleRateHz, 'Factories.Scenario.Global.TimeResolution');
+    error('CSRD:Frame:DeprecatedDerivedTimeResolution', ...
+        ['Factories.Scenario.Global.TimeResolution is a derived runtime fact. ', ...
+         'Use RuntimePlan.Frame.FrameDurationSec.']);
 end
 
 observationDurationSec = frameDurationSec * numFrames;
 if isfield(globalConfig, 'ObservationDuration') && ~isempty(globalConfig.ObservationDuration)
-    declaredObservationDuration = localRequirePositiveScalar( ...
-        globalConfig.ObservationDuration, ...
-        'Factories.Scenario.Global.ObservationDuration', ...
-        'CSRD:Frame:InvalidObservationDuration');
-    expectedSamples = declaredObservationDuration * sampleRateHz;
-    canonicalSamples = frameNumSamples * numFrames;
-    if opts.StrictObservationDuration && abs(expectedSamples - canonicalSamples) > 1
-        error('CSRD:Frame:InconsistentObservationDuration', ...
-            ['ObservationDuration*SampleRate=%g but ', ...
-             'FrameNumSamples*NumFramesPerScenario=%g.'], ...
-            expectedSamples, canonicalSamples);
-    end
-    observationDurationSec = declaredObservationDuration;
+    error('CSRD:Frame:DeprecatedDerivedObservationDuration', ...
+        ['Factories.Scenario.Global.ObservationDuration is a derived runtime fact. ', ...
+         'Use RuntimePlan.Frame.ObservationDurationSec.']);
 end
 
 if ~isempty(opts.FrameWindow)

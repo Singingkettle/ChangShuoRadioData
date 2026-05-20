@@ -37,8 +37,10 @@ classdef SimulationRunner < matlab.System
     %   masterConfig = initialize_csrd_configuration();
     %
     %   % Create simulation runner
-    %   runner = csrd.SimulationRunner('RunnerConfig', masterConfig.Runner);
-    %   runner.FactoryConfigs = masterConfig.Factories;
+    %   runner = csrd.SimulationRunner( ...
+    %       'RunnerConfig', masterConfig.Runner, ...
+    %       'FactoryConfigs', masterConfig.Factories, ...
+    %       'RuntimePlan', masterConfig.RuntimePlan);
     %
     %   % Execute simulation (single worker)
     %   runner(1, 1);
@@ -69,6 +71,9 @@ classdef SimulationRunner < matlab.System
         % that will be used by each ChangShuo engine instance
         % Scenario configuration is accessed via FactoryConfigs.Scenario
         FactoryConfigs struct
+
+        % RuntimePlan: canonical derived runtime facts built by config_loader
+        RuntimePlan struct
     end
 
     properties (Access = private)
@@ -181,7 +186,7 @@ classdef SimulationRunner < matlab.System
 
             stageStart = tic;
             obj.validateConfiguration();
-            obj.normalizeAndValidateFactoryRuntimeContracts();
+            obj.validateRuntimePlan();
             obj.recordPerformanceStage('Runner.ValidateConfiguration', toc(stageStart), struct());
 
             % --- Phase 0 change #1: validate required toolboxes ---
@@ -215,6 +220,9 @@ classdef SimulationRunner < matlab.System
                     obj.logger.debug('Random seed set to %d.', obj.RunnerConfig.RandomSeed);
                 end
 
+            end
+            if isfield(obj.RuntimePlan, 'Seed') && isstruct(obj.RuntimePlan.Seed)
+                obj.RuntimePlan.Seed.ResolvedRunSeed = obj.resolvedRuntimeSeed;
             end
 
             stageStart = tic;
@@ -561,23 +569,29 @@ classdef SimulationRunner < matlab.System
             end
 
             engine.FactoryConfigs = factoryConfigs;
+            engine.RuntimePlan = obj.RuntimePlan;
 
             obj.logger.debug('ChangShuo engine configured for scenario %d', scenarioId);
         end
 
-        function normalizeAndValidateFactoryRuntimeContracts(obj)
-            %NORMALIZEANDVALIDATEFACTORYRUNTIMECONTRACTS Enforce Phase 18 contracts.
-            % 中文说明：直传 FactoryConfigs 的路径也必须走配置加载后的同一合同。
+        function validateRuntimePlan(obj)
+            %VALIDATERUNTIMEPLAN Enforce Phase 30 runtime-plan boundary.
+            % 中文说明：生产 Runner 必须接收 config_loader 构建好的 RuntimePlan。
             if isempty(obj.FactoryConfigs)
                 error('SimulationRunner:ConfigError', ...
                     'FactoryConfigs are required before SimulationRunner setup.');
             end
-            wrappedConfig = struct();
-            wrappedConfig.Runner = obj.RunnerConfig;
-            wrappedConfig.Factories = obj.FactoryConfigs;
-            wrappedConfig.Metadata = struct();
-            wrappedConfig = csrd.pipeline.runtime.normalizeRuntimeContracts(wrappedConfig);
-            obj.FactoryConfigs = wrappedConfig.Factories;
+            if isempty(obj.RuntimePlan) || ~isstruct(obj.RuntimePlan)
+                error('CSRD:RuntimePlan:MissingRuntimePlan', ...
+                    ['SimulationRunner.RuntimePlan is required. ', ...
+                     'Load configs through csrd.runtime.config_loader.']);
+            end
+            expected = csrd.pipeline.runtime.buildRuntimePlan(struct( ...
+                'Runner', obj.RunnerConfig, ...
+                'Factories', obj.FactoryConfigs, ...
+                'Metadata', struct()));
+            localAssertRuntimePlanFrameMatches(obj.RuntimePlan.Frame, ...
+                expected.RuntimePlan.Frame);
         end
 
         function saveScenarioData(obj, scenarioData, scenarioAnnotation, ...
@@ -1482,6 +1496,27 @@ hash = mod(hash * 48271 + 1, modulus);
 seedValue = double(mod(hash, modulus - 1)) + 1;
 if seedValue < 1
     seedValue = 1;
+end
+end
+
+function localAssertRuntimePlanFrameMatches(actualFrame, expectedFrame)
+%LOCALASSERTRUNTIMEPLANFRAMEMATCHES Ensure plan matches current config.
+required = {'FrameNumSamples', 'FrameDurationSec', ...
+    'NumFramesPerScenario', 'ObservationDurationSec', 'SampleRateHz'};
+for idx = 1:numel(required)
+    field = required{idx};
+    if ~isfield(actualFrame, field) || ~isfield(expectedFrame, field)
+        error('CSRD:RuntimePlan:FrameContractMismatch', ...
+            'RuntimePlan.Frame.%s is required.', field);
+    end
+    actual = double(actualFrame.(field));
+    expected = double(expectedFrame.(field));
+    tolerance = max(1e-9 * max(abs([actual, expected])), 1e-9);
+    if abs(actual - expected) > tolerance
+        error('CSRD:RuntimePlan:FrameContractMismatch', ...
+            'RuntimePlan.Frame.%s=%g but config resolves to %g.', ...
+            field, actual, expected);
+    end
 end
 end
 

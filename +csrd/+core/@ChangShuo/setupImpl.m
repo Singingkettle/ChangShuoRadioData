@@ -20,10 +20,11 @@ function setupImpl(obj)
         error('ChangShuo:ConfigurationError', 'Scenario configuration required in FactoryConfigs.');
     end
 
-    wrappedConfig = struct('Factories', obj.FactoryConfigs, ...
-        'Runner', struct(), 'Metadata', struct());
-    wrappedConfig = csrd.pipeline.runtime.normalizeRuntimeContracts(wrappedConfig);
-    obj.FactoryConfigs = wrappedConfig.Factories;
+    if isempty(obj.RuntimePlan) || ~isstruct(obj.RuntimePlan)
+        error('CSRD:RuntimePlan:MissingRuntimePlan', ...
+            ['ChangShuo.RuntimePlan is required. ', ...
+             'Configure the engine through SimulationRunner or pass RuntimePlan explicitly.']);
+    end
 
     validateFactoryConfigs(obj);
 
@@ -46,7 +47,12 @@ function setupImpl(obj)
         config = factoryMap{i, 3};
 
         try
-            obj.Factories.(name) = feval(handle, 'Config', config);
+            if strcmp(name, 'Scenario')
+                obj.Factories.(name) = feval(handle, ...
+                    'Config', config, 'RuntimePlan', obj.RuntimePlan);
+            else
+                obj.Factories.(name) = feval(handle, 'Config', config);
+            end
             obj.logger.debug('Factory [%s] initialized with own config.', name);
         catch ME
             obj.logger.error('Failed to instantiate %s factory: %s', name, ME.message);

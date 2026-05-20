@@ -82,9 +82,9 @@ function masterConfig = config_loader(config_name)
     % Ensure all required top-level fields exist for framework integration
     masterConfig = ensureRequiredFields(masterConfig);
 
-    % Phase 17: validate the canonical scenario frame contract and stamp
-    % derived fields before any production component sees the config.
-    masterConfig = csrd.pipeline.runtime.normalizeRuntimeContracts(masterConfig);
+    % Phase 30: build the canonical runtime plan before any production
+    % component sees the config. Derived facts live under RuntimePlan.
+    masterConfig = csrd.pipeline.runtime.buildRuntimePlan(masterConfig);
 
     % Validate essential factory configurations
     validateFactoryConfigurations(masterConfig);

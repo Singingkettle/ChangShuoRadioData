@@ -68,7 +68,9 @@ classdef ChangShuo < matlab.System
     %
     %   % Engine with factory configurations
     %   config = initialize_csrd_configuration();
-    %   engine = ChangShuo('FactoryConfigs', config.Factories);
+    %   engine = ChangShuo( ...
+    %       'FactoryConfigs', config.Factories, ...
+    %       'RuntimePlan', config.RuntimePlan);
     %
     %   % Engine with specific factory configuration
     %   msgConfig.handle = 'csrd.factories.MessageFactory';
@@ -93,6 +95,9 @@ classdef ChangShuo < matlab.System
         %
         % Each factory is instantiated with ONLY its own config, ensuring independence.
         FactoryConfigs struct
+
+        % RuntimePlan - Canonical derived runtime facts built at config boundary.
+        RuntimePlan struct
     end
 
     properties (SetAccess = private, GetAccess = public)

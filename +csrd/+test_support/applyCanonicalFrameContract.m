@@ -1,6 +1,6 @@
 function cfg = applyCanonicalFrameContract(cfg, observationDurationSec, numFrames)
-%APPLYCANONICALFRAMECONTRACT Write the strict Phase 17 frame contract.
-% 中文说明：测试辅助函数；每次改场景总时长时同步写入 canonical 帧样点数。
+%APPLYCANONICALFRAMECONTRACT Write the strict Phase 30 frame authority.
+% 中文说明：测试辅助函数；只写 raw config 权威字段，不写派生字段。
 
 if nargin < 3
     error('CSRD:TestSupport:FrameContractArgs', ...
@@ -25,14 +25,8 @@ if frameSamples <= 0
     error('CSRD:TestSupport:InvalidFrameSamples', ...
         'Resolved FrameNumSamples must be positive.');
 end
-frameDurationSec = frameSamples / sampleRateHz;
-canonicalObservationDurationSec = frameDurationSec * double(numFrames);
-
 scenarioConfig.Global.NumFramesPerScenario = double(numFrames);
 scenarioConfig.Global.FrameNumSamples = frameSamples;
-scenarioConfig.Global.FrameDuration = frameDurationSec;
-scenarioConfig.Global.ObservationDuration = canonicalObservationDurationSec;
-scenarioConfig.Global.TimeResolution = frameDurationSec;
 
 switch target
     case 'master'

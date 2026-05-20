@@ -25,6 +25,9 @@ classdef ScenarioFactory < matlab.System
         % Expected structure: Config.Factories.Scenario.PhysicalEnvironment and
         %                    Config.Factories.Scenario.CommunicationBehavior
         Config struct
+
+        % RuntimePlan: Canonical derived runtime facts for this run
+        RuntimePlan struct
     end
 
     properties (SetAccess = private)
@@ -683,12 +686,10 @@ classdef ScenarioFactory < matlab.System
                 physicalEnvConfig.Global = obj.factoryConfig.Global;
             end
 
-            % Physical state evolves once per receiver frame. Reusing an
-            % unrelated TimeResolution silently desynchronizes mobility,
-            % Doppler, signal placement, and annotation execution truth.
-            frameContract = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
-                struct('Scenario', obj.factoryConfig), struct());
-            physicalEnvConfig.TimeResolution = frameContract.FrameDurationSec;
+            % Physical state evolves once per receiver frame. RuntimePlan is
+            % the only source for derived frame duration.
+            framePlan = obj.requireRuntimeFramePlan();
+            physicalEnvConfig.TimeResolution = framePlan.FrameDurationSec;
         end
 
         function commBehaviorConfig = getCommunicationBehaviorConfig(obj)
@@ -700,10 +701,7 @@ classdef ScenarioFactory < matlab.System
             % Use configured CommunicationBehavior directly
             commBehaviorConfig = obj.factoryConfig.CommunicationBehavior;
 
-            % Pass through global time parameters needed by CommBehaviorSim
-            if isfield(obj.factoryConfig, 'Global')
-                commBehaviorConfig.Global = obj.factoryConfig.Global;
-            end
+            commBehaviorConfig.RuntimePlan = obj.RuntimePlan;
 
             % Ensure required defaults
             if ~isfield(commBehaviorConfig, 'FrequencyAllocation')
@@ -758,6 +756,16 @@ classdef ScenarioFactory < matlab.System
                     isstruct(commBehaviorConfig.Runtime)
                 runtime = obj.mergeConfigs(runtime, commBehaviorConfig.Runtime);
             end
+        end
+
+        function framePlan = requireRuntimeFramePlan(obj)
+            if isempty(obj.RuntimePlan) || ~isstruct(obj.RuntimePlan) || ...
+                    ~isfield(obj.RuntimePlan, 'Frame') || ...
+                    ~isstruct(obj.RuntimePlan.Frame)
+                error('CSRD:RuntimePlan:MissingFrameContract', ...
+                    'ScenarioFactory.RuntimePlan.Frame is required.');
+            end
+            framePlan = obj.RuntimePlan.Frame;
         end
 
         function storeFrameState(obj, frameId, entities, environment, txConfigs, rxConfigs)
@@ -885,8 +893,9 @@ classdef ScenarioFactory < matlab.System
             blueprint.Emitters  = txConfigs;
             blueprint.Receivers = rxConfigs;
             blueprint.CommunicationLayout = communicationLayout;
-            if isfield(obj.factoryConfig, 'Global')
-                blueprint.Global = obj.factoryConfig.Global;
+            blueprintGlobal = localBlueprintGlobal(obj.factoryConfig, obj.RuntimePlan);
+            if ~isempty(fieldnames(blueprintGlobal))
+                blueprint.Global = blueprintGlobal;
             end
             if isfield(obj.factoryConfig, 'Validator')
                 blueprint.Validator = obj.factoryConfig.Validator;
@@ -969,6 +978,36 @@ typedConfig = mapConfig.(mapType);
 if isstruct(typedConfig) && isfield(typedConfig, 'ChannelModel') && ...
         ~isempty(typedConfig.ChannelModel)
     model = char(string(typedConfig.ChannelModel));
+end
+end
+
+function globalConfig = localBlueprintGlobal(factoryConfig, runtimePlan)
+%LOCALBLUEPRINTGLOBAL Build blueprint global facts from raw authorities and RuntimePlan.
+% 中文说明：蓝图可以携带派生事实，但这些事实只来自 RuntimePlan，不回写 raw config。
+globalConfig = struct();
+if isstruct(factoryConfig) && isfield(factoryConfig, 'Global') && ...
+        isstruct(factoryConfig.Global)
+    globalConfig = factoryConfig.Global;
+end
+if ~isstruct(runtimePlan) || ~isfield(runtimePlan, 'Frame') || ...
+        ~isstruct(runtimePlan.Frame)
+    return;
+end
+
+framePlan = runtimePlan.Frame;
+if isfield(framePlan, 'FrameNumSamples')
+    globalConfig.FrameNumSamples = framePlan.FrameNumSamples;
+end
+if isfield(framePlan, 'NumFramesPerScenario')
+    globalConfig.NumFramesPerScenario = framePlan.NumFramesPerScenario;
+    globalConfig.NumFrames = framePlan.NumFramesPerScenario;
+end
+if isfield(framePlan, 'FrameDurationSec')
+    globalConfig.FrameDurationSec = framePlan.FrameDurationSec;
+    globalConfig.FrameDuration = framePlan.FrameDurationSec;
+end
+if isfield(framePlan, 'ObservationDurationSec')
+    globalConfig.ObservationDurationSec = framePlan.ObservationDurationSec;
 end
 end
 

@@ -323,8 +323,8 @@ function params = getTemporalParams(config)
     % Default values
     params.PatternTypes = {'Continuous', 'Burst', 'Scheduled', 'Random'};
     params.PatternDistribution = [0.4, 0.3, 0.2, 0.1];
-    params.ObservationDuration = 1.0;
-    params.NumFramesPerScenario = 10;
+    params.ObservationDuration = [];
+    params.NumFramesPerScenario = [];
     
     % Burst pattern defaults
     params.Burst.OnDuration.Min = 0.01;
@@ -354,14 +354,21 @@ function params = getTemporalParams(config)
     % shared by every transmitter or a 1xNumTx cell array of Nx2 matrices.
     params.Explicit.Intervals = [];
 
-    % Override with config values
-    if isfield(config, 'Global')
-        if isfield(config.Global, 'ObservationDuration')
-            params.ObservationDuration = config.Global.ObservationDuration;
+    if isfield(config, 'RuntimePlan') && isstruct(config.RuntimePlan) && ...
+            isfield(config.RuntimePlan, 'Frame') && ...
+            isstruct(config.RuntimePlan.Frame)
+        framePlan = config.RuntimePlan.Frame;
+        if isfield(framePlan, 'ObservationDurationSec')
+            params.ObservationDuration = framePlan.ObservationDurationSec;
         end
-        if isfield(config.Global, 'NumFramesPerScenario')
-            params.NumFramesPerScenario = config.Global.NumFramesPerScenario;
+        if isfield(framePlan, 'NumFramesPerScenario')
+            params.NumFramesPerScenario = framePlan.NumFramesPerScenario;
         end
+    end
+    if isempty(params.ObservationDuration) || isempty(params.NumFramesPerScenario)
+        error('CSRD:RuntimePlan:MissingFrameContract', ...
+            ['CommunicationBehavior requires RuntimePlan.Frame.', ...
+             'ObservationDurationSec and NumFramesPerScenario.']);
     end
     
     if isfield(config, 'TemporalBehavior')

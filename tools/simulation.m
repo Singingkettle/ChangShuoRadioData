@@ -119,6 +119,7 @@ function simulation(worker_id, num_workers, config_name)
 
         % Configure runner with factory configurations (includes scenario config)
         runner.FactoryConfigs = configStruct.Factories;
+        runner.RuntimePlan = configStruct.RuntimePlan;
 
         logger.info('Starting scenario-based simulation execution...');
 

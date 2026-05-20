@@ -48,9 +48,6 @@ function config = csrd2025_osm_large_map_validation()
 
     config.Factories.Scenario.Global.NumFramesPerScenario = 1;
     config.Factories.Scenario.Global.FrameNumSamples = 1024;
-    config.Factories.Scenario.Global.FrameDuration = 2.048e-5;
-    config.Factories.Scenario.Global.TimeResolution = 2.048e-5;
-    config.Factories.Scenario.Global.ObservationDuration = 2.048e-5;
 
     config.Factories.Scenario.PhysicalEnvironment.Map.Types = {'OSM'};
     config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;
