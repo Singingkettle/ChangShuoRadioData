@@ -7,7 +7,9 @@ classdef ScenarioModulationAntennaCompatibilityTest < matlab.unittest.TestCase
             addpath(root);
 
             scenarioCfg = localScenarioConfig('OOK', [1 4]);
-            factory = csrd.factories.ScenarioFactory('Config', scenarioCfg);
+            cfg = csrd.test_support.buildRuntimePlanForTest(scenarioCfg);
+            factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+                'RuntimePlan', cfg.RuntimePlan);
             cleanupFactory = onCleanup(@() release(factory)); %#ok<NASGU>
             [txConfigs, ~, ~] = factory(1);
 
@@ -20,7 +22,9 @@ classdef ScenarioModulationAntennaCompatibilityTest < matlab.unittest.TestCase
             addpath(root);
 
             scenarioCfg = localScenarioConfig('OOK', [2 4]);
-            factory = csrd.factories.ScenarioFactory('Config', scenarioCfg);
+            cfg = csrd.test_support.buildRuntimePlanForTest(scenarioCfg);
+            factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+                'RuntimePlan', cfg.RuntimePlan);
             cleanupFactory = onCleanup(@() release(factory)); %#ok<NASGU>
 
             testCase.verifyError(@() factory(1), ...
@@ -32,7 +36,9 @@ classdef ScenarioModulationAntennaCompatibilityTest < matlab.unittest.TestCase
             addpath(root);
 
             scenarioCfg = localScenarioConfig('PAM', [1 4]);
-            factory = csrd.factories.ScenarioFactory('Config', scenarioCfg);
+            cfg = csrd.test_support.buildRuntimePlanForTest(scenarioCfg);
+            factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+                'RuntimePlan', cfg.RuntimePlan);
             cleanupFactory = onCleanup(@() release(factory)); %#ok<NASGU>
             [txConfigs, ~, ~] = factory(1);
 
@@ -52,9 +58,6 @@ scenarioCfg.Runtime.WorkerId = 1;
 scenarioCfg.Validator.Enabled = false;
 scenarioCfg.Global.NumFramesPerScenario = 1;
 scenarioCfg.Global.FrameNumSamples = 1024;
-scenarioCfg.Global.FrameDuration = 1024 / 50e6;
-scenarioCfg.Global.TimeResolution = 1024 / 50e6;
-scenarioCfg.Global.ObservationDuration = 1024 / 50e6;
 scenarioCfg.PhysicalEnvironment.Map.Types = {'Statistical'};
 scenarioCfg.PhysicalEnvironment.Map.Ratio = 1;
 scenarioCfg.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;

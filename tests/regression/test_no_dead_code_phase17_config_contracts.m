@@ -31,6 +31,18 @@ for k = 1:numel(prodFiles)
     if contains(code, 'Global.FrameLength')
         violations{end + 1} = sprintf('%s reads/writes Global.FrameLength', rel); %#ok<AGROW>
     end
+    if contains(code, 'Global.FrameDuration')
+        violations{end + 1} = sprintf('%s reads/writes Global.FrameDuration', rel); %#ok<AGROW>
+    end
+    if contains(code, 'Global.ObservationDuration')
+        violations{end + 1} = sprintf('%s reads/writes Global.ObservationDuration', rel); %#ok<AGROW>
+    end
+    if contains(code, 'Global.TimeResolution')
+        violations{end + 1} = sprintf('%s reads/writes Global.TimeResolution', rel); %#ok<AGROW>
+    end
+    if contains(code, 'normalizeRuntimeContracts')
+        violations{end + 1} = sprintf('%s calls legacy normalizeRuntimeContracts', rel); %#ok<AGROW>
+    end
     if contains(code, 'messageLength = 1024')
         violations{end + 1} = sprintf('%s contains messageLength=1024 fallback', rel); %#ok<AGROW>
     end

@@ -388,9 +388,12 @@ function [annotationCell, frameDataCell] = runSmoke(testCase)
         cohort.PatternTypes;
     cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = ...
         cohort.PatternDistribution;
+    cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 
     runner = csrd.SimulationRunner( ...
-        'RunnerConfig', cfg.Runner, 'FactoryConfigs', cfg.Factories);
+        'RunnerConfig', cfg.Runner, ...
+        'FactoryConfigs', cfg.Factories, ...
+        'RuntimePlan', cfg.RuntimePlan);
     setup(runner);
     step(runner, 1, 1);
 

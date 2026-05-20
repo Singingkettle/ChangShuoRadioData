@@ -50,8 +50,13 @@ function test_simulation_runner_startup_hooks()
     csrd.runtime.logger.GlobalLogManager.initialize( ...
         runnerCfg.Log, fullfile(tempRoot, 'phase0_startup_logs'));
 
+    masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
+    masterCfg.Runner = runnerCfg;
+    masterCfg = csrd.pipeline.runtime.buildRuntimePlan(masterCfg);
     runner = csrd.SimulationRunner( ...
-        'RunnerConfig', runnerCfg, 'FactoryConfigs', struct());
+        'RunnerConfig', runnerCfg, ...
+        'FactoryConfigs', masterCfg.Factories, ...
+        'RuntimePlan', masterCfg.RuntimePlan);
 
     % --- Hook 1+2: setup() should not throw ------------------------------
     setup(runner);

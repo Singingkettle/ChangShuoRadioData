@@ -41,8 +41,11 @@ frameDuration = frameSamples / sampleRate;
 cfg = struct();
 cfg.Global.FrameNumSamples = frameSamples;
 cfg.Global.NumFramesPerScenario = numFrames;
-cfg.Global.ObservationDuration = frameDuration * numFrames;
-cfg.Global.TimeResolution = frameDuration;
+cfg.RuntimePlan.Frame = struct( ...
+    'FrameNumSamples', frameSamples, ...
+    'FrameDurationSec', frameDuration, ...
+    'ObservationDurationSec', frameDuration * numFrames, ...
+    'NumFramesPerScenario', numFrames);
 cfg.Receiver.Type = 'Simulation';
 cfg.Receiver.SampleRate = sampleRate;
 cfg.Receiver.NumAntennas = 1;

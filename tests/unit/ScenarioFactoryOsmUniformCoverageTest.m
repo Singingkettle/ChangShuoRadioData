@@ -43,7 +43,9 @@ classdef ScenarioFactoryOsmUniformCoverageTest < matlab.unittest.TestCase
 end
 
 function profile = localRunAndGetMapProfile(scenarioCfg)
-factory = csrd.factories.ScenarioFactory('Config', scenarioCfg);
+cfg = csrd.test_support.buildRuntimePlanForTest(scenarioCfg);
+factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+    'RuntimePlan', cfg.RuntimePlan);
 cleanupFactory = onCleanup(@() release(factory)); %#ok<NASGU>
 [~, ~, layout] = factory(1);
 profile = layout.Environment.Map.MapProfile;
@@ -59,9 +61,6 @@ scenarioCfg.Runtime.WorkerId = 1;
 scenarioCfg.Validator.Enabled = false;
 scenarioCfg.Global.NumFramesPerScenario = 1;
 scenarioCfg.Global.FrameNumSamples = 1024;
-scenarioCfg.Global.FrameDuration = 1024 / 50e6;
-scenarioCfg.Global.TimeResolution = 1024 / 50e6;
-scenarioCfg.Global.ObservationDuration = 1024 / 50e6;
 scenarioCfg.PhysicalEnvironment.Map.OSM.DataDirectory = osmRoot;
 scenarioCfg.PhysicalEnvironment.Map.OSM.FilePattern = '*.osm';
 scenarioCfg.PhysicalEnvironment.Map.OSM.SpecificFile = '';

@@ -406,8 +406,11 @@ csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, perScenarioDir);
 policy = csrd.runtime.logger.policy.LogPolicy('Standard');
 policy.apply();
 
+cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 runner = csrd.SimulationRunner( ...
-    'RunnerConfig', cfg.Runner, 'FactoryConfigs', cfg.Factories);
+    'RunnerConfig', cfg.Runner, ...
+    'FactoryConfigs', cfg.Factories, ...
+    'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
 step(runner, 1, 1);
 

@@ -93,8 +93,11 @@ end
 
 
 function annotationPath = localRunOneScenario(cfg)
+cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 runner = csrd.SimulationRunner( ...
-    'RunnerConfig', cfg.Runner, 'FactoryConfigs', cfg.Factories);
+    'RunnerConfig', cfg.Runner, ...
+    'FactoryConfigs', cfg.Factories, ...
+    'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
 cleanup = onCleanup(@() localRelease(runner));
 step(runner, 1, 1);

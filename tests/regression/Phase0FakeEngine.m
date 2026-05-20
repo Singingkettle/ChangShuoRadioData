@@ -26,6 +26,7 @@ classdef Phase0FakeEngine < matlab.System
 
     properties
         FactoryConfigs struct
+        RuntimePlan struct
     end
 
     properties (SetAccess = private, GetAccess = public)

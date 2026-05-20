@@ -280,16 +280,9 @@ fprintf(fid, 'config.Log.SaveToFile = true;\n');
 fprintf(fid, 'config.Log.DisplayInConsole = false;\n\n');
 
 frameSamples = round(0.0015 * c.SampleRateHz);
-frameDuration = frameSamples / c.SampleRateHz;
 fprintf(fid, 'config.Factories.Scenario.Global.NumFramesPerScenario = 1;\n');
-fprintf(fid, 'config.Factories.Scenario.Global.ObservationDuration = %.17g;\n', ...
-    frameDuration);
 fprintf(fid, 'config.Factories.Scenario.Global.FrameNumSamples = %d;\n', ...
     frameSamples);
-fprintf(fid, 'config.Factories.Scenario.Global.FrameDuration = %.17g;\n', ...
-    frameDuration);
-fprintf(fid, 'config.Factories.Scenario.Global.TimeResolution = %.17g;\n', ...
-    frameDuration);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Types = {''%s''};\n', c.MapType);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1.0;\n');
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = %d;\n', c.TxCount);

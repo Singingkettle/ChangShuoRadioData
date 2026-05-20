@@ -29,7 +29,7 @@ classdef FlatTerrainNoOnlineTerrainRegressionTest < matlab.unittest.TestCase
             phys.Entities.Transmitters.Count.Max = 1;
             phys.Entities.Receivers.Count.Min = 1;
             phys.Entities.Receivers.Count.Max = 1;
-            phys.TimeResolution = cfg.Factories.Scenario.Global.FrameDuration;
+            phys.TimeResolution = cfg.RuntimePlan.Frame.FrameDurationSec;
 
             sim = csrd.blocks.scenario.PhysicalEnvironmentSimulator( ...
                 'Config', phys);

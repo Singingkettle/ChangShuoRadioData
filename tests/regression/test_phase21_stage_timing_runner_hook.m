@@ -31,8 +31,13 @@ runnerCfg.Performance.ArtifactDirectory = fullfile(tempRoot, 'perf');
 csrd.runtime.logger.GlobalLogManager.initialize( ...
     runnerCfg.Log, fullfile(tempRoot, 'logs'));
 
+masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
+masterCfg.Runner = runnerCfg;
+masterCfg = csrd.pipeline.runtime.buildRuntimePlan(masterCfg);
 runner = csrd.SimulationRunner( ...
-    'RunnerConfig', runnerCfg, 'FactoryConfigs', struct());
+    'RunnerConfig', runnerCfg, ...
+    'FactoryConfigs', masterCfg.Factories, ...
+    'RuntimePlan', masterCfg.RuntimePlan);
 setup(runner);
 step(runner, 1, 1);
 release(runner);

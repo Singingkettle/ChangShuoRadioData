@@ -48,7 +48,7 @@ function test_empty_osm_raytracing()
     physConfig.Entities.Transmitters.Count.Max = 1;
     physConfig.Entities.Receivers.Count.Min = 1;
     physConfig.Entities.Receivers.Count.Max = 1;
-    physConfig.TimeResolution = masterConfig.Factories.Scenario.Global.FrameDuration;
+    physConfig.TimeResolution = masterConfig.RuntimePlan.Frame.FrameDurationSec;
 
     simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physConfig);
     setup(simulator);
@@ -71,9 +71,11 @@ function test_empty_osm_raytracing()
     mc.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = [1.0];
+    mc = csrd.test_support.buildRuntimePlanForTest(mc);
 
     engine = csrd.core.ChangShuo();
     engine.FactoryConfigs = mc.Factories;
+    engine.RuntimePlan = mc.RuntimePlan;
     setup(engine, 1);
     [scenarioData, scenarioAnnotation] = step(engine, 1);
     assert(~isempty(scenarioData), 'Scenario data should not be empty for empty OSM FlatTerrain.');

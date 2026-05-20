@@ -1,6 +1,6 @@
 classdef RuntimeParameterContractTest < matlab.unittest.TestCase
-    % RuntimeParameterContractTest - Config loader stamps canonical runtime contracts.
-    % 中文说明：配置加载后不能残留旧帧长字段，派生时间字段必须一致。
+    % RuntimeParameterContractTest - Config loader builds canonical runtime plan.
+    % 中文说明：配置加载后 raw config 只保留权威字段，派生事实进入 RuntimePlan。
 
     methods (Test)
         function defaultConfigUsesCanonicalFrameContract(testCase)
@@ -11,21 +11,25 @@ classdef RuntimeParameterContractTest < matlab.unittest.TestCase
                 'FrameNumSamples'));
             testCase.verifyFalse(isfield(cfg.Factories.Scenario.Global, ...
                 'FrameLength'));
+            testCase.verifyFalse(isfield(cfg.Factories.Scenario.Global, ...
+                'FrameDuration'));
+            testCase.verifyFalse(isfield(cfg.Factories.Scenario.Global, ...
+                'ObservationDuration'));
 
-            contract = cfg.Metadata.RuntimeContracts.Frame;
+            contract = cfg.RuntimePlan.Frame;
             testCase.verifyEqual(contract.FrameNumSamples, ...
                 cfg.Factories.Scenario.Global.FrameNumSamples);
             testCase.verifyEqual( ...
-                cfg.Factories.Scenario.Global.ObservationDuration * ...
-                cfg.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate, ...
+                contract.ObservationDurationSec * contract.SampleRateHz, ...
                 contract.FrameNumSamples * contract.NumFramesPerScenario, ...
                 'AbsTol', 1);
+            testCase.verifyEqual(cfg.Metadata.RuntimeContracts.Frame, contract);
         end
 
         function injectedLegacyFrameLengthIsRejected(testCase)
             fc = struct();
             fc.Scenario.Global = struct('FrameLength', 1024, ...
-                'NumFramesPerScenario', 1, 'ObservationDuration', 1024 / 50e6);
+                'NumFramesPerScenario', 1);
             fc.Scenario.CommunicationBehavior.Receiver.SampleRate = 50e6;
 
             testCase.verifyError(@() ...

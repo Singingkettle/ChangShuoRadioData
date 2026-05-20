@@ -140,10 +140,12 @@ function [passed, failed] = runTestCase(baseMasterConfig, testName, params)
     end
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = params.PatternTypes;
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = params.PatternDistribution;
+    mc = csrd.test_support.buildRuntimePlanForTest(mc);
 
     try
         engine = csrd.core.ChangShuo();
         engine.FactoryConfigs = mc.Factories;
+        engine.RuntimePlan = mc.RuntimePlan;
         setup(engine, 1);
         fprintf('  [OK] Engine setup.\n');
     catch ME

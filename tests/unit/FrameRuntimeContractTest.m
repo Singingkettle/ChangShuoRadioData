@@ -45,13 +45,22 @@ classdef FrameRuntimeContractTest < matlab.unittest.TestCase
                 'CSRD:Frame:DeprecatedRunnerFixedFrameLength');
         end
 
-        function inconsistentObservationDurationFailsFast(testCase)
+        function derivedObservationDurationFailsFast(testCase)
             fc = localFactoryConfigs(1024, 10, 50e6);
             fc.Scenario.Global.ObservationDuration = 1.0;
 
             testCase.verifyError(@() ...
                 csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct()), ...
-                'CSRD:Frame:InconsistentObservationDuration');
+                'CSRD:Frame:DeprecatedDerivedObservationDuration');
+        end
+
+        function derivedFrameDurationFailsFast(testCase)
+            fc = localFactoryConfigs(1024, 10, 50e6);
+            fc.Scenario.Global.FrameDuration = 1024 / 50e6;
+
+            testCase.verifyError(@() ...
+                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct()), ...
+                'CSRD:Frame:DeprecatedDerivedFrameDuration');
         end
 
         function frameWindowMustMatchCanonicalFrame(testCase)
@@ -67,12 +76,9 @@ classdef FrameRuntimeContractTest < matlab.unittest.TestCase
 end
 
 function fc = localFactoryConfigs(frameSamples, numFrames, sampleRate)
-frameDuration = frameSamples / sampleRate;
 fc = struct();
 fc.Scenario.Global = struct( ...
     'FrameNumSamples', frameSamples, ...
-    'FrameDuration', frameDuration, ...
-    'NumFramesPerScenario', numFrames, ...
-    'ObservationDuration', frameDuration * numFrames);
+    'NumFramesPerScenario', numFrames);
 fc.Scenario.CommunicationBehavior.Receiver.SampleRate = sampleRate;
 end

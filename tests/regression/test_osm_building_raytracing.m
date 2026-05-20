@@ -26,7 +26,7 @@ function test_osm_building_raytracing()
     physConfig.Entities.Transmitters.Count.Max = 1;
     physConfig.Entities.Receivers.Count.Min = 1;
     physConfig.Entities.Receivers.Count.Max = 1;
-    physConfig.TimeResolution = masterConfig.Factories.Scenario.Global.FrameDuration;
+    physConfig.TimeResolution = masterConfig.RuntimePlan.Frame.FrameDurationSec;
 
     physSim = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physConfig);
     physCleanup = onCleanup(@() release(physSim)); %#ok<NASGU>
@@ -49,10 +49,12 @@ function test_osm_building_raytracing()
     mc.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = [1.0];
+    mc = csrd.test_support.buildRuntimePlanForTest(mc);
 
     engine = csrd.core.ChangShuo();
     engineCleanup = onCleanup(@() release(engine)); %#ok<NASGU>
     engine.FactoryConfigs = mc.Factories;
+    engine.RuntimePlan = mc.RuntimePlan;
     setup(engine, 1);
     [scenarioData, scenarioAnnotation] = step(engine, 1);
     assert(~isempty(scenarioData) && ~isempty(scenarioAnnotation), ...

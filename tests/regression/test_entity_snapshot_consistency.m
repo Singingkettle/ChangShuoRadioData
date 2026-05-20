@@ -25,7 +25,9 @@ function test_entity_snapshot_consistency()
     scenarioConfig.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
     scenarioConfig.CommunicationBehavior.TemporalBehavior.PatternDistribution = [1.0];
 
-    factory = csrd.factories.ScenarioFactory('Config', scenarioConfig);
+    cfg = csrd.test_support.buildRuntimePlanForTest(scenarioConfig);
+    factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+        'RuntimePlan', cfg.RuntimePlan);
     cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>
     setup(factory);
 
