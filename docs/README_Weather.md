@@ -140,9 +140,8 @@ config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.Wi
 3. Run your simulation with the configuration:
 
 ```matlab
-config = my_weather_config();
-runner = csrd.SimulationRunner(config);
-runner.run();
+addpath('tools');
+simulation(1, 1, 'my_weather_config.m');
 ```
 
 ## Notes
@@ -159,4 +158,4 @@ runner.run();
 - `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/updateWeatherConditions.m` - Weather evolution logic
 - `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/initializeEnvironment.m` - Weather initialization
 - `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/getDefaultConfiguration.m` - Default weather settings
-- `config/csrd2025/weather_example.m` - Complete weather configuration example 
+- `config/csrd2025/weather_example.m` - Complete weather configuration example

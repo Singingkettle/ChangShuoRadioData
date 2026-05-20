@@ -4,6 +4,10 @@
 
 The CSRD framework supports a modular configuration system that provides configuration inheritance, modular organization, and flexible customization capabilities.
 
+## Manual Review
+
+- [`audits/manual-full-code-review-guide.md`](audits/manual-full-code-review-guide.md) provides a read-only, file-by-file human review workflow for checking the full simulation pipeline without losing the signal-scene-annotation contract.
+
 ## Quick Start
 
 ```matlab
@@ -16,17 +20,15 @@ simulation(1, 1, 'csrd2025/csrd2025.m');
 
 ## Runtime Contract Notes
 
-Phase 17 makes `Factories.Scenario.Global.FrameNumSamples` the only frame-length authority. Do not set `Runner.FixedFrameLength` or `Factories.Scenario.Global.FrameLength`; both are rejected. When a config changes receiver sample rate, frame sample count, or frame count, keep the four frame fields numerically consistent:
+Phase 30 separates raw configuration authorities from derived runtime facts. Raw config keeps only the frame authorities `Factories.Scenario.Global.FrameNumSamples` and `Factories.Scenario.Global.NumFramesPerScenario`. Do not set `Runner.FixedFrameLength`, `Factories.Scenario.Global.FrameLength`, `FrameDuration`, `ObservationDuration`, or `TimeResolution`; they are rejected at the config boundary.
 
 ```matlab
 config.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate = 20e6;
 config.Factories.Scenario.Global.NumFramesPerScenario = 1;
 config.Factories.Scenario.Global.FrameNumSamples = 262144;
-config.Factories.Scenario.Global.FrameDuration = 262144 / 20e6;
-config.Factories.Scenario.Global.ObservationDuration = 262144 / 20e6;
 ```
 
-The loader stamps derived runtime metadata after validation. Execution blocks must not fill missing bandwidth, sample-rate, antenna-count, message-length, or channel-seed fields with defaults.
+`csrd.runtime.config_loader` builds `masterConfig.RuntimePlan`. Execution blocks read `RuntimePlan.Frame.FrameDurationSec` and `RuntimePlan.Frame.ObservationDurationSec`; they must not write derived facts back into `Factories`, and they must not fill missing bandwidth, sample-rate, antenna-count, message-length, or channel-seed fields with defaults.
 
 ## Directory Structure
 

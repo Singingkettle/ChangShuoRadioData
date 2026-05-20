@@ -170,7 +170,7 @@ ChangShuoRadioData/
 │   ├── +factories/                              # Factory pattern (executors of the plan)
 │   │   ├── ScenarioFactory.m                   # Scenario instantiation
 │   │   ├── ModulationFactory.m                 # 22 modulation types
-│   │   ├── MessageFactory.m                    # Message generation (Seed/SeedValue alias)
+│   │   ├── MessageFactory.m                    # Message generation and seed-bound payloads
 │   │   ├── TransmitFactory.m                   # Tx front-end
 │   │   ├── ChannelFactory.m                    # Channel orchestration + link budget
 │   │   └── ReceiveFactory.m                    # Rx front-end
@@ -298,8 +298,10 @@ simulation(2, 4, 'csrd2025/csrd2025.m'); % Worker 2 of 4
 
 % Direct configuration loading
 masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
-runner = csrd.SimulationRunner('RunnerConfig', masterConfig.Runner);
-runner.FactoryConfigs = masterConfig.Factories;
+runner = csrd.SimulationRunner( ...
+    'RunnerConfig', masterConfig.Runner, ...
+    'FactoryConfigs', masterConfig.Factories, ...
+    'RuntimePlan', masterConfig.RuntimePlan);
 runner(1, 1);
 ```
 
@@ -352,7 +354,6 @@ masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 masterConfig = {
   Runner: {                    % Simulation execution parameters
     NumScenarios: 4,          % Number of scenarios to execute
-    FixedFrameLength: 1024,   % Consistent frame size
     RandomSeed: 'shuffle',    % Reproducibility control
     Data: {                   % Data storage configuration
       OutputDirectory: 'CSRD2025',
@@ -374,9 +375,8 @@ masterConfig = {
   Factories: {                 % Factory configurations for all components
     Scenario: {               % Dual-component scenario factory
       Global: {               % Global scenario parameters
-        SampleRate: 1e6,      % Base sample rate
-        NumFramesPerScenario: 5,  % Frames per scenario
-        FrequencyBand: [900e6, 2.4e9]  % Operating frequency range
+        FrameNumSamples: 1024,     % Frame length authority
+        NumFramesPerScenario: 5    % Frames per scenario
       },
       PhysicalEnvironment: {...},    % Physical world modeling
       CommunicationBehavior: {...}   % Communication behavior modeling
@@ -392,6 +392,13 @@ masterConfig = {
     Receive: {...}            % Receiver front-end models
   },
   
+  RuntimePlan: {               % Derived runtime facts built at load time
+    Frame: {
+      FrameDurationSec: 2.048e-5,
+      ObservationDurationSec: 1.024e-4
+    }
+  },
+
   Metadata: {                  % Configuration metadata
     Version: '2025.1.0',
     Architecture: 'Scenario-Driven',

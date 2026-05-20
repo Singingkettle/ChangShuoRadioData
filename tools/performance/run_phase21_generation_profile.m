@@ -211,8 +211,10 @@ else
 end
 outputDir = fullfile(projectRoot, 'data', cfg.Runner.Data.OutputDirectory);
 csrd.runtime.logger.GlobalLogManager.initialize(logCfg, outputDir);
+cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner);
 runner.FactoryConfigs = cfg.Factories;
+runner.RuntimePlan = cfg.RuntimePlan;
 runner(1, 1);
 detail = struct('OutputDirectory', outputDir, 'StageTimingDirectory', artifactDir);
 end
