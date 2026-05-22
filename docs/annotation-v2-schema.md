@@ -1,6 +1,7 @@
 # CSRD Annotation V2 Schema
 
-Status: Phase 7 validated, aligned with Phase 4-6 Frozen contracts.
+Status: Annotation v2 current contract, updated for scenario-level
+`ScenarioPlan` generation.
 
 This document describes the frozen annotation v2 shape used by the refactored
 CSRD pipeline. Annotation v2 is not a compatibility layer for legacy v1 fields.
@@ -15,7 +16,7 @@ The schema separates facts by source:
 
 | Namespace | Meaning | Source |
 |-----------|---------|--------|
-| `Truth.Design` | Planned facts that come from the scenario blueprint | Blueprint / planning stage |
+| `Truth.Design` | Planned facts that come from the scenario plan | `ScenarioPlan` / planning stage |
 | `Truth.Execution` | Realized construction facts from waveform, channel, geometry, and RF execution | Construction stage |
 | `Truth.Measured` | Measurements computed after signal generation | Measurement stage |
 | `ReceiverView` | Projection of one source into one receiver observation window | Receiver-view construction |
@@ -23,6 +24,11 @@ The schema separates facts by source:
 Design facts such as modulation family do not need to be measured. Values such
 as occupied bandwidth may differ from the planned bandwidth, so the final label
 uses measured fields.
+
+Current generation builds a frozen `ScenarioPlan` before the first frame of each
+scenario. Annotation headers may include `ScenarioPlan.Frame` and
+`DatasetAccounting`; per-source design facts must agree with that plan, while
+execution and measured facts are still taken from actual generated data.
 
 ## Root Shape
 
@@ -57,6 +63,8 @@ Each frame must contain:
 | `SignalSources` | struct array | Per-source records in this receiver frame |
 | `SampleRate` | Hz | Receiver sample rate, when present |
 | `ObservableRange` | Hz | Receiver observable frequency range `[low high]`, when present |
+| `ScenarioPlan` | struct | Optional scenario plan header for the owning scenario |
+| `DatasetAccounting` | struct | Optional receiver-frame accounting copied from `ScenarioPlan` |
 
 ## Source Fields
 

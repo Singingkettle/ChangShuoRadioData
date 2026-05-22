@@ -149,10 +149,15 @@ Files:
 
 Check:
 
-- Only `Factories.Scenario.Global.FrameNumSamples` is the frame-length
-  authority.
-- `ObservationDuration`, `FrameDuration`, and `NumFramesPerScenario` are
-  validation fields, not competing authorities.
+- `RuntimePlan` is a run-level policy object; it must not contain resolved
+  `RuntimePlan.Frame` facts.
+- `Factories.Scenario.FramePolicy` is the raw frame rule; concrete
+  `FrameNumSamples`, `NumFramesPerScenario`, `FrameDurationSec`, and
+  `ObservationDurationSec` must be resolved in `ScenarioPlan.Frame` before
+  frame generation begins.
+- `Truth.Design` should reflect `ScenarioPlan`, while `Truth.Execution` must
+  still come from the actual sample grid and `Truth.Measured` from signal
+  measurement.
 - OSM map selection is file-level balanced and does not filter by size.
 - Deprecated size-cap fields fail fast.
 - RayTracing frequency support is checked before running the channel.
@@ -161,6 +166,12 @@ Check:
 Tests to inspect:
 
 - `tests/unit/FrameRuntimeContractTest.m`
+- `tests/unit/RunPlanPolicyOnlyTest.m`
+- `tests/unit/ScenarioPlanBuildTest.m`
+- `tests/unit/ScenarioPlanDiversityTest.m`
+- `tests/unit/ScenarioPlanFrozenBeforeFrameExecutionTest.m`
+- `tests/unit/ReceiverFrameAccountingTest.m`
+- `tests/unit/ScenarioPlanAnnotationContractTest.m`
 - `tests/unit/ContinuousFrameWindowContractTest.m`
 - `tests/unit/ScenarioFactoryOsmUniformCoverageTest.m`
 - `tests/unit/ScenarioFactoryOsmNoSizeCapTest.m`
