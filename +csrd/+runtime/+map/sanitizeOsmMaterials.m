@@ -1,6 +1,7 @@
 function info = sanitizeOsmMaterials(osmFile)
 %SANITIZEOSMMATERIALS Create ignored OSM copy with material tags normalized.
-% 中文说明：不修改原始 OSM；只在 artifacts 下创建 RayTracing 可用的临时副本。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 info = struct('OriginalFile', char(string(osmFile)), ...
     'SanitizedFile', char(string(osmFile)), ...
@@ -77,6 +78,9 @@ info.Changed = true;
 end
 
 function line = localNormalizeMaterialValue(line)
+    % localNormalizeMaterialValue - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 doubleMatch = regexp(line, 'v="([^"]*)"', 'tokens', 'once');
 if ~isempty(doubleMatch)
     value = strtrim(doubleMatch{1});
@@ -96,6 +100,9 @@ end
 end
 
 function tf = localMustNormalizeMaterial(value)
+    % localMustNormalizeMaterial - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(value)
     tf = true;
     return;
@@ -112,6 +119,9 @@ tf = ~any(strcmpi(string(value), supported));
 end
 
 function text = localJoinLines(lines, separators)
+    % localJoinLines - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(lines)
     text = '';
     return;
@@ -130,6 +140,9 @@ text = [pieces{1:cursor}];
 end
 
 function root = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 here = fileparts(mfilename('fullpath'));
 root = fileparts(fileparts(fileparts(here)));
 end

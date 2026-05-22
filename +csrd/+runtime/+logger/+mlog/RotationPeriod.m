@@ -1,5 +1,4 @@
 classdef RotationPeriod
-    % 中文说明：提供 CSRD 生产链路中的 RotationPeriod 实现。
 
     % Enumeration of log file rotation periods
     %   This class enumerates log file rotation periods
@@ -43,9 +42,8 @@ classdef RotationPeriod
 
         function obj = RotationPeriod(format)
             % RotationPeriod - Production declaration in CSRD.
-            % 中文说明：RotationPeriod 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.DateFormat = format;
 
@@ -58,9 +56,8 @@ classdef RotationPeriod
 
         function p = getNextPeriod(obj, curTime)
             % getNextPeriod - Production declaration in CSRD.
-            % 中文说明：getNextPeriod 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             arguments
                 obj (1, 1)

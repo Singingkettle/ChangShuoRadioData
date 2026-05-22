@@ -1,15 +1,14 @@
 function report = rfPropagationCapabilities(varargin)
 %RFPROPAGATIONCAPABILITIES Inspect MATLAB RF propagation runtime support.
-% 中文说明：检查当前 MATLAB 运行时是否具备 OSM 建筑射线追踪所需的站点、地图和信道对象能力。
 %
-% Inputs / 输入:
+% Inputs:
 %   'OsmFile'  - optional OSM building file used by the smoke probe.
 %   'RunSmoke' - when true, create and immediately delete a hidden siteviewer.
 %
-% Outputs / 输出:
+% Outputs:
 %   report - struct with capability flags, symbol locations, and skip reason.
 %
-% References / 参考资料:
+% References:
 %   MathWorks siteviewer documentation, including OpenStreetMap building files:
 %   https://www.mathworks.com/help/comm/ref/siteviewer.html
 %   MathWorks raytrace documentation for txsite/rxsite propagation paths:
@@ -82,9 +81,8 @@ end
 
 function symbol = localSymbolReport(name, kind)
 % localSymbolReport - Resolve a MATLAB symbol without assuming exist == 2.
-% 中文说明：用 which 和 exist 共同识别函数、p-code、类和对象方法，避免误判运行时能力。
-% Inputs / 输入: name is a MATLAB symbol, kind is the preferred exist query.
-% Outputs / 输出: symbol records availability, exist code, and which path.
+% Inputs: name is a MATLAB symbol, kind is the preferred exist query.
+% Outputs: symbol records availability, exist code, and which path.
 symbol = struct();
 symbol.Name = string(name);
 symbol.Kind = string(kind);
@@ -99,9 +97,8 @@ end
 
 function [ok, message] = localSiteviewerSmoke(osmFile)
 % localSiteviewerSmoke - Create and delete a hidden OSM building siteviewer.
-% 中文说明：用最小化的隐藏 siteviewer 创建测试验证当前 OSM 建筑地图能力。
-% Inputs / 输入: osmFile points to the selected OSM building file.
-% Outputs / 输出: ok reports smoke success, message carries diagnostic detail.
+% Inputs: osmFile points to the selected OSM building file.
+% Outputs: ok reports smoke success, message carries diagnostic detail.
 viewer = [];
 try
     viewer = siteviewer('Basemap', 'openstreetmap', ...
@@ -118,7 +115,6 @@ if ~isempty(viewer)
         delete(viewer);
     catch
         % Best-effort cleanup only.
-        % 中文说明：诊断路径只做尽力资源释放，不掩盖真实探测结果。
     end
 end
 end
@@ -126,9 +122,8 @@ end
 
 function reason = localSkipReason(report)
 % localSkipReason - Produce a short human-readable environment skip reason.
-% 中文说明：生成可写入测试和验证摘要的环境限制说明。
-% Inputs / 输入: report is the capability report built by the public helper.
-% Outputs / 输出: reason is a concise char vector suitable for skip metadata.
+% Inputs: report is the capability report built by the public helper.
+% Outputs: reason is a concise char vector suitable for skip metadata.
 if ~report.OsmFileExists
     reason = "selected building OSM file is missing";
 elseif ~isempty(report.Missing)

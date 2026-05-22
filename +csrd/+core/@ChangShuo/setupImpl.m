@@ -1,8 +1,7 @@
 function setupImpl(obj)
     % setupImpl - Initialize all factories (one-time setup)
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 setupImpl 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Each factory is instantiated with ONLY its own configuration,
     % ensuring independence between factories. The ScenarioFactory

@@ -1,8 +1,7 @@
 function openLogFile(obj)
 % Open the log file for viewing
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 openLogFile 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 
 % Copyright 2018-2022 The MathWorks Inc.
 

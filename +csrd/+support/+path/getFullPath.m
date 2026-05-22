@@ -1,8 +1,7 @@
 function abs_path = getFullPath(relative_or_abs_path, base_path)
     % getFullPath Converts a potentially relative path to an absolute path.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 getFullPath 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % If relative_or_abs_path is already absolute, it is returned unchanged.
     % Otherwise, it is considered relative to base_path.
 

@@ -1,6 +1,5 @@
 function occ = frequencyOccupancy(occupiedBwHz, observableBwHz)
 %FREQUENCYOCCUPANCY Ratio of occupied bandwidth to observable bandwidth.
-% 中文说明：提供 CSRD 生产链路中的 frequencyOccupancy 实现。
 %
 % Phase 4 §3.1 measurement helper. Returns occupiedBwHz/observableBwHz
 % clipped to [0, 1]. If observableBwHz is non-positive (no receiver

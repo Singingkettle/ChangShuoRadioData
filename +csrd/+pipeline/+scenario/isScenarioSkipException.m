@@ -1,6 +1,5 @@
 function tf = isScenarioSkipException(ME)
 %ISSCENARIOSKIPEXCEPTION True for identifiers that mean "skip this scenario".
-% 中文说明：提供 CSRD 生产链路中的 isScenarioSkipException 实现。
 %
 %   tf = csrd.pipeline.scenario.isScenarioSkipException(ME)
 %

@@ -1,6 +1,7 @@
 function config = csrd2025_osm_raytracing_validation()
     % csrd2025_osm_raytracing_validation - Phase 16 OSM RayTracing validation config.
-    % 中文说明：通过正式 simulation.m 入口压测 building/empty OSM RayTracing、多实体、多天线和法规频谱链路。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 
     config.baseConfigs = {
                           '_base_/logging/default.m',
@@ -28,11 +29,11 @@ function config = csrd2025_osm_raytracing_validation()
     config.Runner.Data.VersionControl = false;
     config.Runner.Data.ScenarioGrouping = true;
 
-    config.Log.Name = 'CSRD-Phase16-OSM-RayTracing';
-    config.Log.Level = 'INFO';
-    config.Log.SaveToFile = true;
-    config.Log.DisplayInConsole = true;
-    config.Log.SessionLogging = true;
+    config.Logging.Name = 'CSRD-Phase16-OSM-RayTracing';
+    config.Logging.Policy = 'Standard';
+    config.Logging.Console.Enabled = true;
+    config.Logging.File.Enabled = true;
+    config.Logging.Progress.Mode = 'Detailed';
 
     config.CoverageValidation.Enable = true;
     config.CoverageValidation.Mode = 'osm_raytracing_stress';

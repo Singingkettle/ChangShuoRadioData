@@ -1,6 +1,7 @@
 function summary = diagnose_default_simulation_runtime_contracts(varargin)
 %DIAGNOSE_DEFAULT_SIMULATION_RUNTIME_CONTRACTS Phase 20 default-chain probe.
-% 中文说明：记录默认仿真关键运行合同，输出到 ignored artifacts/debug/default-simulation/。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 %
 % Usage:
 %   summary = diagnose_default_simulation_runtime_contracts()
@@ -24,13 +25,15 @@ summary.ArtifactDir = artifactDir;
 
 cfg = csrd.runtime.config_loader(summary.ConfigPath);
 scenarioCfg = cfg.Factories.Scenario;
-contract = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
-    struct('Scenario', scenarioCfg), struct());
-summary.FrameNumSamples = contract.FrameNumSamples;
-summary.SampleRateHz = contract.SampleRateHz;
-summary.FrameDurationSec = contract.FrameDurationSec;
-summary.NumFramesPerScenario = contract.NumFramesPerScenario;
-summary.ObservationDurationSec = contract.ObservationDurationSec;
+scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+    cfg.RuntimePlan, scenarioCfg, ...
+    struct('ScenarioId', 1, 'RandomSeed', cfg.Runner.RandomSeed));
+summary.FramePolicy = cfg.RuntimePlan.FramePolicy;
+summary.FrameNumSamples = scenarioPlan.Frame.FrameNumSamples;
+summary.SampleRateHz = scenarioPlan.Frame.SampleRateHz;
+summary.FrameDurationSec = scenarioPlan.Frame.FrameDurationSec;
+summary.NumFramesPerScenario = scenarioPlan.Frame.NumFramesPerScenario;
+summary.ObservationDurationSec = scenarioPlan.Frame.ObservationDurationSec;
 
 summary.Scenarios = localScenarioMatrix(scenarioCfg);
 summary.RunSimulation = p.Results.RunSimulation;
@@ -55,11 +58,17 @@ fprintf('Phase 20 default simulation diagnostic written to %s\n', summaryPath);
 end
 
 function projectRoot = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 end
 
 function rows = localScenarioMatrix(scenarioCfg)
+    % localScenarioMatrix - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 rows = struct('MapMode', {}, 'ChannelModel', {}, 'RequiredCarrierRangeHz', {});
 mapCfg = scenarioCfg.PhysicalEnvironment.Map;
 if isfield(mapCfg, 'TypeRatio') && isstruct(mapCfg.TypeRatio)

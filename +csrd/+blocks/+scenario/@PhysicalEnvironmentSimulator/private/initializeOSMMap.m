@@ -1,8 +1,7 @@
 function initializeOSMMap(obj)
     % initializeOSMMap - Initialize OSM map for ray tracing
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 initializeOSMMap 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Loads lightweight OSM metadata. The heavy siteviewer/map handle is
     % owned by the RayTracing channel block so one OSM file is not loaded
@@ -166,9 +165,8 @@ end
 
 function channelModel = resolveOSMChannelModel(obj)
     % resolveOSMChannelModel - Production declaration in CSRD.
-    % 中文说明：resolveOSMChannelModel 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     channelModel = 'RayTracing';
     if isfield(obj.Config, 'Environment') && ...
             isstruct(obj.Config.Environment) && ...
@@ -185,9 +183,8 @@ end
 
 function osmConfig = getOSMConfig(obj)
     % getOSMConfig - Production declaration in CSRD.
-    % 中文说明：getOSMConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     osmConfig = struct();
     if isfield(obj.Config, 'Map') && isfield(obj.Config.Map, 'OSM') && isstruct(obj.Config.Map.OSM)
         osmConfig = obj.Config.Map.OSM;
@@ -196,9 +193,8 @@ end
 
 function value = getFieldOrDefault(s, fieldName, defaultValue)
     % getFieldOrDefault - Production declaration in CSRD.
-    % 中文说明：getFieldOrDefault 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -209,9 +205,8 @@ end
 function mapProfile = buildMapProfile(mode, osmFile, hasBuildings, ...
         terrain, terrainMaterial, maxNumReflections, boundaries, channelModel)
             % buildMapProfile - Production declaration in CSRD.
-            % 中文说明：buildMapProfile 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
     mapProfile = struct();
     mapProfile.Mode = mode;
     mapProfile.OSMFile = osmFile;
@@ -226,7 +221,8 @@ end
 function mapProfile = stampOsmRuntimeMetadata(mapProfile, osmFileSizeMB, ...
         selectionPolicy, coverageOrdinal, candidateFileCount)
     %STAMPOSMRUNTIMEMETADATA Attach OSM file-coverage provenance.
-    % 中文说明：这些字段进入 MapProfile，供 RayTracing trace 和 annotation 使用。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     mapProfile.OSMFileSizeMB = osmFileSizeMB;
     mapProfile.SelectionPolicy = char(string(selectionPolicy));
     mapProfile.CoverageOrdinal = coverageOrdinal;
@@ -234,6 +230,9 @@ function mapProfile = stampOsmRuntimeMetadata(mapProfile, osmFileSizeMB, ...
 end
 
 function sizeMB = localFileSizeMB(pathText)
+    % localFileSizeMB - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     sizeMB = NaN;
     if isempty(pathText)
         return;

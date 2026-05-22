@@ -1,5 +1,5 @@
 classdef ChannelFactory < matlab.System
-        % 中文说明：提供 CSRD 生产链路中的 ChannelFactory 实现。
+% ChannelFactory - CSRD MATLAB declaration.
 
     properties
         % Config: Struct containing the configuration for channel models.
@@ -20,9 +20,8 @@ classdef ChannelFactory < matlab.System
 
         function obj = ChannelFactory(varargin)
             % ChannelFactory - Production declaration in CSRD.
-            % 中文说明：ChannelFactory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
             obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
         end
@@ -30,7 +29,8 @@ classdef ChannelFactory < matlab.System
         function precomputeRayTracingFrame(obj, frameId, txInfos, rxInfos, ...
                 scenarioMapProfile, scenarioConfig)
             %PRECOMPUTERAYTRACINGFRAME Batch per-frame RayTracing geometry.
-            % 中文说明：预先批量计算当前帧 Tx×Rx rays，segment 信道处理复用缓存。
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             obj.ensurePrecomputeReady();
             if isempty(obj.factoryConfig) || ~isstruct(obj.factoryConfig) || ...
                     isempty(txInfos) || isempty(rxInfos)
@@ -81,6 +81,8 @@ classdef ChannelFactory < matlab.System
 
         function ensurePrecomputeReady(obj)
             %ENSUREPRECOMPUTEREADY Initialise state for public precompute calls.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             %
             % MATLAB System objects run setupImpl before step(), but
             % precomputeRayTracingFrame is a normal public method called before
@@ -107,16 +109,14 @@ classdef ChannelFactory < matlab.System
 
         function validateInputsImpl(~, ~, ~, ~, ~, ~)
             % validateInputsImpl - Production declaration in CSRD.
-            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
             % setupImpl - Production declaration in CSRD.
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if isempty(obj.Config) || ~isstruct(obj.Config) || ~isfield(obj.Config, 'ChannelModels')
                 error('ChannelFactory:ConfigError', 'Config property must be a valid struct with a ChannelModels field.');
             end
@@ -136,9 +136,8 @@ classdef ChannelFactory < matlab.System
 
         function receivedSignalStruct = stepImpl(obj, inputSignalStruct, frameId, txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo)
             % stepImpl - Production declaration in CSRD.
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if ~isstruct(channelLinkSpecificInfo)
                 channelLinkSpecificInfo = struct();
             end
@@ -244,9 +243,8 @@ classdef ChannelFactory < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Production declaration in CSRD.
-            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('ChannelFactory releaseImpl called.');
             obj.releaseCachedBlocks();
             obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
@@ -255,9 +253,8 @@ classdef ChannelFactory < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Production declaration in CSRD.
-            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('ChannelFactory resetImpl called.');
             if isa(obj.cachedChannelBlock, 'containers.Map')
                 blockValues = values(obj.cachedChannelBlock);
@@ -277,9 +274,8 @@ classdef ChannelFactory < matlab.System
 
         function modelName = resolveChannelModelName(obj, channelLinkInfo)
             % Thin instance-level adapter; the actual resolution policy
-            % 中文说明：resolveChannelModelName 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % lives in the Hidden static helper so unit tests can
             % exercise every branch without spinning up matlab.System
             % setupImpl. Phase 2 (audit D5 / §3.6) removed the
@@ -295,9 +291,8 @@ classdef ChannelFactory < matlab.System
 
         function defaultModel = getDefaultModelForMode(obj, mode)
             % Phase 2 (D5): instance-level adapter. The actual policy is
-            % 中文说明：getDefaultModelForMode 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % a Hidden static helper so unit tests can drive it without
             % spinning up matlab.System.
             defaultModel = csrd.factories.ChannelFactory.getDefaultModelForModeFromConfig( ...
@@ -306,9 +301,8 @@ classdef ChannelFactory < matlab.System
 
         function cacheKey = resolveChannelCacheKey(obj, modelName, txIdStr, rxIdStr, channelLinkInfo) %#ok<INUSL>
             % Statistical/fading channel models are cached per Tx-Rx link.
-            % 中文说明：resolveChannelCacheKey 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % RayTracing itself is stateless per link except for generated
             % site handles used for diagnostics; the expensive siteviewer and
             % propagation-model resources are map/profile-scoped, so Phase 21
@@ -335,17 +329,15 @@ classdef ChannelFactory < matlab.System
 
         function tf = isRayTracingModelName(~, modelName)
             % isRayTracingModelName - Production declaration in CSRD.
-            % 中文说明：isRayTracingModelName 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             tf = contains(modelName, 'RayTracing', 'IgnoreCase', true);
         end
 
         function block = getChannelBlock(obj, modelName, cacheKey)
             % getChannelBlock - Production declaration in CSRD.
-            % 中文说明：getChannelBlock 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if isempty(obj.cachedChannelBlock) || ~isa(obj.cachedChannelBlock, 'containers.Map')
                 obj.cachedChannelBlock = containers.Map('KeyType', 'char', 'ValueType', 'any');
             end
@@ -381,9 +373,8 @@ classdef ChannelFactory < matlab.System
 
         function applyBlockConfig(obj, block, blockConfig)
             % applyBlockConfig - Production declaration in CSRD.
-            % 中文说明：applyBlockConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfgFields = fieldnames(blockConfig);
             for idx = 1:numel(cfgFields)
                 fieldName = cfgFields{idx};
@@ -415,9 +406,8 @@ classdef ChannelFactory < matlab.System
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...
                 txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB)
             % NOTE: linkDistance_m is in METERS to match the documented
-            % 中文说明：configureStatisticalBlock 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % BaseChannel.Distance unit. The previous signature used
             % linkDistance_km but the body referenced linkDistance_m,
             % which would crash with an undefined-variable error if the
@@ -502,9 +492,8 @@ classdef ChannelFactory < matlab.System
 
         function seedValue = deriveChannelSeed(~, frameId, txIdStr, rxIdStr, channelLinkInfo)
             % deriveChannelSeed Compute a burst-aware deterministic seed
-            % 中文说明：deriveChannelSeed 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % for statistical channel blocks.
             %
             % This method is intentionally PUBLIC so unit tests and
@@ -549,9 +538,8 @@ classdef ChannelFactory < matlab.System
 
         function receivedSignalStruct = mergeChannelOutput(~, inputSignalStruct, channelBlockOutput)
             % mergeChannelOutput Whitelist-based merge of a channel block
-            % 中文说明：mergeChannelOutput 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % output into the upstream signal struct.
             %
             % Phase 1 / H14 contract (see docs/audits/phases/phase-1-dataflow.md §3.5):
@@ -623,9 +611,8 @@ classdef ChannelFactory < matlab.System
 
         function [linkDistance_m, linkDistance_km] = computeLinkDistance(obj, txInfo, rxInfo, channelLinkInfo)
             % computeLinkDistance - Production declaration in CSRD.
-            % 中文说明：computeLinkDistance 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             linkDistance_m = 0;
             txPos = getStructField(txInfo, 'Position', []);
             rxPos = getStructField(rxInfo, 'Position', []);
@@ -658,9 +645,8 @@ classdef ChannelFactory < matlab.System
 
         function pathLoss_dB = computeFreeSpacePathLoss(obj, linkDistance_m, rxInfo, channelLinkInfo)
             % computeFreeSpacePathLoss - Production declaration in CSRD.
-            % 中文说明：computeFreeSpacePathLoss 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             carrierFreq = obj.resolveCarrierFrequency(rxInfo, channelLinkInfo);
             waveLength = physconst('LightSpeed') / carrierFreq;
             pathLoss_dB = fspl(max(linkDistance_m, 1), waveLength);
@@ -668,9 +654,8 @@ classdef ChannelFactory < matlab.System
 
         function carrierFreq = resolveCarrierFrequency(obj, rxInfo, channelLinkInfo)
             % resolveCarrierFrequency - Production declaration in CSRD.
-            % 中文说明：resolveCarrierFrequency 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             rxScenarioConfig = getStructField(channelLinkInfo, 'RxScenarioConfig', struct());
             if isfield(rxScenarioConfig, 'Observation') && ...
                     isfield(rxScenarioConfig.Observation, 'RealCarrierFrequency') && ...
@@ -698,9 +683,8 @@ classdef ChannelFactory < matlab.System
 
         function snr_dB = computeLinkBudgetSNR(obj, pathLoss_dB, txInfo, inputSignalStruct, rxInfo)
             % Compute analytical link-budget SNR.
-            % 中文说明：computeLinkBudgetSNR 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Noise bandwidth is resolved from explicit link-budget,
             % receiver observation, and current segment bandwidth facts,
@@ -779,9 +763,8 @@ classdef ChannelFactory < matlab.System
 
         function releaseCachedBlocks(obj)
             % releaseCachedBlocks - Production declaration in CSRD.
-            % 中文说明：releaseCachedBlocks 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if ~isa(obj.cachedChannelBlock, 'containers.Map')
                 return;
             end
@@ -801,9 +784,8 @@ classdef ChannelFactory < matlab.System
 
         function modelName = resolveChannelModelNameFromConfig(requested, mode, factoryConfig)
             % resolveChannelModelNameFromConfig - Phase 2 (D5) channel
-            % 中文说明：resolveChannelModelNameFromConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % model resolution policy as a Hidden static helper.
             %
             % This is the single source of truth for "given a requested
@@ -855,9 +837,8 @@ classdef ChannelFactory < matlab.System
 
         function defaultModel = getDefaultModelForModeFromConfig(mode, factoryConfig)
             % getDefaultModelForModeFromConfig - Phase 2 (D5) default
-            % 中文说明：getDefaultModelForModeFromConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % model lookup as a Hidden static helper. The registry must
             % declare a default for the requested mode or for Statistical.
             if ~isstruct(factoryConfig) || ~isfield(factoryConfig, 'DefaultModels') ...
@@ -895,6 +876,9 @@ classdef ChannelFactory < matlab.System
 end
 
 function value = requireFiniteScalar(value, label)
+    % requireFiniteScalar - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
         error('CSRD:RuntimeTruth:InvalidFiniteScalar', ...
             '%s must be a finite numeric scalar.', label);
@@ -903,6 +887,9 @@ function value = requireFiniteScalar(value, label)
 end
 
 function value = requirePositiveFiniteScalar(value, label)
+    % requirePositiveFiniteScalar - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     value = requireFiniteScalar(value, label);
     if value <= 0
         error('CSRD:RuntimeTruth:InvalidPositiveScalar', ...
@@ -912,9 +899,8 @@ end
 
 function value = getStructField(s, fieldName, defaultValue)
     % getStructField - Production declaration in CSRD.
-    % 中文说明：getStructField 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -923,11 +909,17 @@ function value = getStructField(s, fieldName, defaultValue)
 end
 
 function tf = localUsesMeterPosition(info)
+    % localUsesMeterPosition - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = isstruct(info) && isfield(info, 'PositionUnit') && ...
         ~isempty(info.PositionUnit) && strcmpi(char(string(info.PositionUnit)), 'meters');
 end
 
 function geoPosition = localResolveGeoPosition(info, position, roleName)
+    % localResolveGeoPosition - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isstruct(info) && isfield(info, 'GeoPositionDeg') && ...
             ~isempty(info.GeoPositionDeg)
         geoPosition = double(info.GeoPositionDeg(:)).';
@@ -952,6 +944,9 @@ function geoPosition = localResolveGeoPosition(info, position, roleName)
 end
 
 function height = getPositionHeight(position)
+    % getPositionHeight - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isnumeric(position) && numel(position) >= 3
         height = position(3);
     else
@@ -961,9 +956,8 @@ end
 
 function distance_m = geographicDistance(txGeo, rxGeo)
     % geographicDistance - Production declaration in CSRD.
-    % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
     lat1 = deg2rad(txGeo(1));
     lon1 = deg2rad(txGeo(2));
@@ -984,6 +978,9 @@ function distance_m = geographicDistance(txGeo, rxGeo)
 end
 
 function linkInfos = localBuildFrameLinkInfos(txInfos, rxInfos, mapProfile, scenarioConfig)
+    % localBuildFrameLinkInfos - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     nTx = numel(txInfos);
     nRx = numel(rxInfos);
     linkInfos = cell(1, nTx * nRx);
@@ -1004,6 +1001,9 @@ function linkInfos = localBuildFrameLinkInfos(txInfos, rxInfos, mapProfile, scen
 end
 
 function entry = localScenarioEntry(scenarioConfig, fieldName, idx)
+    % localScenarioEntry - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     entry = struct();
     if ~isstruct(scenarioConfig) || ~isfield(scenarioConfig, fieldName)
         return;

@@ -1,6 +1,5 @@
 classdef CPFSK < csrd.blocks.physical.modulate.digital.CPM.GFSK
     % CPFSK - Continuous Phase Frequency Shift Keying Modulator
-    % 中文说明：提供 CSRD 生产链路中的 CPFSK 实现。
     %
     % This class implements Continuous Phase Frequency Shift Keying (CPFSK)
     % modulation as a subclass of the GFSK modulator. CPFSK is a digital
@@ -82,7 +81,7 @@ classdef CPFSK < csrd.blocks.physical.modulate.digital.CPM.GFSK
     %   - Lower ModulationIndex: Narrower bandwidth, more ISI
     %   - Higher ModulationIndex: Wider bandwidth, less ISI
     %
-    % References / 参考资料:
+    % References:
     %   - MATLAB Communications Toolbox CPM Documentation:
     %     https://www.mathworks.com/help/comm/ug/continuous-phase-modulation.html
     %   - CPFSK Implementation Details:
@@ -98,9 +97,8 @@ classdef CPFSK < csrd.blocks.physical.modulate.digital.CPM.GFSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured CPFSK modulator function handle
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method configures the CPFSK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation

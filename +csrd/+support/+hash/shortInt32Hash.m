@@ -1,8 +1,7 @@
 function value = shortInt32Hash(text)
 %SHORTINT32HASH Deterministic non-negative int32 hash of a UTF-8 string.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 shortInt32Hash 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   value = csrd.support.hash.shortInt32Hash(text)
 %

@@ -1,6 +1,5 @@
 classdef BlueprintFeasibilityValidator < handle
     %BLUEPRINTFEASIBILITYVALIDATOR Phase 3 static-only feasibility validator.
-    % 中文说明：提供 CSRD 生产链路中的 BlueprintFeasibilityValidator 实现。
     %
     % Runs all 20 in-process checks against a ScenarioBlueprint struct
     % (Phase 3 ReceiverViews-aware schema, see phase-3-construction.md §3.1.A)
@@ -31,9 +30,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function report = validate(blueprint)
             %VALIDATE Run all 20 checks; return ValidationReport struct.
-            % 中文说明：validate 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             checkList = {
                 @csrd.pipeline.blueprint.BlueprintFeasibilityValidator.checkFrameSampleConsistency
@@ -91,9 +89,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkFrameSampleConsistency(blueprint)
             % checkFrameSampleConsistency - Production declaration in CSRD.
-            % 中文说明：checkFrameSampleConsistency 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             global_ = getOrEmpty(blueprint, 'Global');
             rx      = getReceivers(blueprint);
@@ -124,9 +121,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkRxFsEqualsObservableBw(blueprint)
             % checkRxFsEqualsObservableBw - Production declaration in CSRD.
-            % 中文说明：checkRxFsEqualsObservableBw 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             rx = getReceivers(blueprint);
             for i = 1:numel(rx)
@@ -152,9 +148,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkTxBwInsideRxWindow(blueprint)
             % Phase 3: prefers tx.ReceiverViews(r).ProjectedCenterOffsetHz
-            % 中文说明：checkTxBwInsideRxWindow 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % when present (per-pair projection); falls back to
             % tx.Spectrum.PlannedFreqOffset for synthetic blueprints
             % without explicit ReceiverViews (single-Rx tests).
@@ -192,9 +187,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkModulationAntennaCompatible(blueprint)
             % checkModulationAntennaCompatible - Production declaration in CSRD.
-            % 中文说明：checkModulationAntennaCompatible 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             tx = getEmitters(blueprint);
             if isempty(tx)
@@ -253,9 +247,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkRFImpairmentRange(blueprint)
             % checkRFImpairmentRange - Production declaration in CSRD.
-            % 中文说明：checkRFImpairmentRange 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             tx = getEmitters(blueprint);
             for t = 1:numel(tx)
@@ -302,9 +295,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkBurstTotalDurationFits(blueprint)
             % checkBurstTotalDurationFits - Production declaration in CSRD.
-            % 中文说明：checkBurstTotalDurationFits 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             global_ = getOrEmpty(blueprint, 'Global');
             tx      = getEmitters(blueprint);
@@ -352,9 +344,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkCrossFrameSegmentMinSamples(blueprint)
             % checkCrossFrameSegmentMinSamples - Production declaration in CSRD.
-            % 中文说明：checkCrossFrameSegmentMinSamples 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             tx = getEmitters(blueprint);
             for t = 1:numel(tx)
@@ -380,9 +371,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkOsmFileExistsAndBuildings(blueprint)
             % checkOsmFileExistsAndBuildings - Production declaration in CSRD.
-            % 中文说明：checkOsmFileExistsAndBuildings 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             cp = getOrEmpty(blueprint, 'ChannelPreference');
             if isempty(cp) || ~isfield(cp, 'Model')
@@ -420,9 +410,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkChannelModelInRegistry(blueprint)
             % checkChannelModelInRegistry - Production declaration in CSRD.
-            % 中文说明：checkChannelModelInRegistry 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             cp = getOrEmpty(blueprint, 'ChannelPreference');
             if isempty(cp) || ~isfield(cp, 'Model')
@@ -445,9 +434,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkTrajectoryMonotonicAndCovers(blueprint)
             % checkTrajectoryMonotonicAndCovers - Production declaration in CSRD.
-            % 中文说明：checkTrajectoryMonotonicAndCovers 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             global_ = getOrEmpty(blueprint, 'Global');
             entities = getEntitiesAll(blueprint);
@@ -487,9 +475,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkLinkDistanceAboveMin(blueprint)
             % checkLinkDistanceAboveMin - Production declaration in CSRD.
-            % 中文说明：checkLinkDistanceAboveMin 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             tx = getEmitters(blueprint);
             rx = getReceivers(blueprint);
@@ -522,9 +509,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkMemoryBudget(blueprint)
             % checkMemoryBudget - Production declaration in CSRD.
-            % 中文说明：checkMemoryBudget 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             global_ = getOrEmpty(blueprint, 'Global');
             rx      = getReceivers(blueprint);
@@ -565,9 +551,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkReceiverViewProjectionPresent(blueprint)
             % checkReceiverViewProjectionPresent - Production declaration in CSRD.
-            % 中文说明：checkReceiverViewProjectionPresent 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             tx = getEmitters(blueprint);
             rx = getReceivers(blueprint);
@@ -593,9 +578,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkBurstOverlapsFrameExpansion(blueprint)
             % checkBurstOverlapsFrameExpansion - Production declaration in CSRD.
-            % 中文说明：checkBurstOverlapsFrameExpansion 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             tx = getEmitters(blueprint);
             for t = 1:numel(tx)
@@ -626,9 +610,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkMeasurementPlanesSeparated(blueprint)
             % checkMeasurementPlanesSeparated - Production declaration in CSRD.
-            % 中文说明：checkMeasurementPlanesSeparated 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             mp = getOrEmpty(blueprint, 'MeasurementPolicy');
             if isempty(mp)
@@ -658,9 +641,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkGeometryGranularityDeclared(blueprint)
             % checkGeometryGranularityDeclared - Production declaration in CSRD.
-            % 中文说明：checkGeometryGranularityDeclared 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             ann = getOrEmpty(blueprint, 'AnnotationPolicy');
             if isempty(ann) || ~isfield(ann, 'GeometryGranularity')
@@ -679,9 +661,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkReceiverOutputWindowConsistent(blueprint)
             % checkReceiverOutputWindowConsistent - Production declaration in CSRD.
-            % 中文说明：checkReceiverOutputWindowConsistent 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             failure = csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailure();
             global_ = getOrEmpty(blueprint, 'Global');
             output  = getOrEmpty(blueprint, 'OutputPolicy');
@@ -713,9 +694,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkOverlapAnnotationConsistent(blueprint)
             % Phase 4 (audit §3.6.C / P4-followup-5):
-            % 中文说明：checkOverlapAnnotationConsistent 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %   Two-rail check that BurstSchedule's burst-level overlap
             %   annotation is consistent with the FrameExecutionPlan
             %   ground truth. Two annotations exist in the wild:
@@ -789,9 +769,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkMeasurementCompleteness(~) %#ok<INUSD>
             % Phase 4 (audit §3.6.A): blueprint-phase NoOp.
-            % 中文说明：checkMeasurementCompleteness 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % The measurement-completeness contract is enforced post-
             % execution at annotation write-back time by the
@@ -811,9 +790,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function failure = checkDopplerSelfConsistency(blueprint)
             % Phase 4 (audit §3.6.B):
-            % 中文说明：checkDopplerSelfConsistency 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %   Predictive blueprint-phase check. When any Emitter
             %   declares `Mobility.MaxSpeedMps > 0` (or any of the
             %   legacy aliases TopSpeed / MaxSpeed) the blueprint MUST
@@ -860,9 +838,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function f = emptyFailure()
             % emptyFailure - Production declaration in CSRD.
-            % 中文说明：emptyFailure 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             f = repmat( ...
                 struct('Code', '', 'Severity', '', 'Message', '', 'Hint', '', 'Field', ''), ...
                 0, 1);
@@ -870,9 +847,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function arr = emptyFailureArray()
             % emptyFailureArray - Production declaration in CSRD.
-            % 中文说明：emptyFailureArray 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             arr = repmat( ...
                 struct('Code', '', 'Severity', '', 'Message', '', 'Hint', '', 'Field', ''), ...
                 0, 1);
@@ -880,9 +856,8 @@ classdef BlueprintFeasibilityValidator < handle
 
         function f = makeFailure(code, severity, message, hint, field)
             % makeFailure - Production declaration in CSRD.
-            % 中文说明：makeFailure 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             f = struct( ...
                 'Code',     char(code), ...
                 'Severity', char(severity), ...
@@ -901,9 +876,8 @@ end
 
 function v = getOrEmpty(s, fname)
     % getOrEmpty - Production declaration in CSRD.
-    % 中文说明：getOrEmpty 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fname)
         v = s.(fname);
     else
@@ -913,25 +887,22 @@ end
 
 function items = getReceivers(blueprint)
     % getReceivers - Production declaration in CSRD.
-    % 中文说明：getReceivers 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     items = wrapAsCell(getOrEmpty(blueprint, 'Receivers'));
 end
 
 function items = getEmitters(blueprint)
     % getEmitters - Production declaration in CSRD.
-    % 中文说明：getEmitters 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     items = wrapAsCell(getOrEmpty(blueprint, 'Emitters'));
 end
 
 function items = getEntitiesAll(blueprint)
     % getEntitiesAll - Production declaration in CSRD.
-    % 中文说明：getEntitiesAll 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     e = wrapAsCell(getOrEmpty(blueprint, 'Emitters'));
     r = wrapAsCell(getOrEmpty(blueprint, 'Receivers'));
     items = [e, r];
@@ -939,9 +910,8 @@ end
 
 function c = wrapAsCell(value)
     % wrapAsCell - Production declaration in CSRD.
-    % 中文说明：wrapAsCell 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isempty(value)
         c = {};
     elseif iscell(value)
@@ -955,9 +925,8 @@ end
 
 function [centerOff, halfBw, source] = extractTxOffsetAndHalfBw(txc, rxc, rxIdx)
     % Phase 3: prefers ReceiverView-aware projection over the legacy
-    % 中文说明：extractTxOffsetAndHalfBw 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % emitter-global Spectrum.PlannedFreqOffset.
     %   source -- 'ReceiverView' when ProjectedCenterOffsetHz is read
     %             from txc.ReceiverViews; 'SpectrumLegacy' when the
@@ -991,9 +960,8 @@ end
 
 function rv = findReceiverView(txc, rxc, rxIdx)
     % findReceiverView - Production declaration in CSRD.
-    % 中文说明：findReceiverView 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     rv = [];
     rvs = getOrEmpty(txc, 'ReceiverViews');
     if isempty(rvs)
@@ -1027,9 +995,8 @@ end
 
 function fam = extractModulationFamily(txc)
     % extractModulationFamily - Production declaration in CSRD.
-    % 中文说明：extractModulationFamily 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     fam = '';
     m = getOrEmpty(txc, 'Modulation');
     if isstruct(m) && isfield(m, 'Family') && ischar(m.Family)
@@ -1039,9 +1006,8 @@ end
 
 function n = extractNumTxAntennas(txc)
     % extractNumTxAntennas - Production declaration in CSRD.
-    % 中文说明：extractNumTxAntennas 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     n = [];
     h = getOrEmpty(txc, 'Hardware');
     if isstruct(h) && isfield(h, 'NumAntennas') && isnumeric(h.NumAntennas)
@@ -1051,9 +1017,8 @@ end
 
 function n = extractNumRxAntennas(rxc)
     % extractNumRxAntennas - Production declaration in CSRD.
-    % 中文说明：extractNumRxAntennas 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     n = [];
     h = getOrEmpty(rxc, 'Hardware');
     if isstruct(h) && isfield(h, 'NumAntennas') && isnumeric(h.NumAntennas)
@@ -1067,9 +1032,8 @@ end
 
 function pos = extractEntityPosition(ent)
     % extractEntityPosition - Production declaration in CSRD.
-    % 中文说明：extractEntityPosition 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     pos = [];
     p = getOrEmpty(ent, 'Position');
     if ~isempty(p) && isnumeric(p)
@@ -1084,9 +1048,8 @@ end
 
 function bursts = extractBurstList(txc)
     % extractBurstList - Production declaration in CSRD.
-    % 中文说明：extractBurstList 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     bursts = struct([]);
     bs = getOrEmpty(txc, 'BurstSchedule');
     if isempty(bs), return; end
@@ -1098,9 +1061,8 @@ end
 
 function frames = collectFramesForBurst(fep, burstIdx)
     % collectFramesForBurst - Production declaration in CSRD.
-    % 中文说明：collectFramesForBurst 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     frames = [];
     if ~isstruct(fep) || ~isfield(fep, 'Segments')
         return;
@@ -1119,9 +1081,8 @@ end
 
 function indices = collectActiveIntervalIndices(fep)
     %COLLECTACTIVEINTERVALINDICES Phase 4 §3.6.C / P4-followup-5 helper.
-    % 中文说明：collectActiveIntervalIndices 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Walks FrameExecutionPlan.Segments and concatenates all
     %   ActiveIntervalIndices entries (each segment may carry a
@@ -1143,9 +1104,8 @@ end
 
 function speed = extractEntityMaxSpeed(ent)
     %EXTRACTENTITYMAXSPEED Phase 4 §3.6.B helper.
-    % 中文说明：extractEntityMaxSpeed 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Returns the declared maximum speed (m/s) for an emitter/receiver.
     %   Looks for `Mobility.MaxSpeedMps` first (the Phase 3+4 canonical
@@ -1175,9 +1135,8 @@ end
 
 function ok = conditionalAntennaConstraintSatisfied(family, numAnt, txc, profile)
     % conditionalAntennaConstraintSatisfied - Production declaration in CSRD.
-    % 中文说明：conditionalAntennaConstraintSatisfied 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     ok = true;
     if ~isstruct(profile.Conditions)
         return;

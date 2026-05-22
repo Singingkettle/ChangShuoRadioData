@@ -1,6 +1,5 @@
 function report = validateRequiredToolboxes(level)
 %VALIDATEREQUIREDTOOLBOXES Verify required MATLAB toolboxes are installed and licensed.
-% 中文说明：提供 CSRD 生产链路中的 validateRequiredToolboxes 实现。
 %
 %   report = csrd.runtime.toolbox.validateRequiredToolboxes(level)
 %
@@ -156,9 +155,8 @@ end % function
 % =========================================================================
 function catalog = localToolboxCatalog()
 % Authoritative list of toolboxes CSRD may need. Keep aligned with the
-% 中文说明：localToolboxCatalog 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 % blueprint refactor doc §16.5.2 / phase-0-baseline.md Appendix A.
 %
 % Field map:
@@ -219,9 +217,8 @@ end
 % =========================================================================
 function name = localHostname()
 % Tiny cross-platform hostname helper; no external dependencies.
-% 中文说明：localHostname 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 name = '';
 try
     [status, raw] = system('hostname');

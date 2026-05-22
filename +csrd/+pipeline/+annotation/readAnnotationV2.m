@@ -1,8 +1,7 @@
 function result = readAnnotationV2(input, varargin)
 %READANNOTATIONV2 Read and validate a CSRD annotation v2 document.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 readAnnotationV2 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   RESULT = csrd.pipeline.annotation.readAnnotationV2(PATH) reads a JSON
 %   annotation file and validates the frozen v0.4
@@ -70,9 +69,8 @@ end
 
 function [payload, sourcePath] = localLoadPayload(input)
     % localLoadPayload - Production declaration in CSRD.
-    % 中文说明：localLoadPayload 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 sourcePath = '';
 if isstruct(input)
     payload = input;
@@ -92,9 +90,8 @@ end
 
 function items = localFlattenStructs(value, context)
     % localFlattenStructs - Production declaration in CSRD.
-    % 中文说明：localFlattenStructs 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 items = {};
 if isempty(value)
     return;
@@ -122,9 +119,8 @@ end
 
 function localValidateFrame(frame, frameIdx)
     % localValidateFrame - Production declaration in CSRD.
-    % 中文说明：localValidateFrame 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 context = sprintf('Frames{%d}', frameIdx);
 localRequireFields(frame, ...
     {'FrameId', 'ReceiverID', 'Status', 'SignalSources'}, context);
@@ -136,9 +132,8 @@ end
 
 function localValidateSource(source, frameIdx, sourceIdx)
     % localValidateSource - Production declaration in CSRD.
-    % 中文说明：localValidateSource 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 context = sprintf('Frames{%d}.SignalSources{%d}', frameIdx, sourceIdx);
 localRejectV1Fields(source, context);
 localRequireFields(source, ...
@@ -156,9 +151,8 @@ end
 
 function localValidateDesign(design, context)
     % localValidateDesign - Production declaration in CSRD.
-    % 中文说明：localValidateDesign 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFields(design, ...
     {'PlannedCenterFrequencyHz', 'PlannedBandwidthHz', ...
      'PlannedSampleRate', 'ModulationFamily', 'ModulationOrder', ...
@@ -185,9 +179,8 @@ end
 
 function localValidateRegulatoryDesign(reg, context)
     % localValidateRegulatoryDesign - Production declaration in CSRD.
-    % 中文说明：localValidateRegulatoryDesign 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFields(reg, ...
     {'RegionId', 'Authority', 'BandId', 'ServiceClass', 'Application', ...
      'AllocationStatus', 'SourceRefs', 'EvidenceLevel', 'ChannelRasterHz', ...
@@ -210,9 +203,8 @@ end
 
 function localValidateExecution(execution, context)
     % localValidateExecution - Production declaration in CSRD.
-    % 中文说明：localValidateExecution 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFields(execution, ...
     {'ModulatedBandwidthHz', 'CenterFrequencyOffsetHz', 'SampleRate', ...
      'ChannelModel', 'PathLossDB', 'AnalyticalSNRdB', 'AppliedSNRdB', ...
@@ -226,9 +218,8 @@ end
 
 function localValidateMeasured(measured, context)
     % localValidateMeasured - Production declaration in CSRD.
-    % 中文说明：localValidateMeasured 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFields(measured, {'SourcePlane', 'FramePlane'}, context);
 localRequireFields(measured.SourcePlane, ...
     {'OccupiedBandwidthHz', 'CenterFrequencyHz', 'SNRdB', ...
@@ -249,9 +240,8 @@ end
 
 function localValidateReceiverView(receiverView, context)
     % localValidateReceiverView - Production declaration in CSRD.
-    % 中文说明：localValidateReceiverView 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFields(receiverView, ...
     {'ReceiverId', 'ProjectedCenterOffsetHz', 'ProjectedLowerEdgeHz', ...
      'ProjectedUpperEdgeHz', 'IsVisible', 'VisibilityReason'}, context);
@@ -260,9 +250,8 @@ end
 
 function localRejectV1Fields(source, context)
     % localRejectV1Fields - Production declaration in CSRD.
-    % 中文说明：localRejectV1Fields 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 forbidden = {'Realized', 'Planned', 'Temporal', 'Spatial', ...
     'LinkBudget', 'Channel'};
 for k = 1:numel(forbidden)
@@ -276,9 +265,8 @@ end
 
 function localRequireFields(s, fields, context)
     % localRequireFields - Production declaration in CSRD.
-    % 中文说明：localRequireFields 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(isstruct(s), ...
     'CSRD:AnnotationV2:ExpectedStruct', ...
     '%s must be a struct.', context);
@@ -292,9 +280,8 @@ end
 
 function localAssertTextEquals(actual, expected, context)
     % localAssertTextEquals - Production declaration in CSRD.
-    % 中文说明：localAssertTextEquals 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(strcmp(char(actual), expected), ...
     'CSRD:AnnotationV2:UnexpectedSemantics', ...
     '%s expected "%s", got "%s".', context, expected, char(actual));
@@ -303,9 +290,8 @@ end
 
 function localRequireFiniteScalar(value, context)
     % localRequireFiniteScalar - Production declaration in CSRD.
-    % 中文说明：localRequireFiniteScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(isnumeric(value) && isscalar(value) && isfinite(value), ...
     'CSRD:AnnotationV2:InvalidDesignValue', ...
     '%s must be a finite numeric scalar.', context);
@@ -314,9 +300,8 @@ end
 
 function localRequirePositiveScalar(value, context)
     % localRequirePositiveScalar - Production declaration in CSRD.
-    % 中文说明：localRequirePositiveScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFiniteScalar(value, context);
 assert(double(value) > 0, ...
     'CSRD:AnnotationV2:InvalidDesignValue', ...
@@ -326,9 +311,8 @@ end
 
 function localRequireNonnegativeScalar(value, context)
     % localRequireNonnegativeScalar - Production declaration in CSRD.
-    % 中文说明：localRequireNonnegativeScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 localRequireFiniteScalar(value, context);
 assert(double(value) >= 0, ...
     'CSRD:AnnotationV2:InvalidDesignValue', ...
@@ -338,9 +322,8 @@ end
 
 function localRequireNonemptyText(value, context)
     % localRequireNonemptyText - Production declaration in CSRD.
-    % 中文说明：localRequireNonemptyText 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(ischar(value) || isstring(value), ...
     'CSRD:AnnotationV2:InvalidDesignValue', ...
     '%s must be non-empty text.', context);

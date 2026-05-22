@@ -1,9 +1,8 @@
 function [txConfigs, globalLayout] = allocateFrequenciesReceiverCentric(obj, txConfigs, ...
         rxConfigs, observableRange, globalLayout)
     %allocateFrequenciesReceiverCentric Receiver-centric frequency allocation.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 allocateFrequenciesReceiverCentric 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Allocates an emitter-global PlannedFreqOffset per Tx inside the
     %   unified observable range using random placement + collision
@@ -123,7 +122,8 @@ end
 function centerFreq = localFindNonOverlappingCenter(obj, txBW, minCenter, ...
         maxCenter, usedRanges)
 %LOCALFINDNONOVERLAPPINGCENTER Deterministic fallback for finite gap search.
-% 中文说明：随机放置失败时仍先精确找可行间隙，而不是直接制造频谱重叠。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 centerFreq = NaN;
 if isempty(usedRanges)
     centerFreq = (minCenter + maxCenter) / 2;
@@ -157,6 +157,9 @@ end
 end
 
 function value = getStructField(s, fieldName, defaultValue)
+    % getStructField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
     value = s.(fieldName);
 else

@@ -1,8 +1,7 @@
 function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalSegments, TxInfos, RxInfos)
     % processChannelPropagation - Apply channel effects to transmitted signals
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processChannelPropagation 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method processes all transmitter-receiver pairs through the channel model.
     %
@@ -342,6 +341,9 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
 end
 
 function durationSec = localComponentDurationSec(segmentSignal)
+    % localComponentDurationSec - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isfield(segmentSignal, 'FrameRelativeStartTime') && ...
             isfield(segmentSignal, 'FrameRelativeEndTime') && ...
             ~isempty(segmentSignal.FrameRelativeStartTime) && ...
@@ -361,6 +363,9 @@ function durationSec = localComponentDurationSec(segmentSignal)
 end
 
 function localAssertSegmentAntennaColumns(segmentSignal, txInfo, rxInfo, frameId, segIdx)
+    % localAssertSegmentAntennaColumns - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     signalData = segmentSignal.Signal;
     if isempty(signalData)
         return;
@@ -386,6 +391,9 @@ function localAssertSegmentAntennaColumns(segmentSignal, txInfo, rxInfo, frameId
 end
 
 function expectedColumns = localResolveTxAntennaColumns(segmentSignal, txInfo)
+    % localResolveTxAntennaColumns - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     expectedColumns = [];
     if isstruct(segmentSignal) && isfield(segmentSignal, 'NumTransmitAntennas') && ...
             isnumeric(segmentSignal.NumTransmitAntennas) && ...
@@ -407,6 +415,9 @@ function expectedColumns = localResolveTxAntennaColumns(segmentSignal, txInfo)
 end
 
 function idText = localIdText(infoStruct, fallbackPrefix)
+    % localIdText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isstruct(infoStruct) && isfield(infoStruct, 'ID') && ~isempty(infoStruct.ID)
         idText = char(string(infoStruct.ID));
     else
@@ -416,9 +427,8 @@ end
 
 function mapProfile = getMapProfileFromLayout(layout)
     % getMapProfileFromLayout - Production declaration in CSRD.
-    % 中文说明：getMapProfileFromLayout 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     mapProfile = struct();
     if isfield(layout, 'Environment')
         env = layout.Environment;
@@ -431,6 +441,9 @@ function mapProfile = getMapProfileFromLayout(layout)
 end
 
 function activeTxInfos = localActiveTxInfosForChannelPrecompute(txsSignalSegments, TxInfos)
+    % localActiveTxInfosForChannelPrecompute - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     activeTxInfos = {};
     numTx = min(numel(txsSignalSegments), numel(TxInfos));
     for txIdx = 1:numTx
@@ -447,6 +460,9 @@ function activeTxInfos = localActiveTxInfosForChannelPrecompute(txsSignalSegment
 end
 
 function tf = localTxHasLiveSignalSegment(txSegments)
+    % localTxHasLiveSignalSegment - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = false;
     if isempty(txSegments) || ~iscell(txSegments)
         return;
@@ -462,6 +478,9 @@ function tf = localTxHasLiveSignalSegment(txSegments)
 end
 
 function activeRxInfos = localActiveRxInfosForChannelPrecompute(RxInfos)
+    % localActiveRxInfosForChannelPrecompute - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     activeRxInfos = {};
     for rxIdx = 1:numel(RxInfos)
         rxInfo = RxInfos{rxIdx};
@@ -474,9 +493,8 @@ function activeRxInfos = localActiveRxInfosForChannelPrecompute(RxInfos)
 end
 function channelModel = resolveChannelModelFromScenario(mapProfile)
     % resolveChannelModelFromScenario - Production declaration in CSRD.
-    % 中文说明：resolveChannelModelFromScenario 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     channelModel = '';
     if isstruct(mapProfile) && isfield(mapProfile, 'ChannelModel')
         channelModel = mapProfile.ChannelModel;
@@ -486,9 +504,8 @@ end
 function [shiftedSignal, dopplerHz, radialVelMps] = ...
         applyDopplerForComponent(channelOutput, txInfo, rxInfo)
     % applyDopplerForComponent - Apply external Doppler when the channel did not.
-    % 中文说明：当信道模块未内部处理多普勒时，基于 Tx/Rx 相对速度补偿当前链路信号。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Phase 4 (§3.2.B): channel-type whitelist gate. If the channel block
     % already honoured Tx/Rx velocity internally (e.g. a future
     % phased.FreeSpace/Doppler-aware variant), it MUST set
@@ -541,9 +558,8 @@ end
 
 function bwHz = measureModulatedBandwidth(segmentSignal)
     %MEASUREMODULATEDBANDWIDTH OBW of clean modulator output.
-    % 中文说明：measureModulatedBandwidth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Phase 4 §3.4 promotes `Truth.Execution.ModulatedBandwidthHz` from
     % the modulator's analytical formula scalar to a real measurement on
@@ -589,6 +605,9 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
 end
 
 function diagnostic = localCleanObwDiagnostic(component, segmentSignal)
+    % localCleanObwDiagnostic - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     diagnostic = struct();
     diagnostic.TxID = localStructText(component, 'TxID');
     diagnostic.BurstId = localStructText(component, 'BurstId');
@@ -628,6 +647,9 @@ function diagnostic = localCleanObwDiagnostic(component, segmentSignal)
 end
 
 function textValue = localStructText(s, fieldName)
+    % localStructText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     textValue = '';
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         textValue = char(string(s.(fieldName)));
@@ -635,6 +657,9 @@ function textValue = localStructText(s, fieldName)
 end
 
 function numericValue = localStructNumber(s, fieldName)
+    % localStructNumber - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     numericValue = NaN;
     if isstruct(s) && isfield(s, fieldName) && ...
             isnumeric(s.(fieldName)) && isscalar(s.(fieldName)) && ...
@@ -645,9 +670,8 @@ end
 
 function bwHz = coerceScalarBandwidth(rawBw)
     %COERCESCALARBANDWIDTH Normalise a [lo,hi] / scalar BW field to Hz.
-    % 中文说明：coerceScalarBandwidth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   The legacy modulator API stored bandwidth as `[lo, hi]`; some
     %   factories already collapse to a scalar. We accept either and

@@ -1,8 +1,7 @@
 function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalSegments, TxInfos)
     % processTransmitImpairments - Apply transmitter frontend impairments
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processTransmitImpairments 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method applies transmitter RF frontend impairments to all signal segments
     % using the TransmitFactory.
@@ -82,6 +81,9 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
 end
 
 function durationSec = localSegmentDurationSec(segSignal)
+    % localSegmentDurationSec - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isfield(segSignal, 'FrameRelativeStartTime') && ...
             isfield(segSignal, 'FrameRelativeEndTime') && ...
             ~isempty(segSignal.FrameRelativeStartTime) && ...

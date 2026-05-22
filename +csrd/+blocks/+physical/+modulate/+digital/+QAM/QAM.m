@@ -1,6 +1,5 @@
 classdef QAM < csrd.blocks.physical.modulate.digital.APSK.APSK
     % QAM - Quadrature Amplitude Modulation Modulator
-    % 中文说明：提供 CSRD 生产链路中的 QAM 实现。
     %
     % This class implements Quadrature Amplitude Modulation (QAM) as a subclass
     % of the APSK modulator. QAM modulation combines amplitude and phase modulation
@@ -61,9 +60,8 @@ classdef QAM < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core QAM modulation implementation
-            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method performs the complete QAM modulation process including
             % QAM constellation mapping with unit average power, OSTBC encoding
@@ -118,9 +116,8 @@ classdef QAM < csrd.blocks.physical.modulate.digital.APSK.APSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured QAM modulator function handle
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method configures the QAM modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

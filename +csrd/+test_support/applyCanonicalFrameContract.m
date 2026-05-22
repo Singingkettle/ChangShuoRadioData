@@ -1,6 +1,7 @@
 function cfg = applyCanonicalFrameContract(cfg, observationDurationSec, numFrames)
-%APPLYCANONICALFRAMECONTRACT Write the strict Phase 30 frame authority.
-% 中文说明：测试辅助函数；只写 raw config 权威字段，不写派生字段。
+%APPLYCANONICALFRAMECONTRACT Write a fixed Phase 33 frame policy.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 if nargin < 3
     error('CSRD:TestSupport:FrameContractArgs', ...
@@ -25,8 +26,21 @@ if frameSamples <= 0
     error('CSRD:TestSupport:InvalidFrameSamples', ...
         'Resolved FrameNumSamples must be positive.');
 end
-scenarioConfig.Global.NumFramesPerScenario = double(numFrames);
-scenarioConfig.Global.FrameNumSamples = frameSamples;
+if isfield(scenarioConfig, 'Global') && isstruct(scenarioConfig.Global)
+    oldFields = {'FrameNumSamples', 'FrameLength', 'NumFramesPerScenario', ...
+        'NumFrames', 'FrameDuration', 'ObservationDuration', 'TimeResolution'};
+    for idx = 1:numel(oldFields)
+        if isfield(scenarioConfig.Global, oldFields{idx})
+            scenarioConfig.Global = rmfield(scenarioConfig.Global, oldFields{idx});
+        end
+    end
+end
+scenarioConfig.FramePolicy.FrameNumSamples = struct( ...
+    'Mode', 'Fixed', ...
+    'Value', frameSamples);
+scenarioConfig.FramePolicy.NumFramesPerScenario = struct( ...
+    'Mode', 'Fixed', ...
+    'Value', double(numFrames));
 
 switch target
     case 'master'
@@ -37,11 +51,18 @@ end
 end
 
 function [scenarioConfig, target] = localScenarioConfig(cfg)
+    % localScenarioConfig - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isfield(cfg, 'Factories') && isstruct(cfg.Factories) && ...
         isfield(cfg.Factories, 'Scenario') && isstruct(cfg.Factories.Scenario)
     scenarioConfig = cfg.Factories.Scenario;
     target = 'master';
 elseif isfield(cfg, 'Global') && isstruct(cfg.Global)
+    scenarioConfig = cfg;
+    target = 'scenario';
+elseif isfield(cfg, 'PhysicalEnvironment') && isstruct(cfg.PhysicalEnvironment) && ...
+        isfield(cfg, 'CommunicationBehavior') && isstruct(cfg.CommunicationBehavior)
     scenarioConfig = cfg;
     target = 'scenario';
 else
@@ -54,6 +75,9 @@ end
 end
 
 function sampleRateHz = localReceiverSampleRate(scenarioConfig)
+    % localReceiverSampleRate - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if ~isfield(scenarioConfig, 'CommunicationBehavior') || ...
         ~isstruct(scenarioConfig.CommunicationBehavior) || ...
         ~isfield(scenarioConfig.CommunicationBehavior, 'Receiver') || ...

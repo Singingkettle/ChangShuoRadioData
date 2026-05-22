@@ -1,8 +1,7 @@
 function TxInfo = setupTransmitterInfo(obj, FrameId, currentTxScenario, currentTxId)
     % setupTransmitterInfo - Setup transmitter information structure
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 setupTransmitterInfo 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method creates and configures the transmitter information structure
     % including antenna configuration and site parameters.
@@ -87,9 +86,8 @@ end
 
 function requireStructField(s, fieldName, errId, FrameId, txId)
     % requireStructField - Production declaration in CSRD.
-    % 中文说明：requireStructField 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isfield(s, fieldName) || ~isstruct(s.(fieldName))
         error(errId, ...
             'Frame %d, TxID %s: transmitter plan must include struct field %s.', ...
@@ -99,9 +97,8 @@ end
 
 function requireAnyField(s, fieldName, errId, FrameId, txId)
     % requireAnyField - Production declaration in CSRD.
-    % 中文说明：requireAnyField 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isfield(s, fieldName) || isempty(s.(fieldName))
         error(errId, ...
             'Frame %d, TxID %s: transmitter plan missing %s.', ...
@@ -111,9 +108,8 @@ end
 
 function requireFiniteScalar(s, fieldName, errId, FrameId, txId)
     % requireFiniteScalar - Production declaration in CSRD.
-    % 中文说明：requireFiniteScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     requireAnyField(s, fieldName, errId, FrameId, txId);
     value = s.(fieldName);
     if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
@@ -125,9 +121,8 @@ end
 
 function requirePositiveScalar(s, fieldName, errId, FrameId, txId)
     % requirePositiveScalar - Production declaration in CSRD.
-    % 中文说明：requirePositiveScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     requireFiniteScalar(s, fieldName, errId, FrameId, txId);
     if s.(fieldName) <= 0
         error(errId, ...
@@ -138,9 +133,8 @@ end
 
 function requirePositiveIntegerScalar(s, fieldName, errId, FrameId, txId)
     % requirePositiveIntegerScalar - Production declaration in CSRD.
-    % 中文说明：requirePositiveIntegerScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     requirePositiveScalar(s, fieldName, errId, FrameId, txId);
     if abs(s.(fieldName) - round(s.(fieldName))) > 0
         error(errId, ...
@@ -151,9 +145,8 @@ end
 
 function requireNumericVector(s, fieldName, expectedNumel, errId, FrameId, txId)
     % requireNumericVector - Production declaration in CSRD.
-    % 中文说明：requireNumericVector 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     requireAnyField(s, fieldName, errId, FrameId, txId);
     value = s.(fieldName);
     if ~isnumeric(value) || numel(value) ~= expectedNumel || ...

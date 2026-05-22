@@ -1,9 +1,9 @@
 function cfg = buildRuntimePlanForTest(cfg)
 %BUILDRUNTIMEPLANFORTEST Build RuntimePlan for test fixtures.
-% 中文说明：测试 fixture 也必须走生产 buildRuntimePlan 入口。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
-if isstruct(cfg) && isfield(cfg, 'Global') && ...
-        isfield(cfg, 'PhysicalEnvironment') && ...
+if isstruct(cfg) && isfield(cfg, 'PhysicalEnvironment') && ...
         isfield(cfg, 'CommunicationBehavior')
     master = csrd.runtime.config_loader('csrd2025/csrd2025.m');
     master.Factories.Scenario = cfg;

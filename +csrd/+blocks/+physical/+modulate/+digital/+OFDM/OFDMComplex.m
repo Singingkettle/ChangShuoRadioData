@@ -1,6 +1,5 @@
 classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
     % OFDMComplex - Advanced OFDM Modulator with Complete Physical Layer Processing
-    % 中文说明：提供 CSRD 生产链路中的 OFDMComplex 实现。
     %
     % This class implements a comprehensive OFDM (Orthogonal Frequency Division
     % Multiplexing) modulator with full physical layer processing including
@@ -27,7 +26,7 @@ classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
     %   - Zadoff-Chu synchronization sequences
     %   - Advanced filtering and spectral shaping
     %
-    % References / 参考资料:
+    % References:
     %   - 5G NR OFDM resampling and filtering:
     %     https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
     %   - Multirate filter design for OFDM:
@@ -85,9 +84,6 @@ classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
 
     % Technical References (preserved original comments):
     % https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
-    % https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html  关于如何实现对OFDM信号采样的仿真，本质上是一个转换
-    % https://github.com/wonderfulnx/acousticOFDM/blob/main/Matlab/IQmod.m      关于如何实现对OFDM信号采样的仿真
-    % https://www.mathworks.com/help/comm/ug/introduction-to-mimo-systems.html  基于这个例子确定OFDM-MIMO的整体流程
     % https://www.mathworks.com/help/comm/ug/ofdm-transmitter-and-receiver.html
 
     properties (Nontunable)
@@ -119,9 +115,8 @@ classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
 
         function [sysParam, txParam] = setParameters(obj)
             % setParameters - Production declaration in CSRD.
-            % 中文说明：setParameters 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             sysParam = struct();
 
             % Set transmit-specific parameter structure
@@ -197,9 +192,8 @@ classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
 
         function txObj = txInit(obj)
             %txInit Initializes transmitter
-            % 中文说明：txInit 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %   This helper function is called once and sets up various transmitter
             %   objects for use in per-frame processing of transport blocks.
             %
@@ -238,9 +232,8 @@ classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
 
         function y = baseModulator(obj, x)
             % baseModulator - Production declaration in CSRD.
-            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.sysParam.numSymPerFrame = round(length(x) / obj.sysParam.usedSubCarr / obj.NumTransmitAntennas);
             numDataOFDMSymbols = obj.sysParam.numSymPerFrame - ...
                 length(obj.sysParam.ssIdx) - length(obj.sysParam.rsIdx) - ...
@@ -470,9 +463,8 @@ classdef OFDMComplex < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Production declaration in CSRD.
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             [obj.txParam, obj.sysParam] = obj.setParameters;
             obj.txObj = obj.txInit;
@@ -486,9 +478,8 @@ end
 
 function [modType, bitsPerModSym, puncVec, codeRate] = getParameters(modOrder, codeRateIndex)
     % Select modulation type and bits per modulated symbol
-    % 中文说明：getParameters 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     switch modOrder
         case 2
             modType = 'BPSK';
@@ -538,9 +529,8 @@ end
 
 function intrlvOut = OFDMInterleave(in, dataIntrlvLen)
     % OFDMInterleave - Production declaration in CSRD.
-    % 中文说明：OFDMInterleave 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 
     lenIn = size(in, 1);
     numIntRows = ceil(lenIn / dataIntrlvLen);
@@ -562,9 +552,8 @@ end
 
 function firCoeff = OFDMFrontEndFilter(sysParam)
     %OFDMFrontEndFilter() Generates the transceiver front-end filter.
-    % 中文说明：OFDMFrontEndFilter 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   firCoeff = helperOFDMFrontEndFilter(sysParam)
     %   sysParam - system parameters structure
@@ -594,9 +583,8 @@ end
 
 function syncSignal = OFDMSyncSignal()
     %OFDMSyncSignal Generates synchronization signal
-    % 中文说明：OFDMSyncSignal 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %   This function returns a length-62 complex-valued vector for the
     %   frequency-domain representation of the sync signal.
     %
@@ -631,9 +619,8 @@ end
 
 function refSignal = OFDMRefSignal(numSubCarr)
     %OFDMRefSignal Generates reference signal.
-    % 中文说明：OFDMRefSignal 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %   This function generates a reference signal (refSignal) for the given
     %   number of active subcarriers (numSubCarr). This reference signal is
     %   known to both the transmitter and receiver.

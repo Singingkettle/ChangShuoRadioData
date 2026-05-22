@@ -1,8 +1,7 @@
 function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, signalsAtReceivers, RxInfos)
     % processReceiverProcessing - Process received signals and generate outputs
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processReceiverProcessing 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method combines all received signal components and generates
     % the final frame data and annotations.
@@ -88,6 +87,13 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             FrameAnnotation{rxIdx}.ObservableRange = rxInfo.ObservableRange;
             FrameAnnotation{rxIdx}.FrameLengthSamples = frameShape.NumSamples;
             FrameAnnotation{rxIdx}.FrameDurationSec = frameShape.DurationSec;
+            if isfield(obj.ScenarioConfig, 'ScenarioPlan') && ...
+                    isstruct(obj.ScenarioConfig.ScenarioPlan)
+                FrameAnnotation{rxIdx}.ScenarioPlan = struct( ...
+                    'Frame', obj.ScenarioConfig.ScenarioPlan.Frame, ...
+                    'DatasetAccounting', ...
+                        obj.ScenarioConfig.ScenarioPlan.DatasetAccounting);
+            end
             FrameAnnotation{rxIdx}.NumSignalComponents = length(combinedSignal.Components);
             FrameAnnotation{rxIdx}.Status = 'Success';
 
@@ -136,9 +142,8 @@ end
 function sourceInfo = buildSourceAnnotation(comp, isolatedSignal, ...
         sampleRate, observableBwHz, framePlaneCache)
     %BUILDSOURCEANNOTATION Phase 4 v2 schema (annotation full-replacement).
-    % 中文说明：buildSourceAnnotation 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Per Phase 4 §3.4 owner decision A_full_replace, the v1 top-level
     %   keys (`Realized` / `Planned` / `Temporal` / `Spatial` /
@@ -199,9 +204,8 @@ end
 
 function design = buildDesignTruth(comp)
     %BUILDDESIGNTRUTH Project comp.Planned (modulator-set) into v2 Design.
-    % 中文说明：buildDesignTruth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     design = struct();
     plannedSrc = struct();
     if isfield(comp, 'Planned') && isstruct(comp.Planned)
@@ -233,9 +237,8 @@ end
 
 function execution = buildExecutionTruth(comp)
     %BUILDEXECUTIONTRUTH Construction-layer ground truth (post-channel).
-    % 中文说明：buildExecutionTruth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Phase 4 §3.4 / §6 C8: `ModulatedBandwidthHz` is now the
     %   `obwActual` measurement performed in `processChannelPropagation`
@@ -304,9 +307,8 @@ end
 function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         observableBwHz, comp, framePlaneCache)
     %BUILDMEASUREDTRUTH SourcePlane (isolated) + FramePlane (cached).
-    % 中文说明：buildMeasuredTruth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     measured = struct();
 
     sourcePlane = struct();
@@ -360,9 +362,8 @@ end
 
 function fp = computeFramePlaneCache(combinedSignal, sampleRate, observableBwHz)
     %COMPUTEFRAMEPLANECACHE Once-per-receiver FramePlane measurements.
-    % 中文说明：computeFramePlaneCache 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     fp = makeEmptyFramePlane();
     if ~isstruct(combinedSignal) || ~isfield(combinedSignal, 'Signal') || ...
             isempty(combinedSignal.Signal)
@@ -413,9 +414,8 @@ end
 
 function fp = makeEmptyFramePlane()
     % makeEmptyFramePlane - Production declaration in CSRD.
-    % 中文说明：makeEmptyFramePlane 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     fp = struct( ...
         'OccupiedBandwidthHz',  NaN, ...
         'CenterFrequencyHz',    NaN, ...
@@ -427,9 +427,8 @@ end
 
 function bwHz = computeObservableBandwidthHz(rxInfo)
     %COMPUTEOBSERVABLEBANDWIDTHHZ Resolve receiver observable BW (Hz).
-    % 中文说明：computeObservableBandwidthHz 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isstruct(rxInfo) || ~isfield(rxInfo, 'ObservableRange') || ...
             numel(rxInfo.ObservableRange) < 2
         error('CSRD:Receiver:MissingObservableRange', ...
@@ -444,6 +443,9 @@ function bwHz = computeObservableBandwidthHz(rxInfo)
 end
 
 function validateExecutionSampleGrid(execution, comp)
+    % validateExecutionSampleGrid - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     sampleRate = requirePositiveMeasurement(execution.SampleRate, ...
         'Truth.Execution.SampleRate');
     frameStart = requireFiniteMeasurement(execution.FrameStartSample, ...
@@ -491,6 +493,9 @@ function validateExecutionSampleGrid(execution, comp)
 end
 
 function value = guardedMeasurement(fn, errorId)
+    % guardedMeasurement - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     try
         value = fn();
     catch ME
@@ -499,6 +504,9 @@ function value = guardedMeasurement(fn, errorId)
 end
 
 function value = requireFiniteMeasurement(value, label)
+    % requireFiniteMeasurement - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if ~isnumeric(value) || ~isscalar(value) || ~isfinite(value)
         error('CSRD:Measurement:InvalidMeasuredValue', ...
             '%s must be a finite numeric scalar for a live signal.', label);
@@ -507,6 +515,9 @@ function value = requireFiniteMeasurement(value, label)
 end
 
 function value = requirePositiveMeasurement(value, label)
+    % requirePositiveMeasurement - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     value = requireFiniteMeasurement(value, label);
     if value <= 0
         error('CSRD:Measurement:InvalidMeasuredValue', ...
@@ -516,9 +527,8 @@ end
 
 function value = getFieldOrDefault(s, fieldName, defaultValue)
     % getFieldOrDefault - Production declaration in CSRD.
-    % 中文说明：getFieldOrDefault 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -528,9 +538,8 @@ end
 
 function value = getFieldOrEmpty(s, fieldName, defaultValue)
     % getFieldOrEmpty - Production declaration in CSRD.
-    % 中文说明：getFieldOrEmpty 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -540,9 +549,8 @@ end
 
 function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
     % combineSignalComponents - Combine multiple signal components at receiver
-    % 中文说明：combineSignalComponents 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Aggregates signal components with time-alignment based on StartTime.
     % Each component's StartTime determines its position in the output buffer.
@@ -599,14 +607,17 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
 end
 
 function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
+    % localResolveFrameShape - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     frameWindow = localFrameWindowFromComponents(signalComponents);
-    if isempty(obj.RuntimePlan) || ~isstruct(obj.RuntimePlan) || ...
-            ~isfield(obj.RuntimePlan, 'Frame') || ...
-            ~isstruct(obj.RuntimePlan.Frame)
-        error('CSRD:RuntimePlan:MissingFrameContract', ...
-            'RuntimePlan.Frame is required to resolve receiver frame shape.');
+    if isempty(obj.ScenarioPlan) || ~isstruct(obj.ScenarioPlan) || ...
+            ~isfield(obj.ScenarioPlan, 'Frame') || ...
+            ~isstruct(obj.ScenarioPlan.Frame)
+        error('CSRD:ScenarioPlan:MissingFrameContract', ...
+            'ScenarioPlan.Frame is required to resolve receiver frame shape.');
     end
-    contract = obj.RuntimePlan.Frame;
+    contract = obj.ScenarioPlan.Frame;
     if ~isempty(frameWindow)
         localAssertFrameWindowMatchesPlan(frameWindow, ...
             contract.FrameNumSamples, sampleRate);
@@ -620,6 +631,9 @@ function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
 end
 
 function localAssertFrameWindowMatchesPlan(frameWindow, frameSamples, sampleRate)
+    % localAssertFrameWindowMatchesPlan - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if any(~isfinite(frameWindow)) || numel(frameWindow) < 2 || ...
             frameWindow(2) <= frameWindow(1)
         error('CSRD:Frame:InvalidFrameWindow', ...
@@ -628,12 +642,15 @@ function localAssertFrameWindowMatchesPlan(frameWindow, frameSamples, sampleRate
     computedSamples = (frameWindow(2) - frameWindow(1)) * sampleRate;
     if abs(computedSamples - frameSamples) > 1
         error('CSRD:Frame:InconsistentFrameSamples', ...
-            'SignalComponents.FrameWindow resolves to %g samples but RuntimePlan.Frame.FrameNumSamples is %d.', ...
+            'SignalComponents.FrameWindow resolves to %g samples but ScenarioPlan.Frame.FrameNumSamples is %d.', ...
             computedSamples, frameSamples);
     end
 end
 
 function frameWindow = localFrameWindowFromComponents(signalComponents)
+    % localFrameWindowFromComponents - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     frameWindow = [];
     for k = 1:numel(signalComponents)
         comp = signalComponents{k};
@@ -651,6 +668,9 @@ end
 
 function comp = localUpdateComponentSampleGrid(comp, compSig, startOffset, ...
         frameSamples, sampleRate)
+            % localUpdateComponentSampleGrid - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
     sampleCount = size(compSig, 1);
     gridStart = min(startOffset, frameSamples);
     endOffset = max(gridStart, min(frameSamples, startOffset + sampleCount));
@@ -670,6 +690,9 @@ function comp = localUpdateComponentSampleGrid(comp, compSig, startOffset, ...
 end
 
 function [signalOut, info] = localCoerceProcessedFrameLength(signalIn, targetSamples)
+    % localCoerceProcessedFrameLength - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isempty(signalIn)
         signalIn = complex(zeros(0, 1));
     elseif isvector(signalIn)
@@ -696,9 +719,8 @@ end
 
 function startOffset = localFrameStartOffset(comp, sampleRate)
     % localFrameStartOffset - Convert source start time into frame samples.
-    % 中文说明：把源的帧内起始时间转换为样点偏移；优先使用帧相对时间。
-    % Inputs / 输入: component struct and receiver sample rate.
-    % 输出 / Outputs: zero-based sample offset inside the current frame.
+    % Inputs: component struct and receiver sample rate.
+    % Outputs: zero-based sample offset inside the current frame.
     startTime = 0;
     if isfield(comp, 'FrameRelativeStartTime') && ~isempty(comp.FrameRelativeStartTime)
         startTime = comp.FrameRelativeStartTime;
@@ -710,9 +732,8 @@ end
 
 function y = localCollapseAntennaSignal(signal)
     % localCollapseAntennaSignal - Convert [samples x antennas] into one monitor stream.
-    % 中文说明：把多天线源信号按天线列求和成单个监测通道，避免列优先展开破坏时间轴。
-    % Inputs / 输入: signal matrix from the channel component.
-    % 输出 / Outputs: column vector aligned to the receiver time axis.
+    % Inputs: signal matrix from the channel component.
+    % Outputs: column vector aligned to the receiver time axis.
     if isempty(signal)
         y = complex(zeros(0, 1));
         return;

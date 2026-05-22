@@ -1,7 +1,6 @@
 classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
         matlab.mixin.Heterogeneous & matlab.mixin.CustomDisplay
     %LOGGER Advanced logging tool for MATLAB
-    % 中文说明：提供 CSRD 生产链路中的 Logger 实现。
     %   This class provides configurable logging capabilites for MATLAB
     %   applications.
     %
@@ -156,9 +155,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function obj = Logger(name, pathName)
             % Construct the logger
-            % 中文说明：Logger 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Define input arguments
             arguments
@@ -184,9 +182,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function delete(obj)
             % Destruct the Logger
-            % 中文说明：delete 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % If a log file was open, close it
             obj.fcloseLogFile();
@@ -200,9 +197,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function obj = getSingletonLogger(obj,name)
             % Get a singleton logger
-            % 中文说明：getSingletonLogger 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Define input arguments
             arguments
@@ -247,9 +243,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function propgrp = getPropertyGroups(obj)
             % Customize property display in command window
-            % 中文说明：getPropertyGroups 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if ~isscalar(obj)
 
@@ -293,9 +288,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
         function displayScalarObject(obj)
 
             % Start with default display
-            % 中文说明：displayScalarObject 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.displayScalarObject@matlab.mixin.CustomDisplay();
 
             % Display the recent messages
@@ -316,9 +310,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function obj = loadobj(s)
             % loadobj - Production declaration in CSRD.
-            % 中文说明：loadobj 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if isstruct(s)
                 warning("mlog:loadobjFailed",...
@@ -338,9 +331,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function value = get.Messages(obj)
             % Get the ordered messages from the circular buffer
-            % 中文说明：get.Messages 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if obj.BufferIsWrapped
                 value = circshift(obj.MessageBuffer, -obj.BufferIndex);
             else
@@ -351,18 +343,16 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function value = get.MessageTable(obj)
             % Get a timetable of messages
-            % 中文说明：get.MessageTable 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             value = obj.Messages.toTable();
         end %function
 
 
         function value = get.LastMessage(obj)
             % Get the most recent message
-            % 中文说明：get.LastMessage 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if obj.BufferIndex > 0
                 value = obj.MessageBuffer(obj.BufferIndex);
             else
@@ -373,9 +363,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function set.Name(obj,value)
             % set.Name - Production declaration in CSRD.
-            % 中文说明：set.Name 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.Name = value;
             obj.fcloseLogFile();
         end %function
@@ -383,9 +372,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function set.LogFolder(obj,value)
             % Remove trailing filesep
-            % 中文说明：set.LogFolder 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.LogFolder = strip(value,'right',filesep);
             obj.fcloseLogFile();
         end %function
@@ -393,9 +381,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function set.LogFile(obj,value)
             % set.LogFile - Production declaration in CSRD.
-            % 中文说明：set.LogFile 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.LogFile = value;
             obj.fcloseLogFile();
         end %function
@@ -403,9 +390,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function set.BufferSize(obj,value)
             % set.BufferSize - Production declaration in CSRD.
-            % 中文说明：set.BufferSize 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.updateBufferSize(value);
             obj.BufferSize = value;
         end %function
@@ -413,9 +399,8 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
         function set.MessageConstructor(obj,value)
             % set.MessageConstructor - Production declaration in CSRD.
-            % 中文说明：set.MessageConstructor 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.MessageConstructor = value;
             obj.updateMessageClass();
         end %function

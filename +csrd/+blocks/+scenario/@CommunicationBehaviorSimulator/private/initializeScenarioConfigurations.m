@@ -1,6 +1,5 @@
 function entities = initializeScenarioConfigurations(obj, entities)
     % initializeScenarioConfigurations - Initialize fixed scenario-level configurations
-    % 中文说明：提供 CSRD 生产链路中的 initializeScenarioConfigurations 实现。
     %
     % This method sets up all the communication parameters that remain fixed
     % throughout the entire scenario (temporal properties):

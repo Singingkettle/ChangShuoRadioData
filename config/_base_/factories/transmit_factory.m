@@ -1,8 +1,7 @@
 function config = transmit_factory()
     %TRANSMIT_FACTORY Transmitter factory configuration (v0.4 deep refactor).
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 transmit_factory 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Implementation details for transmitter instantiation:
     %     * Class handles for different transmitter types

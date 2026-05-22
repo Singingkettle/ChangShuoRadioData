@@ -1,8 +1,7 @@
 function profile = AntennaModulationMatrix()
 %ANTENNAMODULATIONMATRIX v0 antenna-vs-modulation 3-state compatibility matrix.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 AntennaModulationMatrix 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Source: docs/audits/2026-04-...refactor.md §16.8.4 (3-state table).
 % Phase 2 §3.1.3.D wires the table here.

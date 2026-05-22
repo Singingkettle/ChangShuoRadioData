@@ -145,3 +145,6 @@ artifacts/tests/generated_configs/
 # Smoke baseline lives next to the canonical one but is regenerated on
 # every run_all_tests('phase0') call; do not commit it.
 docs/baselines/*.smoke.json
+
+# Generated documentation/audit manifests are reproducible and can be large.
+docs/audits/reports/*.json

@@ -1,8 +1,7 @@
 function profile = PortableMonitor_40MHz()
 %PORTABLEMONITOR_40MHZ v0 receiver profile: handheld monitor up to 40 MHz Fs.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 PortableMonitor_40MHz 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Source numbers: docs/audits/2026-04-...refactor.md §5.bis B (row 1).
 % Schema:        docs/audits/phases/phase-2-blueprint.md §3.1.3.B.

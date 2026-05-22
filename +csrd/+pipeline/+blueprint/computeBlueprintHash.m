@@ -1,8 +1,7 @@
 function hashHex16 = computeBlueprintHash(blueprint)
 %COMPUTEBLUEPRINTHASH Canonical SHA-256 hash (first 16 hex chars) of a blueprint.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 computeBlueprintHash 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Phase 2 §3.2 implementation. Algorithm:
 %   1. Recursively canonicalize the blueprint to a typed-JSON string with
@@ -53,9 +52,8 @@ end
 
 function s = canonicalize(value)
 %CANONICALIZE Recursively serialize VALUE to a typed-JSON char vector.
-% 中文说明：canonicalize 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % The output is *not* RFC-8259 JSON; it embeds type tags so that
 %   numeric 1   vs   logical true   vs   char '1'   vs   {1}
@@ -98,9 +96,8 @@ end
 
 function s = canonicalizeStruct(value)
 %CANONICALIZESTRUCT Handle scalar struct OR struct array.
-% 中文说明：canonicalizeStruct 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 
     if isscalar(value)
         fields = sort(fieldnames(value));
@@ -128,9 +125,8 @@ end
 
 function s = canonicalizeCell(value)
     % canonicalizeCell - Production declaration in CSRD.
-    % 中文说明：canonicalizeCell 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isempty(value)
         s = '<cell:empty>[]';
         return;
@@ -145,9 +141,8 @@ end
 
 function s = canonicalizeString(value)
     % canonicalizeString - Production declaration in CSRD.
-    % 中文说明：canonicalizeString 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstring(value)
         if ~isscalar(value)
             error('CSRD:Blueprint:HashFailed', ...
@@ -166,9 +161,8 @@ end
 
 function s = canonicalizeLogical(value)
     % canonicalizeLogical - Production declaration in CSRD.
-    % 中文说明：canonicalizeLogical 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isscalar(value)
         if value
             s = '<bool>true';
@@ -191,9 +185,8 @@ end
 
 function s = canonicalizeNumeric(value)
     % canonicalizeNumeric - Production declaration in CSRD.
-    % 中文说明：canonicalizeNumeric 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isempty(value)
         s = '<num:empty>[]';
         return;
@@ -243,9 +236,8 @@ end
 
 function escaped = jsonEscape(str)
 %JSONESCAPE Minimal JSON-string escaping (sufficient for hash determinism).
-% 中文说明：jsonEscape 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 
     escaped = strrep(str, '\', '\\');
     escaped = strrep(escaped, '"', '\"');

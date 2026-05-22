@@ -1,8 +1,7 @@
 function validateMeasurementCompleteness(annotation)
     %VALIDATEMEASUREMENTCOMPLETENESS Phase 4 §S7 / C4 annotation write-back hook.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 validateMeasurementCompleteness 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   csrd.core.ChangShuo.validateMeasurementCompleteness(annotation)
     %
@@ -217,9 +216,8 @@ end
 % =========================================================================
 function tf = isFiniteNonNegativeScalar(value)
     %ISFINITENONNEGATIVESCALAR True iff value is numeric, scalar, finite, >=0.
-    % 中文说明：isFiniteNonNegativeScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Accepts the post-sanitize null sentinel ([]) as "not finite" so the
     % check uniformly fires whether validateMeasurementCompleteness is
@@ -243,9 +241,8 @@ end
 % =========================================================================
 function carriers = collectSignalSourceCarriers(annotation)
     %COLLECTSIGNALSOURCECARRIERS Recursively locate any struct exposing
-    % 中文说明：collectSignalSourceCarriers 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % a `SignalSources` field. Returns a struct array with .Path and
     % .SignalSources so the caller can produce useful error messages.
 
@@ -257,9 +254,8 @@ end
 
 function state = walkForCarriers(node, path, state)
     % walkForCarriers - Production declaration in CSRD.
-    % 中文说明：walkForCarriers 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(node)
         for nIdx = 1:numel(node)
             elem = node(nIdx);
@@ -292,9 +288,8 @@ end
 
 function out = normaliseSignalSources(value)
     % normaliseSignalSources - Production declaration in CSRD.
-    % 中文说明：normaliseSignalSources 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if iscell(value)
         out = value;
     elseif isstruct(value)

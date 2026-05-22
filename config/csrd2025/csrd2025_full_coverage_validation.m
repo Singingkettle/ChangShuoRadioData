@@ -1,8 +1,7 @@
 function config = csrd2025_full_coverage_validation()
     % csrd2025_full_coverage_validation - Phase 13 validation-grade generation config.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：通过正式 simulation.m 入口调度覆盖矩阵，用于验证重构后的全链路生成能力。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 
     config.baseConfigs = {
                           '_base_/logging/default.m',
@@ -30,11 +29,11 @@ function config = csrd2025_full_coverage_validation()
     config.Runner.Data.VersionControl = true;
     config.Runner.Data.ScenarioGrouping = true;
 
-    config.Log.Name = 'CSRD-Phase13-FullCoverage';
-    config.Log.Level = 'INFO';
-    config.Log.SaveToFile = true;
-    config.Log.DisplayInConsole = true;
-    config.Log.SessionLogging = true;
+    config.Logging.Name = 'CSRD-Phase13-FullCoverage';
+    config.Logging.Policy = 'Standard';
+    config.Logging.Console.Enabled = true;
+    config.Logging.File.Enabled = true;
+    config.Logging.Progress.Mode = 'Detailed';
 
     config.CoverageValidation.Enable = true;
     config.CoverageValidation.Mode = 'validation';

@@ -1,12 +1,11 @@
 function report = clean_csrd_artifacts(varargin)
 %CLEAN_CSRD_ARTIFACTS Clean ignored CSRD generated artifacts.
-% 中文说明：清理 ignored 测试/目视检查产物和旧 csrd_simulation_output，保护 data、OSM 和 raw 资产。
 %
-% Inputs / 输入:
+% Inputs:
 %   'DryRun' - when true, only report candidate paths.
 %   'IncludeVisualChecks' - include artifacts/visual_checks in cleanup.
 %
-% Outputs / 输出:
+% Outputs:
 %   report - candidate paths and removal status.
 
 p = inputParser;
@@ -67,7 +66,8 @@ end
 
 function tf = localIsSafeGeneratedPath(projectRoot, pathName)
 % localIsSafeGeneratedPath - Restrict cleanup to known generated roots.
-% 中文说明：只允许删除项目内明确的 generated artifact 路径，避免误删数据资产。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 resolvedRoot = localCanonicalFolder(projectRoot);
 resolvedPath = localCanonicalFolder(pathName);
 allowedRoots = { ...
@@ -80,7 +80,8 @@ end
 
 function folderPath = localCanonicalFolder(pathName)
 % localCanonicalFolder - Resolve an existing folder without Java.
-% 中文说明：不依赖 Java，将现有目录解析为 MATLAB 当前平台的绝对路径。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 oldFolder = pwd;
 cleanup = onCleanup(@() cd(oldFolder));
 cd(pathName);
@@ -90,7 +91,8 @@ end
 
 function tf = localIsInsideOrEqual(pathName, rootName)
 % localIsInsideOrEqual - Check whether a path is a root or child path.
-% 中文说明：判断目标路径是否位于允许删除的 generated 根目录内。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 rootName = char(rootName);
 pathName = char(pathName);
 tf = strcmpi(pathName, rootName) || startsWith(pathName, [rootName filesep], 'IgnoreCase', true);

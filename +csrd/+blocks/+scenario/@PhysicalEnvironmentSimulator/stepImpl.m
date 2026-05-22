@@ -1,6 +1,5 @@
 function [entities, environment] = stepImpl(obj, frameId)
     % stepImpl - Update physical environment state for current frame
-    % 中文说明：提供 CSRD 生产链路中的 stepImpl 实现。
     %
     % Updates the physical environment state including entity positions,
     % mobility states, and environmental conditions based on the internal

@@ -1,6 +1,5 @@
 classdef GlobalLogManager < handle
     % GlobalLogManager - Global logging manager for CSRD framework
-    % 中文说明：提供 CSRD 生产链路中的 GlobalLogManager 实现。
     %
     % This class provides a singleton pattern for logging across the entire
     % ChangShuoRadioData (CSRD) framework, ensuring all components use the
@@ -15,7 +14,7 @@ classdef GlobalLogManager < handle
     %
     % Usage:
     %   % Initialize global logging (typically called once at startup)
-    %   csrd.runtime.logger.GlobalLogManager.initialize(runnerConfig.Log, outputDir);
+    %   csrd.runtime.logger.GlobalLogManager.initialize(runtimePlan.Logging, outputDir);
     %
     %   % Get logger instance (called by any component)
     %   logger = csrd.runtime.logger.GlobalLogManager.getLogger();
@@ -46,9 +45,8 @@ classdef GlobalLogManager < handle
 
         function obj = GlobalLogManager()
             % Private constructor for singleton pattern
-            % 中文说明：GlobalLogManager 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
     end
@@ -57,9 +55,8 @@ classdef GlobalLogManager < handle
 
         function initialize(logConfig, outputDirectory)
             % initialize - Initialize global logging system
-            % 中文说明：initialize 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method sets up the global logger with specified configuration
             % and output directory. Should be called once at application startup.
@@ -68,11 +65,12 @@ classdef GlobalLogManager < handle
             %   GlobalLogManager.initialize(logConfig, outputDirectory)
             %
             % Input Arguments:
-            %   logConfig - Log configuration structure
-            %               .Name - Logger name
-            %               .Level - Log level ('DEBUG', 'INFO', 'WARNING', 'ERROR')
-            %               .SaveToFile - Enable file logging
-            %               .DisplayInConsole - Enable console logging
+            %   logConfig - RuntimePlan.Logging structure
+            %               .Policy - Log policy tier
+            %               .ConsoleThreshold - Console threshold level
+            %               .FileThreshold - File threshold level
+            %               .ConsoleEnabled - Enable console logging
+            %               .FileEnabled - Enable file logging
             %   outputDirectory - Base directory for log files
 
             manager = csrd.runtime.logger.GlobalLogManager.getInstance();
@@ -83,7 +81,8 @@ classdef GlobalLogManager < handle
                 return;
             end
 
-            % Store configuration
+            % Store the resolved runtime logging plan.
+            logConfig = localResolveLogConfig(logConfig);
             manager.logConfig = logConfig;
 
             % Setup log directory
@@ -112,39 +111,16 @@ classdef GlobalLogManager < handle
             loggerName = sprintf('%s_%s', manager.DEFAULT_LOGGER_NAME, currentTime);
             manager.loggerInstance = csrd.runtime.logger.Log.getInstance(loggerName);
 
-            % Configure log levels
-            logLevel = upper(logConfig.Level);
-
-            switch logLevel
-                case 'DEBUG'
-                    mlogLevel = csrd.runtime.logger.mlog.Level.DEBUG;
-                case 'INFO'
-                    mlogLevel = csrd.runtime.logger.mlog.Level.INFO;
-                case 'WARNING'
-                    mlogLevel = csrd.runtime.logger.mlog.Level.WARNING;
-                case 'ERROR'
-                    mlogLevel = csrd.runtime.logger.mlog.Level.ERROR;
-                case 'CRITICAL'
-                    mlogLevel = csrd.runtime.logger.mlog.Level.CRITICAL;
-                otherwise
-                    mlogLevel = csrd.runtime.logger.mlog.Level.INFO; % Default
-                    % Use direct console output since logger isn't fully initialized yet
-                    if logConfig.DisplayInConsole
-                        fprintf('[GlobalLogManager] Unknown log level "%s", using INFO\n', logLevel);
-                    end
-
-            end
-
             % Set log thresholds and output directory
-            if logConfig.SaveToFile
-                manager.loggerInstance.FileThreshold = mlogLevel;
+            if logConfig.FileEnabled
+                manager.loggerInstance.FileThreshold = logConfig.FileThreshold;
                 manager.loggerInstance.LogFolder = manager.logDirectory;
             else
                 manager.loggerInstance.FileThreshold = csrd.runtime.logger.mlog.Level.NONE; % Disable file logging
             end
 
-            if logConfig.DisplayInConsole
-                manager.loggerInstance.CommandWindowThreshold = mlogLevel;
+            if logConfig.ConsoleEnabled
+                manager.loggerInstance.CommandWindowThreshold = logConfig.ConsoleThreshold;
             else
                 manager.loggerInstance.CommandWindowThreshold = csrd.runtime.logger.mlog.Level.NONE; % Disable console logging
             end
@@ -153,18 +129,17 @@ classdef GlobalLogManager < handle
 
             % Log initialization success
             manager.loggerInstance.info('=== CSRD Global Logging System Initialized ===');
-            manager.loggerInstance.info('Log Level: %s', logLevel);
-            manager.loggerInstance.info('File Logging: %s', string(logConfig.SaveToFile));
-            manager.loggerInstance.info('Console Logging: %s', string(logConfig.DisplayInConsole));
+            manager.loggerInstance.info('Log Policy: %s', logConfig.Policy);
+            manager.loggerInstance.info('File Logging: %s', string(logConfig.FileEnabled));
+            manager.loggerInstance.info('Console Logging: %s', string(logConfig.ConsoleEnabled));
             manager.loggerInstance.info('Log Directory: %s', manager.logDirectory);
             manager.loggerInstance.info('Logger Name: %s', loggerName);
         end
 
         function logger = getLogger()
             % getLogger - Get the global logger instance
-            % 中文说明：getLogger 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns the global logger instance. If not initialized, returns
             % a default logger with warning.
@@ -197,9 +172,8 @@ classdef GlobalLogManager < handle
 
         function logDir = getLogDirectory()
             % getLogDirectory - Get the current log directory path
-            % 中文说明：getLogDirectory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns the path where log files are being saved.
             %
@@ -221,7 +195,6 @@ classdef GlobalLogManager < handle
 
         function reset()
             % reset - Reset the global logging system
-            % 中文说明：reset 在 CSRD 生产链路中执行对应处理。
             %
             % This method resets the global logging system, allowing for
             % re-initialization. Useful for testing or configuration changes.
@@ -240,9 +213,8 @@ classdef GlobalLogManager < handle
 
         function status = getInitializationStatus()
             % getInitializationStatus - Check if global logging is initialized
-            % 中文说明：getInitializationStatus 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns true if the global logging system has been initialized.
             %
@@ -262,9 +234,8 @@ classdef GlobalLogManager < handle
 
         function obj = getInstance()
             % getInstance - Get singleton instance of GlobalLogManager
-            % 中文说明：getInstance 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             persistent instance
 
@@ -277,4 +248,129 @@ classdef GlobalLogManager < handle
 
     end
 
+end
+
+function resolved = localResolveLogConfig(logConfig)
+    % localResolveLogConfig - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+if nargin < 1 || isempty(logConfig) || ~isstruct(logConfig)
+    logConfig = struct();
+end
+
+if isfield(logConfig, 'Policy')
+    policyName = char(string(logConfig.Policy));
+elseif isfield(logConfig, 'Level')
+    policyName = localPolicyFromLevel(logConfig.Level);
+else
+    policyName = 'Standard';
+end
+policy = csrd.runtime.logger.policy.LogPolicy(policyName);
+desc = policy.describe();
+
+resolved = struct();
+resolved.Name = localTextField(logConfig, 'Name', 'CSRD');
+resolved.Policy = desc.Level;
+resolved.ConsoleThreshold = localLevelField(logConfig, ...
+    'ConsoleThreshold', desc.ConsoleThreshold);
+resolved.FileThreshold = localLevelField(logConfig, ...
+    'FileThreshold', desc.FileThreshold);
+resolved.ConsoleEnabled = localLogicalField(logConfig, ...
+    {'ConsoleEnabled', 'DisplayInConsole'}, true);
+resolved.FileEnabled = localLogicalField(logConfig, ...
+    {'FileEnabled', 'SaveToFile'}, true);
+end
+
+function policyName = localPolicyFromLevel(level)
+    % localPolicyFromLevel - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+levelText = upper(char(string(level)));
+switch levelText
+    case {'DEBUG', 'DETAIL', 'TRACE'}
+        policyName = 'Dev';
+    case {'WARNING', 'ERROR', 'CRITICAL', 'FATAL'}
+        policyName = 'LargeMC';
+    otherwise
+        policyName = 'Standard';
+end
+end
+
+function value = localTextField(source, fieldName, defaultValue)
+    % localTextField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+value = char(defaultValue);
+if isfield(source, fieldName) && ~isempty(source.(fieldName))
+    value = char(string(source.(fieldName)));
+end
+end
+
+function value = localLevelField(source, fieldName, defaultValue)
+    % localLevelField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+if isfield(source, fieldName) && ~isempty(source.(fieldName))
+    value = localParseLevel(source.(fieldName));
+else
+    value = localParseLevel(defaultValue);
+end
+end
+
+function level = localParseLevel(value)
+    % localParseLevel - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+if isa(value, 'csrd.runtime.logger.mlog.Level')
+    level = value;
+    return;
+end
+levelText = upper(char(string(value)));
+switch levelText
+    case 'NONE'
+        level = csrd.runtime.logger.mlog.Level.NONE;
+    case 'FATAL'
+        level = csrd.runtime.logger.mlog.Level.FATAL;
+    case 'CRITICAL'
+        level = csrd.runtime.logger.mlog.Level.CRITICAL;
+    case 'ERROR'
+        level = csrd.runtime.logger.mlog.Level.ERROR;
+    case 'WARNING'
+        level = csrd.runtime.logger.mlog.Level.WARNING;
+    case 'INFO'
+        level = csrd.runtime.logger.mlog.Level.INFO;
+    case 'MESSAGE'
+        level = csrd.runtime.logger.mlog.Level.MESSAGE;
+    case 'DEBUG'
+        level = csrd.runtime.logger.mlog.Level.DEBUG;
+    case 'DETAIL'
+        level = csrd.runtime.logger.mlog.Level.DETAIL;
+    case 'TRACE'
+        level = csrd.runtime.logger.mlog.Level.TRACE;
+    otherwise
+        error('GlobalLogManager:InvalidLogLevel', ...
+            'Unsupported log threshold "%s".', levelText);
+end
+end
+
+function value = localLogicalField(source, names, defaultValue)
+    % localLogicalField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+value = logical(defaultValue);
+for idx = 1:numel(names)
+    name = names{idx};
+    if ~isfield(source, name) || isempty(source.(name))
+        continue;
+    end
+    raw = source.(name);
+    if islogical(raw) && isscalar(raw)
+        value = raw;
+    elseif isnumeric(raw) && isscalar(raw) && isfinite(raw)
+        value = raw ~= 0;
+    elseif ischar(raw) || (isstring(raw) && isscalar(raw))
+        value = any(strcmpi(char(string(raw)), {'true', 'on', 'yes', '1'}));
+    end
+    return;
+end
 end

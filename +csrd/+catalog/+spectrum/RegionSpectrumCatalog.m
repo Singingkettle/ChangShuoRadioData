@@ -1,6 +1,5 @@
 classdef RegionSpectrumCatalog
     %REGIONSPECTRUMCATALOG Source-backed regional spectrum service catalog.
-    % 中文说明：提供 CSRD 生产链路中的 RegionSpectrumCatalog 实现。
     %
     % Phase 8 keeps regional regulatory facts in a dedicated catalog layer
     % above the older generic band profiles. FrequencyRangeHz is an
@@ -11,17 +10,15 @@ classdef RegionSpectrumCatalog
     methods (Static)
         function ids = supportedRegionIds()
             % supportedRegionIds - Production declaration in CSRD.
-            % 中文说明：supportedRegionIds 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             ids = {'CN', 'US', 'EU', 'JP', 'KR'};
         end
 
         function catalogs = loadAll()
             % loadAll - Production declaration in CSRD.
-            % 中文说明：loadAll 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             ids = csrd.catalog.spectrum.RegionSpectrumCatalog.supportedRegionIds();
             catalogs = cell(1, numel(ids));
             for k = 1:numel(ids)
@@ -31,9 +28,8 @@ classdef RegionSpectrumCatalog
 
         function catalog = load(regionId)
             % load - Production declaration in CSRD.
-            % 中文说明：load 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             regionId = upper(char(string(regionId)));
             switch regionId
                 case 'CN'
@@ -59,9 +55,8 @@ end
 
 function catalog = buildCnCatalog()
     % buildCnCatalog - Production declaration in CSRD.
-    % 中文说明：buildCnCatalog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 authority = 'Ministry of Industry and Information Technology';
 refs = {'https://www.miit.gov.cn/gyhxxhb/jgsj/cyzcyfgs/bmgz/wxdl/art/2023/art_1e98823e689f42ca9ed14dcb6feec07a.html'};
 catalog = mkCatalog('CN', 'China', authority, refs);
@@ -86,9 +81,8 @@ end
 
 function catalog = buildUsCatalog()
     % buildUsCatalog - Production declaration in CSRD.
-    % 中文说明：buildUsCatalog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 authority = 'Federal Communications Commission / NTIA';
 refs = {'https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-2/subpart-B/section-2.106', ...
     'https://www.ntia.gov/publications/redbook-manual'};
@@ -112,9 +106,8 @@ end
 
 function catalog = buildEuCatalog()
     % buildEuCatalog - Production declaration in CSRD.
-    % 中文说明：buildEuCatalog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 authority = 'CEPT/ECO';
 refs = {'https://docdb.cept.org/document/593', 'https://efis.cept.org/'};
 catalog = mkCatalog('EU', 'Europe CEPT', authority, refs);
@@ -137,9 +130,8 @@ end
 
 function catalog = buildJpCatalog()
     % buildJpCatalog - Production declaration in CSRD.
-    % 中文说明：buildJpCatalog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 authority = 'Ministry of Internal Affairs and Communications';
 refs = {'https://www.tele.soumu.go.jp/e/adm/freq/search/index.htm'};
 catalog = mkCatalog('JP', 'Japan', authority, refs);
@@ -160,9 +152,8 @@ end
 
 function catalog = buildKrCatalog()
     % buildKrCatalog - Production declaration in CSRD.
-    % 中文说明：buildKrCatalog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 authority = 'Ministry of Science and ICT / Korea Law Information Center';
 refs = {'https://law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000254700'};
 catalog = mkCatalog('KR', 'Korea', authority, refs);
@@ -185,9 +176,8 @@ end
 
 function catalog = mkCatalog(regionId, regionName, authority, sourceRefs)
     % mkCatalog - Production declaration in CSRD.
-    % 中文说明：mkCatalog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 catalog = struct( ...
     'RegionId', regionId, ...
     'RegionName', regionName, ...
@@ -201,9 +191,8 @@ function b = band(catalog, bandId, tier, rangeHz, serviceClass, application, ...
         allocationStatus, duplexMode, rasterHz, explicitCentersHz, bandwidthsHz, ...
         modFamilies, temporalPattern, priorityWeight, evidenceLevel, sourceRefs)
             % band - Production declaration in CSRD.
-            % 中文说明：band 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 b = emptyBand();
 b.RegionId = catalog.RegionId;
 b.RegionName = catalog.RegionName;
@@ -229,18 +218,16 @@ end
 
 function bands = emptyBandArray()
     % emptyBandArray - Production declaration in CSRD.
-    % 中文说明：emptyBandArray 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 bands = repmat(emptyBand(), 0, 1);
 end
 
 
 function b = emptyBand()
     % emptyBand - Production declaration in CSRD.
-    % 中文说明：emptyBand 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 b = struct( ...
     'RegionId', '', ...
     'RegionName', '', ...

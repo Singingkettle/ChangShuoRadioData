@@ -1,6 +1,7 @@
 function out = trace(action, varargin)
 %TRACE Low-overhead runtime performance counters for opt-in profiling.
-% 中文说明：默认关闭；仅在 Runner.Performance.EnableStageTiming=true 时记录性能诊断。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 persistent state
 
@@ -100,6 +101,9 @@ end
 end
 
 function state = localEmptyState(enabled)
+    % localEmptyState - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 state = struct( ...
     'Schema', 'csrd.runtime.performance-trace.v1', ...
     'Enabled', logical(enabled), ...
@@ -119,6 +123,9 @@ state = struct( ...
 end
 
 function localWriteHeartbeat(state)
+    % localWriteHeartbeat - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if ~isstruct(state) || ~isfield(state, 'ArtifactDirectory') || ...
         isempty(state.ArtifactDirectory) || ~isstruct(state.Heartbeat)
     return;
@@ -141,6 +148,9 @@ end
 end
 
 function value = localCharArg(args, idx, defaultValue)
+    % localCharArg - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = defaultValue;
 if numel(args) >= idx && ~isempty(args{idx})
     value = char(string(args{idx}));
@@ -148,6 +158,9 @@ end
 end
 
 function value = localNumericArg(args, idx, defaultValue)
+    % localNumericArg - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = defaultValue;
 if numel(args) >= idx && isnumeric(args{idx}) && isscalar(args{idx}) && ...
         isfinite(args{idx})
@@ -156,6 +169,9 @@ end
 end
 
 function value = localStructArg(args, idx)
+    % localStructArg - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = struct();
 if numel(args) >= idx && isstruct(args{idx})
     value = args{idx};
@@ -163,6 +179,9 @@ end
 end
 
 function key = localCounterKey(counterName)
+    % localCounterKey - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 key = regexprep(char(string(counterName)), '[^A-Za-z0-9_]', '_');
 if isempty(key)
     key = 'UnnamedCounter';
@@ -172,6 +191,9 @@ end
 end
 
 function stamp = localNowUtc()
+    % localNowUtc - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 stamp = char(datetime('now', 'TimeZone', 'UTC', ...
     'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'''));
 end

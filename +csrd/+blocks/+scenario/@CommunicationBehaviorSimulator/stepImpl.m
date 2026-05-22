@@ -1,6 +1,5 @@
 function [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities)
     % stepImpl - Generate frame-specific communication states
-    % 中文说明：提供 CSRD 生产链路中的 stepImpl 实现。
     %
     % TWO-PHASE ARCHITECTURE:
     %   Phase 1 (first frame only):
@@ -90,9 +89,8 @@ end
 
 function mergedEntities = synchronizeScenarioEntities(previousEntities, currentEntities, frameId)
     % synchronizeScenarioEntities - Production declaration in CSRD.
-    % 中文说明：synchronizeScenarioEntities 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isempty(previousEntities)
         mergedEntities = currentEntities;
         return;

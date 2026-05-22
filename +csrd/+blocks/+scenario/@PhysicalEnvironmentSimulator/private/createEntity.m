@@ -1,8 +1,7 @@
 function entity = createEntity(obj, entityType, entityID, frameId)
     %CREATEENTITY Phase 3 strict-construction entity factory.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 createEntity 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Creates a single entity (Tx or Rx) with the canonical Snapshot-based
     % state container. Phase 3 (audit §3.1.ter / §17.5 P3-followup) removed
@@ -73,9 +72,8 @@ end
 
 function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
     %CREATEINITIALSNAPSHOT Build the first Snapshot for a freshly created
-    % 中文说明：createInitialSnapshot 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % entity. Position must come from the validated map boundaries; the
     % previous ±1000 m fallback was removed in Phase 3.
 
@@ -159,29 +157,27 @@ end
 
 function capacity = resolveSnapshotCapacity(obj, frameId)
     %RESOLVESNAPSHOTCAPACITY Pre-allocation hint driven by config.
-    % 中文说明：resolveSnapshotCapacity 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Snapshots are dynamic-grow cells (writes past the end auto-expand),
-    % but we honor obj.Config.Global.NumFramesPerScenario when available so
-    % long scenarios do not pay repeated reallocation costs.
+    % but we honor ScenarioPlan-derived obj.Config.Global.NumFrames when
+    % available so long scenarios do not pay repeated reallocation costs.
 
     capacity = max(100, frameId);
 
     if isfield(obj.Config, 'Global') && isstruct(obj.Config.Global) ...
-            && isfield(obj.Config.Global, 'NumFramesPerScenario') ...
-            && isnumeric(obj.Config.Global.NumFramesPerScenario) ...
-            && isscalar(obj.Config.Global.NumFramesPerScenario) ...
-            && obj.Config.Global.NumFramesPerScenario > 0
-        capacity = max(capacity, double(obj.Config.Global.NumFramesPerScenario));
+            && isfield(obj.Config.Global, 'NumFrames') ...
+            && isnumeric(obj.Config.Global.NumFrames) ...
+            && isscalar(obj.Config.Global.NumFrames) ...
+            && obj.Config.Global.NumFrames > 0
+        capacity = max(capacity, double(obj.Config.Global.NumFrames));
     end
 end
 
 function cohortMax = resolveCohortMaxSpeed(obj, entityType)
     %RESOLVECOHORTMAXSPEED Phase 4 §3.8.A / §3.8.C cohort speed lookup.
-    % 中文说明：resolveCohortMaxSpeed 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Pulls `Mobility.MaxSpeedMps` (canonical) or the legacy flat
     %   `MobilityModel.MaxSpeedMps` off the per-entity-type slice that
@@ -220,9 +216,8 @@ end
 
 function entityConfig = resolveEntityConfig(obj, entityType)
     %RESOLVEENTITYCONFIG Pull the per-entity-type subtree from obj.Config.
-    % 中文说明：resolveEntityConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Phase 3 mandates that mobility selection lives next to the entity
     % count / height / initial-distribution settings. We accept either
     %   obj.Config.Entities.Transmitters / Receivers  (canonical, used by

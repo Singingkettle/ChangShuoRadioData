@@ -1,8 +1,7 @@
 function config = scenario_factory()
     % scenario_factory - Scenario factory configuration (Blueprint)
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 scenario_factory 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This is the "blueprint" configuration that defines SCENARIO-LEVEL parameters.
     % 
@@ -35,11 +34,22 @@ function config = scenario_factory()
     config.Factories.Scenario.Architecture = 'Blueprint-Factory';
     
     %% ═══════════════════════════════════════════════════════════════════════
-    %%                    GLOBAL TIME DOMAIN PARAMETERS
+    %%                    SCENARIO FRAME POLICY
     %% ═══════════════════════════════════════════════════════════════════════
-    
-    config.Factories.Scenario.Global.NumFramesPerScenario = 10;
-    config.Factories.Scenario.Global.FrameNumSamples = 1024;         % samples per receiver frame
+    %
+    % Phase 33: frame shape is a per-scenario construction-plan fact.
+    % The run-level RuntimePlan stores this policy only; ScenarioFactory
+    % resolves concrete frame samples and frame count before each scenario
+    % begins. All receivers within the same scenario share the resolved
+    % frame shape so receiver-frame annotations remain directly comparable.
+
+    config.Factories.Scenario.FramePolicy.FrameNumSamples.Mode = 'Choice';
+    config.Factories.Scenario.FramePolicy.FrameNumSamples.Values = [1024, 2048, 4096];
+    config.Factories.Scenario.FramePolicy.FrameNumSamples.Weights = [0.5, 0.3, 0.2];
+
+    config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Mode = 'IntegerRange';
+    config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Min = 4;
+    config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Max = 10;
     
     %% ═══════════════════════════════════════════════════════════════════════
     %%                    PHYSICAL ENVIRONMENT (SPATIAL)
@@ -218,8 +228,6 @@ function config = scenario_factory()
     %   OSTBC keeps the historical spatial-diversity path;
     %   SpatialMultiplexing uses comm.OFDMModulator's transmit-stream
     %   dimension directly when validation needs independent antenna streams.
-    % OFDM 多天线抽象：OSTBC 保留历史空时分集路径；SpatialMultiplexing
-    % 直接使用 comm.OFDMModulator 的发射流维度，适合验证独立天线流。
     config.Factories.Scenario.CommunicationBehavior.Modulation.OFDMMimoMode = 'OSTBC';
     
     % ===================== MESSAGE (Type selection only) =====================

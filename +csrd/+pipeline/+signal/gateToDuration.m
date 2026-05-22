@@ -1,5 +1,7 @@
 function signalStruct = gateToDuration(signalStruct, durationSec, stageName, varargin)
 %GATETODURATION Align a signal struct to an explicit duration.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 %
 %   signalStruct = csrd.pipeline.signal.gateToDuration(signalStruct,
 %       durationSec, stageName)

@@ -1,6 +1,5 @@
 function info = detectBurstEnvelope(signal, sampleRate, options)
 %DETECTBURSTENVELOPE Envelope-based burst detection over time.
-% 中文说明：提供 CSRD 生产链路中的 detectBurstEnvelope 实现。
 %
 % Phase 4 §3.1 measurement helper. Slides a non-overlapping power window
 % across the signal magnitude, marks windows whose power exceeds a
@@ -121,9 +120,8 @@ end
 % =====================================================================
 function info = makeEmptyInfo(options)
     % makeEmptyInfo - Production declaration in CSRD.
-    % 中文说明：makeEmptyInfo 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     info = struct( ...
         'TimeOccupancy', 0, ...
         'NumBursts',     0, ...

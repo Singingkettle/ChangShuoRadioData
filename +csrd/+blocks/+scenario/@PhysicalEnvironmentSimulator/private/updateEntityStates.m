@@ -1,6 +1,5 @@
 function entities = updateEntityStates(obj, frameId, timeResolution, previousState)
     % updateEntityStates - Update entity positions based on mobility models
-    % 中文说明：提供 CSRD 生产链路中的 updateEntityStates 实现。
     %
     % Updates all entity positions and states based on their assigned
     % mobility models and the elapsed time since the previous frame.

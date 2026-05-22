@@ -1,6 +1,5 @@
 function diag_phase4_obw_threshold()
 %DIAG_PHASE4_OBW_THRESHOLD Compare OBW estimators on a known band-limited
-% 中文说明：提供 CSRD 生产链路中的 diag_phase4_obw_threshold 实现。
 %   noisy signal at SNR=10 dB.
 
 snrSweep   = [6, 9, 15, 30];
@@ -34,9 +33,8 @@ end
 
 function [bwClean, bwNoisy, trueBwHz] = probeOnce(N, fs, ratio, snrDb, margin, pct, seed)
     % probeOnce - Production declaration in CSRD.
-    % 中文说明：probeOnce 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 rng(seed);
 trueBwHz = ratio * fs;
 x = randn(N, 1) + 1i * randn(N, 1);
@@ -61,9 +59,8 @@ end
 
 function bw = percentileFloor(sig, fs, floorPct, margin)
     % percentileFloor - Production declaration in CSRD.
-    % 中文说明：percentileFloor 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 [spec, fAxis] = computePsd(sig, fs);
 floorVal = prctile(spec, floorPct);
 threshold = floorVal * margin;
@@ -73,9 +70,8 @@ end
 
 function bw = peakRelativeDbc(sig, fs, dbcRel)
     % peakRelativeDbc - Production declaration in CSRD.
-    % 中文说明：peakRelativeDbc 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 [spec, fAxis] = computePsd(sig, fs);
 peakVal = max(spec);
 threshold = peakVal * 10^(dbcRel / 10);
@@ -85,9 +81,8 @@ end
 
 function bw = hybridPeakFloor(sig, fs, dbcRel, floorPct, margin)
     % hybridPeakFloor - Production declaration in CSRD.
-    % 中文说明：hybridPeakFloor 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 [spec, fAxis] = computePsd(sig, fs);
 peakVal = max(spec);
 peakThr = peakVal * 10^(dbcRel / 10);
@@ -100,9 +95,8 @@ end
 
 function [spec, fAxis] = computePsd(sig, fs)
     % computePsd - Production declaration in CSRD.
-    % 中文说明：computePsd 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 sig = double(sig(:));
 N = numel(sig);
 winLen = max(64, 2^floor(log2(N / 8)));
@@ -119,9 +113,8 @@ end
 
 function bw = obwFromMaskedSpec(spec, fAxis, threshold)
     % obwFromMaskedSpec - Production declaration in CSRD.
-    % 中文说明：obwFromMaskedSpec 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 denoised = spec;
 denoised(denoised < threshold) = 0;
 totalEnergy = sum(denoised);

@@ -1,6 +1,7 @@
 function bwHz = obwAntennaMax(signal, sampleRate, percentage, varargin)
 %OBWANTENNAMAX Occupied bandwidth for clean multi-antenna Tx output.
-% 中文说明：逐发射天线测量 clean OBW，避免相位相反列求和抵消。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 if nargin < 3 || isempty(percentage)
     percentage = 99;

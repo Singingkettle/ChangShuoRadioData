@@ -1,8 +1,7 @@
 function setupImpl(obj)
     % setupImpl - Initialize communication behavior modeling systems
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 setupImpl 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % TWO-PHASE ARCHITECTURE:
     %   Phase 1 (here in setupImpl):
@@ -48,9 +47,8 @@ end
 
 function unifiedConfig = initializeUnifiedReceiverConfig(obj)
     % initializeUnifiedReceiverConfig - Create unified receiver configuration
-    % 中文说明：initializeUnifiedReceiverConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Reads configuration from obj.Config.Receiver and creates a single
     % unified configuration that all receivers will share.
@@ -97,9 +95,8 @@ end
 
 function value = requirePositiveScalar(value, fieldName)
     % requirePositiveScalar - Production declaration in CSRD.
-    % 中文说明：requirePositiveScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(value)
         error('CSRD:Scenario:InvalidReceiverConfig', ...
             ['%s must be a positive scalar. Min/Max receiver ranges were ', ...
@@ -114,9 +111,8 @@ end
 
 function value = requirePositiveIntegerScalar(value, fieldName)
     % requirePositiveIntegerScalar - Production declaration in CSRD.
-    % 中文说明：requirePositiveIntegerScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     value = requirePositiveScalar(value, fieldName);
     if abs(value - round(value)) > 0
         error('CSRD:Scenario:InvalidReceiverConfig', ...

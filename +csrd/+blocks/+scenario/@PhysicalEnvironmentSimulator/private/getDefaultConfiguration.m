@@ -1,6 +1,5 @@
 function config = getDefaultConfiguration(obj)
     % getDefaultConfiguration - Get default physical environment configuration
-    % 中文说明：提供 CSRD 生产链路中的 getDefaultConfiguration 实现。
     %
     % Returns a default configuration structure for the physical environment
     % simulator with reasonable default values for all required fields.

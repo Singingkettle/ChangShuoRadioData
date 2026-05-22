@@ -1,6 +1,5 @@
 classdef LogPolicy < handle
     %LOGPOLICY Centralised log-volume policy for CSRD's mlog logger.
-    % 中文说明：提供 CSRD 生产链路中的 LogPolicy 实现。
     %
     %   Phase 0 (audit §16.10 / §17.2 / phase-0-baseline.md §2.2):
     %     The original codebase sprayed `obj.logger.debug(...)` calls into
@@ -17,18 +16,16 @@ classdef LogPolicy < handle
     %       'LargeMC'  : WARNING+ to console, INFO+ to file. Required
     %                    for >100 scenario sweeps and for CI.
     %
-    %   The policy is applied to the singleton mlog logger held by
-    %   GlobalLogManager. We intentionally only touch the two threshold
-    %   properties; we do NOT delete or rotate any handlers, so an
-    %   already-open log file keeps receiving entries.
+    %   Phase 35 moved production logging to RuntimePlan.Logging. This
+    %   class now resolves tier semantics for the plan builder; production
+    %   startup initializes GlobalLogManager once from that plan.
     %
     %   Usage:
     %       policy = csrd.runtime.logger.policy.LogPolicy('LargeMC');
-    %       policy.apply();
     %       desc = policy.describe();   % human-readable, persistable
     %
-    %   Bonus: also exposes `restore(prev)` for tests that need to leave
-    %   the global logger untouched.
+    %   apply/restore remain for legacy unit fixtures only. Production code
+    %   must not call them after startup.
     %
     %   See also: csrd.runtime.logger.GlobalLogManager,
     %             csrd.runtime.logger.mlog.Level
@@ -39,7 +36,7 @@ classdef LogPolicy < handle
     end
 
     properties (Access = private)
-        % cached resolved threshold pair for `apply()`
+        % cached resolved threshold pair for legacy `apply()`
         consoleThreshold
         fileThreshold
     end
@@ -47,9 +44,8 @@ classdef LogPolicy < handle
     methods
         function obj = LogPolicy(level)
             %LOGPOLICY Construct a policy descriptor for the given tier.
-            % 中文说明：LogPolicy 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if nargin < 1 || isempty(level)
                 level = 'Standard';
@@ -85,9 +81,8 @@ classdef LogPolicy < handle
 
         function previous = apply(obj)
             %APPLY Push the policy onto the global logger.
-            % 中文说明：apply 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             %   previous = apply(obj) returns a struct snapshot of the
             %   logger's prior thresholds, suitable to pass back to
@@ -116,9 +111,8 @@ classdef LogPolicy < handle
 
         function desc = describe(obj)
             %DESCRIBE Return a JSON-friendly struct describing the policy.
-            % 中文说明：describe 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             %   This is the value SimulationRunner injects into
             %   Header.Runtime.LogPolicy so that downstream consumers
@@ -137,9 +131,8 @@ classdef LogPolicy < handle
     methods (Static)
         function restore(snapshot)
             %RESTORE Re-apply a previously captured threshold snapshot.
-            % 中文说明：restore 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             arguments
                 snapshot (1, 1) struct
             end

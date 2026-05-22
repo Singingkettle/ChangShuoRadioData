@@ -1,5 +1,5 @@
 classdef Log < handle
-% 中文说明：提供 CSRD 生产链路中的 Log 实现。
+% Log - CSRD MATLAB declaration.
 
     properties (Access = private)
         Name = "logger" % Default logger name
@@ -10,9 +10,8 @@ classdef Log < handle
         % Private constructor
         function obj = Log(name)
             % Log - Production declaration in CSRD.
-            % 中文说明：Log 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if nargin > 0
                 obj.Name = name;
@@ -32,9 +31,8 @@ classdef Log < handle
 
         function logger = getInstance(name)
             % getInstance - Production declaration in CSRD.
-            % 中文说明：getInstance 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             persistent globalInstance
 

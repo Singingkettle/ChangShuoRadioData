@@ -1,8 +1,7 @@
 function assertSignalStructContract(signalStruct, boundary, contextLabel)
 %ASSERTSIGNALSTRUCTCONTRACT Validate the schema of a signal struct at a pipeline boundary.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 assertSignalStructContract 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   csrd.pipeline.contract.assertSignalStructContract(signalStruct, boundary)
 %   csrd.pipeline.contract.assertSignalStructContract(signalStruct, boundary, contextLabel)
@@ -92,9 +91,8 @@ end
 
 function s = formatContext(contextLabel)
     % formatContext - Production declaration in CSRD.
-    % 中文说明：formatContext 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isempty(contextLabel)
         s = '';
     else

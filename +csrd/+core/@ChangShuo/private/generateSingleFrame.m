@@ -1,8 +1,7 @@
 function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
     % generateSingleFrame - Generate data for a single frame (refactored)
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 generateSingleFrame 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method orchestrates the complete frame generation process by calling
     % specialized private methods for each major processing stage. This modular
@@ -51,6 +50,7 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
         obj.ScenarioConfig.Transmitters = instantiatedTxs;
         obj.ScenarioConfig.Receivers = instantiatedRxs;
         obj.ScenarioConfig.Layout = globalLayout;
+        obj.ScenarioConfig.ScenarioPlan = obj.ScenarioPlan;
         
         % Store entities with Snapshots for downstream processing
         if isfield(globalLayout, 'Entities')
@@ -107,6 +107,9 @@ function [FrameData, FrameAnnotation] = generateSingleFrame(obj, FrameId)
 end
 
 function localTraceFrameStage(stageName, startTick, frameId, metadata)
+    % localTraceFrameStage - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if nargin < 4 || ~isstruct(metadata)
     metadata = struct();
 end

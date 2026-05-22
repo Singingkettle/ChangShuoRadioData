@@ -1,8 +1,7 @@
 function [x,varargout]=minL1intlin(C,d,varargin)
 % The submission minL1lin finds the  minimum L1-norm solution of the linear equations C*x=d,
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 minL1intlin 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 % optionally under linear constraints. It is similar to the Optimization Toolbox's lsqlin except that it minimizes with
 % respect to the L1 norm by reformulating the problem as a linear program. The input/output syntax,
 %

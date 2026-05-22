@@ -1,8 +1,7 @@
 function initializeStatisticalMap(obj)
     % initializeStatisticalMap - Initialize statistical/logical map
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 initializeStatisticalMap 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Sets up logical boundaries for statistical channel modeling
 
@@ -52,9 +51,8 @@ end
 
 function channelModel = resolveStatisticalChannelModel(obj)
     % resolveStatisticalChannelModel - Production declaration in CSRD.
-    % 中文说明：resolveStatisticalChannelModel 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     channelModel = 'Statistical';
     if isfield(obj.Config, 'Environment') && ...
             isstruct(obj.Config.Environment) && ...

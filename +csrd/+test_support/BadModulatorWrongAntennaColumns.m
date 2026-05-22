@@ -7,6 +7,9 @@ classdef BadModulatorWrongAntennaColumns < matlab.System
 
     methods (Access = protected)
         function out = stepImpl(obj, ~)
+            % stepImpl - Return a signal with the wrong antenna column count.
+            % Inputs: obj plus ignored input payload.
+            % Outputs: malformed modulator output struct.
             out = struct();
             out.Signal = complex(ones(8, obj.NumTransmitAntennas + 1));
             out.Bandwidth = obj.TargetBandwidth;

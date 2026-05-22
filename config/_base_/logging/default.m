@@ -1,24 +1,15 @@
 function config = default()
     % default - Default logging configuration
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 default 实现。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % Provides standard logging settings suitable for most use cases.
 
-    config.Log.Name = 'CSRD';
-    config.Log.Level = 'INFO';
-    config.Log.SaveToFile = true;
-    config.Log.DisplayInConsole = true;
-    config.Log.MaxFileSize = '10MB';
-    config.Log.RotationCount = 5;
-    config.Log.TimestampFormat = 'yyyy-MM-dd HH:mm:ss.SSS';
-    config.Log.IncludeStackTrace = false;
-    config.Log.PerformanceMetrics = true;
-    config.Log.SessionLogging = true;
-    config.Log.ComponentLogging = true;
-    config.Log.FactoryLogging = true;
-    config.Log.EngineLogging = true;
-    config.Log.ScenarioProgress = true;
-    config.Log.GlobalErrorTracking = true;
+    config.Logging.Name = 'CSRD';
+    config.Logging.Policy = 'Standard';
+    config.Logging.Console.Enabled = true;
+    config.Logging.File.Enabled = true;
+    config.Logging.Progress.Mode = 'Detailed';
+    config.Logging.TimestampFormat = 'yyyy-MM-dd HH:mm:ss.SSS';
+    config.Logging.IncludeStackTrace = false;
 end

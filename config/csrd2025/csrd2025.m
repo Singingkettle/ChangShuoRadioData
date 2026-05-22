@@ -1,8 +1,7 @@
 function config = csrd2025()
     % csrd2025 - CSRD2025 dataset configuration example
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 csrd2025 实现。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % This example shows how to create modular configuration
     % by inheriting from base configurations and overriding specific settings.
@@ -35,7 +34,6 @@ function config = csrd2025()
     config.Runner.Data.VersionControl = true; % Enable version control
     config.Runner.Data.ScenarioGrouping = true; % Group data by scenario
     config.Runner.Data.PrettyPrintAnnotations = false; % Compact JSON for production speed
-    config.Runner.Log.Policy = 'LargeMC'; % Suppress hot-path debug/info formatting
 
     % Parallel Processing Configuration
     config.Runner.Parallel.UseParallel = false; % Enable parallel processing
@@ -67,22 +65,14 @@ function config = csrd2025()
     config.Runner.QualityAssurance.AutoCorrection = false; % Enable auto correction
     config.Runner.QualityAssurance.ScenarioValidation = true; % Enable scenario validation
 
-    % Global Logging Configuration - matches initialize_csrd_configuration.m
-    config.Log.Name = 'CSRD';
-    config.Log.Level = 'DEBUG'; % Log level for this dataset
-    config.Log.SaveToFile = true; % Save logs to file
-    config.Log.DisplayInConsole = true; % Display logs in console
-    config.Log.MaxFileSize = '10MB'; % Maximum log file size
-    config.Log.RotationCount = 5; % Number of rotated log files
-    config.Log.TimestampFormat = 'yyyy-MM-dd HH:mm:ss.SSS'; % Timestamp format
-    config.Log.IncludeStackTrace = false; % Include stack trace
-    config.Log.PerformanceMetrics = true; % Enable performance metrics
-    config.Log.SessionLogging = true; % Enable session logging
-    config.Log.ComponentLogging = true; % Enable component logging
-    config.Log.FactoryLogging = true; % Enable factory logging
-    config.Log.EngineLogging = true; % Enable engine logging
-    config.Log.ScenarioProgress = true; % Log scenario progress
-    config.Log.GlobalErrorTracking = true; % Enable error tracking
+    % Global logging policy.
+    config.Logging.Name = 'CSRD';
+    config.Logging.Policy = 'LargeMC';
+    config.Logging.Console.Enabled = true;
+    config.Logging.File.Enabled = true;
+    config.Logging.Progress.Mode = 'Summary';
+    config.Logging.TimestampFormat = 'yyyy-MM-dd HH:mm:ss.SSS';
+    config.Logging.IncludeStackTrace = false;
 
     % Factory Configurations - inherited from base configurations
     % The complete factory configurations are loaded via baseConfigs inheritance:

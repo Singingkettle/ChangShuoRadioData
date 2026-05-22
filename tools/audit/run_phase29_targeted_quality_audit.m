@@ -1,6 +1,7 @@
 function summary = run_phase29_targeted_quality_audit(varargin)
 %RUN_PHASE29_TARGETED_QUALITY_AUDIT Phase 29 high-risk quality audit.
-% 中文说明：只跑固定高风险小矩阵；每个 case 都从 tools/simulation.m 入口执行。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 p = inputParser();
 p.FunctionName = 'run_phase29_targeted_quality_audit';
@@ -69,6 +70,9 @@ localWriteMarkdown(fullfile(artifactRoot, 'phase29_targeted_quality_summary.md')
 end
 
 function cases = localCaseMatrix(projectRoot, baseConfig)
+    % localCaseMatrix - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 northDakota = fullfile(projectRoot, 'data', 'map', 'osm', ...
     'Open_Farmland_Flat', ...
     'Open_Farmland_Flat_Central_North_Dakota_Farmland_USA_47.0000_-100.0000.osm');
@@ -101,6 +105,9 @@ cases(7) = localCase('frequency_no_overlap_default', baseConfig, 20262907, ...
 end
 
 function rec = localCase(name, baseConfig, seed, numScenarios, description, mode, osmFile)
+    % localCase - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 rec = localEmptyCase();
 rec.Name = name;
 rec.Description = description;
@@ -112,11 +119,17 @@ rec.OSMFile = osmFile;
 end
 
 function rec = localEmptyCase()
+    % localEmptyCase - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 rec = struct('Name', '', 'Description', '', 'BaseConfig', '', ...
     'Seed', NaN, 'NumScenarios', 0, 'Mode', '', 'OSMFile', '');
 end
 
 function result = localPrepareCase(projectRoot, artifactRoot, c, index)
+    % localPrepareCase - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 caseDir = fullfile(artifactRoot, 'cases', c.Name);
 localEnsureDirectory(caseDir);
 configPath = fullfile(artifactRoot, 'generated_configs', ...
@@ -142,6 +155,9 @@ result.ArtifactDirectory = caseDir;
 end
 
 function localWriteCaseConfig(configPath, functionName, c, outputDirectory, perfDir)
+    % localWriteCaseConfig - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 localEnsureDirectory(fileparts(configPath));
 fid = fopen(configPath, 'w');
 if fid == -1
@@ -155,15 +171,16 @@ fprintf(fid, 'config.Runner.NumScenarios = %d;\n', c.NumScenarios);
 fprintf(fid, 'config.Runner.RandomSeed = %d;\n', c.Seed);
 fprintf(fid, 'config.Runner.Data.OutputDirectory = ''%s'';\n', localEscape(outputDirectory));
 fprintf(fid, 'config.Runner.Data.PrettyPrintAnnotations = false;\n');
-fprintf(fid, 'config.Runner.Log.Policy = ''LargeMC'';\n');
+fprintf(fid, 'config.Logging.Policy = ''LargeMC'';\n');
+fprintf(fid, 'config.Logging.File.Enabled = true;\n');
+fprintf(fid, 'config.Logging.Console.Enabled = false;\n');
+fprintf(fid, 'config.Logging.Progress.Mode = ''Summary'';\n');
 fprintf(fid, 'config.Runner.Performance.EnableStageTiming = true;\n');
 fprintf(fid, 'config.Runner.Performance.EnableHeartbeat = true;\n');
 fprintf(fid, 'config.Runner.Performance.RawEventLimit = 2000;\n');
 fprintf(fid, 'config.Runner.Performance.PartialWriteInterval = 10;\n');
 fprintf(fid, 'config.Runner.Performance.ArtifactDirectory = ''%s'';\n', ...
     localEscape(perfDir));
-fprintf(fid, 'config.Log.Level = ''INFO'';\n');
-fprintf(fid, 'config.Log.DisplayInConsole = false;\n');
 fprintf(fid, 'config.Metadata.Phase29Audit.CaseName = ''%s'';\n', ...
     localEscape(c.Name));
 fprintf(fid, 'config.Metadata.Phase29Audit.RiskMode = ''%s'';\n', ...
@@ -178,7 +195,8 @@ switch c.Mode
     case 'StatisticalShortFrame'
         fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Types = {''Statistical''};\n');
         fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;\n');
-        fprintf(fid, 'config.Factories.Scenario.Global.FrameNumSamples = 1024;\n');
+        fprintf(fid, 'config.Factories.Scenario.FramePolicy.FrameNumSamples.Mode = ''Fixed'';\n');
+        fprintf(fid, 'config.Factories.Scenario.FramePolicy.FrameNumSamples.Value = 1024;\n');
     otherwise
         fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Types = {''OSM''};\n');
         fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;\n');
@@ -204,6 +222,9 @@ clear cleanup;
 end
 
 function result = localExecuteCase(projectRoot, result)
+    % localExecuteCase - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 result.StartedAtUtc = localUtcNow();
 try
     simulation(1, 1, result.ConfigPath);
@@ -235,6 +256,9 @@ localWriteJson(fullfile(result.ArtifactDirectory, 'case_result.json'), result);
 end
 
 function audit = localAuditLogs(outputRoot, artifactDir)
+    % localAuditLogs - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 patterns = {'ERROR', '[FAILED]', 'CSRD:', 'FrameWindow', ...
     'detectBurstEnvelope', 'Measurement failed', 'RayTracing failed', ...
     'Insufficient bandwidth', 'Unable to access terrain', 'gmted2010', ...
@@ -265,6 +289,9 @@ audit = struct('FilesScanned', numel(files), ...
 end
 
 function audit = localAuditAnnotations(outputRoot)
+    % localAuditAnnotations - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 files = localListFiles(outputRoot, '*_annotation.json');
 invalidMeasured = 0;
 noSignalNan = 0;
@@ -284,6 +311,9 @@ audit = struct('FilesScanned', numel(files), ...
 end
 
 function [invalid, noSignal] = localAnnotationInvalidMeasured(value)
+    % localAnnotationInvalidMeasured - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 invalid = 0;
 noSignal = 0;
 if isstruct(value)
@@ -324,6 +354,9 @@ end
 end
 
 function tf = localStructHasNan(value)
+    % localStructHasNan - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = false;
 if isnumeric(value)
     tf = any(~isfinite(value(:)));
@@ -355,6 +388,9 @@ end
 end
 
 function cases = localFilterCases(cases, names)
+    % localFilterCases - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(names)
     return;
 end
@@ -372,6 +408,9 @@ cases = cases(keep);
 end
 
 function totals = localUpdateTotals(results)
+    % localUpdateTotals - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 status = string({results.Status});
 totals = struct('Planned', sum(status == "Planned"), ...
     'Passed', sum(status == "Passed"), ...
@@ -380,6 +419,9 @@ totals = struct('Planned', sum(status == "Planned"), ...
 end
 
 function rec = localEmptyCaseResult()
+    % localEmptyCaseResult - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 rec = struct();
 rec.Name = '';
 rec.Description = '';
@@ -401,6 +443,9 @@ rec.AnnotationAudit = struct();
 end
 
 function localWriteMarkdown(pathText, summary)
+    % localWriteMarkdown - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 lines = strings(0, 1);
 lines(end + 1) = "# Phase 29 Targeted Quality Audit";
 lines(end + 1) = "";
@@ -421,6 +466,9 @@ localWriteText(pathText, strjoin(lines, newline));
 end
 
 function value = localFileSizeMB(pathText)
+    % localFileSizeMB - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = NaN;
 if isempty(pathText) || ~isfile(pathText)
     return;
@@ -430,6 +478,9 @@ value = info.bytes / 1024^2;
 end
 
 function files = localListFiles(rootDir, pattern)
+    % localListFiles - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 files = {};
 if ~isfolder(rootDir)
     return;
@@ -443,6 +494,9 @@ end
 end
 
 function sig = localNormalizeFailureSignature(line)
+    % localNormalizeFailureSignature - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 sig = char(string(line));
 sig = regexprep(sig, '^\d+/\d+\s+\d+:\d+:\d+\s+-\s+[^-]+-\s+', '');
 sig = regexprep(sig, '\s+', ' ');
@@ -452,6 +506,9 @@ end
 end
 
 function text = localReadText(pathText)
+    % localReadText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fid = fopen(pathText, 'r');
 if fid == -1
     text = '';
@@ -463,6 +520,9 @@ clear cleanup;
 end
 
 function localWriteText(pathText, text)
+    % localWriteText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 localEnsureDirectory(fileparts(pathText));
 fid = fopen(pathText, 'w');
 if fid == -1
@@ -474,6 +534,9 @@ clear cleanup;
 end
 
 function localWriteJson(pathText, payload)
+    % localWriteJson - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 try
     text = jsonencode(payload, 'PrettyPrint', true);
 catch
@@ -483,6 +546,9 @@ localWriteText(pathText, text);
 end
 
 function localEnsureDirectory(pathText)
+    % localEnsureDirectory - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(pathText)
     return;
 end
@@ -492,20 +558,32 @@ end
 end
 
 function projectRoot = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 end
 
 function tf = localIsAbsolutePath(pathText)
+    % localIsAbsolutePath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 pathText = char(string(pathText));
 tf = ~isempty(regexp(pathText, '^[A-Za-z]:[\\/]', 'once')) || ...
     startsWith(pathText, filesep);
 end
 
 function escaped = localEscape(text)
+    % localEscape - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 escaped = strrep(char(string(text)), '''', '''''');
 end
 
 function value = localMarkdownCell(value)
+    % localMarkdownCell - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = char(string(value));
 value = strrep(value, '|', '\|');
 if isempty(value)
@@ -514,6 +592,9 @@ end
 end
 
 function stamp = localUtcNow()
+    % localUtcNow - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 stamp = char(datetime('now', 'TimeZone', 'UTC', ...
     'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'''));
 end

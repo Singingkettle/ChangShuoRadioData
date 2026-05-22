@@ -1,8 +1,7 @@
 function signalSegmentsPerTx = processTransmitterSegments(obj, FrameId, currentTxScenario, currentTxId)
     %PROCESSTRANSMITTERSEGMENTS Phase 3 strict-construction segment fan-out.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processTransmitterSegments 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Iterates every active segment of currentTxScenario and dispatches
     %   to processSingleSegment. Phase 3 (audit §3.4 / §17.5 P3-6) removed

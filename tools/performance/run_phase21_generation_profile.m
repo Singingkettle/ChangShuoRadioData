@@ -1,6 +1,7 @@
 function summary = run_phase21_generation_profile(varargin)
 %RUN_PHASE21_GENERATION_PROFILE Phase 21 generation performance entrypoint.
-% 中文说明：生成链路性能画像入口，输出到 ignored artifacts/performance/phase21/。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 %
 % This tool records low-overhead evidence without changing simulation
 % contracts. Expensive smoke runs are opt-in so the quick path is safe for
@@ -81,26 +82,37 @@ end
 end
 
 function contract = localFrameContract(cfg)
+    % localFrameContract - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 contract = struct();
 try
-    runtime = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
-        struct('Scenario', cfg.Factories.Scenario), struct());
-    contract.FrameNumSamples = runtime.FrameNumSamples;
-    contract.SampleRateHz = runtime.SampleRateHz;
-    contract.FrameDurationSec = runtime.FrameDurationSec;
-    contract.NumFramesPerScenario = runtime.NumFramesPerScenario;
-    contract.ObservationDurationSec = runtime.ObservationDurationSec;
+    scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+        cfg.RuntimePlan, cfg.Factories.Scenario, ...
+        struct('ScenarioId', 1, 'RandomSeed', cfg.Runner.RandomSeed));
+    contract.FramePolicy = cfg.RuntimePlan.FramePolicy;
+    contract.FrameNumSamples = scenarioPlan.Frame.FrameNumSamples;
+    contract.SampleRateHz = scenarioPlan.Frame.SampleRateHz;
+    contract.FrameDurationSec = scenarioPlan.Frame.FrameDurationSec;
+    contract.NumFramesPerScenario = scenarioPlan.Frame.NumFramesPerScenario;
+    contract.ObservationDurationSec = scenarioPlan.Frame.ObservationDurationSec;
 catch ME
     contract.Error = sprintf('%s: %s', ME.identifier, ME.message);
 end
 end
 
 function shape = localConfigRuntimeShape(cfg)
+    % localConfigRuntimeShape - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 shape = struct();
 shape.NumScenarios = localGet(cfg.Runner, 'NumScenarios', NaN);
 shape.LogPolicy = '';
-if isfield(cfg.Runner, 'Log') && isfield(cfg.Runner.Log, 'Policy')
-    shape.LogPolicy = char(string(cfg.Runner.Log.Policy));
+if isfield(cfg, 'RuntimePlan') && isfield(cfg.RuntimePlan, 'Logging') && ...
+        isfield(cfg.RuntimePlan.Logging, 'Policy')
+    shape.LogPolicy = char(string(cfg.RuntimePlan.Logging.Policy));
+elseif isfield(cfg, 'Logging') && isfield(cfg.Logging, 'Policy')
+    shape.LogPolicy = char(string(cfg.Logging.Policy));
 end
 shape.PrettyPrintAnnotations = NaN;
 if isfield(cfg.Runner, 'Data') && ...
@@ -115,6 +127,9 @@ end
 end
 
 function bench = localRunMeasurementMicrobench(numRepeats)
+    % localRunMeasurementMicrobench - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 bench = struct('Ran', true);
 fs = 50e6;
 n = 32768;
@@ -160,6 +175,9 @@ bench.Passed = bench.Equivalence.OccupiedBandwidthAbsHz <= max(1, 1e-9 * fs) && 
 end
 
 function probe = localOptionalProbe(name, shouldRun, runner)
+    % localOptionalProbe - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 probe = struct('Ran', false, 'Name', name, 'Status', 'NotRun', ...
     'ElapsedSec', NaN, 'Error', '');
 if ~shouldRun
@@ -179,6 +197,9 @@ probe.ElapsedSec = toc(t);
 end
 
 function detail = localRunOsmFlatSmoke(projectRoot)
+    % localRunOsmFlatSmoke - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 addpath(fullfile(projectRoot, 'tests', 'regression'));
 summary = test_simulation_entrypoint_coverage_sweep( ...
     'Mode', 'quick', ...
@@ -193,25 +214,34 @@ detail = summary;
 end
 
 function detail = localRunOsmBuildingSmoke(projectRoot)
+    % localRunOsmBuildingSmoke - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 addpath(fullfile(projectRoot, 'tests', 'regression'));
 test_osm_building_raytracing();
 detail = struct('Function', 'test_osm_building_raytracing', 'Passed', true);
 end
 
 function detail = localRunDefaultSimulation(cfg, artifactDir, projectRoot)
+    % localRunDefaultSimulation - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 cfg.Runner.Performance.EnableStageTiming = true;
 cfg.Runner.Performance.ArtifactDirectory = artifactDir;
 cfg.Runner.Data.OutputDirectory = 'CSRD2025_phase21_profile';
 csrd.runtime.logger.GlobalLogManager.reset();
-if isfield(cfg, 'Log')
-    logCfg = cfg.Log;
-else
-    logCfg = struct('Name', 'CSRD-Phase21-Profile', ...
-        'Level', 'INFO', 'SaveToFile', true, 'DisplayInConsole', true);
+if ~isfield(cfg, 'Logging') || ~isstruct(cfg.Logging)
+    cfg.Logging = struct();
+    cfg.Logging.Name = 'CSRD-Phase21-Profile';
+    cfg.Logging.Policy = 'Standard';
+    cfg.Logging.Console.Enabled = true;
+    cfg.Logging.File.Enabled = true;
+    cfg.Logging.Progress.Mode = 'Detailed';
 end
+cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
+logCfg = cfg.RuntimePlan.Logging;
 outputDir = fullfile(projectRoot, 'data', cfg.Runner.Data.OutputDirectory);
 csrd.runtime.logger.GlobalLogManager.initialize(logCfg, outputDir);
-cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner);
 runner.FactoryConfigs = cfg.Factories;
 runner.RuntimePlan = cfg.RuntimePlan;
@@ -220,6 +250,9 @@ detail = struct('OutputDirectory', outputDir, 'StageTimingDirectory', artifactDi
 end
 
 function ok = localProbeSuccess(probes)
+    % localProbeSuccess - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 ok = true;
 names = fieldnames(probes);
 for k = 1:numel(names)
@@ -235,6 +268,9 @@ end
 end
 
 function value = localGet(s, fieldName, defaultValue)
+    % localGet - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
     value = s.(fieldName);
 else
@@ -243,6 +279,9 @@ end
 end
 
 function localWriteJson(path, payload)
+    % localWriteJson - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fid = fopen(path, 'w');
 if fid == -1
     error('CSRD:Phase21:JsonOpenFailed', ...
@@ -254,6 +293,9 @@ clear cleanup;
 end
 
 function localPrintSummary(summary)
+    % localPrintSummary - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fprintf('Phase 21 profile written to:\n  %s\n  %s\n', ...
     summary.SummaryPath, summary.JsonPath);
 if isfield(summary.Probes, 'MeasurementMicrobench') && ...
@@ -265,11 +307,17 @@ end
 end
 
 function tf = localPositiveInteger(value)
+    % localPositiveInteger - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = isnumeric(value) && isscalar(value) && isfinite(value) && ...
     value >= 1 && floor(value) == value;
 end
 
 function projectRoot = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 end

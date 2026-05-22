@@ -1,8 +1,7 @@
 function [ScenarioData, ScenarioAnnotation] = stepImpl(obj, scenarioId)
     % stepImpl - Execute simulation for an entire scenario
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 stepImpl 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method handles the complete execution of a scenario by extracting
     % the frame count from scenario configuration and managing the frame-level
@@ -21,7 +20,12 @@ function [ScenarioData, ScenarioAnnotation] = stepImpl(obj, scenarioId)
     %   ScenarioData - Cell array of generated signal data for all frames
     %   ScenarioAnnotation - Cell array of metadata and annotations for all frames
 
-    % Extract frame count from scenario configuration
+    % Build the scenario construction plan before any frame data is
+    % generated. The plan is frozen for this scenario; later stages measure
+    % actual signal data against it rather than changing the plan mid-run.
+    obj.ScenarioPlan = prepareScenarioPlan(obj, scenarioId);
+
+    % Extract frame count from the scenario construction plan.
     framesPerScenario = getFramesPerScenarioFromConfig(obj);
 
     obj.logger.debug("Scenario %d: Starting simulation for %d frames (from scenario config).", ...

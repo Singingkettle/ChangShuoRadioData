@@ -1,6 +1,5 @@
 classdef SCFDMA < csrd.blocks.physical.modulate.digital.OFDM.OFDM
     % SCFDMA - Single Carrier Frequency Division Multiple Access Modulator
-    % 中文说明：提供 CSRD 生产链路中的 SCFDMA 实现。
     %
     % This class implements SC-FDMA (Single Carrier Frequency Division Multiple Access)
     % modulation as a subclass of the OFDM modulator with additional DFT spreading.
@@ -92,9 +91,8 @@ classdef SCFDMA < csrd.blocks.physical.modulate.digital.OFDM.OFDM
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputSymbols)
             % baseModulator - Core SC-FDMA modulation implementation
-            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method implements the complete SC-FDMA modulation process including
             % base modulation, OSTBC encoding, DFT spreading, subcarrier mapping,
@@ -173,9 +171,8 @@ classdef SCFDMA < csrd.blocks.physical.modulate.digital.OFDM.OFDM
 
         function secondStageModulator = genSecondStageModulator(obj)
             % genSecondStageModulator - Generate OFDM modulator for second stage
-            % 中文说明：genSecondStageModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method creates a Communications Toolbox OFDMModulator object
             % configured for SC-FDMA operation. The OFDM modulator handles IFFT
@@ -219,9 +216,8 @@ classdef SCFDMA < csrd.blocks.physical.modulate.digital.OFDM.OFDM
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured SC-FDMA modulator function handle
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method configures the SC-FDMA modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

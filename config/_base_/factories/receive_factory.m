@@ -1,8 +1,7 @@
 function config = receive_factory()
     %RECEIVE_FACTORY Receiver factory configuration (v0.4 deep refactor).
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 receive_factory 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Splits cleanly into:
     %     * Available receiver TYPEs (the scenario layer picks one).

@@ -1,6 +1,7 @@
 function varargout = osmSiteViewerCache(action, osmFile)
 %OSMSITEVIEWERCACHE Process-local shared OSM siteviewer cache.
-% 中文说明：在一次 SimulationRunner 生命周期内复用 OSM building map handle。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 persistent cache
 persistent retainAcrossReleases
@@ -152,6 +153,9 @@ end
 end
 
 function localDeleteViewer(viewer)
+    % localDeleteViewer - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(viewer)
     return;
 end
@@ -173,11 +177,17 @@ end
 end
 
 function tf = localIsCacheEntryUsable(entry)
+    % localIsCacheEntryUsable - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = isstruct(entry) && isfield(entry, 'Viewer') && ...
     localIsUsableViewer(entry.Viewer);
 end
 
 function tf = localIsUsableViewer(viewer)
+    % localIsUsableViewer - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = ~isempty(viewer) && isobject(viewer);
 if ~tf
     return;
@@ -193,6 +203,9 @@ end
 end
 
 function value = getStructField(s, fieldName, defaultValue)
+    % getStructField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isstruct(s) && isfield(s, fieldName)
     value = s.(fieldName);
 else
@@ -201,11 +214,17 @@ end
 end
 
 function stamp = localNowUtc()
+    % localNowUtc - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 stamp = char(datetime('now', 'TimeZone', 'UTC', ...
     'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'''));
 end
 
 function sizeMB = localFileSizeMB(pathText)
+    % localFileSizeMB - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 sizeMB = NaN;
 if isempty(pathText)
     return;

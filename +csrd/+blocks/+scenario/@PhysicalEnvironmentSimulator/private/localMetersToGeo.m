@@ -1,6 +1,7 @@
 function geoPositionDeg = localMetersToGeo(positionMeters, bounds)
 %LOCALMETERSTOGEO Convert local meter position to [lat lon height].
-% 中文说明：把米制位置反算为供 RayTracing site 使用的经纬度 degree。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 [originLat, originLon] = getGeoOriginFromBounds(bounds);
 earthRadiusMeters = 6371008.8;
 lat0 = deg2rad(originLat);

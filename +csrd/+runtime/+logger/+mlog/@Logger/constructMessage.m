@@ -1,8 +1,7 @@
 function msg = constructMessage(obj, argA, argB, varargin)
 % Constructs a csrd.runtime.logger.mlog.Message object, with the same class as the existing
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 constructMessage 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 % Logger
 
 % Copyright 2018-2024 The MathWorks Inc.
@@ -77,9 +76,8 @@ end
 
 function callerInfo = getCallerInfo()
 % Get the caller's full qualified name and line number from the call stack
-% 中文说明：getCallerInfo 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 % Skip internal logger functions to find the actual caller
 % Returns format like: csrd.core.ChangShuo.setupImpl:45
 
@@ -119,9 +117,8 @@ end
 
 function fullName = extractFullQualifiedName(filePath, funcName)
 % Extract full qualified name from file path
-% 中文说明：extractFullQualifiedName 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 % e.g., C:\...\+csrd\+core\@ChangShuo\setupImpl.m -> csrd.core.ChangShuo.setupImpl
 
     fullName = funcName; %#ok<NASGU> - default fallback value

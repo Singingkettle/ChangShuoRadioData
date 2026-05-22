@@ -1,6 +1,5 @@
 function diag_phase4_obw_invariance()
 %DIAG_PHASE4_OBW_INVARIANCE Probe whether obwActual depends on the
-% 中文说明：提供 CSRD 生产链路中的 diag_phase4_obw_invariance 实现。
 %   sample rate at which the same band-limited signal is observed.
 %
 %   This is the working hypothesis behind the C8 outliers: pre-channel

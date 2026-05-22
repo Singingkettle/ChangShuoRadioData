@@ -1,6 +1,5 @@
 function masterConfig = config_loader(config_name)
     % config_loader - Modular configuration loader for CSRD framework
-    % 中文说明：提供 CSRD 生产链路中的 config_loader 实现。
     %
     % This function loads and composes complete CSRD configurations from modular
     % configuration files using inheritance and merging. It serves as the main
@@ -24,7 +23,7 @@ function masterConfig = config_loader(config_name)
     %
     % Output Arguments:
     %   masterConfig - Complete CSRD framework configuration structure
-    %                  Contains: Runner, Log, Factories, Metadata
+    %                  Contains: Runner, Logging, Factories, RuntimePlan, Metadata
     %
     % Examples:
     %   % Load default configuration
@@ -95,16 +94,14 @@ end
 
 function config = load_config_with_inheritance(config_file)
     % load_config_with_inheritance - Load configuration with inheritance support
-    % 中文说明：load_config_with_inheritance 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % This function handles loading of modular configuration files with
     % inheritance through baseConfigs field, providing deep merging and
     % circular dependency detection.
 
-    % Find config directory from the runtime package root.
-    % 中文说明：从 runtime 包位置反推项目根目录下的 config 目录。
+    % Find the config directory from the runtime package root.
     runtime_dir = fileparts(mfilename('fullpath'));
     csrd_dir = fileparts(runtime_dir); % +csrd
     project_root = fileparts(csrd_dir); % project root
@@ -123,9 +120,8 @@ end
 
 function config = load_config_recursive(config_file, config_dir, visited_files)
     % load_config_recursive - Recursively load and merge configurations
-    % 中文说明：load_config_recursive 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % This function handles the recursive loading and merging of configuration
     % files, including circular dependency detection and base configuration
@@ -207,9 +203,8 @@ end
 
 function merged = merge_configs(base_config, override_config)
     % merge_configs - Deep merge two configuration structures
-    % 中文说明：merge_configs 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % This function performs a deep merge of two configuration structures,
     % where override_config takes precedence over base_config for overlapping
@@ -241,9 +236,8 @@ end
 
 function masterConfig = ensureRequiredFields(masterConfig)
     % ensureRequiredFields - Ensure all required configuration fields exist
-    % 中文说明：ensureRequiredFields 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % This function ensures that the loaded configuration contains all required
     % fields and structures for the CSRD framework to function properly. It
@@ -252,11 +246,6 @@ function masterConfig = ensureRequiredFields(masterConfig)
     % Ensure Runner field exists
     if ~isfield(masterConfig, 'Runner')
         masterConfig.Runner = struct();
-    end
-
-    % Ensure Log field exists
-    if ~isfield(masterConfig, 'Log')
-        masterConfig.Log = struct();
     end
 
     % Ensure Factories field exists
@@ -273,9 +262,8 @@ end
 
 function validateFactoryConfigurations(masterConfig)
     % validateFactoryConfigurations - Validate essential factory configurations
-    % 中文说明：validateFactoryConfigurations 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %
     % This function ensures that critical factory configurations are present
     % and loads defaults for any missing essential factories.

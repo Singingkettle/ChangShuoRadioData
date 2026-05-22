@@ -1,8 +1,7 @@
 function summary = runFullCoverageValidation(configStruct, configName, projectRoot, workerId, numWorkers, varargin)
 %RUNFULLCOVERAGEVALIDATION Execute validation-grade coverage generation.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：从正式 simulation.m 入口派生覆盖矩阵配置，并验证每个生成结果的标注一致性。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 
 p = inputParser;
 addParameter(p, 'DryRun', false, @islogical);
@@ -131,9 +130,8 @@ end
 
 function opts = localResolveOptions(configStruct)
     % localResolveOptions - Production declaration in CSRD.
-    % 中文说明：localResolveOptions 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 cfg = configStruct.CoverageValidation;
 opts = struct();
 opts.Mode = lower(char(string(localGetField(cfg, 'Mode', 'full_coverage'))));
@@ -168,9 +166,8 @@ end
 
 function value = localGetField(s, name, fallback)
     % localGetField - Production declaration in CSRD.
-    % 中文说明：localGetField 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if isstruct(s) && isfield(s, name) && ~isempty(s.(name))
     value = s.(name);
 else
@@ -181,9 +178,8 @@ end
 
 function n = localTargetFrameSamples(opts)
     % localTargetFrameSamples - Resolve optional per-frame sample target.
-    % 中文说明：解析可选目标帧采样点数；为空时沿用 ObservationDuration。
-    % Inputs / 输入: resolved validation options.
-    % 输出 / Outputs: positive integer sample count or [].
+    % Inputs: resolved validation options.
+    % Outputs: positive integer sample count or [].
 n = [];
 if isfield(opts, 'TargetFrameSamples') && ~isempty(opts.TargetFrameSamples)
     n = round(double(opts.TargetFrameSamples));
@@ -195,9 +191,8 @@ end
 
 function duration = localCaseObservationDuration(c, opts)
     % localCaseObservationDuration - Derive duration from target samples.
-    % 中文说明：优先按目标采样点数和 case 采样率计算帧时长，保证高分辨率验证。
-    % Inputs / 输入: case descriptor and resolved options.
-    % 输出 / Outputs: observation duration in seconds.
+    % Inputs: case descriptor and resolved options.
+    % Outputs: observation duration in seconds.
 targetFrameSamples = localTargetFrameSamples(opts);
 if isempty(targetFrameSamples)
     duration = opts.ObservationDuration;
@@ -210,9 +205,8 @@ end
 
 function txt = localMatlabCellstr(values)
     % localMatlabCellstr - Serialize a cellstr/string vector for generated config.
-    % 中文说明：把字符串列表序列化为 MATLAB cell 字符串字面量。
-    % Inputs / 输入: cell/string/char values.
-    % 输出 / Outputs: MATLAB source snippet.
+    % Inputs: cell/string/char values.
+    % Outputs: MATLAB source snippet.
 if ischar(values) || isstring(values)
     values = cellstr(string(values));
 end
@@ -226,9 +220,8 @@ end
 
 function txt = localMatlabNumericVector(values)
     % localMatlabNumericVector - Serialize a numeric vector for generated config.
-    % 中文说明：把数值向量序列化为 MATLAB 字面量。
-    % Inputs / 输入: numeric scalar/vector.
-    % 输出 / Outputs: MATLAB source snippet.
+    % Inputs: numeric scalar/vector.
+    % Outputs: MATLAB source snippet.
 values = double(values);
 txt = ['[', strjoin(arrayfun(@(x) sprintf('%.17g', x), values(:).', ...
     'UniformOutput', false), ', '), ']'];
@@ -237,6 +230,8 @@ end
 
 function intervals = localScaleIntervalFractions(intervalFractions, durationSec)
     % localScaleIntervalFractions - Convert [0,1] fractions to seconds.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if ~iscell(intervalFractions)
     error('CSRD:Validation:InvalidExplicitIntervals', ...
         'ExplicitIntervalFractions must be a cell array of Nx2 matrices.');
@@ -256,6 +251,8 @@ end
 
 function txt = localMatlabCellOfMatrices(values)
     % localMatlabCellOfMatrices - Serialize a cell array of numeric matrices.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 parts = cell(1, numel(values));
 for k = 1:numel(values)
     parts{k} = localMatlabMatrix(values{k});
@@ -265,6 +262,9 @@ end
 
 
 function txt = localMatlabMatrix(values)
+    % localMatlabMatrix - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 values = double(values);
 rows = cell(1, size(values, 1));
 for r = 1:size(values, 1)
@@ -277,9 +277,8 @@ end
 
 function tf = localVisualizationEnabled(opts)
     % localVisualizationEnabled - Detect requested Phase 16 visual QA output.
-    % 中文说明：判断覆盖验证配置是否要求生成频谱图 overlay 目视检查产物。
-    % Inputs / 输入: resolved coverage validation options.
-    % 输出 / Outputs: true when spectrogram overlays should be rendered.
+    % Inputs: resolved coverage validation options.
+    % Outputs: true when spectrogram overlays should be rendered.
 tf = isstruct(opts.Visualization) && isfield(opts.Visualization, 'Enable') && ...
     isequal(opts.Visualization.Enable, true);
 end
@@ -287,9 +286,8 @@ end
 
 function outputRoot = localVisualizationOutputRoot(projectRoot, opts)
     % localVisualizationOutputRoot - Resolve visualization artifact directory.
-    % 中文说明：把相对 artifacts 目录解析到项目根，确保目视检查图不写进源码目录树之外。
-    % Inputs / 输入: project root and resolved coverage validation options.
-    % 输出 / Outputs: absolute output directory for PNG/contact-sheet artifacts.
+    % Inputs: project root and resolved coverage validation options.
+    % Outputs: absolute output directory for PNG/contact-sheet artifacts.
 relativeRoot = localGetField(opts.Visualization, 'OutputDirectory', ...
     fullfile('artifacts', 'visual_checks', 'coverage_validation'));
 if isfolder(relativeRoot) || startsWith(char(string(relativeRoot)), projectRoot)
@@ -302,9 +300,8 @@ end
 
 function mask = localWorkerSelection(numCases, workerId, numWorkers, opts)
     % localWorkerSelection - Production declaration in CSRD.
-    % 中文说明：localWorkerSelection 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 mask = false(1, numCases);
 for idx = 1:numCases
     if idx < opts.StartAt || idx > opts.StopAfter
@@ -317,9 +314,8 @@ end
 
 function cases = localBuildCases(projectRoot, configStruct, opts)
     % localBuildCases - Production declaration in CSRD.
-    % 中文说明：localBuildCases 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 cases = repmat(localDefaultCase('placeholder', opts), 0, 1);
 
 regCases = opts.RegulatoryCases;
@@ -439,9 +435,8 @@ end
 
 function c = localDefaultCase(name, opts)
     % localDefaultCase - Production declaration in CSRD.
-    % 中文说明：localDefaultCase 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 c = struct( ...
     'Name', char(name), ...
     'Regulatory', true, ...
@@ -479,9 +474,8 @@ end
 
 function cases = localAppendOsmRayTracingStressCases(cases, projectRoot, configStruct, opts)
     % localAppendOsmRayTracingStressCases - Add Phase 16 OSM RayTracing matrix.
-    % 中文说明：追加 Phase 16 building/empty OSM 与多实体、多天线、调制覆盖组合。
-    % Inputs / 输入: existing cases, project root, merged config, resolved options.
-    % 输出 / Outputs: cases with validation-grade OSM RayTracing stress cases.
+    % Inputs: existing cases, project root, merged config, resolved options.
+    % Outputs: cases with validation-grade OSM RayTracing stress cases.
 osmOpts = opts.OsmRayTracing;
 buildingFile = localFindOsmFromCategories(projectRoot, ...
     localGetField(osmOpts, 'BuildingCategories', {'Dense_Urban_Mid_Rise'}), true);
@@ -560,7 +554,6 @@ for k = 1:numel(modulationTypes)
 end
 
 % A receiver-level visual QA case with several emitters and several bursts.
-% 中文说明：专门生成“单接收机看到多个发射机、多段 burst”的频谱图样本。
 c = localDefaultCase('osm_rt_building_multi_tx_multi_burst_visual', opts);
 c.Regulatory = false;
 c.ModulationType = 'OFDM';
@@ -596,9 +589,8 @@ end
 
 function reason = localOsmSkipReason(osmFile, mapFlavor)
     % localOsmSkipReason - Resolve missing/capability skip reason for OSM cases.
-    % 中文说明：在生成子配置前明确 OSM 文件缺失或 building RayTracing 能力限制。
-    % Inputs / 输入: selected OSM file and Phase 16 map flavor.
-    % 输出 / Outputs: reason is empty when the case should execute.
+    % Inputs: selected OSM file and Phase 16 map flavor.
+    % Outputs: reason is empty when the case should execute.
 reason = '';
 if isempty(osmFile) || exist(osmFile, 'file') ~= 2
     reason = sprintf('selected %s OSM file is missing', mapFlavor);
@@ -616,9 +608,8 @@ end
 
 function path = localFindOsmFromCategories(projectRoot, categories, requireBuildings)
     % localFindOsmFromCategories - Pick the first matching OSM fixture.
-    % 中文说明：按目录类别选择 building 或 empty/no-building OSM 文件，不扫描无关数据。
-    % Inputs / 输入: project root, preferred categories, and building requirement.
-    % 输出 / Outputs: absolute OSM path or empty char when none match.
+    % Inputs: project root, preferred categories, and building requirement.
+    % Outputs: absolute OSM path or empty char when none match.
 path = '';
 for c = 1:numel(categories)
     cat = char(string(categories{c}));
@@ -637,9 +628,8 @@ end
 
 function sampleRate = localSampleRateForBand(bandId, opts)
     % localSampleRateForBand - Use wider receiver bandwidth for broadband bands.
-    % 中文说明：对 NR/WLAN/ISM 等宽带业务使用更宽采样率，其余使用默认采样率。
-    % Inputs / 输入: catalog band identifier and resolved validation options.
-    % 输出 / Outputs: receiver sample rate in Hz.
+    % Inputs: catalog band identifier and resolved validation options.
+    % Outputs: receiver sample rate in Hz.
 wideTokens = {'NR', 'ISM', 'WLAN', 'LTE', 'UHF'};
 if any(contains(upper(char(string(bandId))), wideTokens))
     sampleRate = opts.WideSampleRateHz;
@@ -651,9 +641,8 @@ end
 
 function localWriteCaseConfig(configPath, c, outputDirectory, opts, idx)
     % localWriteCaseConfig - Production declaration in CSRD.
-    % 中文说明：localWriteCaseConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 parentDir = fileparts(configPath);
 if ~exist(parentDir, 'dir'); mkdir(parentDir); end
 [~, fn] = fileparts(configPath);
@@ -663,7 +652,7 @@ cleanup = onCleanup(@() fclose(fid)); %#ok<NASGU>
 
 fprintf(fid, 'function config = %s()\n', fn);
 fprintf(fid, '%% %s - Generated coverage validation case config.\n', fn);
-fprintf(fid, '%% 中文说明：自动生成的覆盖验证子配置。\n');
+fprintf(fid, '%% Generated by runFullCoverageValidation; do not edit by hand.\n');
 fprintf(fid, 'config.baseConfigs = { ...\n');
 fprintf(fid, '    ''_base_/logging/default.m'', ...\n');
 fprintf(fid, '    ''_base_/runners/default.m'', ...\n');
@@ -681,10 +670,11 @@ fprintf(fid, 'config.Runner.Toolbox.Level = ''minimal'';\n');
 fprintf(fid, 'config.Runner.Data.OutputDirectory = ''%s'';\n', ...
     localEscapeMatlabChar(outputDirectory));
 fprintf(fid, 'config.Runner.Data.CompressData = false;\n');
-fprintf(fid, 'config.Log.Name = ''CSRD-Phase13-Case'';\n');
-fprintf(fid, 'config.Log.Level = ''ERROR'';\n');
-fprintf(fid, 'config.Log.SaveToFile = true;\n');
-fprintf(fid, 'config.Log.DisplayInConsole = false;\n');
+fprintf(fid, 'config.Logging.Name = ''CSRD-Phase13-Case'';\n');
+fprintf(fid, 'config.Logging.Policy = ''LargeMC'';\n');
+fprintf(fid, 'config.Logging.File.Enabled = true;\n');
+fprintf(fid, 'config.Logging.Console.Enabled = false;\n');
+fprintf(fid, 'config.Logging.Progress.Mode = ''Summary'';\n');
 fprintf(fid, 'config.CoverageValidation.Enable = false;\n\n');
 
 caseObservationDuration = localCaseObservationDuration(c, opts);
@@ -695,9 +685,11 @@ if isempty(caseFrameSamples)
 end
 caseFrameDuration = double(caseFrameSamples) / double(c.SampleRateHz);
 caseObservationDuration = caseFrameDuration * double(opts.NumFramesPerCase);
-fprintf(fid, 'config.Factories.Scenario.Global.NumFramesPerScenario = %d;\n', ...
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Mode = ''Fixed'';\n');
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Value = %d;\n', ...
     opts.NumFramesPerCase);
-fprintf(fid, 'config.Factories.Scenario.Global.FrameNumSamples = %d;\n', ...
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.FrameNumSamples.Mode = ''Fixed'';\n');
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.FrameNumSamples.Value = %d;\n', ...
     caseFrameSamples);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Types = {''%s''};\n', ...
     c.MapType);
@@ -790,9 +782,8 @@ end
 
 function annotationPath = localFindAnnotation(projectRoot, outputDirectory)
     % localFindAnnotation - Production declaration in CSRD.
-    % 中文说明：localFindAnnotation 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 caseRoot = fullfile(projectRoot, 'data', outputDirectory);
 sessions = dir(fullfile(caseRoot, 'session_*'));
 assert(~isempty(sessions), 'No session directory found in %s.', caseRoot);
@@ -807,9 +798,8 @@ end
 
 function coverage = localAssertCaseResult(result, c)
     % localAssertCaseResult - Production declaration in CSRD.
-    % 中文说明：localAssertCaseResult 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 coverage = localEmptyCoverage();
 assert(result.Summary.NumReceivers == c.RxCount, ...
     'Case %s expected %d receivers, got %d.', ...
@@ -898,9 +888,8 @@ end
 
 function localAssertRegulatoryDesign(design, c)
     % localAssertRegulatoryDesign - Production declaration in CSRD.
-    % 中文说明：localAssertRegulatoryDesign 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(isfield(design, 'Regulatory'), ...
     'Case %s missing Truth.Design.Regulatory.', c.Name);
 reg = design.Regulatory;
@@ -935,9 +924,8 @@ end
 
 function localAssertOsmExecution(execution, c)
     % localAssertOsmExecution - Validate OSM RayTracing execution truth.
-    % 中文说明：检查 OSM case 的 RayTracing、MapProfile 和 fallback 信息是否写入执行真值。
-    % Inputs / 输入: Truth.Execution struct and expected case descriptor.
-    % 输出 / Outputs: throws when execution metadata is inconsistent.
+    % Inputs: Truth.Execution struct and expected case descriptor.
+    % Outputs: throws when execution metadata is inconsistent.
 assert(isfield(execution, 'ChannelModel') && strcmp(char(execution.ChannelModel), 'RayTracing'), ...
     'Case %s OSM execution must report ChannelModel=RayTracing.', c.Name);
 assert(isfield(execution, 'MapProfile') && isstruct(execution.MapProfile), ...
@@ -968,9 +956,8 @@ end
 
 function method = localTxNonlinearityMethod(source)
     % localTxNonlinearityMethod - Production declaration in CSRD.
-    % 中文说明：localTxNonlinearityMethod 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 method = '';
 if isfield(source, 'RFImpairments') && isstruct(source.RFImpairments) && ...
         isfield(source.RFImpairments, 'NonlinearityConfig') && ...
@@ -983,9 +970,8 @@ end
 
 function method = localRxNonlinearityMethod(frame)
     % localRxNonlinearityMethod - Production declaration in CSRD.
-    % 中文说明：localRxNonlinearityMethod 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 method = '';
 if isfield(frame, 'RxImpairments') && isstruct(frame.RxImpairments) && ...
         isfield(frame.RxImpairments, 'MemoryLessNonlinearityConfig') && ...
@@ -998,9 +984,8 @@ end
 
 function localAssertCoverage(coverage, passed, opts)
     % localAssertCoverage - Production declaration in CSRD.
-    % 中文说明：localAssertCoverage 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(passed > 0, 'No selected Phase 13 cases passed.');
 assert(any(coverage.MapTypes == "Statistical"), ...
     'Coverage did not include statistical map cases.');
@@ -1032,9 +1017,8 @@ end
 
 function coverage = localEmptyCoverage()
     % localEmptyCoverage - Production declaration in CSRD.
-    % 中文说明：localEmptyCoverage 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 coverage = struct( ...
     'RegionIds', strings(0, 1), ...
     'Bands', strings(0, 1), ...
@@ -1053,9 +1037,8 @@ end
 
 function merged = localMergeCoverage(a, b)
     % localMergeCoverage - Production declaration in CSRD.
-    % 中文说明：localMergeCoverage 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 merged = a;
 names = fieldnames(a);
 for k = 1:numel(names)
@@ -1067,9 +1050,8 @@ end
 
 function types = localAllModulationTypes(configStruct)
     % localAllModulationTypes - Production declaration in CSRD.
-    % 中文说明：localAllModulationTypes 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 types = {};
 categories = {'digital', 'analog'};
 for c = 1:numel(categories)
@@ -1087,9 +1069,8 @@ end
 
 function order = localOrderForType(typeId)
     % localOrderForType - Production declaration in CSRD.
-    % 中文说明：localOrderForType 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 switch char(string(typeId))
     case {'APSK', 'DVBSAPSK', 'QAM', 'Mill88QAM', 'OFDM', 'OTFS', 'SCFDMA'}
         order = 16;
@@ -1105,9 +1086,8 @@ end
 
 function ratio = localBandwidthRatioForType(typeId)
     % localBandwidthRatioForType - Production declaration in CSRD.
-    % 中文说明：localBandwidthRatioForType 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 switch char(string(typeId))
     case {'OFDM', 'OTFS', 'SCFDMA'}
         ratio = 0.075;
@@ -1121,18 +1101,16 @@ end
 
 function n = localAntennaCountForType(typeId)
     % localAntennaCountForType - Production declaration in CSRD.
-    % 中文说明：localAntennaCountForType 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 n = localTxAntennasForModulationType(typeId, 1);
 end
 
 
 function n = localTxAntennasForRegulatoryBand(regionId, bandId, requestedCount)
     % localTxAntennasForRegulatoryBand - Choose a stable antenna count for a regulatory band.
-    % 中文说明：根据法规频段可能抽到的调制族，选择不会被调制器静默降级的发射天线数。
-    % Inputs / 输入: region id, band id, requested Tx antenna count.
-    % 输出 / Outputs: compatible Tx antenna count for the generated case.
+    % Inputs: region id, band id, requested Tx antenna count.
+    % Outputs: compatible Tx antenna count for the generated case.
 catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load(regionId);
 bands = catalog.Bands;
 idx = find(strcmpi({bands.BandId}, char(string(bandId))), 1, 'first');
@@ -1151,9 +1129,8 @@ end
 
 function n = localTxAntennasForModulationType(typeId, requestedCount)
     % localTxAntennasForModulationType - Respect requested antennas only for multi-Tx capable modulators.
-    % 中文说明：只有调制器支持多发射天线时才使用请求值，否则固定为 1，避免标注与信号不一致。
-    % Inputs / 输入: modulation type id and requested Tx antenna count.
-    % 输出 / Outputs: compatible Tx antenna count.
+    % Inputs: modulation type id and requested Tx antenna count.
+    % Outputs: compatible Tx antenna count.
 if localAllModulationFamiliesSupportMultiTx({char(string(typeId))})
     n = localClampTxAntennas(requestedCount);
 else
@@ -1164,9 +1141,8 @@ end
 
 function tf = localAllModulationFamiliesSupportMultiTx(families)
     % localAllModulationFamiliesSupportMultiTx - Detect families that can keep requested Tx antennas.
-    % 中文说明：判断允许集合中的每个调制族是否都能保持请求的多发射天线数量。
-    % Inputs / 输入: cell array or string array of modulation family names.
-    % 输出 / Outputs: true when random selection cannot pick a single-antenna-only family.
+    % Inputs: cell array or string array of modulation family names.
+    % Outputs: true when random selection cannot pick a single-antenna-only family.
 if isstring(families)
     families = cellstr(families);
 elseif ischar(families)
@@ -1180,18 +1156,16 @@ end
 
 function n = localClampTxAntennas(requestedCount)
     % localClampTxAntennas - Clamp requested Tx antennas to supported hardware range.
-    % 中文说明：将请求的发射天线数限制在当前调制/信道链路支持的 1 到 4 范围。
-    % Inputs / 输入: requested Tx antenna count.
-    % 输出 / Outputs: integer Tx antenna count.
+    % Inputs: requested Tx antenna count.
+    % Outputs: integer Tx antenna count.
 n = max(1, min(4, round(double(requestedCount))));
 end
 
 
 function path = localFindBuildingOsm(projectRoot)
     % localFindBuildingOsm - Production declaration in CSRD.
-    % 中文说明：localFindBuildingOsm 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 path = '';
 files = dir(fullfile(projectRoot, 'data', 'map', 'osm', ...
     'Dense_Urban_Mid_Rise', '*.osm'));
@@ -1203,9 +1177,8 @@ end
 
 function tf = localIsEnvironmentLimitation(ME)
     % localIsEnvironmentLimitation - Production declaration in CSRD.
-    % 中文说明：localIsEnvironmentLimitation 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 message = lower(ME.message);
 identifier = lower(ME.identifier);
 patterns = {'license', 'toolbox', 'siteviewer', 'txsite', ...
@@ -1216,9 +1189,8 @@ end
 
 function record = localEmptyRecord()
     % localEmptyRecord - Production declaration in CSRD.
-    % 中文说明：localEmptyRecord 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 record = struct( ...
     'Index', 0, ...
     'Name', "", ...
@@ -1237,9 +1209,8 @@ end
 function summary = localMakeSummary(configName, opts, cases, records, ...
     coverage, passed, skipped, failed, dryRun)
         % localMakeSummary - Production declaration in CSRD.
-        % 中文说明：localMakeSummary 在 CSRD 生产链路中执行对应处理。
-        % Inputs / 输入: see signature arguments and local validation.
-        % 输出 / Outputs: see signature return values and contract fields.
+        % Inputs: see signature arguments and local validation.
+        % Outputs: see signature return values and contract fields.
 summary = struct( ...
     'ConfigName', string(configName), ...
     'OutputDirectory', string(opts.OutputDirectory), ...
@@ -1257,9 +1228,8 @@ end
 function localWriteSummary(summaryRoot, configName, opts, cases, records, ...
     coverage, passed, skipped, failed, dryRun)
         % localWriteSummary - Production declaration in CSRD.
-        % 中文说明：localWriteSummary 在 CSRD 生产链路中执行对应处理。
-        % Inputs / 输入: see signature arguments and local validation.
-        % 输出 / Outputs: see signature return values and contract fields.
+        % Inputs: see signature arguments and local validation.
+        % Outputs: see signature return values and contract fields.
 if ~exist(summaryRoot, 'dir'); mkdir(summaryRoot); end
 summary = localMakeSummary(configName, opts, cases, records, coverage, ...
     passed, skipped, failed, dryRun);
@@ -1276,9 +1246,8 @@ end
 
 function safe = localSafeName(value)
     % localSafeName - Production declaration in CSRD.
-    % 中文说明：localSafeName 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 safe = regexprep(char(string(value)), '[^A-Za-z0-9_]', '_');
 safe = regexprep(safe, '_+', '_');
 safe = lower(safe);
@@ -1288,8 +1257,7 @@ end
 
 function escaped = localEscapeMatlabChar(value)
     % localEscapeMatlabChar - Production declaration in CSRD.
-    % 中文说明：localEscapeMatlabChar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 escaped = strrep(char(string(value)), '''', '''''');
 end
