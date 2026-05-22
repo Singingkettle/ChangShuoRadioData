@@ -1,6 +1,5 @@
 classdef FrameRuntimeContractTest < matlab.unittest.TestCase
     % FrameRuntimeContractTest - Phase 17 canonical frame/time contract.
-    % 中文说明：验证 FrameNumSamples 是唯一帧长权威，旧字段直接拒绝。
 
     methods (Test)
         function canonicalFrameNumSamplesResolves(testCase)

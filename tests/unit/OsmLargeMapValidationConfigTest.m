@@ -13,7 +13,9 @@ classdef OsmLargeMapValidationConfigTest < matlab.unittest.TestCase
 
             testCase.verifyEqual(cfg.Runner.NumScenarios, 1);
             testCase.verifyEqual( ...
-                cfg.Factories.Scenario.Global.NumFramesPerScenario, 1);
+                cfg.Factories.Scenario.FramePolicy.NumFramesPerScenario.Value, 1);
+            testCase.verifyEqual( ...
+                cfg.RuntimePlan.FramePolicy.NumFramesPerScenario.Value, 1);
             testCase.verifyNotEmpty(osmCfg.SpecificFile);
             testCase.verifyTrue(isfile(osmCfg.SpecificFile));
             testCase.verifyFalse(isfield(osmCfg, 'MaxFileSizeMB'));

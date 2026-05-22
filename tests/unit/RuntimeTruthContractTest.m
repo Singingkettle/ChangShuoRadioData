@@ -1,6 +1,5 @@
 classdef RuntimeTruthContractTest < matlab.unittest.TestCase
     % RuntimeTruthContractTest - Phase 18 runtime truth validator coverage.
-    % 中文说明：运行真值合同必须在配置加载后形成单一权威。
 
     methods (Test)
         function configLoaderStampsRuntimeTruthContract(testCase)

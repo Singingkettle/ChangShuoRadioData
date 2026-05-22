@@ -1,6 +1,5 @@
 function test_no_dead_code_phase20_default_runtime_contracts()
 %TEST_NO_DEAD_CODE_PHASE20_DEFAULT_RUNTIME_CONTRACTS Static guards for Phase 20.
-% 中文说明：禁止默认仿真链路重新引入连续整段 FrameWindow、时间步 fallback 和测量 skip。
 
 root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 

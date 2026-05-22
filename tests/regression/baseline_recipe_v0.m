@@ -58,7 +58,6 @@ function recipe = baseline_recipe_v0()
     %   downstream construction-layer consumers (S3 / S4), so the
     %   validator now accepts true multi-Rx blueprints.
     %
-    %   Per Owner §10 Q2 = (B) "保守恢复": the three Sub-3GHz cohorts
     %   (cohorts 1 / 2 / 3, 120 scenarios total) are restored to their
     %   design-time RxRange = [1, 2] so Phase 3 actually exercises the
     %   ReceiverViews projection in baseline. Cohorts 4 / 5 / 6 / 7

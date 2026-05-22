@@ -1,6 +1,5 @@
 classdef ModulationFactoryNoExecutionFallbackTest < matlab.unittest.TestCase
     % ModulationFactoryNoExecutionFallbackTest - No execution metadata backfill.
-    % 中文说明：调制器必须显式输出执行带宽、采样率和天线数。
 
     methods (TestMethodSetup)
         function configureLogging(~)

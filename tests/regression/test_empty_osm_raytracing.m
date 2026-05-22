@@ -30,10 +30,13 @@ function test_empty_osm_raytracing()
     fprintf('  [OK] OSM building detection.\n');
 
     masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
-    masterConfig.Log.Level = 'ERROR';
-    masterConfig.Log.SaveToFile = false;
-    masterConfig.Log.DisplayInConsole = false;
-    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
+    masterConfig.RuntimePlan.Logging.Policy = 'LargeMC';
+    masterConfig.RuntimePlan.Logging.FileEnabled = false;
+    masterConfig.RuntimePlan.Logging.ConsoleEnabled = false;
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.RuntimePlan.Logging);
+    scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+        masterConfig.RuntimePlan, masterConfig.Factories.Scenario, ...
+        struct('ScenarioId', 1, 'RandomSeed', masterConfig.Runner.RandomSeed));
 
     physConfig = masterConfig.Factories.Scenario.PhysicalEnvironment;
     physConfig.Environment.MapType = 'OSM';
@@ -48,7 +51,7 @@ function test_empty_osm_raytracing()
     physConfig.Entities.Transmitters.Count.Max = 1;
     physConfig.Entities.Receivers.Count.Min = 1;
     physConfig.Entities.Receivers.Count.Max = 1;
-    physConfig.TimeResolution = masterConfig.RuntimePlan.Frame.FrameDurationSec;
+    physConfig.TimeResolution = scenarioPlan.Frame.FrameDurationSec;
 
     simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physConfig);
     setup(simulator);

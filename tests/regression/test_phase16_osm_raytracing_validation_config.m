@@ -1,6 +1,5 @@
 function test_phase16_osm_raytracing_validation_config()
 %TEST_PHASE16_OSM_RAYTRACING_VALIDATION_CONFIG Validate Phase 16 config.
-% 中文说明：静态加载 Phase 16 正式配置，并 dry-run 覆盖矩阵构建，不生成正式数据。
 
 fprintf('=== Phase 16 OSM RayTracing Validation Config Test ===\n');
 

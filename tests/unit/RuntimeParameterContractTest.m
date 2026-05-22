@@ -1,6 +1,5 @@
 classdef RuntimeParameterContractTest < matlab.unittest.TestCase
     % RuntimeParameterContractTest - Config loader builds canonical runtime plan.
-    % 中文说明：配置加载后 raw config 只保留权威字段，派生事实进入 RuntimePlan。
 
     methods (Test)
         function defaultConfigUsesCanonicalFrameContract(testCase)

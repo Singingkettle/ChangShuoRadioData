@@ -1,11 +1,9 @@
 classdef OFDMMimoModeTest < matlab.unittest.TestCase
     % OFDMMimoModeTest - Verify explicit OFDM multi-antenna abstractions.
-    % 中文说明：验证 OFDM 多天线模式显式生效，避免把 OSTBC 与独立空间流混用。
 
     methods (Test)
         function spatialMultiplexingKeepsRequestedStreams(testCase)
             % spatialMultiplexingKeepsRequestedStreams - Use OFDM stream dimension directly.
-            % 中文说明：SpatialMultiplexing 应直接输出请求的发射流数量。
             modulator = localOFDM('SpatialMultiplexing', 4);
             cleanup = onCleanup(@() release(modulator)); %#ok<NASGU>
 
@@ -18,7 +16,6 @@ classdef OFDMMimoModeTest < matlab.unittest.TestCase
 
         function ostbcKeepsRequestedAntennaColumns(testCase)
             % ostbcKeepsRequestedAntennaColumns - Preserve historical OSTBC path.
-            % 中文说明：OSTBC 模式保留历史空时分集路径，并输出对应天线列。
             modulator = localOFDM('OSTBC', 2);
             cleanup = onCleanup(@() release(modulator)); %#ok<NASGU>
 
@@ -31,7 +28,6 @@ classdef OFDMMimoModeTest < matlab.unittest.TestCase
 
         function invalidModeFailsFast(testCase)
             % invalidModeFailsFast - Reject unknown OFDM spatial modes.
-            % 中文说明：未知 OFDM 多天线模式必须 fail-fast，不能静默回退。
             modulator = localOFDM('BadMode', 2);
             cleanup = onCleanup(@() release(modulator)); %#ok<NASGU>
 
@@ -44,7 +40,6 @@ end
 
 function modulator = localOFDM(mode, numTx)
     % localOFDM - Build a deterministic OFDM modulator fixture.
-    % 中文说明：构造确定性的 OFDM 调制器测试夹具。
     cfg = struct();
     cfg.base.mode = "qam";
     cfg.ofdm.FFTLength = 128;

@@ -1,6 +1,5 @@
 function test_no_dead_code_phase18_runtime_truth_contracts()
 %TEST_NO_DEAD_CODE_PHASE18_RUNTIME_TRUTH_CONTRACTS Phase 18 static gate.
-% 中文说明：禁止运行真值合同里的 warning 降级和 magic fallback 回潮。
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 

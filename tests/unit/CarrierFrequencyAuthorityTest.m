@@ -1,6 +1,5 @@
 classdef CarrierFrequencyAuthorityTest < matlab.unittest.TestCase
     % CarrierFrequencyAuthorityTest - Receiver RF plan owns carrier frequency.
-    % 中文说明：Channel LinkBudget 不能独立漂移出接收端真实载频。
 
     methods (Test)
         function linkBudgetCarrierFieldIsForbidden(testCase)

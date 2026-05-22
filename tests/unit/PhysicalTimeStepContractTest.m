@@ -1,6 +1,5 @@
 classdef PhysicalTimeStepContractTest < matlab.unittest.TestCase
     % PhysicalTimeStepContractTest
-    % 中文说明：物理移动步长必须等于 canonical frame duration。
 
     methods (Test)
 

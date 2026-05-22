@@ -3,13 +3,15 @@ classdef DerivedFieldsRejectedInRawConfigTest < matlab.unittest.TestCase
 
     methods (Test)
         function frameDerivedFieldsAreRejected(testCase)
-            fields = {'FrameDuration', 'ObservationDuration', 'TimeResolution'};
+            fields = {'FrameNumSamples', 'NumFramesPerScenario', ...
+                'FrameLength', 'FrameDuration', 'ObservationDuration', ...
+                'TimeResolution'};
             for idx = 1:numel(fields)
                 cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
                 cfg.Factories.Scenario.Global.(fields{idx}) = 1;
                 testCase.verifyError(@() ...
                     csrd.pipeline.runtime.buildRuntimePlan(cfg), ...
-                    ['CSRD:Frame:DeprecatedDerived' localSuffix(fields{idx})]);
+                    'CSRD:RuntimePlan:DeprecatedRawField');
             end
         end
 
@@ -40,17 +42,4 @@ classdef DerivedFieldsRejectedInRawConfigTest < matlab.unittest.TestCase
                 'CSRD:RuntimePlan:DeprecatedRawField');
         end
     end
-end
-
-function suffix = localSuffix(fieldName)
-switch fieldName
-    case 'FrameDuration'
-        suffix = 'FrameDuration';
-    case 'ObservationDuration'
-        suffix = 'ObservationDuration';
-    case 'TimeResolution'
-        suffix = 'TimeResolution';
-    otherwise
-        suffix = '';
-end
 end

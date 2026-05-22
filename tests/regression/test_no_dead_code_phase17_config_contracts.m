@@ -1,6 +1,5 @@
 function test_no_dead_code_phase17_config_contracts()
 %TEST_NO_DEAD_CODE_PHASE17_CONFIG_CONTRACTS Phase 17 static contract gate.
-% 中文说明：禁止运行期合同旧字段和静默 fallback 回到生产链路。
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 

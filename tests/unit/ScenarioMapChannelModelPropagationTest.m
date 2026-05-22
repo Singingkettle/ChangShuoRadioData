@@ -44,7 +44,10 @@ classdef ScenarioMapChannelModelPropagationTest < matlab.unittest.TestCase
             phys.Environment.OSMMapFile = emptyOsm;
             phys.Environment.ChannelModel = 'AWGN';
             runtimeCfg = csrd.test_support.buildRuntimePlanForTest(cfg);
-            phys.TimeResolution = runtimeCfg.RuntimePlan.Frame.FrameDurationSec;
+            scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+                runtimeCfg.RuntimePlan, runtimeCfg.Factories.Scenario, ...
+                struct('ScenarioId', 1, 'RandomSeed', runtimeCfg.Runner.RandomSeed));
+            phys.TimeResolution = scenarioPlan.Frame.FrameDurationSec;
 
             simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator( ...
                 'Config', phys);

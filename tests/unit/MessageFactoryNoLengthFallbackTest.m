@@ -1,6 +1,5 @@
 classdef MessageFactoryNoLengthFallbackTest < matlab.unittest.TestCase
     % MessageFactoryNoLengthFallbackTest - Reject implicit message timing defaults.
-    % 中文说明：消息长度与符号率必须由 segment 显式提供，不能使用默认 1024/100k。
 
     methods (TestMethodSetup)
         function configureLogging(~)

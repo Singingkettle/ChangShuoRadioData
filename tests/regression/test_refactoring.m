@@ -31,8 +31,7 @@ function test_refactoring()
     end
 
     % Initialize logging
-    masterConfig.Log.Level = 'INFO';
-    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.RuntimePlan.Logging);
 
     totalPassed = 0;
     totalFailed = 0;

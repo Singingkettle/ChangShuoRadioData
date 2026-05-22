@@ -6,7 +6,7 @@ classdef Phase21DefaultPerformanceSmokeTest < matlab.unittest.TestCase
         function defaultConfigUsesProductionPerformancePolicy(testCase)
             cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 
-            testCase.verifyEqual(cfg.Runner.Log.Policy, 'LargeMC');
+            testCase.verifyEqual(cfg.RuntimePlan.Logging.Policy, 'LargeMC');
             testCase.verifyFalse(logical(cfg.Runner.Data.PrettyPrintAnnotations));
             testCase.verifyTrue(isfield(cfg.Runner, 'Performance'));
             testCase.verifyFalse(logical(cfg.Runner.Performance.EnableStageTiming), ...

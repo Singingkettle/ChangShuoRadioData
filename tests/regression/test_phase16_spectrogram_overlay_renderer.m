@@ -1,6 +1,5 @@
 function test_phase16_spectrogram_overlay_renderer()
 %TEST_PHASE16_SPECTROGRAM_OVERLAY_RENDERER Smoke-test visual GT overlays.
-% 中文说明：用小型 IQ/annotation fixture 验证频谱图渲染与时频真值框越界检查。
 
 fprintf('=== Phase 16 Spectrogram Overlay Renderer Test ===\n');
 

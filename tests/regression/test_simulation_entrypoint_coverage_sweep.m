@@ -274,14 +274,17 @@ fprintf(fid, 'config.Runner.Toolbox.Level = ''minimal'';\n');
 fprintf(fid, 'config.Runner.Data.OutputDirectory = fullfile(''..'', ''artifacts'', ''tests'', ''runs'', ''simulation_entrypoint_coverage'', ''%s'', ''%s'');\n', ...
     mode, localSafeName(c.Name));
 fprintf(fid, 'config.Runner.Data.CompressData = false;\n');
-fprintf(fid, 'config.Log.Name = ''CSRD-SimEntryCoverage'';\n');
-fprintf(fid, 'config.Log.Level = ''ERROR'';\n');
-fprintf(fid, 'config.Log.SaveToFile = true;\n');
-fprintf(fid, 'config.Log.DisplayInConsole = false;\n\n');
+fprintf(fid, 'config.Logging.Name = ''CSRD-SimEntryCoverage'';\n');
+fprintf(fid, 'config.Logging.Policy = ''LargeMC'';\n');
+fprintf(fid, 'config.Logging.File.Enabled = true;\n');
+fprintf(fid, 'config.Logging.Console.Enabled = false;\n');
+fprintf(fid, 'config.Logging.Progress.Mode = ''Summary'';\n\n');
 
 frameSamples = round(0.0015 * c.SampleRateHz);
-fprintf(fid, 'config.Factories.Scenario.Global.NumFramesPerScenario = 1;\n');
-fprintf(fid, 'config.Factories.Scenario.Global.FrameNumSamples = %d;\n', ...
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Mode = ''Fixed'';\n');
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Value = 1;\n');
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.FrameNumSamples.Mode = ''Fixed'';\n');
+fprintf(fid, 'config.Factories.Scenario.FramePolicy.FrameNumSamples.Value = %d;\n', ...
     frameSamples);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Types = {''%s''};\n', c.MapType);
 fprintf(fid, 'config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1.0;\n');

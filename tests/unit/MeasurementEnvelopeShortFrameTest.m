@@ -1,6 +1,5 @@
 classdef MeasurementEnvelopeShortFrameTest < matlab.unittest.TestCase
     % MeasurementEnvelopeShortFrameTest
-    % 中文说明：短帧默认测量窗口自适应，显式过大窗口仍硬失败。
 
     methods (Test)
 

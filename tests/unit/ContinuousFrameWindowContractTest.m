@@ -1,6 +1,5 @@
 classdef ContinuousFrameWindowContractTest < matlab.unittest.TestCase
     % ContinuousFrameWindowContractTest
-    % 中文说明：验证 Continuous 发射也必须使用当前帧时间窗，而不是整段 ObservationDuration。
 
     methods (Test)
 

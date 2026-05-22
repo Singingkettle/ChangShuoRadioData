@@ -1,6 +1,5 @@
 classdef AntennaAuthorityContractTest < matlab.unittest.TestCase
     % AntennaAuthorityContractTest - Tx antenna count is planner-owned.
-    % 中文说明：执行层不得用调制器输出回写 TxInfo 天线数量。
 
     methods (Test)
         function productionTransmitterPathDoesNotApplySegmentAntennaRewrite(testCase)

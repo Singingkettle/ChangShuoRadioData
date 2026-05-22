@@ -1,6 +1,5 @@
 classdef RayTracingGeometryCacheToleranceTest < matlab.unittest.TestCase
     %RAYTRACINGGEOMETRYCACHETOLERANCETEST Guard RayTracing long-tail cache policy.
-    % 中文说明：确保 RayTracing 几何缓存容差是显式配置和输出合同，而不是隐式近似。
 
     methods (Test)
 

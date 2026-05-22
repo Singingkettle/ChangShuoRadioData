@@ -1,6 +1,5 @@
 function test_no_dead_code_phase15_architecture()
 %TEST_NO_DEAD_CODE_PHASE15_ARCHITECTURE Guard the post-utils package layout.
-% 中文说明：防止生产代码重新引入已清理的 csrd.utils 命名空间或目录。
 
 fprintf('=== Phase 15 architecture cleanup gate ===\n');
 
@@ -34,7 +33,6 @@ end
 
 function src = readMatlabSource(roots)
 % readMatlabSource - Concatenate MATLAB source under selected production roots.
-% 中文说明：拼接生产目录下的 MATLAB 文件，用于静态架构门禁。
 src = '';
 for r = 1:numel(roots)
     if ~isfolder(roots{r})
@@ -51,7 +49,6 @@ end
 
 function code = stripComments(src)
 % stripComments - Remove MATLAB line comments without touching strings.
-% 中文说明：移除 MATLAB 行注释，避免注释中的历史路径影响架构门禁。
 lines = regexp(src, '\r?\n', 'split');
 code = '';
 for k = 1:numel(lines)

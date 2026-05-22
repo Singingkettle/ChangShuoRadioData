@@ -8,10 +8,10 @@ function test_entity_snapshot_consistency()
     csrd.runtime.logger.GlobalLogManager.reset();
 
     masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
-    masterConfig.Log.Level = 'ERROR';
-    masterConfig.Log.SaveToFile = false;
-    masterConfig.Log.DisplayInConsole = false;
-    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
+    masterConfig.RuntimePlan.Logging.Policy = 'LargeMC';
+    masterConfig.RuntimePlan.Logging.FileEnabled = false;
+    masterConfig.RuntimePlan.Logging.ConsoleEnabled = false;
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.RuntimePlan.Logging);
 
     scenarioConfig = masterConfig.Factories.Scenario;
     scenarioConfig = csrd.test_support.applyCanonicalFrameContract( ...
