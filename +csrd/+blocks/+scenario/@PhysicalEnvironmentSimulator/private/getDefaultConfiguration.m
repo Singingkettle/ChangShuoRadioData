@@ -21,10 +21,10 @@ function config = getDefaultConfiguration(obj)
     % on the Entities subtree so assignMobilityModel never has to fall
     % back to a random selection. The values mirror the canonical layout
     % defined in config/_base_/factories/scenario_factory.m.
-    config.Entities.Transmitters.Mobility.Model = 'RandomWalk';
+    config.Entities.Transmitters.Mobility.Model = 'ConstantVelocity';
     config.Entities.Receivers.Mobility.Model = 'Stationary';
 
-    config.Mobility.DefaultModel = 'RandomWalk';
+    config.Mobility.DefaultModel = 'ConstantVelocity';
     config.Mobility.EnableCollisionAvoidance = true;
 
     % Environment configuration

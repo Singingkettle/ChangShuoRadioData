@@ -197,6 +197,10 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         releaseImpl(obj)
     end
 
+    methods
+        [entities, environment] = planInitialState(obj)
+    end
+
     methods (Access = private)
         % Entity lifecycle methods
         entities = initializeEntities(obj, frameId)

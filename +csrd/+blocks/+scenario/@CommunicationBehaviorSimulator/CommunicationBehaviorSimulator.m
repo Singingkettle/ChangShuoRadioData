@@ -154,6 +154,10 @@ classdef CommunicationBehaviorSimulator < matlab.System
         [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities)
     end
 
+    methods
+        [txConfigs, rxConfigs, globalLayout, entities] = planScenario(obj, entities)
+    end
+
     methods (Static, Hidden)
         function rvs = projectReceiverViews(txSpectrum, rxConfigs, fallbackObservableRange)
             % projectReceiverViews - Phase 3 ReceiverView projection algorithm

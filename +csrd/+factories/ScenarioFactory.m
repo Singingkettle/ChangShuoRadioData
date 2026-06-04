@@ -59,10 +59,9 @@ classdef ScenarioFactory < matlab.System
         % Initialization flag
         isSimulatorsInitialized logical = false
 
-        % Phase 33 scenario construction plan. Built once before the
-        % first receiver frame of each scenario, then treated as frozen.
+        % Scenario construction plan. Built once before the first receiver
+        % frame of each scenario, then treated as frozen.
         currentScenarioPlan struct = struct()
-        plannedFrameOne struct = struct()
     end
 
     methods
@@ -157,14 +156,6 @@ classdef ScenarioFactory < matlab.System
             % cell + struct('Error', ...) result. Errors now propagate
             % fail-fast (Q-extra C-1).
 
-            if frameId == 1 && isfield(obj.plannedFrameOne, 'FrameId') && ...
-                    obj.plannedFrameOne.FrameId == 1
-                instantiatedTxs = obj.plannedFrameOne.Transmitters;
-                instantiatedRxs = obj.plannedFrameOne.Receivers;
-                globalLayout = obj.plannedFrameOne.Layout;
-                return;
-            end
-
             obj.ensureScenarioPlanStarted();
 
             if ~obj.isSimulatorsInitialized
@@ -201,15 +192,15 @@ classdef ScenarioFactory < matlab.System
                     break;
                 end
 
-                if frameId ~= 1
+                if frameId ~= 1 || localScenarioPlanIsFrozen(obj.currentScenarioPlan)
                     rejectCode = '<unknown>';
                     if ~isempty(lastReport.FailedChecks)
                         rejectCode = lastReport.FailedChecks(1).Code;
                     end
                     error('CSRD:Blueprint:Unsamplable', ...
-                        ['Frame %d (mid-scenario) failed feasibility check ''%s''. ', ...
-                         'Mid-scenario blueprints cannot be resampled because ', ...
-                         'scenario-level configurations are frozen at frame 1.'], ...
+                        ['Frame %d failed feasibility check ''%s''. ', ...
+                         'Frame execution cannot resample scenario-level ', ...
+                         'facts because ScenarioPlan is already frozen.'], ...
                         frameId, rejectCode);
                 end
 
@@ -287,7 +278,6 @@ classdef ScenarioFactory < matlab.System
             obj.selectedOSMCandidateCount = NaN;
             obj.currentScenarioConfig = struct();
             obj.currentScenarioPlan = struct();
-            obj.plannedFrameOne = struct();
 
             % Release cached blocks
             blockKeys = keys(obj.cachedScenarioBlocks);
@@ -333,7 +323,6 @@ classdef ScenarioFactory < matlab.System
             obj.selectedOSMCandidateCount = NaN;
             obj.currentScenarioConfig = struct();
             obj.currentScenarioPlan = struct();
-            obj.plannedFrameOne = struct();
         end
 
         function initializeSimulators(obj)
@@ -829,7 +818,11 @@ classdef ScenarioFactory < matlab.System
             plan = obj.currentScenarioPlan;
             plan.Map = localScenarioPlanMap(environment, ...
                 obj.selectedOSMSelectionPolicy, obj.selectedOSMFileSizeMB);
-            plan.Entities = struct('Initial', entities);
+            plan.GeometryPolicy = struct( ...
+                'Evaluation', 'SegmentMidpoint', ...
+                'Source', 'ScenarioPlan');
+            plan.Entities = struct( ...
+                'Initial', localNormalizeInitialEntitiesAtZero(entities));
             plan.Receivers = rxConfigs;
             plan.Transmitters = txConfigs;
             plan.Communication = localScenarioPlanCommunication( ...
@@ -935,20 +928,69 @@ classdef ScenarioFactory < matlab.System
         % tests cover the full stepImpl path end-to-end.
         function scenarioPlan = planScenario(obj, scenarioId)
             %PLANSCENARIO Build and freeze a scenario construction plan.
-            % Inputs: see function signature and validation.
-            % Outputs: see return values and contract fields.
             obj.ensureFactoryConfigReady();
             if nargin < 2 || isempty(scenarioId)
                 runtime = localGetScenarioRuntime(obj.factoryConfig);
                 scenarioId = localRuntimePositiveInteger(runtime, 'ScenarioId', 1);
             end
             obj.ensureScenarioPlanStarted(scenarioId);
-            [txConfigs, rxConfigs, layout] = step(obj, 1);
-            obj.plannedFrameOne = struct( ...
-                'FrameId', 1, ...
-                'Transmitters', {txConfigs}, ...
-                'Receivers', {rxConfigs}, ...
-                'Layout', layout);
+
+            if ~obj.isSimulatorsInitialized
+                obj.initializeSimulators();
+                obj.isSimulatorsInitialized = true;
+            end
+
+            [entities, environment] = obj.physicalEnvironmentSimulator.planInitialState();
+            [maxResamples, validatorEnabled] = obj.getValidatorConfig();
+
+            attempt = 0;
+            lastReport = localDisabledValidationReport();
+            while true
+                attempt = attempt + 1;
+                [txConfigs, rxConfigs, layout, entities] = ...
+                    obj.communicationBehaviorSimulator.planScenario(entities);
+                layout.FrameId = 1;
+                layout.Environment = environment;
+                layout.Entities = entities;
+
+                if validatorEnabled
+                    blueprint = obj.assembleBlueprint(1, txConfigs, ...
+                        rxConfigs, layout, environment);
+                    lastReport = csrd.pipeline.blueprint ...
+                        .BlueprintFeasibilityValidator.validate(blueprint);
+                end
+
+                if ~validatorEnabled || lastReport.IsFeasible
+                    break;
+                end
+
+                if attempt >= maxResamples
+                    rejectCode = localFirstFailedCheckCode(lastReport);
+                    error('CSRD:Blueprint:Unsamplable', ...
+                        ['Scenario plan: %d communication resample attempts ', ...
+                         'exhausted. Last failed check: ''%s''.'], ...
+                        attempt, rejectCode);
+                end
+
+                rejectCode = localFirstFailedCheckCode(lastReport);
+                obj.logger.debug(['Scenario plan attempt %d rejected by ', ...
+                    '''%s''; resampling communication plan.'], ...
+                    attempt, rejectCode);
+                release(obj.communicationBehaviorSimulator);
+                setup(obj.communicationBehaviorSimulator);
+            end
+
+            layout.BlueprintHash = lastReport.BlueprintHash;
+            layout.ValidationReport = lastReport;
+            layout.NumBlueprintAttempts = attempt;
+            obj.enrichScenarioPlan(entities, environment, txConfigs, ...
+                rxConfigs, layout);
+            obj.currentScenarioPlan.ValidationReport = lastReport;
+            obj.currentScenarioPlan.NumBlueprintAttempts = attempt;
+
+            obj.LastValidationReport = lastReport;
+            obj.LastBlueprintResamples = max(0, attempt - 1);
+            obj.LastBlueprintHash = lastReport.BlueprintHash;
             scenarioPlan = obj.currentScenarioPlan;
         end
 
@@ -1083,6 +1125,32 @@ if isstruct(typedConfig) && isfield(typedConfig, 'ChannelModel') && ...
 end
 end
 
+function report = localDisabledValidationReport()
+%LOCALDISABLEDVALIDATIONREPORT Blueprint validator report for disabled mode.
+report = struct('IsFeasible', true, 'BlueprintHash', '', ...
+    'NumChecksRun', 0, 'NumChecksPassed', 0, 'NumChecksFailed', 0, ...
+    'FailedChecks', csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
+    'WarnChecks', csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
+    'Provenance', struct('ValidatorVersion', 'disabled', 'Timestamp', ''));
+end
+
+function code = localFirstFailedCheckCode(report)
+%LOCALFIRSTFAILEDCHECKCODE Return a readable validator failure code.
+code = '<unknown>';
+if isstruct(report) && isfield(report, 'FailedChecks') && ...
+        ~isempty(report.FailedChecks) && ...
+        isfield(report.FailedChecks(1), 'Code') && ...
+        ~isempty(report.FailedChecks(1).Code)
+    code = char(string(report.FailedChecks(1).Code));
+end
+end
+
+function tf = localScenarioPlanIsFrozen(plan)
+%LOCALSCENARIOPLANISFROZEN True after scenario-level facts are sealed.
+tf = isstruct(plan) && isfield(plan, 'DatasetAccounting') && ...
+    isfield(plan, 'Communication') && isfield(plan, 'Entities');
+end
+
 function globalConfig = localBlueprintGlobal(factoryConfig, scenarioPlan)
 %LOCALBLUEPRINTGLOBAL Build blueprint global facts from ScenarioPlan.
 % Inputs: see function signature and validation.
@@ -1123,7 +1191,9 @@ mapPlan = struct( ...
     'OSMFile', '', ...
     'ChannelModel', '', ...
     'SelectionPolicy', '', ...
-    'OSMFileSizeMB', NaN);
+    'OSMFileSizeMB', NaN, ...
+    'MapProfile', struct(), ...
+    'Boundaries', []);
 if isstruct(environment)
     if isfield(environment, 'MapType')
         mapPlan.SelectedType = environment.MapType;
@@ -1134,9 +1204,46 @@ if isstruct(environment)
     if isfield(environment, 'ChannelModel')
         mapPlan.ChannelModel = environment.ChannelModel;
     end
+    if isfield(environment, 'MapProfile') && isstruct(environment.MapProfile)
+        mapPlan.MapProfile = environment.MapProfile;
+        if isfield(environment.MapProfile, 'Boundaries')
+            mapPlan.Boundaries = environment.MapProfile.Boundaries;
+        end
+    end
+    if isempty(mapPlan.Boundaries) && isfield(environment, 'Map') && ...
+            isstruct(environment.Map) && ...
+            isfield(environment.Map, 'MapProfile') && ...
+            isstruct(environment.Map.MapProfile)
+        mapPlan.MapProfile = environment.Map.MapProfile;
+        if isfield(environment.Map.MapProfile, 'Boundaries')
+            mapPlan.Boundaries = environment.Map.MapProfile.Boundaries;
+        end
+    end
+    if isempty(mapPlan.Boundaries) && isfield(environment, 'MapBoundaries')
+        mapPlan.Boundaries = environment.MapBoundaries;
+    end
 end
 mapPlan.SelectionPolicy = selectionPolicy;
 mapPlan.OSMFileSizeMB = osmFileSizeMB;
+end
+
+function entities = localNormalizeInitialEntitiesAtZero(entities)
+%LOCALNORMALIZEINITIALENTITIESATZERO Stamp ScenarioPlan entity base time.
+for idx = 1:numel(entities)
+    entities(idx).CreationTime = 0;
+    entities(idx).LastUpdateTime = 0;
+    if isfield(entities(idx), 'StateHistory')
+        entities(idx).StateHistory = [];
+    end
+    if isfield(entities(idx), 'Snapshots') && iscell(entities(idx).Snapshots) && ...
+            ~isempty(entities(idx).Snapshots)
+        if isempty(entities(idx).Snapshots{1})
+            continue;
+        end
+        entities(idx).Snapshots{1}.Timestamp = 0;
+        entities(idx).Snapshots{1}.FrameId = 1;
+    end
+end
 end
 
 function commPlan = localScenarioPlanCommunication(txConfigs, globalLayout)

@@ -5,9 +5,10 @@ function initializeMobilityModels(obj)
     %
     % Note: These classes need to be implemented separately
 
-    obj.mobilityModels('RandomWalk') = []; % Placeholder
-    obj.mobilityModels('Waypoint') = []; % Placeholder
-    obj.mobilityModels('Stationary') = []; % Placeholder
+    obj.mobilityModels('ConstantVelocity') = [];
+    obj.mobilityModels('RandomWalk') = []; % Unsupported by midpoint evaluator.
+    obj.mobilityModels('Waypoint') = []; % Unsupported by midpoint evaluator.
+    obj.mobilityModels('Stationary') = [];
 
     obj.logger.debug('Initialized %d mobility models', obj.mobilityModels.Count);
 end

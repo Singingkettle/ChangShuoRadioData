@@ -41,7 +41,7 @@ function entity = createEntity(obj, entityType, entityID, frameId)
     entity.ID = entityID;
     entity.Type = entityType;
     entity.CreationFrameId = frameId;
-    entity.CreationTime = frameId * obj.timeResolution;
+    entity.CreationTime = (frameId - 1) * obj.timeResolution;
 
     snapshotCapacity = resolveSnapshotCapacity(obj, frameId);
     entity.Snapshots = cell(1, snapshotCapacity);
@@ -79,7 +79,7 @@ function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
 
     snapshot = struct();
     snapshot.FrameId = frameId;
-    snapshot.Timestamp = frameId * obj.timeResolution;
+    snapshot.Timestamp = (frameId - 1) * obj.timeResolution;
     snapshot.EntityID = entityID;
     snapshot.EntityType = entityType;
 
@@ -119,14 +119,21 @@ function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
             class(bounds), numel(bounds));
     end
 
+    entityConfig = resolveEntityConfig(obj, entityType);
+    mobilityModel = csrd.blocks.scenario.PhysicalEnvironmentSimulator ...
+        .assignMobilityModel(entityType, entityConfig);
     cohortMaxSpeed = resolveCohortMaxSpeed(obj, entityType);
     maxSpeed = getMaxSpeedForEntityType(obj, entityType, ...
         'CohortMaxSpeedMps', cohortMaxSpeed);
-    snapshot.Physical.Velocity = [
-        randomInRange(obj, -maxSpeed, maxSpeed), ...
-        randomInRange(obj, -maxSpeed, maxSpeed), ...
-        0 ...
-    ];
+    if strcmpi(mobilityModel, 'Stationary')
+        snapshot.Physical.Velocity = [0, 0, 0];
+    else
+        snapshot.Physical.Velocity = [
+            randomInRange(obj, -maxSpeed, maxSpeed), ...
+            randomInRange(obj, -maxSpeed, maxSpeed), ...
+            0 ...
+        ];
+    end
 
     snapshot.Physical.Orientation = [
         randi([-180, 180]), ...
@@ -203,6 +210,16 @@ function cohortMax = resolveCohortMaxSpeed(obj, entityType)
             && isnumeric(entityConfig.Mobility.MaxSpeedMps) ...
             && isscalar(entityConfig.Mobility.MaxSpeedMps)
         cohortMax = double(entityConfig.Mobility.MaxSpeedMps);
+        return;
+    end
+    if isstruct(entityConfig) && isfield(entityConfig, 'Mobility') ...
+            && isstruct(entityConfig.Mobility) ...
+            && isfield(entityConfig.Mobility, 'MaxSpeed') ...
+            && isstruct(entityConfig.Mobility.MaxSpeed) ...
+            && isfield(entityConfig.Mobility.MaxSpeed, 'Max') ...
+            && isnumeric(entityConfig.Mobility.MaxSpeed.Max) ...
+            && isscalar(entityConfig.Mobility.MaxSpeed.Max)
+        cohortMax = double(entityConfig.Mobility.MaxSpeed.Max);
         return;
     end
     if isstruct(entityConfig) && isfield(entityConfig, 'MobilityModel') ...

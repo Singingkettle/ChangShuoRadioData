@@ -19,7 +19,7 @@ function entities = updateEntityStates(obj, frameId, timeResolution, previousSta
     end
 
     prevEntities = previousState.entities;
-    currentTime = frameId * timeResolution;
+    currentTime = (frameId - 1) * timeResolution;
 
     % Use cell array to avoid struct field mismatch issues
     entityCell = cell(1, length(prevEntities));

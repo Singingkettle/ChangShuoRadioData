@@ -25,9 +25,11 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
             isfield(obj.ScenarioConfig, 'Layout')
         scenarioMapProfile = getMapProfileFromLayout(obj.ScenarioConfig.Layout);
     end
+    useMidpointGeometry = localUseSegmentMidpointGeometry(obj.ScenarioConfig);
     if isstruct(scenarioMapProfile) && ...
             isfield(scenarioMapProfile, 'ChannelModel') && ...
             strcmpi(char(string(scenarioMapProfile.ChannelModel)), 'RayTracing') && ...
+            ~useMidpointGeometry && ...
             ismethod(obj.Factories.Channel, 'precomputeRayTracingFrame')
         activeTxInfos = localActiveTxInfosForChannelPrecompute( ...
             txsSignalSegments, TxInfos);
@@ -87,9 +89,19 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     localAssertSegmentAntennaColumns( ...
                         segmentSignal, txInfo, rxInfo, FrameId, segIdx);
 
+                    txInfoForLink = txInfo;
+                    rxInfoForLink = rxInfo;
+                    linkGeometry = struct();
+                    if useMidpointGeometry
+                        [txInfoForLink, rxInfoForLink, linkGeometry] = ...
+                            localResolveSegmentMidpointGeometry( ...
+                                obj.ScenarioConfig.ScenarioPlan, ...
+                                segmentSignal, txInfo, rxInfo, FrameId, segIdx);
+                    end
+
                     channelInputStruct = segmentSignal;
-                    channelInputStruct.TxInfo = txInfo;
-                    channelInputStruct.RxInfo = rxInfo;
+                    channelInputStruct.TxInfo = txInfoForLink;
+                    channelInputStruct.RxInfo = rxInfoForLink;
 
                     if iscell(obj.ScenarioConfig.Transmitters)
                         txScenarioConfig = obj.ScenarioConfig.Transmitters{txIdx};
@@ -112,6 +124,14 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     channelLinkInfo.RxScenarioConfig = rxScenarioConfig;
                     channelLinkInfo.MapProfile = scenarioMapProfile;
                     channelLinkInfo.ChannelModel = resolveChannelModelFromScenario(channelLinkInfo.MapProfile);
+                    if ~isempty(fieldnames(linkGeometry))
+                        channelLinkInfo.GeometryEvaluationTimeSec = ...
+                            linkGeometry.EvaluationTimeSec;
+                        channelLinkInfo.GeometryEvaluationPolicy = ...
+                            linkGeometry.EvaluationPolicy;
+                        channelLinkInfo.TxGeometry = linkGeometry.Tx;
+                        channelLinkInfo.RxGeometry = linkGeometry.Rx;
+                    end
                     if isfield(segmentSignal, 'BurstId') && ~isempty(segmentSignal.BurstId)
                         channelLinkInfo.BurstId = segmentSignal.BurstId;
                     else
@@ -123,7 +143,7 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
 
                     % Apply channel effects using ChannelFactory
                     channelOutput = step(obj.Factories.Channel, channelInputStruct, ...
-                        FrameId, txInfo, rxInfo, channelLinkInfo);
+                        FrameId, txInfoForLink, rxInfoForLink, channelLinkInfo);
 
                     component = struct();
                     component.TxID = txInfo.ID;
@@ -160,6 +180,9 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                             FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
                     end
                     component.Planned = segmentSignal.Planned;
+                    if ~isempty(fieldnames(linkGeometry))
+                        component.Planned.GeometrySnapshot = linkGeometry;
+                    end
 
                     % Phase 4 (audit §17.6 / H12 / A5): apply physical
                     % Doppler shift `f_d = v_radial * f_c / c` after the
@@ -173,7 +196,7 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     % causes us to skip to avoid double-shifting.
                     [component.Signal, component.DopplerShiftHz, ...
                      component.RadialVelocityMps] = applyDopplerForComponent( ...
-                        channelOutput, txInfo, rxInfo);
+                        channelOutput, txInfoForLink, rxInfoForLink);
                     component.ChannelOutputWasEmptyBeforeGating = ...
                         isfield(channelOutput, 'Signal') && isempty(channelOutput.Signal);
                     component = csrd.pipeline.signal.gateToDuration( ...
@@ -275,21 +298,32 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     end
 
                     % Attach spatial and link budget info for annotation
-                    if isfield(txInfo, 'Position')
-                        component.TxPosition = txInfo.Position;
+                    if isfield(txInfoForLink, 'Position')
+                        component.TxPosition = txInfoForLink.Position;
                     end
-                    if isfield(txInfo, 'Velocity')
-                        component.TxVelocity = txInfo.Velocity;
+                    if isfield(txInfoForLink, 'Velocity')
+                        component.TxVelocity = txInfoForLink.Velocity;
                     else
-                        component.TxVelocity = [0, 0, 0];
+                        error('CSRD:Construction:MissingTxVelocity', ...
+                            'Frame %d, TxID %s: Tx velocity is required for channel geometry.', ...
+                            FrameId, string(txInfo.ID));
                     end
-                    if isfield(rxInfo, 'Position')
-                        component.RxPosition = rxInfo.Position;
+                    if isfield(rxInfoForLink, 'Position')
+                        component.RxPosition = rxInfoForLink.Position;
                     end
-                    if isfield(rxInfo, 'Velocity')
-                        component.RxVelocity = rxInfo.Velocity;
+                    if isfield(rxInfoForLink, 'Velocity')
+                        component.RxVelocity = rxInfoForLink.Velocity;
                     else
-                        component.RxVelocity = [0, 0, 0];
+                        error('CSRD:Construction:MissingRxVelocity', ...
+                            'Frame %d, RxID %s: Rx velocity is required for channel geometry.', ...
+                            FrameId, string(rxInfo.ID));
+                    end
+                    if ~isempty(fieldnames(linkGeometry))
+                        component.GeometryEvaluationTimeSec = ...
+                            linkGeometry.EvaluationTimeSec;
+                        component.GeometryEvaluationPolicy = ...
+                            linkGeometry.EvaluationPolicy;
+                        component.GeometrySnapshot = linkGeometry;
                     end
                     if isfield(channelOutput, 'LinkDistance')
                         component.LinkDistance = channelOutput.LinkDistance;
@@ -338,6 +372,82 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
     end
 
     obj.logger.debug("Frame %d: Channel propagation complete.", FrameId);
+end
+
+function tf = localUseSegmentMidpointGeometry(scenarioConfig)
+%LOCALUSESEGMENTMIDPOINTGEOMETRY Check the frozen scenario geometry policy.
+tf = false;
+if ~isstruct(scenarioConfig) || ~isfield(scenarioConfig, 'ScenarioPlan') || ...
+        ~isstruct(scenarioConfig.ScenarioPlan) || ...
+        ~isfield(scenarioConfig.ScenarioPlan, 'GeometryPolicy') || ...
+        ~isstruct(scenarioConfig.ScenarioPlan.GeometryPolicy) || ...
+        ~isfield(scenarioConfig.ScenarioPlan.GeometryPolicy, 'Evaluation')
+    return;
+end
+tf = strcmpi(char(string( ...
+    scenarioConfig.ScenarioPlan.GeometryPolicy.Evaluation)), ...
+    'SegmentMidpoint');
+end
+
+function [txInfoOut, rxInfoOut, geometry] = localResolveSegmentMidpointGeometry( ...
+        scenarioPlan, segmentSignal, txInfo, rxInfo, frameId, segIdx)
+%LOCALRESOLVESEGMENTMIDPOINTGEOMETRY Evaluate Tx/Rx states at segment midpoint.
+if ~isstruct(scenarioPlan)
+    error('CSRD:ScenarioPlan:MissingScenarioPlan', ...
+        'Frame %d, Segment %d: ScenarioPlan is required for midpoint geometry.', ...
+        frameId, segIdx);
+end
+evaluationTimeSec = localSegmentEvaluationTime(segmentSignal, frameId, segIdx);
+txState = csrd.pipeline.scenario.evaluateEntityState( ...
+    scenarioPlan, txInfo.ID, evaluationTimeSec);
+rxState = csrd.pipeline.scenario.evaluateEntityState( ...
+    scenarioPlan, rxInfo.ID, evaluationTimeSec);
+
+txInfoOut = localApplyEntityStateToInfo(txInfo, txState);
+rxInfoOut = localApplyEntityStateToInfo(rxInfo, rxState);
+
+geometry = struct( ...
+    'EvaluationTimeSec', evaluationTimeSec, ...
+    'EvaluationPolicy', 'SegmentMidpoint', ...
+    'Tx', txState, ...
+    'Rx', rxState);
+end
+
+function evaluationTimeSec = localSegmentEvaluationTime(segmentSignal, frameId, segIdx)
+%LOCALSEGMENTEVALUATIONTIME Resolve absolute scenario time for geometry.
+if isstruct(segmentSignal) && isfield(segmentSignal, 'GeometryEvaluationTimeSec') && ...
+        isnumeric(segmentSignal.GeometryEvaluationTimeSec) && ...
+        isscalar(segmentSignal.GeometryEvaluationTimeSec) && ...
+        isfinite(segmentSignal.GeometryEvaluationTimeSec)
+    evaluationTimeSec = double(segmentSignal.GeometryEvaluationTimeSec);
+    return;
+end
+if isstruct(segmentSignal) && isfield(segmentSignal, 'StartTime') && ...
+        isfield(segmentSignal, 'EndTime') && ...
+        isnumeric(segmentSignal.StartTime) && isnumeric(segmentSignal.EndTime) && ...
+        isscalar(segmentSignal.StartTime) && isscalar(segmentSignal.EndTime) && ...
+        isfinite(segmentSignal.StartTime) && isfinite(segmentSignal.EndTime)
+    evaluationTimeSec = (double(segmentSignal.StartTime) + ...
+        double(segmentSignal.EndTime)) / 2;
+    return;
+end
+error('CSRD:ScenarioPlan:MissingSegmentMidpoint', ...
+    ['Frame %d, Segment %d: segmentSignal must carry ', ...
+     'GeometryEvaluationTimeSec or finite StartTime/EndTime.'], ...
+    frameId, segIdx);
+end
+
+function infoOut = localApplyEntityStateToInfo(infoIn, entityState)
+%LOCALAPPLYENTITYSTATETOINFO Stamp evaluated geometry onto link info.
+infoOut = infoIn;
+infoOut.Position = entityState.PositionM;
+infoOut.PositionUnit = 'meters';
+infoOut.Velocity = entityState.VelocityMps;
+if isfield(entityState, 'GeoPositionDeg') && ~isempty(entityState.GeoPositionDeg)
+    infoOut.GeoPositionDeg = entityState.GeoPositionDeg;
+end
+infoOut.GeometryEvaluationTimeSec = entityState.EvaluationTimeSec;
+infoOut.GeometryEvaluationPolicy = entityState.EvaluationPolicy;
 end
 
 function durationSec = localComponentDurationSec(segmentSignal)

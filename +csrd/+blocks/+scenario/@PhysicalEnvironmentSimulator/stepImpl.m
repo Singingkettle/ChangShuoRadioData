@@ -14,6 +14,14 @@ function [entities, environment] = stepImpl(obj, frameId)
 
     obj.logger.debug('Frame %d: Updating physical environment (dt=%.9g)', frameId, obj.timeResolution);
 
+    if frameId == 1 && isKey(obj.frameHistory, frameId)
+        frameState = obj.frameHistory(frameId);
+        entities = frameState.entities;
+        environment = frameState.environment;
+        obj.logger.debug('Frame 1: Reusing planned t=0 physical state.');
+        return;
+    end
+
     % Get previous state from internal history
     previousState = getPreviousState(obj, frameId);
 
@@ -39,7 +47,7 @@ function [entities, environment] = stepImpl(obj, frameId)
     frameState.entities = entities;
     frameState.environment = environment;
     frameState.timeResolution = obj.timeResolution;
-    frameState.timestamp = frameId * obj.timeResolution;
+    frameState.timestamp = (frameId - 1) * obj.timeResolution;
     obj.frameHistory(frameId) = frameState;
 
     % Store in state history for scenario replay functionality

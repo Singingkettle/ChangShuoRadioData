@@ -34,11 +34,9 @@ function [activeIntervalIndices, activeIntervals, frameWindow] = ...
 %   bursts that started after frameStart but inside the same frame.
 %
 %   Frame timing resolution mirrors checkTransmissionInterval:
-%     1. pattern.FrameDuration                                (preferred)
+%     1. pattern.FrameDuration
 %     2. pattern.ObservationDuration / pattern.NumFrames
-%   When neither is available the function returns no overlaps and
-%   issues a CSRD:Scenario:MissingFrameTiming warning, identical to the
-%   legacy helper. There is intentionally no magic-number fallback.
+%   Missing timing or out-of-range frames are planner errors and fail fast.
 
     activeIntervalIndices = [];
     activeIntervals = zeros(0, 2);
@@ -59,16 +57,15 @@ function [activeIntervalIndices, activeIntervals, frameWindow] = ...
     end
 
     if isempty(frameDuration)
-        warning('CSRD:Scenario:MissingFrameTiming', ...
+        error('CSRD:Scenario:MissingFrameTiming', ...
             ['findOverlappingTransmissionIntervals could not derive frame duration. ', ...
              'Provide pattern.FrameDuration or both pattern.NumFrames and ', ...
              'pattern.ObservationDuration.']);
-        return;
     end
 
     if isfield(pattern, 'NumFrames') && ~isempty(pattern.NumFrames) && pattern.NumFrames > 0 && ...
             (frameId < 1 || frameId > pattern.NumFrames)
-        warning('CSRD:Scenario:FrameOutOfRange', ...
+        error('CSRD:Scenario:FrameOutOfRange', ...
             'frameId %d is outside [1, %d] for this temporal pattern.', frameId, pattern.NumFrames);
     end
 

@@ -101,7 +101,7 @@ function config = scenario_factory()
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Height.Max = 100;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.InitialDistribution = 'Random';
     
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.Model = 'RandomWalk';
+    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.Model = 'ConstantVelocity';
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.MaxSpeed.Min = 0;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.MaxSpeed.Max = 30;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.AccelerationRange = [-2, 2];

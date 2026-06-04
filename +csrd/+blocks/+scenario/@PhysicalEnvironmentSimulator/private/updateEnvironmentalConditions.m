@@ -8,7 +8,7 @@ function environment = updateEnvironmentalConditions(obj, frameId, timeResolutio
 
     environment = obj.currentEnvironment;
     environment.FrameId = frameId;
-    environment.Time = frameId * timeResolution;
+    environment.Time = (frameId - 1) * timeResolution;
 
     % Update weather conditions (simple model)
     if isfield(obj.Config, 'Environment') && isfield(obj.Config.Environment, 'Weather')

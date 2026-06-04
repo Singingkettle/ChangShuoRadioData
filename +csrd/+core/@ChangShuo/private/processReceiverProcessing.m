@@ -40,6 +40,7 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             % Combine all signal components at this receiver
             combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo);
             frameShape = combinedSignal.FrameShape;
+            framePlan = localFramePlanForAnnotation(obj, FrameId);
 
             % Apply receiver processing using ReceiveFactory
             % Handle both cell array and struct array formats
@@ -87,6 +88,7 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             FrameAnnotation{rxIdx}.ObservableRange = rxInfo.ObservableRange;
             FrameAnnotation{rxIdx}.FrameLengthSamples = frameShape.NumSamples;
             FrameAnnotation{rxIdx}.FrameDurationSec = frameShape.DurationSec;
+            FrameAnnotation{rxIdx}.FramePlan = framePlan;
             if isfield(obj.ScenarioConfig, 'ScenarioPlan') && ...
                     isstruct(obj.ScenarioConfig.ScenarioPlan)
                 FrameAnnotation{rxIdx}.ScenarioPlan = struct( ...
@@ -137,6 +139,15 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
     end
 
     obj.logger.debug("Frame %d: All receiver processing complete.", FrameId);
+end
+
+function framePlan = localFramePlanForAnnotation(obj, frameId)
+%LOCALFRAMEPLANFORANNOTATION Build the header frame plan from ScenarioPlan.
+if isempty(obj.ScenarioPlan) || ~isstruct(obj.ScenarioPlan)
+    error('CSRD:ScenarioPlan:MissingScenarioPlan', ...
+        'ScenarioPlan is required to stamp FramePlan into annotation.');
+end
+framePlan = csrd.pipeline.runtime.buildFramePlan(obj.ScenarioPlan, frameId);
 end
 
 function sourceInfo = buildSourceAnnotation(comp, isolatedSignal, ...
@@ -226,6 +237,20 @@ function design = buildDesignTruth(comp)
     design.StartTimeSec = getFieldOrDefault(plannedSrc, 'StartTimeSec', NaN);
     design.EndTimeSec = getFieldOrDefault(plannedSrc, 'EndTimeSec', NaN);
     design.DurationSec = getFieldOrDefault(plannedSrc, 'DurationSec', NaN);
+    design.ScenarioStartTimeSec = getFieldOrDefault(plannedSrc, ...
+        'ScenarioStartTimeSec', NaN);
+    design.ScenarioEndTimeSec = getFieldOrDefault(plannedSrc, ...
+        'ScenarioEndTimeSec', NaN);
+    design.GeometryEvaluationTimeSec = getFieldOrDefault(plannedSrc, ...
+        'GeometryEvaluationTimeSec', NaN);
+    design.GeometryEvaluationPolicy = getFieldOrEmpty(plannedSrc, ...
+        'GeometryEvaluationPolicy', '');
+    if isfield(plannedSrc, 'GeometrySnapshot') && ...
+            isstruct(plannedSrc.GeometrySnapshot)
+        design.GeometrySnapshot = plannedSrc.GeometrySnapshot;
+    else
+        design.GeometrySnapshot = struct();
+    end
     design.ModulationFamily  = getFieldOrEmpty(plannedSrc, 'ModulationFamily', '');
     design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
     design.ModulationSpatialMode = getFieldOrEmpty(plannedSrc, 'ModulationSpatialMode', '');
@@ -299,6 +324,13 @@ function execution = buildExecutionTruth(comp)
     geom.TxVelocityMps = getFieldOrDefault(comp, 'TxVelocity', [NaN, NaN, NaN]);
     geom.RxPositionM   = getFieldOrDefault(comp, 'RxPosition', [NaN, NaN, NaN]);
     geom.RxVelocityMps = getFieldOrDefault(comp, 'RxVelocity', [NaN, NaN, NaN]);
+    geom.EvaluationTimeSec = getFieldOrDefault(comp, ...
+        'GeometryEvaluationTimeSec', NaN);
+    geom.EvaluationPolicy = getFieldOrEmpty(comp, ...
+        'GeometryEvaluationPolicy', '');
+    if isfield(comp, 'GeometrySnapshot') && isstruct(comp.GeometrySnapshot)
+        geom.SegmentMidpoint = comp.GeometrySnapshot;
+    end
     geom.LinkDistanceM = getFieldOrDefault(comp, 'LinkDistance', NaN);
     execution.GeometrySnapshot = geom;
     validateExecutionSampleGrid(execution, comp);
@@ -627,7 +659,7 @@ function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
         'NumSamples', frameSamples, ...
         'DurationSec', frameSamples / sampleRate, ...
         'SampleRate', sampleRate, ...
-        'Source', contract.Source);
+        'Source', getFieldOrEmpty(contract, 'Source', 'ScenarioPlan.Frame'));
 end
 
 function localAssertFrameWindowMatchesPlan(frameWindow, frameSamples, sampleRate)
