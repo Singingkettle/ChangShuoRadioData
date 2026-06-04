@@ -1,8 +1,8 @@
-classdef ScenarioPlanFrozenBeforeFrameExecutionTest < matlab.unittest.TestCase
-    %SCENARIOPLANFROZENBEFOREFRAMEEXECUTIONTEST Scenario facts do not resample mid-loop.
+classdef ScenarioPlanInitialStateAtZeroTest < matlab.unittest.TestCase
+    %SCENARIOPLANINITIALSTATEATZEROTEST ScenarioPlan entities start at t=0.
 
     methods (Test)
-        function frameLoopReusesFrozenScenarioPlan(testCase)
+        function initialEntitiesAreStampedAtZero(testCase)
             cfg = localFixedStatisticalConfig();
             factory = csrd.factories.ScenarioFactory( ...
                 'Config', cfg.Factories.Scenario, ...
@@ -10,23 +10,11 @@ classdef ScenarioPlanFrozenBeforeFrameExecutionTest < matlab.unittest.TestCase
             cleanupObj = onCleanup(@() localRelease(factory)); %#ok<NASGU>
 
             scenarioPlan = factory.planScenario(1);
-            [~, ~, layout1] = step(factory, 1);
-            [~, ~, layout2] = step(factory, 2);
+            times = localInitialEntityTimes(scenarioPlan.Entities.Initial);
 
-            testCase.verifyEqual(layout1.ScenarioPlan.Frame, scenarioPlan.Frame);
-            testCase.verifyEqual(layout2.ScenarioPlan.Frame, scenarioPlan.Frame);
-            testCase.verifyEqual(layout1.ScenarioPlan.Map, scenarioPlan.Map);
-            testCase.verifyEqual(layout2.ScenarioPlan.Map, scenarioPlan.Map);
-            testCase.verifyEqual(layout1.ScenarioPlan.Communication, ...
-                scenarioPlan.Communication);
-            testCase.verifyEqual(layout2.ScenarioPlan.Communication, ...
-                scenarioPlan.Communication);
-            testCase.verifyEqual(numel(layout1.ScenarioPlan.Transmitters), ...
-                numel(scenarioPlan.Transmitters));
-            testCase.verifyEqual(numel(layout2.ScenarioPlan.Receivers), ...
-                numel(scenarioPlan.Receivers));
-            testCase.verifyEqual(layout2.ScenarioPlan.Frame.FrameNumSamples, 1024);
-            testCase.verifyEqual(layout2.ScenarioPlan.Frame.NumFramesPerScenario, 2);
+            testCase.verifyEqual(times.CreationTime, zeros(size(times.CreationTime)));
+            testCase.verifyEqual(times.LastUpdateTime, zeros(size(times.LastUpdateTime)));
+            testCase.verifyEqual(times.SnapshotTime, zeros(size(times.SnapshotTime)));
         end
     end
 end
@@ -47,6 +35,13 @@ cfg.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Mobility.Model = .
 cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
 cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = 1;
 cfg = csrd.pipeline.runtime.buildRuntimePlan(cfg);
+end
+
+function times = localInitialEntityTimes(entities)
+times = struct();
+times.CreationTime = arrayfun(@(e) double(e.CreationTime), entities);
+times.LastUpdateTime = arrayfun(@(e) double(e.LastUpdateTime), entities);
+times.SnapshotTime = arrayfun(@(e) double(e.Snapshots{1}.Timestamp), entities);
 end
 
 function localRelease(obj)

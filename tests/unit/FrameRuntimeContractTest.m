@@ -1,83 +1,57 @@
 classdef FrameRuntimeContractTest < matlab.unittest.TestCase
-    % FrameRuntimeContractTest - Phase 17 canonical frame/time contract.
+    %FRAMERUNTIMECONTRACTTEST ScenarioPlan owns resolved frame facts.
 
     methods (Test)
-        function canonicalFrameNumSamplesResolves(testCase)
-            fc = localFactoryConfigs(1024, 10, 50e6);
-            c = csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct());
+        function fixedFramePolicyResolvesInScenarioPlan(testCase)
+            cfg = localFixedFrameConfig(1024, 10, 50e6);
 
-            testCase.verifyEqual(c.FrameNumSamples, 1024);
-            testCase.verifyEqual(c.NumFramesPerScenario, 10);
-            testCase.verifyEqual(c.FrameDurationSec, 1024 / 50e6, ...
-                'AbsTol', 1e-15);
-            testCase.verifyEqual(c.ObservationDurationSec, ...
-                10 * 1024 / 50e6, 'AbsTol', 1e-15);
-            testCase.verifyEqual(c.Source, ...
-                'Factories.Scenario.Global.FrameNumSamples');
+            plan = csrd.pipeline.runtime.buildScenarioPlan( ...
+                cfg.RuntimePlan, cfg.Factories.Scenario, ...
+                struct('ScenarioId', 2, 'RandomSeed', 7));
+
+            testCase.verifyEqual(plan.Frame.FrameNumSamples, 1024);
+            testCase.verifyEqual(plan.Frame.NumFramesPerScenario, 10);
+            testCase.verifyEqual(plan.Frame.FrameDurationSec, 1024 / 50e6, ...
+                AbsTol=1e-15);
+            testCase.verifyEqual(plan.Frame.ObservationDurationSec, ...
+                10 * 1024 / 50e6, AbsTol=1e-15);
+            testCase.verifyEqual(plan.Frame.Source, 'ScenarioPlan.Frame');
         end
 
         function legacyGlobalFrameLengthFailsFast(testCase)
-            fc = localFactoryConfigs(1024, 1, 50e6);
-            fc.Scenario.Global = rmfield(fc.Scenario.Global, 'FrameNumSamples');
-            fc.Scenario.Global.FrameLength = 1024;
+            cfg = localFixedFrameConfig(1024, 1, 50e6);
+            cfg.Factories.Scenario.Global = struct('FrameLength', 1024);
 
             testCase.verifyError(@() ...
-                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct()), ...
-                'CSRD:Frame:DeprecatedFrameLengthAlias');
-        end
-
-        function frameDurationCannotInferFrameSamples(testCase)
-            fc = localFactoryConfigs(1024, 1, 50e6);
-            fc.Scenario.Global = rmfield(fc.Scenario.Global, 'FrameNumSamples');
-
-            testCase.verifyError(@() ...
-                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct()), ...
-                'CSRD:Frame:MissingFrameNumSamples');
+                csrd.pipeline.runtime.buildRuntimePlan(cfg), ...
+                'CSRD:RuntimePlan:DeprecatedRawField');
         end
 
         function runnerFixedFrameLengthFailsFast(testCase)
-            fc = localFactoryConfigs(1024, 1, 50e6);
-            runner = struct('FixedFrameLength', 1024);
+            cfg = localFixedFrameConfig(1024, 1, 50e6);
+            cfg.Runner.FixedFrameLength = 1024;
 
             testCase.verifyError(@() ...
-                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, runner), ...
-                'CSRD:Frame:DeprecatedRunnerFixedFrameLength');
+                csrd.pipeline.runtime.buildRuntimePlan(cfg), ...
+                'CSRD:RuntimePlan:DeprecatedRawField');
         end
 
-        function derivedObservationDurationFailsFast(testCase)
-            fc = localFactoryConfigs(1024, 10, 50e6);
-            fc.Scenario.Global.ObservationDuration = 1.0;
+        function derivedGlobalFrameDurationFailsFast(testCase)
+            cfg = localFixedFrameConfig(1024, 1, 50e6);
+            cfg.Factories.Scenario.Global = struct( ...
+                'FrameDuration', 1024 / 50e6);
 
             testCase.verifyError(@() ...
-                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct()), ...
-                'CSRD:Frame:DeprecatedDerivedObservationDuration');
-        end
-
-        function derivedFrameDurationFailsFast(testCase)
-            fc = localFactoryConfigs(1024, 10, 50e6);
-            fc.Scenario.Global.FrameDuration = 1024 / 50e6;
-
-            testCase.verifyError(@() ...
-                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct()), ...
-                'CSRD:Frame:DeprecatedDerivedFrameDuration');
-        end
-
-        function frameWindowMustMatchCanonicalFrame(testCase)
-            fc = localFactoryConfigs(1024, 1, 50e6);
-            badWindow = [0, 2048 / 50e6];
-
-            testCase.verifyError(@() ...
-                csrd.pipeline.runtime.resolveFrameRuntimeContract(fc, struct(), ...
-                'FrameWindow', badWindow), ...
-                'CSRD:Frame:InconsistentFrameSamples');
+                csrd.pipeline.runtime.buildRuntimePlan(cfg), ...
+                'CSRD:RuntimePlan:DeprecatedRawField');
         end
     end
 end
 
-function fc = localFactoryConfigs(frameSamples, numFrames, sampleRate)
-fc = struct();
-fc.Scenario.Global = struct( ...
-    'FrameNumSamples', frameSamples, ...
-    'NumFramesPerScenario', numFrames);
-fc.Scenario.CommunicationBehavior.Receiver.SampleRate = sampleRate;
+function cfg = localFixedFrameConfig(frameSamples, numFrames, sampleRate)
+cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
+cfg = csrd.test_support.applyCanonicalFrameContract( ...
+    cfg, numFrames * frameSamples / sampleRate, numFrames);
+cfg.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate = sampleRate;
+cfg = csrd.pipeline.runtime.buildRuntimePlan(cfg);
 end

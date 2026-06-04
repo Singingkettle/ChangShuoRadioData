@@ -13,8 +13,9 @@ classdef RuntimeTruthContractTest < matlab.unittest.TestCase
                 cfg.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate);
             testCase.verifyEqual(truth.Receiver.RealCarrierFrequencyHz, ...
                 cfg.Factories.Scenario.CommunicationBehavior.Receiver.RealCarrierFrequency);
-            testCase.verifyEqual(truth.Frame.FrameNumSamples, ...
-                cfg.Factories.Scenario.Global.FrameNumSamples);
+            testCase.verifyTrue(isfield(cfg.Metadata.RuntimeContracts, ...
+                'FramePolicy'));
+            testCase.verifyFalse(isfield(truth, 'Frame'));
         end
 
         function deprecatedLinkBudgetCarrierFailsAtRuntimeContractBoundary(testCase)

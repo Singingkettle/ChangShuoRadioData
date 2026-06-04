@@ -114,9 +114,9 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
             testCase.verifyEqual(size(intervals), [0, 2]);
         end
 
-        function missingFrameTimingWarns(testCase)
+        function missingFrameTimingFailsFast(testCase)
             pattern = struct('Intervals', [0, 1]);
-            testCase.verifyWarning(@() ...
+            testCase.verifyError(@() ...
                 csrd.pipeline.scenario.findOverlappingTransmissionIntervals(1, pattern), ...
                 'CSRD:Scenario:MissingFrameTiming');
         end
