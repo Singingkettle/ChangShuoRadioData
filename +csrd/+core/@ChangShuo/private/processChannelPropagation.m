@@ -1,8 +1,7 @@
 function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalSegments, TxInfos, RxInfos)
     % processChannelPropagation - Apply channel effects to transmitted signals
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processChannelPropagation 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method processes all transmitter-receiver pairs through the channel model.
     %
@@ -26,12 +25,23 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
             isfield(obj.ScenarioConfig, 'Layout')
         scenarioMapProfile = getMapProfileFromLayout(obj.ScenarioConfig.Layout);
     end
+    useMidpointGeometry = localUseSegmentMidpointGeometry(obj.ScenarioConfig);
     if isstruct(scenarioMapProfile) && ...
             isfield(scenarioMapProfile, 'ChannelModel') && ...
             strcmpi(char(string(scenarioMapProfile.ChannelModel)), 'RayTracing') && ...
+            ~useMidpointGeometry && ...
             ismethod(obj.Factories.Channel, 'precomputeRayTracingFrame')
-        obj.Factories.Channel.precomputeRayTracingFrame( ...
-            FrameId, TxInfos, RxInfos, scenarioMapProfile, obj.ScenarioConfig);
+        activeTxInfos = localActiveTxInfosForChannelPrecompute( ...
+            txsSignalSegments, TxInfos);
+        activeRxInfos = localActiveRxInfosForChannelPrecompute(RxInfos);
+        if isempty(activeTxInfos) || isempty(activeRxInfos)
+            obj.logger.debug(['Frame %d: skipped RayTracing precompute ', ...
+                'because no live Tx/Rx links exist.'], FrameId);
+        else
+            obj.Factories.Channel.precomputeRayTracingFrame( ...
+                FrameId, activeTxInfos, activeRxInfos, scenarioMapProfile, ...
+                obj.ScenarioConfig);
+        end
     end
 
     % Initialize received signals structure for each receiver
@@ -79,9 +89,19 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     localAssertSegmentAntennaColumns( ...
                         segmentSignal, txInfo, rxInfo, FrameId, segIdx);
 
+                    txInfoForLink = txInfo;
+                    rxInfoForLink = rxInfo;
+                    linkGeometry = struct();
+                    if useMidpointGeometry
+                        [txInfoForLink, rxInfoForLink, linkGeometry] = ...
+                            localResolveSegmentMidpointGeometry( ...
+                                obj.ScenarioConfig.ScenarioPlan, ...
+                                segmentSignal, txInfo, rxInfo, FrameId, segIdx);
+                    end
+
                     channelInputStruct = segmentSignal;
-                    channelInputStruct.TxInfo = txInfo;
-                    channelInputStruct.RxInfo = rxInfo;
+                    channelInputStruct.TxInfo = txInfoForLink;
+                    channelInputStruct.RxInfo = rxInfoForLink;
 
                     if iscell(obj.ScenarioConfig.Transmitters)
                         txScenarioConfig = obj.ScenarioConfig.Transmitters{txIdx};
@@ -104,6 +124,14 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     channelLinkInfo.RxScenarioConfig = rxScenarioConfig;
                     channelLinkInfo.MapProfile = scenarioMapProfile;
                     channelLinkInfo.ChannelModel = resolveChannelModelFromScenario(channelLinkInfo.MapProfile);
+                    if ~isempty(fieldnames(linkGeometry))
+                        channelLinkInfo.GeometryEvaluationTimeSec = ...
+                            linkGeometry.EvaluationTimeSec;
+                        channelLinkInfo.GeometryEvaluationPolicy = ...
+                            linkGeometry.EvaluationPolicy;
+                        channelLinkInfo.TxGeometry = linkGeometry.Tx;
+                        channelLinkInfo.RxGeometry = linkGeometry.Rx;
+                    end
                     if isfield(segmentSignal, 'BurstId') && ~isempty(segmentSignal.BurstId)
                         channelLinkInfo.BurstId = segmentSignal.BurstId;
                     else
@@ -115,7 +143,7 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
 
                     % Apply channel effects using ChannelFactory
                     channelOutput = step(obj.Factories.Channel, channelInputStruct, ...
-                        FrameId, txInfo, rxInfo, channelLinkInfo);
+                        FrameId, txInfoForLink, rxInfoForLink, channelLinkInfo);
 
                     component = struct();
                     component.TxID = txInfo.ID;
@@ -152,6 +180,9 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                             FrameId, string(txInfo.ID), string(rxInfo.ID), segIdx);
                     end
                     component.Planned = segmentSignal.Planned;
+                    if ~isempty(fieldnames(linkGeometry))
+                        component.Planned.GeometrySnapshot = linkGeometry;
+                    end
 
                     % Phase 4 (audit §17.6 / H12 / A5): apply physical
                     % Doppler shift `f_d = v_radial * f_c / c` after the
@@ -165,7 +196,7 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     % causes us to skip to avoid double-shifting.
                     [component.Signal, component.DopplerShiftHz, ...
                      component.RadialVelocityMps] = applyDopplerForComponent( ...
-                        channelOutput, txInfo, rxInfo);
+                        channelOutput, txInfoForLink, rxInfoForLink);
                     component.ChannelOutputWasEmptyBeforeGating = ...
                         isfield(channelOutput, 'Signal') && isempty(channelOutput.Signal);
                     component = csrd.pipeline.signal.gateToDuration( ...
@@ -267,21 +298,32 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                     end
 
                     % Attach spatial and link budget info for annotation
-                    if isfield(txInfo, 'Position')
-                        component.TxPosition = txInfo.Position;
+                    if isfield(txInfoForLink, 'Position')
+                        component.TxPosition = txInfoForLink.Position;
                     end
-                    if isfield(txInfo, 'Velocity')
-                        component.TxVelocity = txInfo.Velocity;
+                    if isfield(txInfoForLink, 'Velocity')
+                        component.TxVelocity = txInfoForLink.Velocity;
                     else
-                        component.TxVelocity = [0, 0, 0];
+                        error('CSRD:Construction:MissingTxVelocity', ...
+                            'Frame %d, TxID %s: Tx velocity is required for channel geometry.', ...
+                            FrameId, string(txInfo.ID));
                     end
-                    if isfield(rxInfo, 'Position')
-                        component.RxPosition = rxInfo.Position;
+                    if isfield(rxInfoForLink, 'Position')
+                        component.RxPosition = rxInfoForLink.Position;
                     end
-                    if isfield(rxInfo, 'Velocity')
-                        component.RxVelocity = rxInfo.Velocity;
+                    if isfield(rxInfoForLink, 'Velocity')
+                        component.RxVelocity = rxInfoForLink.Velocity;
                     else
-                        component.RxVelocity = [0, 0, 0];
+                        error('CSRD:Construction:MissingRxVelocity', ...
+                            'Frame %d, RxID %s: Rx velocity is required for channel geometry.', ...
+                            FrameId, string(rxInfo.ID));
+                    end
+                    if ~isempty(fieldnames(linkGeometry))
+                        component.GeometryEvaluationTimeSec = ...
+                            linkGeometry.EvaluationTimeSec;
+                        component.GeometryEvaluationPolicy = ...
+                            linkGeometry.EvaluationPolicy;
+                        component.GeometrySnapshot = linkGeometry;
                     end
                     if isfield(channelOutput, 'LinkDistance')
                         component.LinkDistance = channelOutput.LinkDistance;
@@ -332,7 +374,86 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
     obj.logger.debug("Frame %d: Channel propagation complete.", FrameId);
 end
 
+function tf = localUseSegmentMidpointGeometry(scenarioConfig)
+%LOCALUSESEGMENTMIDPOINTGEOMETRY Check the frozen scenario geometry policy.
+tf = false;
+if ~isstruct(scenarioConfig) || ~isfield(scenarioConfig, 'ScenarioPlan') || ...
+        ~isstruct(scenarioConfig.ScenarioPlan) || ...
+        ~isfield(scenarioConfig.ScenarioPlan, 'GeometryPolicy') || ...
+        ~isstruct(scenarioConfig.ScenarioPlan.GeometryPolicy) || ...
+        ~isfield(scenarioConfig.ScenarioPlan.GeometryPolicy, 'Evaluation')
+    return;
+end
+tf = strcmpi(char(string( ...
+    scenarioConfig.ScenarioPlan.GeometryPolicy.Evaluation)), ...
+    'SegmentMidpoint');
+end
+
+function [txInfoOut, rxInfoOut, geometry] = localResolveSegmentMidpointGeometry( ...
+        scenarioPlan, segmentSignal, txInfo, rxInfo, frameId, segIdx)
+%LOCALRESOLVESEGMENTMIDPOINTGEOMETRY Evaluate Tx/Rx states at segment midpoint.
+if ~isstruct(scenarioPlan)
+    error('CSRD:ScenarioPlan:MissingScenarioPlan', ...
+        'Frame %d, Segment %d: ScenarioPlan is required for midpoint geometry.', ...
+        frameId, segIdx);
+end
+evaluationTimeSec = localSegmentEvaluationTime(segmentSignal, frameId, segIdx);
+txState = csrd.pipeline.scenario.evaluateEntityState( ...
+    scenarioPlan, txInfo.ID, evaluationTimeSec);
+rxState = csrd.pipeline.scenario.evaluateEntityState( ...
+    scenarioPlan, rxInfo.ID, evaluationTimeSec);
+
+txInfoOut = localApplyEntityStateToInfo(txInfo, txState);
+rxInfoOut = localApplyEntityStateToInfo(rxInfo, rxState);
+
+geometry = struct( ...
+    'EvaluationTimeSec', evaluationTimeSec, ...
+    'EvaluationPolicy', 'SegmentMidpoint', ...
+    'Tx', txState, ...
+    'Rx', rxState);
+end
+
+function evaluationTimeSec = localSegmentEvaluationTime(segmentSignal, frameId, segIdx)
+%LOCALSEGMENTEVALUATIONTIME Resolve absolute scenario time for geometry.
+if isstruct(segmentSignal) && isfield(segmentSignal, 'GeometryEvaluationTimeSec') && ...
+        isnumeric(segmentSignal.GeometryEvaluationTimeSec) && ...
+        isscalar(segmentSignal.GeometryEvaluationTimeSec) && ...
+        isfinite(segmentSignal.GeometryEvaluationTimeSec)
+    evaluationTimeSec = double(segmentSignal.GeometryEvaluationTimeSec);
+    return;
+end
+if isstruct(segmentSignal) && isfield(segmentSignal, 'StartTime') && ...
+        isfield(segmentSignal, 'EndTime') && ...
+        isnumeric(segmentSignal.StartTime) && isnumeric(segmentSignal.EndTime) && ...
+        isscalar(segmentSignal.StartTime) && isscalar(segmentSignal.EndTime) && ...
+        isfinite(segmentSignal.StartTime) && isfinite(segmentSignal.EndTime)
+    evaluationTimeSec = (double(segmentSignal.StartTime) + ...
+        double(segmentSignal.EndTime)) / 2;
+    return;
+end
+error('CSRD:ScenarioPlan:MissingSegmentMidpoint', ...
+    ['Frame %d, Segment %d: segmentSignal must carry ', ...
+     'GeometryEvaluationTimeSec or finite StartTime/EndTime.'], ...
+    frameId, segIdx);
+end
+
+function infoOut = localApplyEntityStateToInfo(infoIn, entityState)
+%LOCALAPPLYENTITYSTATETOINFO Stamp evaluated geometry onto link info.
+infoOut = infoIn;
+infoOut.Position = entityState.PositionM;
+infoOut.PositionUnit = 'meters';
+infoOut.Velocity = entityState.VelocityMps;
+if isfield(entityState, 'GeoPositionDeg') && ~isempty(entityState.GeoPositionDeg)
+    infoOut.GeoPositionDeg = entityState.GeoPositionDeg;
+end
+infoOut.GeometryEvaluationTimeSec = entityState.EvaluationTimeSec;
+infoOut.GeometryEvaluationPolicy = entityState.EvaluationPolicy;
+end
+
 function durationSec = localComponentDurationSec(segmentSignal)
+    % localComponentDurationSec - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isfield(segmentSignal, 'FrameRelativeStartTime') && ...
             isfield(segmentSignal, 'FrameRelativeEndTime') && ...
             ~isempty(segmentSignal.FrameRelativeStartTime) && ...
@@ -352,6 +473,9 @@ function durationSec = localComponentDurationSec(segmentSignal)
 end
 
 function localAssertSegmentAntennaColumns(segmentSignal, txInfo, rxInfo, frameId, segIdx)
+    % localAssertSegmentAntennaColumns - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     signalData = segmentSignal.Signal;
     if isempty(signalData)
         return;
@@ -377,6 +501,9 @@ function localAssertSegmentAntennaColumns(segmentSignal, txInfo, rxInfo, frameId
 end
 
 function expectedColumns = localResolveTxAntennaColumns(segmentSignal, txInfo)
+    % localResolveTxAntennaColumns - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     expectedColumns = [];
     if isstruct(segmentSignal) && isfield(segmentSignal, 'NumTransmitAntennas') && ...
             isnumeric(segmentSignal.NumTransmitAntennas) && ...
@@ -398,6 +525,9 @@ function expectedColumns = localResolveTxAntennaColumns(segmentSignal, txInfo)
 end
 
 function idText = localIdText(infoStruct, fallbackPrefix)
+    % localIdText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isstruct(infoStruct) && isfield(infoStruct, 'ID') && ~isempty(infoStruct.ID)
         idText = char(string(infoStruct.ID));
     else
@@ -407,9 +537,8 @@ end
 
 function mapProfile = getMapProfileFromLayout(layout)
     % getMapProfileFromLayout - Production declaration in CSRD.
-    % 中文说明：getMapProfileFromLayout 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     mapProfile = struct();
     if isfield(layout, 'Environment')
         env = layout.Environment;
@@ -420,11 +549,62 @@ function mapProfile = getMapProfileFromLayout(layout)
         end
     end
 end
+
+function activeTxInfos = localActiveTxInfosForChannelPrecompute(txsSignalSegments, TxInfos)
+    % localActiveTxInfosForChannelPrecompute - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    activeTxInfos = {};
+    numTx = min(numel(txsSignalSegments), numel(TxInfos));
+    for txIdx = 1:numTx
+        txInfo = TxInfos{txIdx};
+        if ~isstruct(txInfo) || ~isfield(txInfo, 'ID') || ...
+                (isfield(txInfo, 'Status') && contains(txInfo.Status, 'Error'))
+            continue;
+        end
+        if ~localTxHasLiveSignalSegment(txsSignalSegments{txIdx})
+            continue;
+        end
+        activeTxInfos{end + 1} = txInfo; %#ok<AGROW>
+    end
+end
+
+function tf = localTxHasLiveSignalSegment(txSegments)
+    % localTxHasLiveSignalSegment - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    tf = false;
+    if isempty(txSegments) || ~iscell(txSegments)
+        return;
+    end
+    for segIdx = 1:numel(txSegments)
+        segmentSignal = txSegments{segIdx};
+        if isstruct(segmentSignal) && isfield(segmentSignal, 'Signal') && ...
+                ~isempty(segmentSignal.Signal)
+            tf = true;
+            return;
+        end
+    end
+end
+
+function activeRxInfos = localActiveRxInfosForChannelPrecompute(RxInfos)
+    % localActiveRxInfosForChannelPrecompute - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    activeRxInfos = {};
+    for rxIdx = 1:numel(RxInfos)
+        rxInfo = RxInfos{rxIdx};
+        if ~isstruct(rxInfo) || ~isfield(rxInfo, 'ID') || ...
+                (isfield(rxInfo, 'Status') && contains(rxInfo.Status, 'Error'))
+            continue;
+        end
+        activeRxInfos{end + 1} = rxInfo; %#ok<AGROW>
+    end
+end
 function channelModel = resolveChannelModelFromScenario(mapProfile)
     % resolveChannelModelFromScenario - Production declaration in CSRD.
-    % 中文说明：resolveChannelModelFromScenario 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     channelModel = '';
     if isstruct(mapProfile) && isfield(mapProfile, 'ChannelModel')
         channelModel = mapProfile.ChannelModel;
@@ -434,9 +614,8 @@ end
 function [shiftedSignal, dopplerHz, radialVelMps] = ...
         applyDopplerForComponent(channelOutput, txInfo, rxInfo)
     % applyDopplerForComponent - Apply external Doppler when the channel did not.
-    % 中文说明：当信道模块未内部处理多普勒时，基于 Tx/Rx 相对速度补偿当前链路信号。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Phase 4 (§3.2.B): channel-type whitelist gate. If the channel block
     % already honoured Tx/Rx velocity internally (e.g. a future
     % phased.FreeSpace/Doppler-aware variant), it MUST set
@@ -489,9 +668,8 @@ end
 
 function bwHz = measureModulatedBandwidth(segmentSignal)
     %MEASUREMODULATEDBANDWIDTH OBW of clean modulator output.
-    % 中文说明：measureModulatedBandwidth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Phase 4 §3.4 promotes `Truth.Execution.ModulatedBandwidthHz` from
     % the modulator's analytical formula scalar to a real measurement on
@@ -537,6 +715,9 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
 end
 
 function diagnostic = localCleanObwDiagnostic(component, segmentSignal)
+    % localCleanObwDiagnostic - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     diagnostic = struct();
     diagnostic.TxID = localStructText(component, 'TxID');
     diagnostic.BurstId = localStructText(component, 'BurstId');
@@ -576,6 +757,9 @@ function diagnostic = localCleanObwDiagnostic(component, segmentSignal)
 end
 
 function textValue = localStructText(s, fieldName)
+    % localStructText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     textValue = '';
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         textValue = char(string(s.(fieldName)));
@@ -583,6 +767,9 @@ function textValue = localStructText(s, fieldName)
 end
 
 function numericValue = localStructNumber(s, fieldName)
+    % localStructNumber - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     numericValue = NaN;
     if isstruct(s) && isfield(s, fieldName) && ...
             isnumeric(s.(fieldName)) && isscalar(s.(fieldName)) && ...
@@ -593,9 +780,8 @@ end
 
 function bwHz = coerceScalarBandwidth(rawBw)
     %COERCESCALARBANDWIDTH Normalise a [lo,hi] / scalar BW field to Hz.
-    % 中文说明：coerceScalarBandwidth 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   The legacy modulator API stored bandwidth as `[lo, hi]`; some
     %   factories already collapse to a scalar. We accept either and

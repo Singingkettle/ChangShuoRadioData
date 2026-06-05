@@ -1,8 +1,7 @@
 function fcHz = spectrumCentroid(signal, sampleRate)
 %SPECTRUMCENTROID Center-of-mass frequency (Hz) of |FFT(signal)|^2.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 spectrumCentroid 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Phase 4 §3.1 measurement helper. Computes the energy-weighted mean
 % frequency over the two-sided spectrum [-Fs/2, Fs/2). For complex baseband

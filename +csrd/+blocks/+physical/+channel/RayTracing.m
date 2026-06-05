@@ -1,5 +1,5 @@
 classdef RayTracing < matlab.System
-% 中文说明：提供 CSRD 生产链路中的 RayTracing 实现。
+% RayTracing - CSRD MATLAB declaration.
 
     properties
         MapFilename char = ''
@@ -9,6 +9,8 @@ classdef RayTracing < matlab.System
         NoValidPathFallback char = 'FreeSpaceAttenuation'
         UseGPU char = 'auto'
         GpuMinSamples (1, 1) {mustBeNonnegative, mustBeFinite} = 8192
+        RayCachePositionToleranceM (1, 1) {mustBeNonnegative, mustBeFinite} = 0.01
+        SlowStageInfoThresholdSec (1, 1) {mustBeNonnegative, mustBeFinite} = 30
     end
 
     properties (SetAccess = private)
@@ -24,21 +26,22 @@ classdef RayTracing < matlab.System
         propagationModelKey char = ''
         sitePairCache
         raySetCache
+        rayTracingChannelCache
     end
 
     methods
 
         function obj = RayTracing(varargin)
             % RayTracing - Production declaration in CSRD.
-            % 中文说明：RayTracing 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
         end
 
         function precomputeFrameRays(obj, txInfos, rxInfos, channelLinkInfos, frameId)
             %PRECOMPUTEFRAMERAYS Batch raytrace stable Tx/Rx geometry for a frame.
-            % 中文说明：按帧批量计算 Tx×Rx rays，segment 处理时复用 raySetCache。
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             obj.ensureRuntimeCaches();
             if nargin < 5 || isempty(frameId)
                 frameId = NaN;
@@ -79,14 +82,17 @@ classdef RayTracing < matlab.System
                     carrierFrequency = obj.resolveCarrierFrequency( ...
                         txInfo, rxInfo, linkInfo);
                     [txSite, rxSite] = obj.createSites(txInfo, rxInfo, carrierFrequency);
-                    rayKey = raySetCacheKey(txSite, rxSite, mapProfile);
+                    rayKey = raySetCacheKey(txSite, rxSite, mapProfile, ...
+                        obj.RayCachePositionToleranceM);
                     if isa(obj.raySetCache, 'containers.Map') && ...
                             isKey(obj.raySetCache, rayKey)
                         continue;
                     end
 
-                    txKey = siteKeyPart(txSite, true);
-                    rxKey = siteKeyPart(rxSite, false);
+                    txKey = siteKeyPart(txSite, true, ...
+                        obj.RayCachePositionToleranceM);
+                    rxKey = siteKeyPart(rxSite, false, ...
+                        obj.RayCachePositionToleranceM);
                     if isKey(txKeyToIndex, txKey)
                         txUniqueIdx = txKeyToIndex(txKey);
                     else
@@ -121,7 +127,9 @@ classdef RayTracing < matlab.System
                     'NumTxSites', numel(txSiteCells), ...
                     'NumRxSites', numel(rxSiteCells), ...
                     'NumRequestedLinks', numel(pending), ...
-                    'FrameId', frameId);
+                    'FrameId', frameId, ...
+                    'RayCachePositionToleranceM', ...
+                    obj.RayCachePositionToleranceM);
                 csrd.runtime.performance.trace('heartbeat', ...
                     'RayTracing.BatchedRaytraceCall', 'begin', batchMeta);
                 batchStart = tic;
@@ -135,6 +143,8 @@ classdef RayTracing < matlab.System
                     'RayTracing.BatchedRaytraceCall');
                 csrd.runtime.performance.trace('event', ...
                     'RayTracing.BatchedRaytraceCall', elapsedSec, batchMeta);
+                obj.logSlowRayTracingStage('BatchedRaytraceCall', ...
+                    elapsedSec, mapProfile, batchMeta);
                 batchMeta.ElapsedSec = elapsedSec;
                 csrd.runtime.performance.trace('heartbeat', ...
                     'RayTracing.BatchedRaytraceCall', 'end', batchMeta);
@@ -185,9 +195,8 @@ classdef RayTracing < matlab.System
 
         function setupImpl(obj, varargin) %#ok<INUSD>
             % setupImpl - Production declaration in CSRD.
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             obj.PropagationModelConfig = normalizePropagationConfig(obj.PropagationModelConfig);
             obj.ensureRuntimeCaches();
@@ -195,16 +204,14 @@ classdef RayTracing < matlab.System
 
         function validateInputsImpl(~, ~, ~, ~, ~)
             % validateInputsImpl - Production declaration in CSRD.
-            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
         function out = stepImpl(obj, x, txInfo, rxInfo, channelLinkInfo)
             % stepImpl - Production declaration in CSRD.
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if nargin < 5 || ~isstruct(channelLinkInfo)
                 channelLinkInfo = struct();
             end
@@ -225,7 +232,7 @@ classdef RayTracing < matlab.System
             executionStage = 'RayTrace';
             try
                 pm = obj.createPropagationModel(mapProfile);
-                [raySet, rayCount, rayPathLoss, rayFailure] = ...
+                [raySet, rayCount, rayPathLoss, rayFailure, rayCacheKey] = ...
                     obj.computeRays(txSite, rxSite, pm, mapProfile);
 
                 if rayCount == 0
@@ -235,16 +242,18 @@ classdef RayTracing < matlab.System
                 end
 
                 executionStage = 'ChannelConstruct';
+                sampleRate = obj.resolveSampleRate(x, rxInfo);
                 constructMeta = localMapProfileTraceMetadata(mapProfile, ...
-                    'RayCount', rayCount);
+                    'RayCount', rayCount, ...
+                    'RayCachePositionToleranceM', ...
+                    obj.RayCachePositionToleranceM);
                 csrd.runtime.performance.trace('heartbeat', ...
                     'RayTracing.RayTracingChannelConstruct', 'begin', ...
                     constructMeta);
                 rtChannelStart = tic;
-                rtChan = comm.RayTracingChannel(raySet, txSite, rxSite);
+                rtChan = obj.getRayTracingChannel(raySet, txSite, rxSite, ...
+                    mapProfile, rayCacheKey, sampleRate, x.Signal);
                 constructElapsed = toc(rtChannelStart);
-                csrd.runtime.performance.trace('count', ...
-                    'RayTracing.RayTracingChannelConstruct');
                 csrd.runtime.performance.trace('event', ...
                     'RayTracing.RayTracingChannelConstruct', ...
                     constructElapsed, constructMeta);
@@ -252,9 +261,7 @@ classdef RayTracing < matlab.System
                 csrd.runtime.performance.trace('heartbeat', ...
                     'RayTracing.RayTracingChannelConstruct', 'end', ...
                     constructMeta);
-                rtChan.SampleRate = obj.resolveSampleRate(x, rxInfo);
                 obj.assertInputAntennaColumns(x, txInfo, rxInfo, channelLinkInfo);
-                obj.configureGpuPolicy(rtChan, x.Signal);
                 executionStage = 'ChannelApply';
                 applyMeta = localMapProfileTraceMetadata(mapProfile, ...
                     'InputSamples', size(x.Signal, 1), ...
@@ -301,9 +308,8 @@ classdef RayTracing < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Production declaration in CSRD.
-            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.siteViewerCache = [];
             obj.siteViewerKey = '';
             csrd.runtime.map.osmSiteViewerCache('release');
@@ -311,6 +317,7 @@ classdef RayTracing < matlab.System
             obj.propagationModelKey = '';
             obj.sitePairCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
             obj.raySetCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            obj.rayTracingChannelCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
         end
 
     end
@@ -319,9 +326,8 @@ classdef RayTracing < matlab.System
 
         function mapProfile = resolveMapProfile(obj, channelLinkInfo)
             % resolveMapProfile - Production declaration in CSRD.
-            % 中文说明：resolveMapProfile 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             mapProfile = getStructField(channelLinkInfo, 'MapProfile', struct());
             if ~isempty(fieldnames(mapProfile))
                 return;
@@ -351,9 +357,8 @@ classdef RayTracing < matlab.System
 
         function carrierFrequency = resolveCarrierFrequency(obj, txInfo, rxInfo, channelLinkInfo)
             % resolveCarrierFrequency - Production declaration in CSRD.
-            % 中文说明：resolveCarrierFrequency 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             carrierFrequency = obj.CarrierFrequency;
             rxScenarioConfig = getStructField(channelLinkInfo, 'RxScenarioConfig', struct());
 
@@ -368,9 +373,8 @@ classdef RayTracing < matlab.System
 
         function sampleRate = resolveSampleRate(obj, x, rxInfo)
             % resolveSampleRate - Production declaration in CSRD.
-            % 中文说明：resolveSampleRate 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             sampleRate = obj.SampleRate;
             if isfield(x, 'SampleRate') && ~isempty(x.SampleRate) && x.SampleRate > 0
                 sampleRate = x.SampleRate;
@@ -381,9 +385,8 @@ classdef RayTracing < matlab.System
 
         function [txSite, rxSite] = createSites(obj, txInfo, rxInfo, carrierFrequency)
             % createSites - Production declaration in CSRD.
-            % 中文说明：createSites 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             txPos = getStructField(txInfo, 'Position', [0, 0, 30]);
             rxPos = getStructField(rxInfo, 'Position', [0, 0, 10]);
             txGeo = getSiteGeoPosition(txInfo, txPos, 'Tx');
@@ -407,7 +410,8 @@ classdef RayTracing < matlab.System
             numTxAntennas = max(1, round(getStructField(txInfo, 'NumTransmitAntennas', 1)));
             numRxAntennas = max(1, round(getStructField(rxInfo, 'NumAntennas', 1)));
             cacheKey = sitePairCacheKey(txName, rxName, txGeo, rxGeo, ...
-                numTxAntennas, numRxAntennas, carrierFrequency);
+                numTxAntennas, numRxAntennas, carrierFrequency, ...
+                obj.RayCachePositionToleranceM);
             if isa(obj.sitePairCache, 'containers.Map') && isKey(obj.sitePairCache, cacheKey)
                 pair = obj.sitePairCache(cacheKey);
                 txSite = pair.TxSite;
@@ -442,9 +446,8 @@ classdef RayTracing < matlab.System
 
         function pm = createPropagationModel(obj, mapProfile)
             % createPropagationModel - Production declaration in CSRD.
-            % 中文说明：createPropagationModel 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = normalizePropagationConfig(obj.PropagationModelConfig);
             mode = getStructField(mapProfile, 'Mode', '');
 
@@ -519,41 +522,46 @@ classdef RayTracing < matlab.System
                 struct('CacheKey', cacheKey));
         end
 
-        function configureGpuPolicy(obj, rtChan, signal)
-            % configureGpuPolicy - Enable comm.RayTracingChannel GPU only when useful.
-            % 中文说明：只在配置允许、样本量足够且 GPU 可用时启用 UseGPU。
-            if ~isprop(rtChan, 'UseGPU')
-                return;
-            end
+        function mode = resolveGpuMode(obj, signal)
+            % resolveGpuMode - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
+            mode = "off";
             policy = lower(char(string(obj.UseGPU)));
             switch policy
                 case {'false', 'off', 'none', 'cpu'}
-                    rtChan.UseGPU = "off";
+                    mode = "off";
                 case {'true', 'on', 'gpu'}
                     if gpuIsAvailable()
-                        rtChan.UseGPU = "on";
-                    else
-                        rtChan.UseGPU = "off";
+                        mode = "on";
                     end
                 otherwise
                     if gpuIsAvailable() && numel(signal) >= obj.GpuMinSamples
-                        rtChan.UseGPU = "auto";
-                    else
-                        rtChan.UseGPU = "off";
+                        mode = "auto";
                     end
             end
         end
 
-        function [raySet, rayCount, pathLoss, failureMessage] = computeRays(obj, txSite, rxSite, pm, mapProfile)
+        function configureGpuPolicy(~, rtChan, mode)
+            % configureGpuPolicy - Enable comm.RayTracingChannel GPU only when useful.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
+            if ~isprop(rtChan, 'UseGPU')
+                return;
+            end
+            rtChan.UseGPU = mode;
+        end
+
+        function [raySet, rayCount, pathLoss, failureMessage, cacheKey] = computeRays(obj, txSite, rxSite, pm, mapProfile)
             % computeRays - Production declaration in CSRD.
-            % 中文说明：computeRays 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             raySet = [];
             rayCount = 0;
             pathLoss = [];
             failureMessage = '';
-            cacheKey = raySetCacheKey(txSite, rxSite, mapProfile);
+            cacheKey = raySetCacheKey(txSite, rxSite, mapProfile, ...
+                obj.RayCachePositionToleranceM);
             if isa(obj.raySetCache, 'containers.Map') && isKey(obj.raySetCache, cacheKey)
                 cached = obj.raySetCache(cacheKey);
                 raySet = cached.RaySet;
@@ -594,6 +602,8 @@ classdef RayTracing < matlab.System
             csrd.runtime.performance.trace('count', 'RayTracing.RaytraceCall');
             csrd.runtime.performance.trace('event', 'RayTracing.RaytraceCall', ...
                 raytraceElapsed, raytraceMeta);
+            obj.logSlowRayTracingStage('RaytraceCall', ...
+                raytraceElapsed, mapProfile, raytraceMeta);
             raytraceMeta.ElapsedSec = raytraceElapsed;
             csrd.runtime.performance.trace('heartbeat', ...
                 'RayTracing.RaytraceCall', 'end', raytraceMeta);
@@ -606,11 +616,46 @@ classdef RayTracing < matlab.System
             end
         end
 
+        function rtChan = getRayTracingChannel(obj, raySet, txSite, rxSite, ...
+                mapProfile, rayCacheKey, sampleRate, signal)
+                    % getRayTracingChannel - CSRD MATLAB declaration.
+                    % Inputs: see function signature and validation.
+                    % Outputs: see return values and contract fields.
+            obj.ensureRuntimeCaches();
+            gpuMode = obj.resolveGpuMode(signal);
+            channelKey = rayTracingChannelCacheKey(rayCacheKey, sampleRate, ...
+                gpuMode, size(signal, 2));
+            if isa(obj.rayTracingChannelCache, 'containers.Map') && ...
+                    isKey(obj.rayTracingChannelCache, channelKey)
+                rtChan = obj.rayTracingChannelCache(channelKey);
+                resetSystemObjectIfPossible(rtChan);
+                csrd.runtime.performance.trace('count', ...
+                    'RayTracing.RayTracingChannelCacheHit');
+                csrd.runtime.performance.trace('event', ...
+                    'RayTracing.RayTracingChannelCacheHit', 0, ...
+                    localMapProfileTraceMetadata(mapProfile, ...
+                        'KeyHash', rayKeyHash(channelKey), ...
+                        'SampleRate', sampleRate, ...
+                        'GpuMode', char(gpuMode)));
+                return;
+            end
+
+            csrd.runtime.performance.trace('count', ...
+                'RayTracing.RayTracingChannelConstruct');
+            rtChan = comm.RayTracingChannel(raySet, txSite, rxSite);
+            rtChan.SampleRate = sampleRate;
+            obj.configureGpuPolicy(rtChan, gpuMode);
+            if isa(obj.rayTracingChannelCache, 'containers.Map')
+                obj.rayTracingChannelCache(channelKey) = rtChan;
+            end
+            csrd.runtime.performance.trace('count', ...
+                'RayTracing.RayTracingChannelCacheMiss');
+        end
+
         function mapArg = resolveMapArgument(obj, mapProfile)
             % resolveMapArgument - Production declaration in CSRD.
-            % 中文说明：resolveMapArgument 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             mapArg = [];
             mode = getStructField(mapProfile, 'Mode', '');
             osmFile = getStructField(mapProfile, 'OSMFile', obj.MapFilename);
@@ -651,6 +696,8 @@ classdef RayTracing < matlab.System
                 csrd.runtime.performance.trace('event', ...
                     'RayTracing.SiteviewerGet', siteviewerElapsed, ...
                     siteviewerMeta);
+                obj.logSlowRayTracingStage('SiteviewerGet', ...
+                    siteviewerElapsed, mapProfile, siteviewerMeta);
                 siteviewerMeta.ElapsedSec = siteviewerElapsed;
                 csrd.runtime.performance.trace('heartbeat', ...
                     'RayTracing.SiteviewerGet', 'end', siteviewerMeta);
@@ -661,9 +708,8 @@ classdef RayTracing < matlab.System
 
         function tf = shouldFallback(obj, mapProfile, channelLinkInfo)
             % shouldFallback - Production declaration in CSRD.
-            % 中文说明：shouldFallback 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             fallbackPolicy = getStructField(channelLinkInfo, 'NoValidPathFallback', obj.NoValidPathFallback);
             mode = getStructField(mapProfile, 'Mode', '');
             tf = strcmpi(fallbackPolicy, 'FreeSpaceAttenuation') || strcmpi(mode, 'FlatTerrain');
@@ -671,9 +717,8 @@ classdef RayTracing < matlab.System
 
         function out = applyNoPathFallback(obj, out, txInfo, rxInfo, channelLinkInfo, mapProfile, carrierFrequency, errorMessage)
             % applyNoPathFallback - Production declaration in CSRD.
-            % 中文说明：applyNoPathFallback 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             fallbackPolicy = getStructField(channelLinkInfo, 'NoValidPathFallback', obj.NoValidPathFallback);
             if ~strcmpi(fallbackPolicy, 'FreeSpaceAttenuation') && ~strcmpi(getStructField(mapProfile, 'Mode', ''), 'FlatTerrain')
                 error('RayTracing:NoValidPaths', 'Ray tracing returned no valid paths.');
@@ -705,11 +750,10 @@ classdef RayTracing < matlab.System
             end
         end
 
-        function channelInfo = buildChannelInfo(~, mapProfile, carrierFrequency, rayCount, pathLoss, fallback)
+        function channelInfo = buildChannelInfo(obj, mapProfile, carrierFrequency, rayCount, pathLoss, fallback)
             % buildChannelInfo - Production declaration in CSRD.
-            % 中文说明：buildChannelInfo 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             channelInfo = struct();
             channelInfo.Model = 'RayTracing';
             channelInfo.MapProfile = mapProfile;
@@ -717,13 +761,38 @@ classdef RayTracing < matlab.System
             channelInfo.RayCount = rayCount;
             channelInfo.PathLoss = pathLoss;
             channelInfo.Fallback = fallback;
+            channelInfo.RayCachePositionToleranceM = obj.RayCachePositionToleranceM;
+        end
+
+        function logSlowRayTracingStage(obj, stageName, elapsedSec, mapProfile, metadata)
+            % logSlowRayTracingStage - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
+            if elapsedSec < obj.SlowStageInfoThresholdSec || isempty(obj.logger)
+                return;
+            end
+            if nargin < 5 || ~isstruct(metadata)
+                metadata = struct();
+            end
+            osmFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
+            mapMode = char(string(getStructField(mapProfile, 'Mode', '')));
+            fileSizeMB = getStructField(mapProfile, 'OSMFileSizeMB', NaN);
+            requestedLinks = getStructField(metadata, 'NumRequestedLinks', NaN);
+            if isfinite(requestedLinks)
+                linkText = sprintf(', links=%d', round(requestedLinks));
+            else
+                linkText = '';
+            end
+            obj.logger.info(['RayTracing stage %s took %.2fs ', ...
+                '(mapMode=%s, OSMFileSizeMB=%.2f%s, OSMFile=%s).'], ...
+                char(string(stageName)), elapsedSec, mapMode, fileSizeMB, ...
+                linkText, osmFile);
         end
 
         function ok = setPropagationProperty(obj, pm, propName, value)
             % setPropagationProperty - Production declaration in CSRD.
-            % 中文说明：setPropagationProperty 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             ok = false;
             try
                 pm.(propName) = value;
@@ -736,6 +805,8 @@ classdef RayTracing < matlab.System
 
         function ensureRuntimeCaches(obj)
             %ENSURERUNTIMECACHES Lazily initialise caches for public precompute calls.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             if isempty(obj.logger)
                 obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
             end
@@ -746,9 +817,16 @@ classdef RayTracing < matlab.System
             if isempty(obj.raySetCache) || ~isa(obj.raySetCache, 'containers.Map')
                 obj.raySetCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
             end
+            if isempty(obj.rayTracingChannelCache) || ...
+                    ~isa(obj.rayTracingChannelCache, 'containers.Map')
+                obj.rayTracingChannelCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            end
         end
 
         function assertInputAntennaColumns(~, x, txInfo, rxInfo, channelLinkInfo)
+            % assertInputAntennaColumns - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             expectedColumns = max(1, round(getStructField(txInfo, 'NumTransmitAntennas', 1)));
             actualColumns = size(x.Signal, 2);
             if actualColumns == expectedColumns
@@ -778,9 +856,8 @@ end
 
 function cfg = normalizePropagationConfig(cfg)
     % normalizePropagationConfig - Production declaration in CSRD.
-    % 中文说明：normalizePropagationConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isstruct(cfg)
         cfg = struct();
     end
@@ -797,6 +874,8 @@ end
 
 function key = propagationCacheKey(cfg, mapProfile)
     % propagationCacheKey - Stable key for map/profile scoped propagation model.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     mode = char(string(getStructField(mapProfile, 'Mode', '')));
     terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
     material = char(string(getStructField(mapProfile, 'TerrainMaterial', '')));
@@ -813,17 +892,23 @@ function key = propagationCacheKey(cfg, mapProfile)
 end
 
 function key = sitePairCacheKey(txName, rxName, txGeo, rxGeo, ...
-        numTxAntennas, numRxAntennas, carrierFrequency)
+        numTxAntennas, numRxAntennas, carrierFrequency, positionToleranceM)
     % sitePairCacheKey - Geometry-aware key for txsite/rxsite reuse.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    txGeo = quantizeGeoPosition(txGeo, positionToleranceM);
+    rxGeo = quantizeGeoPosition(rxGeo, positionToleranceM);
     key = sprintf(['Tx=%s|Rx=%s|TxGeo=%s|RxGeo=%s|TxAnt=%d|', ...
-        'RxAnt=%d|Fc=%.17g'], ...
+        'RxAnt=%d|Fc=%.17g|TolM=%.17g'], ...
         txName, rxName, mat2str(double(txGeo), 17), ...
         mat2str(double(rxGeo), 17), numTxAntennas, numRxAntennas, ...
-        double(carrierFrequency));
+        double(carrierFrequency), double(positionToleranceM));
 end
 
-function key = raySetCacheKey(txSite, rxSite, mapProfile)
+function key = raySetCacheKey(txSite, rxSite, mapProfile, positionToleranceM)
     % raySetCacheKey - Stable key for rays reused across bursts on one link.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     mode = char(string(getStructField(mapProfile, 'Mode', '')));
     osmFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
     terrain = char(string(getStructField(mapProfile, 'Terrain', '')));
@@ -834,17 +919,33 @@ function key = raySetCacheKey(txSite, rxSite, mapProfile)
         'SurfaceMaterial', '')));
     maxReflections = getStructField(mapProfile, 'MaxNumReflections', []);
     key = sprintf(['Map=%s|File=%s|Terrain=%s|Mat=%s|BuildMat=%s|', ...
-        'SurfMat=%s|Refl=%s|Tx=%s|Rx=%s'], ...
+        'SurfMat=%s|Refl=%s|TolM=%.17g|Tx=%s|Rx=%s'], ...
         mode, osmFile, terrain, material, buildingsMaterial, ...
-        surfaceMaterial, mat2str(maxReflections), ...
-        siteKeyPart(txSite, true), siteKeyPart(rxSite, false));
+        surfaceMaterial, mat2str(maxReflections), double(positionToleranceM), ...
+        siteKeyPart(txSite, true, positionToleranceM), ...
+        siteKeyPart(rxSite, false, positionToleranceM));
+end
+
+function key = rayTracingChannelCacheKey(rayCacheKey, sampleRate, gpuMode, numSignalColumns)
+    % rayTracingChannelCacheKey - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    key = sprintf('Ray=%s|Fs=%.17g|Gpu=%s|Cols=%d', ...
+        rayCacheKey, double(sampleRate), char(string(gpuMode)), ...
+        double(numSignalColumns));
 end
 
 function hashValue = rayKeyHash(key)
+    % rayKeyHash - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     hashValue = csrd.support.hash.shortInt32Hash(key);
 end
 
 function countValue = raySetCacheSize(cacheMap)
+    % raySetCacheSize - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     countValue = 0;
     if isa(cacheMap, 'containers.Map')
         countValue = cacheMap.Count;
@@ -853,7 +954,8 @@ end
 
 function meta = localMapProfileTraceMetadata(mapProfile, varargin)
     %LOCALMAPPROFILETRACEMETADATA Include OSM coverage metadata in perf traces.
-    % 中文说明：性能证据记录被选中的 OSM 文件和均匀覆盖序号，不再记录大小分级。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     meta = struct();
     meta.MapMode = char(string(getStructField(mapProfile, 'Mode', '')));
     meta.OSMFile = char(string(getStructField(mapProfile, 'OSMFile', '')));
@@ -869,6 +971,9 @@ function meta = localMapProfileTraceMetadata(mapProfile, varargin)
 end
 
 function item = localCellOrArrayEntry(collection, idx)
+    % localCellOrArrayEntry - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if iscell(collection)
         item = collection{idx};
     else
@@ -877,11 +982,17 @@ function item = localCellOrArrayEntry(collection, idx)
 end
 
 function tf = localHasErrorStatus(info)
+    % localHasErrorStatus - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = isstruct(info) && isfield(info, 'Status') && ...
         contains(string(info.Status), "Error");
 end
 
 function [raySet, rayCount, pathLoss] = normalizeRaytraceOutput(rays)
+    % normalizeRaytraceOutput - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     raySet = [];
     rayCount = 0;
     pathLoss = [];
@@ -901,6 +1012,9 @@ function [raySet, rayCount, pathLoss] = normalizeRaytraceOutput(rays)
 end
 
 function rays = localBatchedRayCell(allRays, txIdx, rxIdx)
+    % localBatchedRayCell - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     rays = [];
     if iscell(allRays)
         if ndims(allRays) >= 2 && size(allRays, 1) >= txIdx && ...
@@ -914,7 +1028,13 @@ function rays = localBatchedRayCell(allRays, txIdx, rxIdx)
     end
 end
 
-function part = siteKeyPart(siteObj, includeFrequency)
+function part = siteKeyPart(siteObj, includeFrequency, positionToleranceM)
+    % siteKeyPart - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    if nargin < 3 || isempty(positionToleranceM)
+        positionToleranceM = 0;
+    end
     values = nan(1, 4);
     try
         values(1) = double(siteObj.Latitude);
@@ -934,11 +1054,57 @@ function part = siteKeyPart(siteObj, includeFrequency)
         catch
         end
     end
+    values(1:3) = quantizeGeoPosition(values(1:3), positionToleranceM);
     part = mat2str(values, 17);
+end
+
+function geo = quantizeGeoPosition(geo, toleranceM)
+    % quantizeGeoPosition - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    if nargin < 2 || isempty(toleranceM) || toleranceM <= 0
+        return;
+    end
+    geo = double(geo);
+    if numel(geo) < 3
+        return;
+    end
+    lat = geo(1);
+    lon = geo(2);
+    height = geo(3);
+    if isfinite(lat)
+        latStep = toleranceM / 111320;
+        geo(1) = round(lat / latStep) * latStep;
+    end
+    if isfinite(lon)
+        if ~isfinite(lat)
+            latForLon = 0;
+        else
+            latForLon = lat;
+        end
+        lonScale = 111320 * max(abs(cosd(latForLon)), 1e-6);
+        lonStep = toleranceM / lonScale;
+        geo(2) = round(lon / lonStep) * lonStep;
+    end
+    if isfinite(height)
+        geo(3) = round(height / toleranceM) * toleranceM;
+    end
+end
+
+function resetSystemObjectIfPossible(obj)
+    % resetSystemObjectIfPossible - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    try
+        reset(obj);
+    catch
+    end
 end
 
 function tf = gpuIsAvailable()
     % gpuIsAvailable - Best-effort GPU availability probe without requiring one.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = false;
     try
         tf = gpuDeviceCount("available") > 0;
@@ -952,6 +1118,9 @@ function tf = gpuIsAvailable()
 end
 
 function localAssertUsablePropagationModel(pm)
+    % localAssertUsablePropagationModel - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if localIsUsablePropagationModel(pm)
         return;
     end
@@ -961,10 +1130,16 @@ function localAssertUsablePropagationModel(pm)
 end
 
 function tf = localIsUsablePropagationModel(pm)
+    % localIsUsablePropagationModel - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = ~isempty(pm) && isobject(pm) && ~isstruct(pm);
 end
 
 function localAssertUsableMapArgument(mapArg, osmFile)
+    % localAssertUsableMapArgument - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if localIsUsableMapArgument(mapArg)
         return;
     end
@@ -975,6 +1150,9 @@ function localAssertUsableMapArgument(mapArg, osmFile)
 end
 
 function tf = localIsUsableMapArgument(mapArg)
+    % localIsUsableMapArgument - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = ~isempty(mapArg) && isobject(mapArg) && ~isstruct(mapArg);
     if ~tf
         return;
@@ -990,6 +1168,9 @@ function tf = localIsUsableMapArgument(mapArg)
 end
 
 function tf = localRayTraceErrorAllowsFallback(ME)
+    % localRayTraceErrorAllowsFallback - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     msg = lower(char(string(ME.message)));
     id = lower(char(string(ME.identifier)));
 
@@ -1011,9 +1192,8 @@ end
 
 function value = getStructField(s, fieldName, defaultValue)
     % getStructField - Production declaration in CSRD.
-    % 中文说明：getStructField 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
         value = s.(fieldName);
     else
@@ -1023,9 +1203,8 @@ end
 
 function value = getPositionComponent(position, idx, defaultValue)
     % getPositionComponent - Production declaration in CSRD.
-    % 中文说明：getPositionComponent 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isnumeric(position) && numel(position) >= idx
         value = position(idx);
     else
@@ -1035,7 +1214,8 @@ end
 
 function geoPosition = getSiteGeoPosition(siteInfo, position, roleName)
     % getSiteGeoPosition - Resolve [lat lon height] degrees for txsite/rxsite.
-    % 中文说明：RayTracing 只消费 GeoPositionDeg；米制 Position 留给距离/Doppler。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isstruct(siteInfo) && isfield(siteInfo, 'GeoPositionDeg') && ...
             ~isempty(siteInfo.GeoPositionDeg)
         geoPosition = double(siteInfo.GeoPositionDeg(:)).';
@@ -1070,9 +1250,8 @@ end
 
 function pathLoss = extractMinimumPathLoss(raySet)
     % extractMinimumPathLoss - Production declaration in CSRD.
-    % 中文说明：extractMinimumPathLoss 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     pathLoss = [];
     try
         losses = [raySet.PathLoss];
@@ -1086,9 +1265,8 @@ end
 
 function txt = valueToText(value)
     % valueToText - Production declaration in CSRD.
-    % 中文说明：valueToText 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ischar(value)
         txt = value;
     elseif isstring(value)
@@ -1102,9 +1280,8 @@ end
 
 function distance_m = geographicDistance(txGeo, rxGeo)
     % geographicDistance - Production declaration in CSRD.
-    % 中文说明：geographicDistance 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     earthRadius_m = 6371000;
     lat1 = deg2rad(txGeo(1));
     lon1 = deg2rad(txGeo(2));

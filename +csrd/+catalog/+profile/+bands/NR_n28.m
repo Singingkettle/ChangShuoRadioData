@@ -1,8 +1,7 @@
 function profile = NR_n28()
 %NR_N28 v0 band profile: 5G NR band n28 (703-803 MHz).
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 NR_n28 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Source numbers: docs/audits/2026-04-...refactor.md §5.bis A (row 5,
 % labelled '5GNR_n28'). Renamed to 'NR_n28' to match §16.8.1 directory

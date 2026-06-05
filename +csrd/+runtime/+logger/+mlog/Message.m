@@ -1,6 +1,5 @@
 classdef Message < event.EventData & matlab.mixin.CustomDisplay
     % LOGMESSAGE Advanced logging message
-    % 中文说明：提供 CSRD 生产链路中的 Message 实现。
     %   This class implements a log message
     %
     %   See demoLogger.mlx for usage examples:
@@ -33,9 +32,8 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
         function obj = Message()
             % Construct the message
-            % 中文说明：Message 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.Time = datetime('now', 'TimeZone', 'local');
             obj.Time.Format = 'MM/dd HH:mm:ss'; % mmengine style timestamp
@@ -49,9 +47,8 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
         function t = toTable(obj)
             % Convert the object to a table
-            % 中文说明：toTable 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Find any invalid handles
             idxValid = isvalid(obj);
@@ -72,9 +69,8 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
         function toDialog(obj, fig, title)
             % Send the message to a dialog window in the specified figure
-            % 中文说明：toDialog 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Check arguments
             arguments
@@ -112,9 +108,8 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
         function displayNonScalarObject(obj)
 
             % Format text to display
-            % 中文说明：displayNonScalarObject 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             className = matlab.mixin.CustomDisplay.getClassNameForHeader(obj);
             dimStr = matlab.mixin.CustomDisplay.convertDimensionsToString(obj);
 
@@ -132,9 +127,8 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
         function str = createDisplayMessage(obj, loggerName)
             % Get the message formatted for display (mmengine style for console)
-            % 中文说明：createDisplayMessage 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % Timestamp - LoggerName - Level - [Caller] Message
             arguments
                 obj csrd.runtime.logger.mlog.Message
@@ -160,9 +154,8 @@ classdef Message < event.EventData & matlab.mixin.CustomDisplay
 
         function str = createLogFileMessage(obj, loggerName)
             % Get the message formatted for log file (mmengine style)
-            % 中文说明：createLogFileMessage 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % Timestamp - LoggerName - Level - [Caller] Message
             arguments
                 obj csrd.runtime.logger.mlog.Message

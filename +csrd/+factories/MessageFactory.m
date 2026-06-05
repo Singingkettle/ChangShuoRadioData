@@ -1,5 +1,4 @@
 % MessageFactory - Advanced Message Generation Factory for Radio Communication Systems
-% 中文说明：提供 CSRD 生产链路中的 MessageFactory 实现。
 %
 % This class implements a sophisticated factory pattern for generating diverse
 % message types in radio communication simulations. The MessageFactory provides
@@ -174,7 +173,6 @@
 
 classdef MessageFactory < matlab.System
     % MessageFactory - Production declaration in CSRD.
-    % 中文说明：MessageFactory 在 CSRD 生产链路中执行对应处理。
 
     properties
         % Config - Comprehensive message factory configuration structure
@@ -293,9 +291,8 @@ classdef MessageFactory < matlab.System
 
         function obj = MessageFactory(varargin)
             % MessageFactory - Constructor for advanced message generation factory
-            % 中文说明：MessageFactory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new MessageFactory instance with configurable message types,
             % caching strategies, and operational parameters. The constructor accepts
@@ -371,16 +368,14 @@ classdef MessageFactory < matlab.System
 
         function validateInputsImpl(~, ~, ~, ~)
             % validateInputsImpl - Production declaration in CSRD.
-            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
             % setupImpl - Production declaration in CSRD.
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if isempty(obj.Config) || ~isstruct(obj.Config) || ~isfield(obj.Config, 'MessageTypes')
                 error('MessageFactory:ConfigError', 'Config property must be a valid struct with a MessageTypes field.');
@@ -410,9 +405,8 @@ classdef MessageFactory < matlab.System
 
         function messageData = stepImpl(obj, frameId, segmentInfo, messageTypeID)
             % segmentInfo is expected to contain per-segment details, like Message.Length
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % messageTypeID is the string key from Scenario.Transmitters.Segments.Message.TypeID,
             % e.g., "RandomBit"
 
@@ -620,9 +614,8 @@ classdef MessageFactory < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Production declaration in CSRD.
-            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('MessageFactory releaseImpl called.');
             blockKeys = keys(obj.cachedMessageBlocks);
 
@@ -641,9 +634,8 @@ classdef MessageFactory < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Production declaration in CSRD.
-            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('MessageFactory resetImpl called.');
             blockKeys = keys(obj.cachedMessageBlocks);
 

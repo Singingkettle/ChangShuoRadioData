@@ -7,6 +7,9 @@ classdef BadModulatorAntennasBySamples < matlab.System
 
     methods (Access = protected)
         function out = stepImpl(obj, ~)
+            % stepImpl - Return samples-by-antenna contract violation.
+            % Inputs: obj plus ignored input payload.
+            % Outputs: malformed modulator output struct.
             out = struct();
             out.Signal = complex(ones(obj.NumTransmitAntennas, 8));
             out.Bandwidth = obj.TargetBandwidth;

@@ -1,6 +1,5 @@
 classdef ChangShuo < matlab.System
     % ChangShuo - Advanced Radio Communication Simulation Engine Core
-    % 中文说明：提供 CSRD 生产链路中的 ChangShuo 实现。
     %
     % This class implements the core simulation engine for the ChangShuoRadioData
     % (CSRD) framework, providing comprehensive radio communication system modeling
@@ -68,7 +67,9 @@ classdef ChangShuo < matlab.System
     %
     %   % Engine with factory configurations
     %   config = initialize_csrd_configuration();
-    %   engine = ChangShuo('FactoryConfigs', config.Factories);
+    %   engine = ChangShuo( ...
+    %       'FactoryConfigs', config.Factories, ...
+    %       'RuntimePlan', config.RuntimePlan);
     %
     %   % Engine with specific factory configuration
     %   msgConfig.handle = 'csrd.factories.MessageFactory';
@@ -93,9 +94,17 @@ classdef ChangShuo < matlab.System
         %
         % Each factory is instantiated with ONLY its own config, ensuring independence.
         FactoryConfigs struct
+
+        % RuntimePlan - Canonical derived runtime facts built at config boundary.
+        RuntimePlan struct
     end
 
     properties (SetAccess = private, GetAccess = public)
+        % ScenarioPlan - Frozen per-scenario construction plan.
+        % Built before frame generation starts, then used by every frame
+        % and receiver in the scenario.
+        ScenarioPlan = struct();
+
         % LastGlobalLayout - Phase 3 (audit §3.5 / §17.5 P3-7) public
         % read-only snapshot of the last globalLayout returned by
         % processScenarioInstantiation. Mirrors the globalLayout that
@@ -128,9 +137,8 @@ classdef ChangShuo < matlab.System
 
         function obj = ChangShuo(varargin)
             % ChangShuo - Constructor for radio communication simulation engine
-            % 中文说明：ChangShuo 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This constructor initializes the ChangShuo simulation engine with
             % optional property-value pairs for configuration. It sets up the
@@ -171,6 +179,7 @@ classdef ChangShuo < matlab.System
     methods (Access = private)
         % Configuration and validation methods
         validateFactoryConfigs(obj)
+        scenarioPlan = prepareScenarioPlan(obj, scenarioId)
         framesPerScenario = getFramesPerScenarioFromConfig(obj)
 
         % generateSingleFrame - Generate data for a single frame (internal method)

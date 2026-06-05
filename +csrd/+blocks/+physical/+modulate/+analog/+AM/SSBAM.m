@@ -1,6 +1,5 @@
 classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
     % SSBAM - Single Sideband Amplitude Modulation Modulator
-    % 中文职责：实现单边带调幅，生成只保留 USB 或 LSB 的高频谱效率模拟基带信号。
     %
     % This class implements Single Sideband Amplitude Modulation (SSB-AM) as a
     % subclass of DSBSCAM. SSB-AM is an efficient form of amplitude modulation
@@ -35,15 +34,10 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
     %   modulatedSignal = ssbamModulator.step(inputData)
     %
     % Properties (Inherited from DSBSCAM):
-    % 属性（继承自 DSBSCAM）：
     %   SampleRate - Sampling rate in Hz for signal processing
-    %   SampleRate - 信号处理采样率，单位 Hz
     %   NumTransmitAntennas - Number of transmit antennas (fixed at 1)
-    %   NumTransmitAntennas - 发射天线数量，SSB-AM 固定为 1
     %   ModulatorConfig - Configuration structure for SSB-AM parameters
-    %   ModulatorConfig - SSB-AM 参数配置结构体
     %     .mode - Sideband selection ('upper' for USB, 'lower' for LSB)
-    %     .mode - 边带选择，'upper' 表示上边带，'lower' 表示下边带
     %
     % Methods:
     %   baseModulator - Core SSB-AM modulation implementation
@@ -94,7 +88,7 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
     %   - Sensitive to frequency offset and phase noise
     %   - Hilbert transform introduces processing delay
     %
-    % References / 参考资料:
+    % References:
     %   - MathWorks hilbert analytic signal documentation:
     %     https://www.mathworks.com/help/signal/ref/hilbert.html
     %   - MathWorks obw occupied bandwidth documentation:
@@ -109,7 +103,6 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core SSB-AM modulation implementation
-            % 中文职责：使用 Hilbert 变换生成解析信号，并按配置输出上边带或下边带复包络。
             %
             % This method implements SSB-AM modulation using the Hilbert transform
             % to generate the analytic signal representation. The method creates
@@ -121,18 +114,13 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %   [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             %
             % Input Arguments:
-            % 输入参数：
             %   messageSignal - Input message signal to be modulated
-            %   messageSignal - 待调制消息信号
             %                   Type: real-valued numeric array
             %
             % Output Arguments:
-            % 输出参数：
             %   modulatedSignal - SSB-AM modulated complex signal
-            %   modulatedSignal - SSB-AM 调制后的复基带信号
             %                     Type: complex-valued numeric array
             %   bandWidth - Bandwidth of the modulated signal in Hz
-            %   bandWidth - 选定边带的频率范围，单位 Hz
             %               Type: 1x2 numeric array [min_freq max_freq]
             %
             % Processing Steps:
@@ -160,31 +148,25 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %   [signal, bw] = obj.baseModulator(messageSignal);
 
             % Calculate message signal bandwidth for spectrum planning.
-            % 先测量消息带宽，后续按 USB/LSB 方向写入带宽区间。
             messageBandwidth = obw(messageSignal, obj.SampleRate);
 
             % Generate complex envelope based on sideband selection mode.
-            % 根据边带模式构造解析信号的正/负频率分量。
             if strcmp(obj.ModulatorConfig.mode, 'upper')
                 % Upper Sideband (USB) Generation:
-                % 上边带生成：虚部取 Hilbert 正交分量，保留正频率信息。
                 % Complex envelope = m(t) + j*H{m(t)}
                 % Results in positive frequency spectrum after upconversion
                 modulatedSignal = complex(messageSignal, imag(hilbert(messageSignal)));
 
                 % USB bandwidth: spans from DC to message bandwidth
-                % USB 带宽从直流到消息带宽。
                 bandWidth = [0, messageBandwidth];
 
             else % Lower sideband mode
                 % Lower Sideband (LSB) Generation:
-                % 下边带生成：反转 Hilbert 正交分量，保留负频率信息。
                 % Complex envelope = m(t) - j*H{m(t)}
                 % Results in negative frequency spectrum after upconversion
                 modulatedSignal = complex(messageSignal, -imag(hilbert(messageSignal)));
 
                 % LSB bandwidth: spans from negative message bandwidth to DC
-                % LSB 带宽从负消息带宽到直流。
                 bandWidth = [-messageBandwidth, 0];
             end
 
@@ -196,7 +178,6 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured SSB-AM modulator function handle
-            % 中文职责：补齐 SSB-AM 边带模式和模拟单天线约束，并返回调制函数句柄。
             %
             % This method configures the SSB-AM modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.
@@ -207,9 +188,7 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %   modulatorHandle = genModulatorHandle(obj)
             %
             % Output Arguments:
-            % 输出参数：
             %   modulatorHandle - Function handle for SSB-AM modulation
-            %   modulatorHandle - SSB-AM 调制函数句柄，输入消息信号并输出复包络与带宽
             %                     Type: function_handle
             %                     Usage: [signal, bw] = modulatorHandle(message)
             %
@@ -244,21 +223,17 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %   [modSignal, bandwidth] = modHandle(voiceData);
 
             % Set modulation type flags.
-            % 标记为模拟调制，并固定为单天线复包络生成。
             obj.IsDigital = false; % SSB-AM is analog modulation
             obj.NumTransmitAntennas = 1; % Single antenna (complex envelope constraint)
 
             % Configure sideband selection mode if not provided.
-            % 若蓝图未指定边带，随机选择 USB/LSB 以覆盖两类 SSB 行为。
             if ~isfield(obj.ModulatorConfig, 'mode')
                 % Random sideband selection for simulation variety
-                % 仿真中随机选择边带；真实业务可由法规/业务蓝图固定。
                 % In practice, this would be determined by band plan or application
                 obj.ModulatorConfig.mode = randsample(["upper", "lower"], 1);
             end
 
             % Create function handle for modulation.
-            % 生成统一调制入口，供 BaseModulator.stepImpl 调用。
             modulatorHandle = @(messageSignal)obj.baseModulator(messageSignal);
 
         end

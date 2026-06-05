@@ -1,6 +1,5 @@
 function simulation(worker_id, num_workers, config_name)
     % simulation - CSRD Framework Simulation Entry Point
-    % 中文说明：提供 CSRD 生产链路中的 simulation 实现。
     %
     % This function serves as the main entry point for ChangShuoRadioData (CSRD)
     % simulation execution. It creates and executes a SimulationRunner that manages
@@ -67,17 +66,8 @@ function simulation(worker_id, num_workers, config_name)
         % Reset global logging system to ensure clean initialization
         csrd.runtime.logger.GlobalLogManager.reset();
 
-        % Initialize global logging system with Log configuration
-        if isfield(configStruct, 'Log')
-            logConfig = configStruct.Log;
-        else
-            % Fallback to default log configuration
-            logConfig = struct();
-            logConfig.Name = 'CSRD';
-            logConfig.Level = 'INFO';
-            logConfig.SaveToFile = true;
-            logConfig.DisplayInConsole = true;
-        end
+        % Initialize global logging once from the runtime logging plan.
+        logConfig = configStruct.RuntimePlan.Logging;
 
         if isfield(configStruct, 'Runner') && isfield(configStruct.Runner, 'Data') && ...
                 isfield(configStruct.Runner.Data, 'OutputDirectory')
@@ -90,19 +80,21 @@ function simulation(worker_id, num_workers, config_name)
         csrd.runtime.logger.GlobalLogManager.initialize(logConfig, outputDir);
         logger = csrd.runtime.logger.GlobalLogManager.getLogger();
 
-        logger.info('=== CSRD Simulation Session Started ===');
-        logger.info('Worker: %d of %d', worker_id, num_workers);
-        logger.info('Configuration: %s', config_name);
-        logger.info('Output Directory: %s', outputDir);
+        localLogProgress(logger, logConfig, ...
+            '=== CSRD Simulation Session Started ===');
+        localLogProgress(logger, logConfig, 'Worker: %d of %d', ...
+            worker_id, num_workers);
+        localLogProgress(logger, logConfig, 'Configuration: %s', config_name);
+        localLogProgress(logger, logConfig, 'Output Directory: %s', outputDir);
 
         % === System Configuration Information ===
         sysInfoCollector = csrd.runtime.sysinfo.SystemInfoCollector();
         sysInfoCollector.collectAndLog(logger);
 
         % === Full Coverage Validation Dispatch ===
-        % 中文说明：当配置显式请求 Phase 13 覆盖验证时，仍从本入口调度所有生成 case。
         if isCoverageValidationConfig(configStruct)
-            logger.info('CoverageValidation.Enable=true; dispatching Phase 13 full coverage validation.');
+            localLogProgress(logger, logConfig, ...
+                'CoverageValidation.Enable=true; dispatching Phase 13 full coverage validation.');
             summary = csrd.support.validation.runFullCoverageValidation( ...
                 configStruct, config_name, projectRoot, worker_id, num_workers);
             fprintf(['[CSRD Simulation] Full coverage validation completed: ', ...
@@ -112,22 +104,28 @@ function simulation(worker_id, num_workers, config_name)
         end
 
         % === SimulationRunner Creation and Execution ===
-        logger.info('Creating SimulationRunner for worker %d of %d', worker_id, num_workers);
+        localLogProgress(logger, logConfig, ...
+            'Creating SimulationRunner for worker %d of %d', ...
+            worker_id, num_workers);
 
         % Create SimulationRunner with complete configuration
         runner = csrd.SimulationRunner('RunnerConfig', configStruct.Runner);
 
         % Configure runner with factory configurations (includes scenario config)
         runner.FactoryConfigs = configStruct.Factories;
+        runner.RuntimePlan = configStruct.RuntimePlan;
 
-        logger.info('Starting scenario-based simulation execution...');
+        localLogProgress(logger, logConfig, ...
+            'Starting scenario-based simulation execution...');
 
         % Execute simulation with worker parameters
         % SimulationRunner will manage scenarios and instantiate ChangShuo for each scenario
         runner(worker_id, num_workers);
 
-        logger.info('=== CSRD Simulation Session Completed Successfully ===');
-        logger.info('Worker %d finished processing', worker_id);
+        localLogProgress(logger, logConfig, ...
+            '=== CSRD Simulation Session Completed Successfully ===');
+        localLogProgress(logger, logConfig, ...
+            'Worker %d finished processing', worker_id);
 
     catch simulationError
         % Enhanced error handling with global logging
@@ -153,11 +151,43 @@ function simulation(worker_id, num_workers, config_name)
 
 end
 
+function localLogProgress(logger, loggingPlan, formatText, varargin)
+    % localLogProgress - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    logger.info(formatText, varargin{:});
+    if ~localShouldEchoProgress(logger, loggingPlan, 'Summary')
+        return;
+    end
+    fprintf('[CSRD Progress] %s\n', sprintf(formatText, varargin{:}));
+end
+
+function tf = localShouldEchoProgress(logger, loggingPlan, requiredMode)
+    % localShouldEchoProgress - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+    tf = false;
+    if nargin < 3 || isempty(requiredMode)
+        requiredMode = 'Summary';
+    end
+    if ~isstruct(loggingPlan) || ~isfield(loggingPlan, 'ConsoleEnabled') || ...
+            ~loggingPlan.ConsoleEnabled
+        return;
+    end
+    if csrd.runtime.logger.mlog.Level.INFO <= logger.CommandWindowThreshold
+        return;
+    end
+    mode = 'Summary';
+    if isfield(loggingPlan, 'ProgressMode') && ~isempty(loggingPlan.ProgressMode)
+        mode = char(string(loggingPlan.ProgressMode));
+    end
+    tf = strcmpi(mode, 'Detailed') || strcmpi(requiredMode, 'Summary');
+end
+
 function tf = isCoverageValidationConfig(configStruct)
     % isCoverageValidationConfig - Detect Phase 13 coverage validation configs.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：识别显式全量覆盖验证配置，避免普通 csrd2025 默认路径变重。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 
     tf = isfield(configStruct, 'CoverageValidation') && ...
         isstruct(configStruct.CoverageValidation) && ...
@@ -167,9 +197,8 @@ end
 
 function projectRoot = setupProjectPath()
     % setupProjectPath - Setup MATLAB path for CSRD project
-    % 中文说明：setupProjectPath 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This function adds the project root directory to MATLAB path
     % to ensure all packages (+csrd, +config, etc.) can be found.
@@ -206,9 +235,8 @@ end
 
 function validateInputParameters(worker_id, num_workers, config_name)
     % validateInputParameters - Validate simulation input parameters
-    % 中文说明：validateInputParameters 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This function validates all input parameters for the simulation function,
     % ensuring they meet the required constraints and data types.

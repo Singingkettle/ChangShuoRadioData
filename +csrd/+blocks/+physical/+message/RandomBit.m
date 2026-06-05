@@ -1,6 +1,5 @@
 classdef RandomBit < matlab.System
     % RandomBit - Random Binary Message Generator
-    % 中文说明：提供 CSRD 生产链路中的 RandomBit 实现。
     %
     % This class implements a configurable random binary message generator
     % for digital communication system simulations. The generator produces
@@ -186,9 +185,8 @@ classdef RandomBit < matlab.System
 
         function obj = RandomBit(varargin)
             % RandomBit - Constructor for random binary message generator
-            % 中文说明：RandomBit 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This constructor creates a RandomBit object with optional
             % property-value pairs for initial configuration.
@@ -216,9 +214,8 @@ classdef RandomBit < matlab.System
 
         function statistics = getStatistics(obj)
             % getStatistics - Get generation statistics
-            % 中文说明：getStatistics 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method returns statistical information about the bit
             % generation process when EnableStatistics is true.
@@ -269,9 +266,8 @@ classdef RandomBit < matlab.System
 
         function setupImpl(obj)
             % setupImpl - Initialize the random bit generator
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method sets up the random number generator with the
             % specified seed and initializes statistics tracking.
@@ -299,9 +295,8 @@ classdef RandomBit < matlab.System
 
         function messageOutput = stepImpl(obj, messageLength, symbolRate)
             % stepImpl - Generate random binary message sequence
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method generates a random binary sequence with the
             % specified length and symbol rate, applying the configured
@@ -377,9 +372,8 @@ classdef RandomBit < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Reset the random bit generator state
-            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method resets the internal random number generator and
             % statistics to their initial states.
@@ -406,9 +400,8 @@ classdef RandomBit < matlab.System
 
         function updateStatistics(obj, generatedBits, messageLength)
             % updateStatistics - Update internal generation statistics
-            % 中文说明：updateStatistics 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This private method updates running statistics about the
             % bit generation process for monitoring and analysis.

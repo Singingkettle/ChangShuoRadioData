@@ -1,6 +1,5 @@
 function run_csrd_static_gates()
 %RUN_CSRD_STATIC_GATES Cheap source checks for CI smoke.
-% 中文说明：提供 CSRD 生产链路中的 run_csrd_static_gates 实现。
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 
@@ -24,9 +23,8 @@ end
 
 function assertNoExecutablePattern(path, pattern)
     % assertNoExecutablePattern - Production declaration in CSRD.
-    % 中文说明：assertNoExecutablePattern 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(exist(path, 'file') == 2, ...
     'CSRD:CI:MissingStaticGateFile', ...
     'Static gate file does not exist: %s', path);
@@ -41,9 +39,8 @@ end
 
 function stripped = stripMatlabComments(code)
     % stripMatlabComments - Production declaration in CSRD.
-    % 中文说明：stripMatlabComments 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 lines = regexp(code, '\r\n|\n|\r', 'split');
 for i = 1:numel(lines)
     line = lines{i};

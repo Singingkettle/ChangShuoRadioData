@@ -1,6 +1,5 @@
 function entities = updateEntityCommunicationState(obj, entities, txConfigs, rxConfigs)
     % updateEntityCommunicationState - Update Entity Snapshots with communication state
-    % 中文说明：提供 CSRD 生产链路中的 updateEntityCommunicationState 实现。
     %
     % This function updates the Communication section of Entity Snapshots with
     % the allocated frequency, bandwidth, modulation, and other communication
@@ -77,9 +76,8 @@ end
 
 function [idx, entity] = findEntityById(entities, entityId)
     % findEntityById - Find entity by its ID
-    % 中文说明：findEntityById 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     idx = 0;
     entity = [];
     for i = 1:length(entities)
@@ -93,9 +91,8 @@ end
 
 function entity = updateTransmitterSnapshot(obj, entity, txConfig)
     % updateTransmitterSnapshot - Update transmitter entity's Communication snapshot
-    % 中文说明：updateTransmitterSnapshot 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     
     if ~isfield(entity, 'Snapshots') || isempty(entity.Snapshots)
         obj.logger.warning('Entity %s has no Snapshots, skipping communication update', entity.ID);
@@ -138,9 +135,8 @@ end
 
 function entity = updateReceiverSnapshot(entity, rxConfig)
     % updateReceiverSnapshot - Update receiver entity's Communication snapshot
-    % 中文说明：updateReceiverSnapshot 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     
     if ~isfield(entity, 'Snapshots') || isempty(entity.Snapshots)
         return;
@@ -172,9 +168,8 @@ end
 
 function idx = findLatestSnapshotIndex(snapshots)
     % findLatestSnapshotIndex - Find index of latest non-empty snapshot
-    % 中文说明：findLatestSnapshotIndex 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     idx = 0;
     for i = length(snapshots):-1:1
         if ~isempty(snapshots{i})

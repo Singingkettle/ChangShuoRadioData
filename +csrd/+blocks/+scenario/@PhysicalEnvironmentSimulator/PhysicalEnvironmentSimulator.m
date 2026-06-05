@@ -1,6 +1,5 @@
 classdef PhysicalEnvironmentSimulator < matlab.System
     % PhysicalEnvironmentSimulator - Physical World Environment Modeling and Simulation
-    % 中文说明：提供 CSRD 生产链路中的 PhysicalEnvironmentSimulator 实现。
     %
     % This class implements comprehensive physical environment modeling for wireless
     % communication scenarios, including geographical mapping, entity positioning,
@@ -44,7 +43,7 @@ classdef PhysicalEnvironmentSimulator < matlab.System
     %   config.Map.Boundaries = [-1000, 1000, -1000, 1000]; % [xmin, xmax, ymin, ymax]
     %   config.Entities.Transmitters.Count = [2, 6];
     %   config.Entities.Receivers.Count = [1, 3];
-    %   config.Mobility.DefaultModel = 'RandomWalk';
+    %   config.Mobility.DefaultModel = 'ConstantVelocity';
     %   config.TimeResolution = frameDurationSec; % seconds per receiver frame
     %
     %   simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', config);
@@ -117,9 +116,8 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function obj = PhysicalEnvironmentSimulator(varargin)
             % PhysicalEnvironmentSimulator - Constructor for physical environment simulator
-            % 中文说明：PhysicalEnvironmentSimulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new physical environment simulator with configurable
             % geographical, mobility, and environmental parameters.
@@ -134,9 +132,8 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function history = getStateHistory(obj)
             % getStateHistory - Get complete state history for scenario replay
-            % 中文说明：getStateHistory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns the complete simulation state history stored during
             % simulation execution, useful for scenario replay, debugging,
@@ -150,9 +147,8 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function clearStateHistory(obj)
             % clearStateHistory - Clear stored state history to free memory
-            % 中文说明：clearStateHistory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Clears the internal state history to free memory after simulation
             % completion or when history is no longer needed.
@@ -163,9 +159,8 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function timeRes = getTimeResolution(obj)
             % getTimeResolution - Get current time resolution setting
-            % 中文说明：getTimeResolution 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns the current time resolution used for simulation updates.
             %
@@ -177,9 +172,8 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function siteViewer = getSiteViewer(obj)
             % getSiteViewer - Get site viewer for OSM/ray tracing mode
-            % 中文说明：getSiteViewer 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns a physical-environment viewer if available. Production
             % OSM RayTracing keeps the heavy map handle in the channel block
@@ -201,6 +195,10 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         setupImpl(obj)
         [entities, environment] = stepImpl(obj, frameId)
         releaseImpl(obj)
+    end
+
+    methods
+        [entities, environment] = planInitialState(obj)
     end
 
     methods (Access = private)
@@ -251,9 +249,8 @@ classdef PhysicalEnvironmentSimulator < matlab.System
 
         function mobilityModel = assignMobilityModel(entityType, entityConfig)
             %ASSIGNMOBILITYMODEL Phase 3 strict-construction mobility resolver.
-            % 中文说明：assignMobilityModel 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % In Phase 3 (audit §3.1.ter / §17.5 P3-followup) the per-entity
             % mobility model MUST be supplied explicitly through the

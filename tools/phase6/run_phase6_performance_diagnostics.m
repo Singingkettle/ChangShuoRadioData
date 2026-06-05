@@ -1,8 +1,7 @@
 function results = run_phase6_performance_diagnostics(varargin)
 %RUN_PHASE6_PERFORMANCE_DIAGNOSTICS Read-only Phase 6 performance report.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 run_phase6_performance_diagnostics 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   RESULTS = run_phase6_performance_diagnostics() reads the frozen
 %   final-v04 baseline and the Phase 4 reference baseline, checks that
@@ -69,9 +68,8 @@ end
 
 function tf = isPositiveInteger(value)
     % isPositiveInteger - Production declaration in CSRD.
-    % 中文说明：isPositiveInteger 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 tf = isnumeric(value) && isscalar(value) && isfinite(value) && value >= 1 ...
     && floor(value) == value;
 end
@@ -79,9 +77,8 @@ end
 
 function path = resolvePath(projectRoot, supplied, defaultRelative)
     % resolvePath - Production declaration in CSRD.
-    % 中文说明：resolvePath 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if strlength(string(supplied)) == 0
     path = fullfile(projectRoot, defaultRelative);
 else
@@ -98,9 +95,8 @@ end
 
 function payload = readJsonStruct(path, label)
     % readJsonStruct - Production declaration in CSRD.
-    % 中文说明：readJsonStruct 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 payload = jsondecode(fileread(path));
 assert(isstruct(payload), ...
     'CSRD:Phase6:InvalidDiagnosticsInput', ...
@@ -110,9 +106,8 @@ end
 
 function comparison = buildBaselineComparison(referenceBaseline, finalBaseline)
     % buildBaselineComparison - Production declaration in CSRD.
-    % 中文说明：buildBaselineComparison 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 refMetrics = referenceBaseline.Metrics;
 finalMetrics = finalBaseline.Metrics;
 
@@ -142,9 +137,8 @@ end
 
 function out = compareMetric(refMetrics, finalMetrics, fieldName, policy)
     % compareMetric - Production declaration in CSRD.
-    % 中文说明：compareMetric 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 refValue = double(refMetrics.(fieldName));
 finalValue = double(finalMetrics.(fieldName));
 if refValue == 0
@@ -176,9 +170,8 @@ end
 
 function contracts = evaluateFrozenContracts(finalBaseline)
     % evaluateFrozenContracts - Production declaration in CSRD.
-    % 中文说明：evaluateFrozenContracts 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 metrics = finalBaseline.Metrics;
 diag = metrics.Diagnostics;
 runRecovery = finalBaseline.RunRecovery;
@@ -217,9 +210,8 @@ end
 
 function check = makeCheck(name, passed, value)
     % makeCheck - Production declaration in CSRD.
-    % 中文说明：makeCheck 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 check = struct( ...
     'Name', name, ...
     'Passed', logical(passed), ...
@@ -229,9 +221,8 @@ end
 
 function hotspots = inspectStaticHotspots(projectRoot)
     % inspectStaticHotspots - Production declaration in CSRD.
-    % 中文说明：inspectStaticHotspots 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 obwPath = fullfile(projectRoot, '+csrd', '+pipeline', '+measurement', ...
     'obwActual.m');
 rxPath = fullfile(projectRoot, '+csrd', '+core', '@ChangShuo', ...
@@ -271,9 +262,8 @@ end
 
 function item = makeHotspot(name, observed, path, note)
     % makeHotspot - Production declaration in CSRD.
-    % 中文说明：makeHotspot 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 item = struct( ...
     'Name', name, ...
     'Observed', logical(observed), ...
@@ -284,9 +274,8 @@ end
 
 function stripped = stripMatlabComments(code)
     % stripMatlabComments - Production declaration in CSRD.
-    % 中文说明：stripMatlabComments 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 lines = regexp(code, '\r\n|\n|\r', 'split');
 for i = 1:numel(lines)
     line = lines{i};
@@ -301,9 +290,8 @@ end
 
 function microbench = runMeasurementMicrobench(numRepeats)
     % runMeasurementMicrobench - Production declaration in CSRD.
-    % 中文说明：runMeasurementMicrobench 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 rng(20260428, 'twister');
 sampleRate = 50e6;
 n = 2 ^ 15;
@@ -343,9 +331,8 @@ end
 
 function writeResultsJson(results, outputPath)
     % writeResultsJson - Production declaration in CSRD.
-    % 中文说明：writeResultsJson 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 outDir = fileparts(outputPath);
 if ~isempty(outDir) && exist(outDir, 'dir') ~= 7
     mkdir(outDir);
@@ -362,9 +349,8 @@ end
 
 function printSummary(results)
     % printSummary - Production declaration in CSRD.
-    % 中文说明：printSummary 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 fprintf('=== CSRD Phase 6 performance diagnostics ===\n');
 fprintf('Final baseline: %s\n', results.FinalBaselinePath);
 fprintf('Reference baseline: %s\n', results.ReferenceBaselinePath);
@@ -394,9 +380,8 @@ end
 
 function text = passFail(tf)
     % passFail - Production declaration in CSRD.
-    % 中文说明：passFail 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if tf
     text = 'PASS';
 else

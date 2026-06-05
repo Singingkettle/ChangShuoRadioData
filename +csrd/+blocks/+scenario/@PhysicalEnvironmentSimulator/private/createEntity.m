@@ -1,8 +1,7 @@
 function entity = createEntity(obj, entityType, entityID, frameId)
     %CREATEENTITY Phase 3 strict-construction entity factory.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 createEntity 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Creates a single entity (Tx or Rx) with the canonical Snapshot-based
     % state container. Phase 3 (audit §3.1.ter / §17.5 P3-followup) removed
@@ -42,7 +41,7 @@ function entity = createEntity(obj, entityType, entityID, frameId)
     entity.ID = entityID;
     entity.Type = entityType;
     entity.CreationFrameId = frameId;
-    entity.CreationTime = frameId * obj.timeResolution;
+    entity.CreationTime = (frameId - 1) * obj.timeResolution;
 
     snapshotCapacity = resolveSnapshotCapacity(obj, frameId);
     entity.Snapshots = cell(1, snapshotCapacity);
@@ -73,15 +72,14 @@ end
 
 function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
     %CREATEINITIALSNAPSHOT Build the first Snapshot for a freshly created
-    % 中文说明：createInitialSnapshot 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % entity. Position must come from the validated map boundaries; the
     % previous ±1000 m fallback was removed in Phase 3.
 
     snapshot = struct();
     snapshot.FrameId = frameId;
-    snapshot.Timestamp = frameId * obj.timeResolution;
+    snapshot.Timestamp = (frameId - 1) * obj.timeResolution;
     snapshot.EntityID = entityID;
     snapshot.EntityType = entityType;
 
@@ -121,14 +119,21 @@ function snapshot = createInitialSnapshot(obj, entityType, entityID, frameId)
             class(bounds), numel(bounds));
     end
 
+    entityConfig = resolveEntityConfig(obj, entityType);
+    mobilityModel = csrd.blocks.scenario.PhysicalEnvironmentSimulator ...
+        .assignMobilityModel(entityType, entityConfig);
     cohortMaxSpeed = resolveCohortMaxSpeed(obj, entityType);
     maxSpeed = getMaxSpeedForEntityType(obj, entityType, ...
         'CohortMaxSpeedMps', cohortMaxSpeed);
-    snapshot.Physical.Velocity = [
-        randomInRange(obj, -maxSpeed, maxSpeed), ...
-        randomInRange(obj, -maxSpeed, maxSpeed), ...
-        0 ...
-    ];
+    if strcmpi(mobilityModel, 'Stationary')
+        snapshot.Physical.Velocity = [0, 0, 0];
+    else
+        snapshot.Physical.Velocity = [
+            randomInRange(obj, -maxSpeed, maxSpeed), ...
+            randomInRange(obj, -maxSpeed, maxSpeed), ...
+            0 ...
+        ];
+    end
 
     snapshot.Physical.Orientation = [
         randi([-180, 180]), ...
@@ -159,29 +164,27 @@ end
 
 function capacity = resolveSnapshotCapacity(obj, frameId)
     %RESOLVESNAPSHOTCAPACITY Pre-allocation hint driven by config.
-    % 中文说明：resolveSnapshotCapacity 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Snapshots are dynamic-grow cells (writes past the end auto-expand),
-    % but we honor obj.Config.Global.NumFramesPerScenario when available so
-    % long scenarios do not pay repeated reallocation costs.
+    % but we honor ScenarioPlan-derived obj.Config.Global.NumFrames when
+    % available so long scenarios do not pay repeated reallocation costs.
 
     capacity = max(100, frameId);
 
     if isfield(obj.Config, 'Global') && isstruct(obj.Config.Global) ...
-            && isfield(obj.Config.Global, 'NumFramesPerScenario') ...
-            && isnumeric(obj.Config.Global.NumFramesPerScenario) ...
-            && isscalar(obj.Config.Global.NumFramesPerScenario) ...
-            && obj.Config.Global.NumFramesPerScenario > 0
-        capacity = max(capacity, double(obj.Config.Global.NumFramesPerScenario));
+            && isfield(obj.Config.Global, 'NumFrames') ...
+            && isnumeric(obj.Config.Global.NumFrames) ...
+            && isscalar(obj.Config.Global.NumFrames) ...
+            && obj.Config.Global.NumFrames > 0
+        capacity = max(capacity, double(obj.Config.Global.NumFrames));
     end
 end
 
 function cohortMax = resolveCohortMaxSpeed(obj, entityType)
     %RESOLVECOHORTMAXSPEED Phase 4 §3.8.A / §3.8.C cohort speed lookup.
-    % 中文说明：resolveCohortMaxSpeed 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Pulls `Mobility.MaxSpeedMps` (canonical) or the legacy flat
     %   `MobilityModel.MaxSpeedMps` off the per-entity-type slice that
@@ -209,6 +212,16 @@ function cohortMax = resolveCohortMaxSpeed(obj, entityType)
         cohortMax = double(entityConfig.Mobility.MaxSpeedMps);
         return;
     end
+    if isstruct(entityConfig) && isfield(entityConfig, 'Mobility') ...
+            && isstruct(entityConfig.Mobility) ...
+            && isfield(entityConfig.Mobility, 'MaxSpeed') ...
+            && isstruct(entityConfig.Mobility.MaxSpeed) ...
+            && isfield(entityConfig.Mobility.MaxSpeed, 'Max') ...
+            && isnumeric(entityConfig.Mobility.MaxSpeed.Max) ...
+            && isscalar(entityConfig.Mobility.MaxSpeed.Max)
+        cohortMax = double(entityConfig.Mobility.MaxSpeed.Max);
+        return;
+    end
     if isstruct(entityConfig) && isfield(entityConfig, 'MobilityModel') ...
             && isstruct(entityConfig.MobilityModel) ...
             && isfield(entityConfig.MobilityModel, 'MaxSpeedMps') ...
@@ -220,9 +233,8 @@ end
 
 function entityConfig = resolveEntityConfig(obj, entityType)
     %RESOLVEENTITYCONFIG Pull the per-entity-type subtree from obj.Config.
-    % 中文说明：resolveEntityConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Phase 3 mandates that mobility selection lives next to the entity
     % count / height / initial-distribution settings. We accept either
     %   obj.Config.Entities.Transmitters / Receivers  (canonical, used by

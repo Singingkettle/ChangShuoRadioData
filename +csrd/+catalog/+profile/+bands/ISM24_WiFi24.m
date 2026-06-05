@@ -1,8 +1,7 @@
 function profile = ISM24_WiFi24()
 %ISM24_WIFI24 v0 band profile: 2.4 GHz ISM / WiFi (2400-2483.5 MHz).
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 ISM24_WiFi24 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Source numbers: docs/audits/2026-04-...refactor.md §5.bis A (row 3).
 % Schema:        docs/audits/phases/phase-2-blueprint.md §3.1.3.A.

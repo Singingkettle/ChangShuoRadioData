@@ -1,6 +1,5 @@
 classdef RayTracingFrequencySupportContractTest < matlab.unittest.TestCase
     % RayTracingFrequencySupportContractTest
-    % 中文说明：RayTracing 场景必须在频谱规划阶段排除 MATLAB 不支持的载波。
 
     methods (Test)
 

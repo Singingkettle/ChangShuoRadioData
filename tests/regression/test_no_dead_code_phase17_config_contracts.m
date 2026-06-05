@@ -1,6 +1,5 @@
 function test_no_dead_code_phase17_config_contracts()
 %TEST_NO_DEAD_CODE_PHASE17_CONFIG_CONTRACTS Phase 17 static contract gate.
-% 中文说明：禁止运行期合同旧字段和静默 fallback 回到生产链路。
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 
@@ -30,6 +29,18 @@ for k = 1:numel(prodFiles)
     end
     if contains(code, 'Global.FrameLength')
         violations{end + 1} = sprintf('%s reads/writes Global.FrameLength', rel); %#ok<AGROW>
+    end
+    if contains(code, 'Global.FrameDuration')
+        violations{end + 1} = sprintf('%s reads/writes Global.FrameDuration', rel); %#ok<AGROW>
+    end
+    if contains(code, 'Global.ObservationDuration')
+        violations{end + 1} = sprintf('%s reads/writes Global.ObservationDuration', rel); %#ok<AGROW>
+    end
+    if contains(code, 'Global.TimeResolution')
+        violations{end + 1} = sprintf('%s reads/writes Global.TimeResolution', rel); %#ok<AGROW>
+    end
+    if contains(code, 'normalizeRuntimeContracts')
+        violations{end + 1} = sprintf('%s calls legacy normalizeRuntimeContracts', rel); %#ok<AGROW>
     end
     if contains(code, 'messageLength = 1024')
         violations{end + 1} = sprintf('%s contains messageLength=1024 fallback', rel); %#ok<AGROW>

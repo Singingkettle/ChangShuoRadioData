@@ -1,6 +1,5 @@
 classdef DSBSCAM < csrd.blocks.physical.modulate.BaseModulator
     % DSBSCAM - Double Sideband Suppressed Carrier Amplitude Modulator
-    % 中文说明：提供 CSRD 生产链路中的 DSBSCAM 实现。
     %
     % This class implements Double Sideband Suppressed Carrier Amplitude Modulation
     % (DSB-SC AM) as a subclass of the BaseModulator. DSB-SC AM is a bandwidth-efficient
@@ -76,7 +75,7 @@ classdef DSBSCAM < csrd.blocks.physical.modulate.BaseModulator
     %   - Costas loop or pilot tone for phase synchronization
     %   - Higher complexity compared to envelope detection
     %
-    % References / 参考资料:
+    % References:
     %   - MathWorks obw occupied bandwidth documentation:
     %     https://www.mathworks.com/help/signal/ref/obw.html
     %
@@ -89,9 +88,8 @@ classdef DSBSCAM < csrd.blocks.physical.modulate.BaseModulator
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core DSB-SC AM modulation implementation
-            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method performs DSB-SC AM modulation by directly multiplying the
             % message signal with a suppressed carrier, creating both upper and lower
@@ -154,9 +152,8 @@ classdef DSBSCAM < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured DSB-SC AM modulator function handle
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method configures the DSB-SC AM modulator with default parameters if not
             % specified and returns a function handle for the complete modulation process.

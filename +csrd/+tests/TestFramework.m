@@ -1,6 +1,5 @@
 classdef TestFramework < handle
     % TestFramework - Comprehensive Testing Framework for CSRD Radio Communication System
-    % 中文说明：提供 CSRD 生产链路中的 TestFramework 实现。
     %
     % This class implements a sophisticated testing framework specifically designed
     % for the ChangShuoRadioData (CSRD) radio communication simulation system,
@@ -255,9 +254,8 @@ classdef TestFramework < handle
 
         function obj = TestFramework(varargin)
             % TestFramework - Constructor for comprehensive testing framework
-            % 中文说明：TestFramework 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new TestFramework instance with configurable testing
             % parameters, suite organization, and integration capabilities.
@@ -319,9 +317,8 @@ classdef TestFramework < handle
 
         function results = runAllTests(obj)
             % runAllTests - Execute complete test suite with comprehensive validation
-            % 中文说明：runAllTests 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes all registered test suites including unit tests, integration
             % tests, performance benchmarks, and regression validation. Provides
@@ -376,9 +373,8 @@ classdef TestFramework < handle
 
         function results = runTestSuite(obj, suiteName)
             % runTestSuite - Execute specific test suite
-            % 中文说明：runTestSuite 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes a specific test suite by name with detailed result
             % collection and analysis. Supports all registered test suites
@@ -433,9 +429,8 @@ classdef TestFramework < handle
 
         function results = runUnitTests(obj)
             % runUnitTests - Execute unit tests for individual components
-            % 中文说明：runUnitTests 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes comprehensive unit tests for all CSRD framework components
             % including message generators, modulation schemes, channel models,
@@ -448,9 +443,8 @@ classdef TestFramework < handle
 
         function results = runIntegrationTests(obj)
             % runIntegrationTests - Execute integration tests for system validation
-            % 中文说明：runIntegrationTests 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes end-to-end integration tests validating component
             % interactions, factory instantiation, and complete signal
@@ -463,9 +457,8 @@ classdef TestFramework < handle
 
         function results = runPerformanceTests(obj)
             % runPerformanceTests - Execute performance benchmarks and profiling
-            % 中文说明：runPerformanceTests 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes comprehensive performance benchmarks including execution
             % time profiling, memory usage analysis, and throughput measurement
@@ -478,9 +471,8 @@ classdef TestFramework < handle
 
         function results = runRegressionTests(obj)
             % runRegressionTests - Execute regression validation tests
-            % 中文说明：runRegressionTests 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes regression tests for stability validation, backward
             % compatibility verification, and API consistency checking
@@ -493,9 +485,8 @@ classdef TestFramework < handle
 
         function report = generateReport(obj, results)
             % generateReport - Generate comprehensive test report
-            % 中文说明：generateReport 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates detailed test reports with execution metrics, coverage
             % analysis, performance benchmarks, and failure diagnostics in
@@ -528,9 +519,8 @@ classdef TestFramework < handle
 
         function initializeDefaultConfiguration(obj)
             % Initialize default testing configuration
-            % 中文说明：initializeDefaultConfiguration 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.TestConfiguration = struct();
             obj.TestConfiguration.Parallel = false;
@@ -548,9 +538,8 @@ classdef TestFramework < handle
 
         function parseInputArguments(obj, varargin)
             % Parse input arguments and update configuration
-            % 中文说明：parseInputArguments 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             p = inputParser;
             addParameter(p, 'TestConfiguration', obj.TestConfiguration, @isstruct);
@@ -575,9 +564,8 @@ classdef TestFramework < handle
 
         function initializeTestSuites(obj)
             % Initialize and register all test suites
-            % 中文说明：initializeTestSuites 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Unit test suites
             obj.TestSuites('Unit') = obj.createUnitTestSuite();
@@ -602,9 +590,8 @@ classdef TestFramework < handle
 
         function initializeMockObjects(obj)
             % Initialize mock object registry
-            % 中文说明：initializeMockObjects 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if obj.TestConfiguration.MockObjectsEnabled
                 obj.MockObjects('MessageFactory') = obj.createMockMessageFactory();
@@ -618,9 +605,8 @@ classdef TestFramework < handle
 
         function initializeTestData(obj)
             % Initialize test data repository
-            % 中文说明：initializeTestData 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.TestData = struct();
             obj.TestData.ReferenceSignals = obj.loadReferenceSignals();
@@ -632,9 +618,8 @@ classdef TestFramework < handle
 
         function initializeTestInfrastructure(obj)
             % Initialize test runner and analysis tools
-            % 中文说明：initializeTestInfrastructure 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Create test runner with appropriate plugins
             import matlab.unittest.TestRunner;

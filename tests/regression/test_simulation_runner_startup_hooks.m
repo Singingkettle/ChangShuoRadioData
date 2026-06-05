@@ -6,7 +6,7 @@ function test_simulation_runner_startup_hooks()
     %   Hook coverage:
     %     1. validateRequiredToolboxes('minimal') runs without throwing
     %        on the host MATLAB.
-    %     2. LogPolicy('Standard') is applied; logger thresholds match
+    %     2. RuntimePlan.Logging('Standard') is used; thresholds match
     %        the documented (INFO console, DEBUG file) pair.
     %     3. saveScenarioData round-trips an annotation containing
     %        NaN/Inf/complex through sanitizeForJson and decorates it
@@ -38,20 +38,20 @@ function test_simulation_runner_startup_hooks()
     runnerCfg.Engine.Handle = ...
         'Phase0FakeEngine'; % function handle resolved via feval below
     runnerCfg.Toolbox.Level = 'minimal';
-    runnerCfg.Log = struct( ...
-        'Name', 'CSRD-Phase0-Startup', ...
-        'Level', 'DEBUG', ...
-        'SaveToFile', true, ...
-        'DisplayInConsole', true, ...
-        'Policy', 'Standard');
-
-    % Initialise the global logger BEFORE constructing the runner so
-    % LogPolicy.apply() has a concrete singleton to mutate.
+    masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
+    masterCfg.Runner = runnerCfg;
+    masterCfg.Logging.Name = 'CSRD-Phase0-Startup';
+    masterCfg.Logging.Policy = 'Standard';
+    masterCfg.Logging.Console.Enabled = true;
+    masterCfg.Logging.File.Enabled = true;
+    masterCfg.Logging.Progress.Mode = 'Detailed';
+    masterCfg = csrd.pipeline.runtime.buildRuntimePlan(masterCfg);
     csrd.runtime.logger.GlobalLogManager.initialize( ...
-        runnerCfg.Log, fullfile(tempRoot, 'phase0_startup_logs'));
-
+        masterCfg.RuntimePlan.Logging, fullfile(tempRoot, 'phase0_startup_logs'));
     runner = csrd.SimulationRunner( ...
-        'RunnerConfig', runnerCfg, 'FactoryConfigs', struct());
+        'RunnerConfig', runnerCfg, ...
+        'FactoryConfigs', masterCfg.Factories, ...
+        'RuntimePlan', masterCfg.RuntimePlan);
 
     % --- Hook 1+2: setup() should not throw ------------------------------
     setup(runner);
@@ -99,10 +99,10 @@ function test_simulation_runner_startup_hooks()
     fprintf('  [OK] Hook 4: Header.Runtime carries %d mandatory keys.\n', ...
         numel(requiredKeys));
 
-    % LogPolicy description should report the applied tier.
-    assert(strcmp(rt.LogPolicy.Level, 'Standard'), ...
-        'Header.Runtime.LogPolicy.Level expected "Standard", got "%s".', ...
-        rt.LogPolicy.Level);
+    % LogPolicy description should report the startup logging plan.
+    assert(strcmp(rt.LogPolicy.Policy, 'Standard'), ...
+        'Header.Runtime.LogPolicy.Policy expected "Standard", got "%s".', ...
+        rt.LogPolicy.Policy);
     assert(strcmp(rt.ToolboxLevel, 'minimal'), ...
         'Header.Runtime.ToolboxLevel expected "minimal", got "%s".', ...
         rt.ToolboxLevel);

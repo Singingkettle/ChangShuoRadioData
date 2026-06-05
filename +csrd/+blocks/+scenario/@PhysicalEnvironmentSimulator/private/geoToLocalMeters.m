@@ -1,6 +1,7 @@
 function xyMeters = geoToLocalMeters(latDeg, lonDeg, bounds)
 %GEOTOLOCALMETERS Convert latitude/longitude degrees to local meters.
-% 中文说明：采用局部等距近似，把经纬度坐标转换为以地图中心为原点的米制 x/y。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 [originLat, originLon] = getGeoOriginFromBounds(bounds);
 earthRadiusMeters = 6371008.8;
 lat0 = deg2rad(originLat);

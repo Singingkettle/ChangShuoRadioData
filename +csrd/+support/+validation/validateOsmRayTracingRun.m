@@ -1,13 +1,12 @@
 function summary = validateOsmRayTracingRun(dataRoot, varargin)
 %VALIDATEOSMRAYTRACINGRUN Validate generated OSM RayTracing annotations.
-% 中文说明：扫描正式生成目录，验证 OSM RayTracing、building/flat MapProfile 和标注执行事实一致。
 %
-% Inputs / 输入:
+% Inputs:
 %   dataRoot - dataset or run root containing session annotations.
 %   'RequireBuilding' - require at least one building OSM source.
 %   'RequireFlat' - require at least one empty/no-building flat-terrain source.
 %
-% Outputs / 输出:
+% Outputs:
 %   summary - counts and coverage labels for the scanned run.
 
 p = inputParser;
@@ -114,7 +113,8 @@ end
 
 function value = getTextField(s, fieldName, fallback)
 % getTextField - Read a text field from a struct with a safe fallback.
-% 中文说明：从结构体读取文本字段，缺失时返回指定默认值。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 if isstruct(s) && isfield(s, fieldName) && ~isempty(s.(fieldName))
     value = char(string(s.(fieldName)));
 else

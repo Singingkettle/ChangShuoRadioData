@@ -1,6 +1,5 @@
 classdef SystemInfoCollector < handle
     % SystemInfoCollector - System configuration information collector for CSRD framework
-    % 中文说明：提供 CSRD 生产链路中的 SystemInfoCollector 实现。
     %
     % This class provides comprehensive system configuration collection capabilities
     % including hardware (CPU, memory, disk, GPU) and software (MATLAB, OS, toolboxes)
@@ -35,9 +34,8 @@ classdef SystemInfoCollector < handle
 
         function obj = SystemInfoCollector()
             % SystemInfoCollector - Constructor
-            % 中文说明：SystemInfoCollector 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new SystemInfoCollector instance ready for
             % system configuration information collection.
@@ -48,9 +46,8 @@ classdef SystemInfoCollector < handle
 
         function collectAndLog(obj, logger)
             % collectAndLog - Collect and log comprehensive system configuration
-            % 中文说明：collectAndLog 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method collects detailed system configuration information and
             % logs it using the provided logger with beautiful formatting.
@@ -100,9 +97,8 @@ classdef SystemInfoCollector < handle
 
         function sysInfo = getSystemInfo(obj)
             % getSystemInfo - Get system information as struct
-            % 中文说明：getSystemInfo 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns the collected system information as a structured data.
             %
@@ -122,9 +118,8 @@ classdef SystemInfoCollector < handle
 
         function collectHardwareInfo(obj, logger)
             % collectHardwareInfo - Collect hardware configuration information
-            % 中文说明：collectHardwareInfo 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             try
                 % CPU Information
@@ -277,9 +272,8 @@ classdef SystemInfoCollector < handle
 
         function collectSoftwareInfo(obj, logger)
             % collectSoftwareInfo - Collect software configuration information
-            % 中文说明：collectSoftwareInfo 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             try
                 % MATLAB Version Information
@@ -380,9 +374,8 @@ classdef SystemInfoCollector < handle
 
         function collectSimulationEnvironmentInfo(obj, logger)
             % collectSimulationEnvironmentInfo - Collect simulation-specific environment info
-            % 中文说明：collectSimulationEnvironmentInfo 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             try
                 % Current working directory
@@ -442,9 +435,8 @@ classdef SystemInfoCollector < handle
 
         function collectSystemInfoSilent(obj)
             % collectSystemInfoSilent - Collect system information without logging
-            % 中文说明：collectSystemInfoSilent 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method collects system information and stores it in the
             % systemInfo property without producing log output.
@@ -478,9 +470,8 @@ classdef SystemInfoCollector < handle
 
         function collector = getInstance()
             % getInstance - Get a singleton instance of SystemInfoCollector
-            % 中文说明：getInstance 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Returns a singleton instance for consistent system information
             % collection across the application.

@@ -1,13 +1,11 @@
 classdef RegionSpectrumSelector
     %REGIONSPECTRUMSELECTOR Deterministic-region, stochastic-service selector.
-    % 中文说明：提供 CSRD 生产链路中的 RegionSpectrumSelector 实现。
 
     methods (Static)
         function tf = isEnabled(config)
             % isEnabled - Production declaration in CSRD.
-            % 中文说明：isEnabled 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             tf = isstruct(config) && isfield(config, 'Regulatory') ...
                 && isstruct(config.Regulatory) ...
                 && isfield(config.Regulatory, 'Enable') ...
@@ -16,9 +14,8 @@ classdef RegionSpectrumSelector
 
         function plan = selectScenarioPlan(config, receiverConfig, numTransmitters)
             % selectScenarioPlan - Production declaration in CSRD.
-            % 中文说明：selectScenarioPlan 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             regulatory = normalizeRegulatoryConfig(config);
             catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load(regulatory.RegionId);
             bands = filterBands(catalog.Bands, regulatory);
@@ -77,9 +74,8 @@ end
 
 function regulatory = normalizeRegulatoryConfig(config)
     % normalizeRegulatoryConfig - Production declaration in CSRD.
-    % 中文说明：normalizeRegulatoryConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if ~isfield(config, 'Regulatory') || ~isstruct(config.Regulatory)
     error('CSRD:Spectrum:MissingRegulatoryConfig', ...
         'CommunicationBehavior.Regulatory must be configured when regulatory planning is enabled.');
@@ -153,9 +149,8 @@ end
 
 function tf = isLogicalScalar(value)
     % isLogicalScalar - Production declaration in CSRD.
-    % 中文说明：isLogicalScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 tf = (islogical(value) || isnumeric(value)) && isscalar(value) && ...
     isfinite(double(value));
 end
@@ -163,9 +158,8 @@ end
 
 function sampleRateHz = resolveSampleRate(receiverConfig)
     % resolveSampleRate - Production declaration in CSRD.
-    % 中文说明：resolveSampleRate 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 sampleRateHz = 50e6;
 if isstruct(receiverConfig) && isfield(receiverConfig, 'SampleRate') ...
         && ~isempty(receiverConfig.SampleRate)
@@ -181,9 +175,8 @@ end
 
 function bands = filterBands(allBands, regulatory)
     % filterBands - Production declaration in CSRD.
-    % 中文说明：filterBands 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 keep = false(size(allBands));
 for k = 1:numel(allBands)
     b = allBands(k);
@@ -201,9 +194,8 @@ end
 
 function bands = filterBandsByRequiredCarrierRange(bands, sampleRateHz, regulatory)
     % filterBandsByRequiredCarrierRange - Apply channel-model carrier support.
-    % 中文说明：按当前传播模型支持的接收机载波范围过滤 monitoring band。
-    % Inputs / 输入: regulatory bands, receiver sample rate, runtime range.
-    % 输出 / Outputs: bands that can place the receiver center in range.
+    % Inputs: regulatory bands, receiver sample rate, runtime range.
+    % Outputs: bands that can place the receiver center in range.
 if isempty(regulatory.RequiredCarrierFrequencyRangeHz)
     return;
 end
@@ -234,9 +226,8 @@ end
 
 function rank = tierRank(tier)
     % tierRank - Production declaration in CSRD.
-    % 中文说明：tierRank 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 tier = lower(char(string(tier)));
 switch tier
     case 'tier1'
@@ -251,9 +242,8 @@ end
 
 function anchor = selectMonitoringAnchor(bands, regulatory)
     % selectMonitoringAnchor - Production declaration in CSRD.
-    % 中文说明：selectMonitoringAnchor 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if isfield(regulatory.MonitoringBand, 'FixedBandId') && ...
         ~isempty(regulatory.MonitoringBand.FixedBandId)
     fixedId = char(string(regulatory.MonitoringBand.FixedBandId));
@@ -271,9 +261,8 @@ end
 
 function centerHz = selectMonitoringCenter(anchor, sampleRateHz, regulatory)
     % selectMonitoringCenter - Production declaration in CSRD.
-    % 中文说明：selectMonitoringCenter 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if isfield(regulatory.MonitoringBand, 'CenterFrequencyHz') && ...
         isnumeric(regulatory.MonitoringBand.CenterFrequencyHz) && ...
         isscalar(regulatory.MonitoringBand.CenterFrequencyHz) && ...
@@ -323,7 +312,8 @@ end
 
 function [centerMin, centerMax] = monitoringCenterBounds(anchor, sampleRateHz, regulatory)
     % monitoringCenterBounds - Receiver center bounds that cover the band.
-    % 中文说明：给定采样率，计算接收机中心频点可覆盖 monitoring band 的范围。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     %#ok<INUSD> regulatory is kept for signature symmetry with callers.
 window = double(anchor.FrequencyRangeHz);
 if diff(window) <= sampleRateHz
@@ -345,9 +335,8 @@ end
 
 function bands = filterBandsForReceiverWindow(allBands, receiverPlan, regulatory)
     % filterBandsForReceiverWindow - Production declaration in CSRD.
-    % 中文说明：filterBandsForReceiverWindow 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 rxWindow = receiverPlan.MonitoringRangeHz;
 keep = false(size(allBands));
 restrictToBand = regulatory.RestrictEmittersToMonitoringBand && ...
@@ -370,9 +359,8 @@ end
 
 function plan = selectEmitterPlan(band, receiverPlan, catalog, regulatory)
     % selectEmitterPlan - Production declaration in CSRD.
-    % 中文说明：selectEmitterPlan 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 bwChoices = usableBandwidthsForReceiverWindow(band, receiverPlan, regulatory);
 if isempty(bwChoices)
     error('CSRD:Spectrum:NoUsableBandwidth', ...
@@ -418,9 +406,8 @@ end
 
 function bwChoices = usableBandwidths(band, sampleRateHz, regulatory)
     % usableBandwidths - Production declaration in CSRD.
-    % 中文说明：usableBandwidths 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 raw = zeros(1, numel(band.RecommendedBandwidthsHz));
 for k = 1:numel(band.RecommendedBandwidthsHz)
     raw(k) = double(band.RecommendedBandwidthsHz{k});
@@ -432,7 +419,8 @@ end
 
 function bwChoices = usableBandwidthsForReceiverWindow(band, receiverPlan, regulatory)
     % usableBandwidthsForReceiverWindow - Candidate bandwidths that can be placed.
-    % 中文说明：只保留在接收机当前监测窗口内存在合法中心频点的带宽。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 raw = usableBandwidths(band, receiverPlan.SampleRateHz, regulatory);
 keep = false(size(raw));
 for k = 1:numel(raw)
@@ -444,7 +432,8 @@ end
 
 function tf = canPlaceBandwidthInReceiverWindow(band, bandwidthHz, receiverPlan)
     % canPlaceBandwidthInReceiverWindow - Validate center feasibility.
-    % 中文说明：带宽只有在 band 与接收窗口交集内存在合法中心频点时才可随机选择。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 rxWindow = receiverPlan.MonitoringRangeHz;
 centerMin = max(band.FrequencyRangeHz(1) + bandwidthHz / 2, ...
     rxWindow(1) + bandwidthHz / 2);
@@ -475,9 +464,8 @@ end
 
 function centerHz = selectCenterInBand(band, bandwidthHz, receiverPlan)
     % selectCenterInBand - Production declaration in CSRD.
-    % 中文说明：selectCenterInBand 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 rxWindow = receiverPlan.MonitoringRangeHz;
 centerMin = max(band.FrequencyRangeHz(1) + bandwidthHz / 2, rxWindow(1) + bandwidthHz / 2);
 centerMax = min(band.FrequencyRangeHz(2) - bandwidthHz / 2, rxWindow(2) - bandwidthHz / 2);
@@ -515,9 +503,8 @@ end
 
 function band = weightedBandChoice(bands)
     % weightedBandChoice - Production declaration in CSRD.
-    % 中文说明：weightedBandChoice 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 weights = [bands.PriorityWeight];
 weights(~isfinite(weights) | weights < 0) = 0;
 if all(weights == 0)
@@ -535,18 +522,16 @@ end
 
 function value = chooseCellValue(values)
     % chooseCellValue - Production declaration in CSRD.
-    % 中文说明：chooseCellValue 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 value = values{randi(numel(values))};
 end
 
 
 function order = defaultModulationOrder(family)
     % defaultModulationOrder - Production declaration in CSRD.
-    % 中文说明：defaultModulationOrder 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 family = char(string(family));
 switch family
     case {'FM','PM','AM','SSBAM','DSBAM','DSBSCAM','VSBAM'}
@@ -570,9 +555,8 @@ end
 
 function p = emptyEmitterPlan()
     % emptyEmitterPlan - Production declaration in CSRD.
-    % 中文说明：emptyEmitterPlan 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 p = struct( ...
     'RegionId', '', ...
     'BandId', '', ...

@@ -1,6 +1,5 @@
 classdef RuntimeTruthContractTest < matlab.unittest.TestCase
     % RuntimeTruthContractTest - Phase 18 runtime truth validator coverage.
-    % 中文说明：运行真值合同必须在配置加载后形成单一权威。
 
     methods (Test)
         function configLoaderStampsRuntimeTruthContract(testCase)
@@ -14,8 +13,9 @@ classdef RuntimeTruthContractTest < matlab.unittest.TestCase
                 cfg.Factories.Scenario.CommunicationBehavior.Receiver.SampleRate);
             testCase.verifyEqual(truth.Receiver.RealCarrierFrequencyHz, ...
                 cfg.Factories.Scenario.CommunicationBehavior.Receiver.RealCarrierFrequency);
-            testCase.verifyEqual(truth.Frame.FrameNumSamples, ...
-                cfg.Factories.Scenario.Global.FrameNumSamples);
+            testCase.verifyTrue(isfield(cfg.Metadata.RuntimeContracts, ...
+                'FramePolicy'));
+            testCase.verifyFalse(isfield(truth, 'Frame'));
         end
 
         function deprecatedLinkBudgetCarrierFailsAtRuntimeContractBoundary(testCase)

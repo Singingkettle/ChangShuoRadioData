@@ -1,8 +1,7 @@
 function transmissionState = calculateTransmissionState(obj, frameId, txConfig)
     %CALCULATETRANSMISSIONSTATE Compute the per-frame transmission state.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 calculateTransmissionState 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   The state is the *only* contract the downstream segment-generation
     %   code is allowed to consume. After the v0.4 deep refactor it carries

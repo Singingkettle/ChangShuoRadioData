@@ -1,6 +1,5 @@
 classdef AnnotationExecutionSampleGridContractTest < matlab.unittest.TestCase
     % AnnotationExecutionSampleGridContractTest - Annotation uses inserted samples.
-    % 中文说明：Truth.Execution 时间必须来自接收端实际插入样点。
 
     methods (Test)
         function receiverProcessingContainsSampleGridValidator(testCase)

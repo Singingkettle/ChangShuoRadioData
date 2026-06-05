@@ -1,6 +1,7 @@
 function summary = write_massive_pilot_slow_summary(artifactRoot, varargin)
 %WRITE_MASSIVE_PILOT_SLOW_SUMMARY Summarize slow scenarios from live logs.
-% 中文说明：只读取 massive watchdog artifacts，写 ignored 慢场景摘要，不影响仿真进程。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 if nargin < 1
     artifactRoot = '';
@@ -45,6 +46,9 @@ localWriteText(summary.LatestMarkdown, localSlowScenarioMarkdown(summary));
 end
 
 function chunk = localResolveChunk(manifest, requestedChunkId)
+    % localResolveChunk - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 chunk = struct();
 if ~isempty(requestedChunkId)
     chunk = localFindChunkById(manifest, double(requestedChunkId));
@@ -72,6 +76,9 @@ end
 end
 
 function chunk = localFindChunkById(manifest, requestedChunkId)
+    % localFindChunkById - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 chunk = struct();
 if isfield(manifest, 'ActiveChunk') && isstruct(manifest.ActiveChunk) && ...
         isfield(manifest.ActiveChunk, 'ChunkId') && ...
@@ -94,6 +101,9 @@ error('CSRD:MassiveSlowSummary:ChunkIdMissing', ...
 end
 
 function workers = localInferWorkers(chunk)
+    % localInferWorkers - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 workers = struct('WorkerId', {}, 'DataRoot', {});
 if ~isfield(chunk, 'DataChunkRoot') || ~isfolder(chunk.DataChunkRoot)
     return;
@@ -114,6 +124,9 @@ end
 end
 
 function summary = localCollectSlowScenarioSummary(chunk, topN)
+    % localCollectSlowScenarioSummary - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 records = localParseScenarioProgressLogs(chunk);
 records = localAttachAnnotationMetadata(records, chunk);
 if ~isempty(records)
@@ -147,6 +160,9 @@ summary = struct( ...
 end
 
 function records = localParseScenarioProgressLogs(chunk)
+    % localParseScenarioProgressLogs - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 records = localEmptySlowScenarioRecord();
 records = records([]);
 files = [localListFiles(chunk.ChunkRoot, '*.log'); ...
@@ -185,6 +201,9 @@ end
 end
 
 function records = localParseScenarioPerformanceTrace(chunk)
+    % localParseScenarioPerformanceTrace - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 records = localEmptySlowScenarioRecord();
 records = records([]);
 files = localListFiles(fullfile(chunk.ChunkRoot, 'performance'), ...
@@ -223,6 +242,9 @@ end
 end
 
 function records = localAppendMissingScenarioRecords(records, extraRecords)
+    % localAppendMissingScenarioRecords - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 existingKeys = strings(1, numel(records));
 for idx = 1:numel(records)
     existingKeys(idx) = localScenarioRecordKey(records(idx));
@@ -237,10 +259,16 @@ end
 end
 
 function key = localScenarioRecordKey(record)
+    % localScenarioRecordKey - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 key = sprintf('w%.0f-s%.0f', record.WorkerId, record.ScenarioId);
 end
 
 function records = localAttachAnnotationMetadata(records, chunk)
+    % localAttachAnnotationMetadata - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(records)
     return;
 end
@@ -257,6 +285,9 @@ end
 end
 
 function metadata = localCollectAnnotationScenarioMetadata(chunk)
+    % localCollectAnnotationScenarioMetadata - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 metadata = localEmptyAnnotationScenarioMetadata();
 metadata = metadata([]);
 files = {};
@@ -298,6 +329,9 @@ end
 end
 
 function artifactRoot = localArtifactRootFromChunk(chunk)
+    % localArtifactRootFromChunk - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 artifactRoot = '';
 if ~isfield(chunk, 'ChunkRoot') || isempty(chunk.ChunkRoot)
     return;
@@ -309,10 +343,16 @@ end
 end
 
 function part = getLastPathPart(pathText)
+    % getLastPathPart - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 [~, part] = fileparts(char(string(pathText)));
 end
 
 function scenarioId = localScenarioIdFromAnnotationPath(pathText)
+    % localScenarioIdFromAnnotationPath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 scenarioId = NaN;
 tokens = regexp(char(string(pathText)), ...
     'scenario_(\d+)_annotation\.json$', 'tokens', 'once');
@@ -322,6 +362,9 @@ end
 end
 
 function value = localFirstNumericField(payload, names)
+    % localFirstNumericField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = NaN;
 for idx = 1:numel(names)
     values = localExtractFieldValues(payload, names{idx});
@@ -333,6 +376,9 @@ end
 end
 
 function item = localEmptySlowScenarioRecord()
+    % localEmptySlowScenarioRecord - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 item = struct('WorkerId', NaN, 'Status', '', 'ScenarioIndex', NaN, ...
     'WorkerScenarioCount', NaN, 'ScenarioId', NaN, 'DurationSec', NaN, ...
     'OSMFile', '', 'MapMode', '', 'HasBuildings', false, ...
@@ -340,11 +386,17 @@ item = struct('WorkerId', NaN, 'Status', '', 'ScenarioIndex', NaN, ...
 end
 
 function item = localEmptyAnnotationScenarioMetadata()
+    % localEmptyAnnotationScenarioMetadata - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 item = struct('ScenarioId', NaN, 'OSMFile', '', 'MapMode', '', ...
     'HasBuildings', false, 'OSMFileSizeMB', NaN);
 end
 
 function values = localExtractFieldValues(value, fieldName)
+    % localExtractFieldValues - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 values = {};
 if isstruct(value)
     for elemIdx = 1:numel(value)
@@ -365,6 +417,9 @@ end
 end
 
 function value = localStructCharField(source, fieldName, defaultValue)
+    % localStructCharField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = defaultValue;
 if isstruct(source) && isfield(source, fieldName) && ~isempty(source.(fieldName))
     value = char(string(source.(fieldName)));
@@ -372,6 +427,9 @@ end
 end
 
 function value = localStructLogicalField(source, fieldName, defaultValue)
+    % localStructLogicalField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = logical(defaultValue);
 if isstruct(source) && isfield(source, fieldName) && ~isempty(source.(fieldName))
     raw = source.(fieldName);
@@ -386,6 +444,9 @@ end
 end
 
 function value = localStructDoubleField(source, fieldName, defaultValue)
+    % localStructDoubleField - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = defaultValue;
 if isstruct(source) && isfield(source, fieldName) && ...
         isnumeric(source.(fieldName)) && isscalar(source.(fieldName)) && ...
@@ -395,6 +456,9 @@ end
 end
 
 function text = localSlowScenarioMarkdown(summary)
+    % localSlowScenarioMarkdown - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 lines = {};
 lines{end + 1} = '# Phase 28 Slow Scenario Summary'; %#ok<AGROW>
 lines{end + 1} = ''; %#ok<AGROW>
@@ -420,6 +484,9 @@ text = strjoin(lines, newline);
 end
 
 function text = localBoolText(value)
+    % localBoolText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if value
     text = 'true';
 else
@@ -428,6 +495,9 @@ end
 end
 
 function text = localMarkdownCell(value)
+    % localMarkdownCell - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 text = char(string(value));
 text = strrep(text, '|', '\|');
 text = strrep(text, sprintf('\r'), ' ');
@@ -435,6 +505,9 @@ text = strrep(text, sprintf('\n'), ' ');
 end
 
 function files = localListFiles(rootDir, pattern)
+    % localListFiles - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 files = {};
 if ~isfolder(rootDir)
     return;
@@ -449,6 +522,9 @@ files = files(:);
 end
 
 function text = localReadText(pathText)
+    % localReadText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fid = fopen(pathText, 'r');
 if fid == -1
     text = '';
@@ -460,6 +536,9 @@ clear cleanup;
 end
 
 function localWriteText(pathText, text)
+    % localWriteText - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 parent = fileparts(pathText);
 if ~isempty(parent) && ~isfolder(parent)
     mkdir(parent);
@@ -475,6 +554,9 @@ clear cleanup;
 end
 
 function localWriteJson(pathText, payload)
+    % localWriteJson - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 parent = fileparts(pathText);
 if ~isempty(parent) && ~isfolder(parent)
     mkdir(parent);
@@ -490,16 +572,25 @@ clear cleanup;
 end
 
 function stamp = localUtcNow()
+    % localUtcNow - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 stamp = char(datetime('now', 'TimeZone', 'UTC', ...
     'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'''));
 end
 
 function tf = localIsAbsolutePath(pathText)
+    % localIsAbsolutePath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 pathText = char(string(pathText));
 tf = ~isempty(regexp(pathText, '^[A-Za-z]:[\\/]|^[/\\]', 'once'));
 end
 
 function projectRoot = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 end

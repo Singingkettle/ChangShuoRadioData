@@ -1,6 +1,5 @@
 classdef MSK < csrd.blocks.physical.modulate.digital.FSK.FSK
     % MSK - Minimum Shift Keying Modulator
-    % 中文说明：提供 CSRD 生产链路中的 MSK 实现。
     %
     % This class implements Minimum Shift Keying (MSK) modulation as a subclass
     % of the FSK modulator. MSK is a special case of Continuous Phase Frequency
@@ -70,9 +69,8 @@ classdef MSK < csrd.blocks.physical.modulate.digital.FSK.FSK
 
         function [modulatedSignal, bandWidth] = baseModulator(obj, inputBits)
             % baseModulator - Core MSK modulation implementation with preprocessing
-            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method performs MSK modulation with proper data length validation
             % and preprocessing for differential encoding modes. MSK requires even
@@ -129,9 +127,8 @@ classdef MSK < csrd.blocks.physical.modulate.digital.FSK.FSK
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Generate configured MSK modulator function handle
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method configures the MSK modulator with default parameters if not
             % specified and returns a function handle for the complete modulation

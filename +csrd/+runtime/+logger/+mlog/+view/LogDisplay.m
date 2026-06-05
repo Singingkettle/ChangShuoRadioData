@@ -1,6 +1,5 @@
 classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
     % Display log messages
-    % 中文说明：提供 CSRD 生产链路中的 LogDisplay 实现。
 
     % Copyright 2022 The MathWorks Inc.
 
@@ -65,9 +64,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function setup(obj)
             % Configure the widget
-            % 中文说明：setup 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Grid Layout to manage building blocks
             obj.Grid = uigridlayout(obj,[1 1]);
@@ -83,9 +81,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function update(obj)
             % Update display
-            % 中文说明：update 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Get the list of messages
             if ~isempty(obj.Log) && isvalid(obj.Log)
@@ -129,9 +126,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function requestUpdate(obj)
             % Request an update occur at next draw
-            % 中文说明：requestUpdate 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.IsDirty = true;
 
@@ -140,9 +136,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function attachListener(obj)
             % Attach listener to log
-            % 中文说明：attachListener 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if isempty(obj.Log) || ~isvalid(obj.Log)
                 obj.LogListener(:) = [];
@@ -161,9 +156,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function value = get.LogName(obj)
             % get.LogName - Production declaration in CSRD.
-            % 中文说明：get.LogName 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if isempty(obj.Log) || ~isvalid(obj.Log)
                 value = "";
             else
@@ -174,9 +168,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function set.LogName(obj,value)
             % set.LogName - Production declaration in CSRD.
-            % 中文说明：set.LogName 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if strlength(value)
                 obj.Log = csrd.runtime.logger.mlog.Logger(value);
             else
@@ -187,9 +180,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function set.Log(obj,value)
             % set.Log - Production declaration in CSRD.
-            % 中文说明：set.Log 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.Log = value;
             obj.attachListener();
         end %function
@@ -197,9 +189,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function set.UpperDisplayThreshold(obj,value)
             % set.UpperDisplayThreshold - Production declaration in CSRD.
-            % 中文说明：set.UpperDisplayThreshold 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.UpperDisplayThreshold = value;
             if obj.LowerDisplayThreshold < obj.UpperDisplayThreshold
                 obj.LowerDisplayThreshold = obj.UpperDisplayThreshold;
@@ -209,9 +200,8 @@ classdef LogDisplay < matlab.ui.componentcontainer.ComponentContainer
 
         function set.LowerDisplayThreshold(obj,value)
             % set.LowerDisplayThreshold - Production declaration in CSRD.
-            % 中文说明：set.LowerDisplayThreshold 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.LowerDisplayThreshold = value;
             if obj.UpperDisplayThreshold > obj.LowerDisplayThreshold
                 obj.UpperDisplayThreshold = obj.LowerDisplayThreshold;

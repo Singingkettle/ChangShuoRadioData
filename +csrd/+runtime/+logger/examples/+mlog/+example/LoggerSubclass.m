@@ -1,5 +1,4 @@
 classdef LoggerSubclass < mlog.Logger
-    % 中文说明：提供 CSRD 生产链路中的 LoggerSubclass 实现。
     
     %   Copyright 2021 The MathWorks Inc.
     
@@ -9,9 +8,8 @@ classdef LoggerSubclass < mlog.Logger
         
         function obj = LoggerSubclass(varargin)
             % Construct the logger
-            % 中文说明：LoggerSubclass 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             
             % Call superclass constructor with the same inputs
             obj@mlog.Logger(varargin{:});
@@ -30,9 +28,8 @@ classdef LoggerSubclass < mlog.Logger
         
         function varargout = write(obj, customString, customNumber, varargin)
             % write a message to the log
-            % 中文说明：write 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %       logObj.write(name, type, level,...)

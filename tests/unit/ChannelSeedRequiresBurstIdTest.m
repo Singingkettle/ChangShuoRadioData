@@ -1,6 +1,5 @@
 classdef ChannelSeedRequiresBurstIdTest < matlab.unittest.TestCase
     % ChannelSeedRequiresBurstIdTest - No frame-id seed fallback after Phase 17.
-    % 中文说明：信道种子必须由 Tx/Rx/Burst 三元组决定。
 
     methods (Test)
         function missingBurstIdIsRejected(testCase)

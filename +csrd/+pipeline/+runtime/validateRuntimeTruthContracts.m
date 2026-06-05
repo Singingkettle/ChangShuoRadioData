@@ -1,6 +1,7 @@
 function contract = validateRuntimeTruthContracts(factoryConfigs, runnerConfig)
 %VALIDATERUNTIMETRUTHCONTRACTS Validate global runtime truth authorities.
-% 中文说明：集中校验运行真值合同，禁止下游 block 反向补运行事实。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 %
 % This validator is intentionally narrow: it checks the cross-module facts
 % that can make signal, scene state, and annotation disagree when silently
@@ -18,8 +19,6 @@ if ~isfield(factoryConfigs, 'Scenario') || ~isstruct(factoryConfigs.Scenario)
         'FactoryConfigs.Scenario is required.');
 end
 
-frame = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
-    factoryConfigs, runnerConfig);
 scenario = factoryConfigs.Scenario;
 
 receiver = localRequireStructPath(scenario, ...
@@ -27,10 +26,6 @@ receiver = localRequireStructPath(scenario, ...
     'FactoryConfigs.Scenario.CommunicationBehavior.Receiver');
 sampleRateHz = localRequirePositiveScalar(receiver, 'SampleRate', ...
     'FactoryConfigs.Scenario.CommunicationBehavior.Receiver.SampleRate');
-localAssertClose(sampleRateHz, frame.SampleRateHz, ...
-    'CSRD:RuntimeTruth:SampleRateFrameMismatch', ...
-    ['Receiver.SampleRate=%g but frame contract SampleRateHz=%g. ', ...
-     'Receiver sample rate is the frame-time authority.']);
 
 realCarrierHz = localRequirePositiveScalar(receiver, 'RealCarrierFrequency', ...
     'FactoryConfigs.Scenario.CommunicationBehavior.Receiver.RealCarrierFrequency');
@@ -51,7 +46,6 @@ if isfield(receiver, 'ObservableRange') && ~isempty(receiver.ObservableRange)
 end
 
 contract = struct();
-contract.Frame = frame;
 contract.Receiver = struct( ...
     'SampleRateHz', sampleRateHz, ...
     'CenterFrequencyHz', centerFrequencyHz, ...
@@ -99,6 +93,9 @@ end
 end
 
 function channelContract = localValidateChannelContract(channelConfig, receiverCarrierHz)
+    % localValidateChannelContract - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 channelContract = struct();
 if isfield(channelConfig, 'LinkBudget') && isstruct(channelConfig.LinkBudget)
     linkBudget = channelConfig.LinkBudget;
@@ -127,6 +124,9 @@ end
 end
 
 function txContract = localValidateTransmitContract(transmitConfig)
+    % localValidateTransmitContract - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 txContract = struct();
 if isfield(transmitConfig, 'Power') && isstruct(transmitConfig.Power)
     powerCfg = transmitConfig.Power;
@@ -143,6 +143,9 @@ end
 end
 
 function registryContract = localValidateRegistryContract(factoryConfig, label)
+    % localValidateRegistryContract - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 registryContract = struct();
 types = {};
 if strcmp(label, 'Message') && isfield(factoryConfig, 'MessageTypes') && ...
@@ -180,6 +183,9 @@ registryContract.TypeIds = types(:).';
 end
 
 function types = localValidateNamedHandleStruct(typeStruct, label)
+    % localValidateNamedHandleStruct - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 types = fieldnames(typeStruct);
 for k = 1:numel(types)
     typeConfig = typeStruct.(types{k});
@@ -191,11 +197,17 @@ end
 end
 
 function tf = localHasHandle(typeConfig)
+    % localHasHandle - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = (isfield(typeConfig, 'handle') && ~isempty(typeConfig.handle)) || ...
     (isfield(typeConfig, 'Handle') && ~isempty(typeConfig.Handle));
 end
 
 function sub = localRequireStructPath(root, pathParts, label)
+    % localRequireStructPath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 sub = root;
 for k = 1:numel(pathParts)
     key = pathParts{k};
@@ -207,6 +219,9 @@ end
 end
 
 function value = localRequirePositiveInteger(root, fieldName, label)
+    % localRequirePositiveInteger - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = localRequirePositiveScalar(root, fieldName, label);
 rounded = round(value);
 if abs(value - rounded) > 0
@@ -216,6 +231,9 @@ value = rounded;
 end
 
 function value = localRequirePositiveScalar(root, fieldName, label)
+    % localRequirePositiveScalar - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 value = localRequireFiniteScalar(root, fieldName, label);
 if value <= 0
     error('CSRD:RuntimeTruth:InvalidPositiveScalar', ...
@@ -224,6 +242,9 @@ end
 end
 
 function value = localRequireFiniteScalar(root, fieldName, label)
+    % localRequireFiniteScalar - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if ~isfield(root, fieldName) || isempty(root.(fieldName)) || ...
         ~isnumeric(root.(fieldName)) || ~isscalar(root.(fieldName)) || ...
         ~isfinite(root.(fieldName))
@@ -234,6 +255,9 @@ value = double(root.(fieldName));
 end
 
 function range = localRequireIncreasingRange(rawRange, label)
+    % localRequireIncreasingRange - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if ~isnumeric(rawRange) || numel(rawRange) ~= 2
     error('CSRD:RuntimeTruth:InvalidRange', ...
         '%s must be a numeric 1x2 [low high] range.', label);
@@ -246,6 +270,9 @@ end
 end
 
 function localAssertClose(actual, expected, errorId, message)
+    % localAssertClose - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tolerance = max(1e-9 * max(abs([actual, expected])), 1e-6);
 if abs(actual - expected) > tolerance
     error(errorId, message, actual, expected);

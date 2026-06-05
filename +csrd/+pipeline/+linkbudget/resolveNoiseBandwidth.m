@@ -1,6 +1,5 @@
 function noiseBW = resolveNoiseBandwidth(configuredBW, rxBW, txBW)
 %RESOLVENOISEBANDWIDTH Pick the noise bandwidth used in the link-budget SNR.
-% 中文说明：提供 CSRD 生产链路中的 resolveNoiseBandwidth 实现。
 %
 %   noiseBW = csrd.pipeline.linkbudget.resolveNoiseBandwidth(configuredBW, ...
 %       rxBW, txBW)

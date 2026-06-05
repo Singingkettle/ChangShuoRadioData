@@ -1,8 +1,7 @@
 function config = channel_factory()
     % channel_factory - Channel factory configuration
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 channel_factory 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Channel propagation models for CSRD framework.
 
@@ -37,6 +36,13 @@ function config = channel_factory()
     config.Factories.Channel.ChannelModels.RayTracing.Config.NumRaysPerSource = 1000;
     config.Factories.Channel.ChannelModels.RayTracing.Config.UseGPU = 'auto';
     config.Factories.Channel.ChannelModels.RayTracing.Config.GpuMinSamples = 8192;
+    % Geometry cache tolerance (meters) for RayTracing site/ray keys.
+    % The default frame duration is microseconds, so moving endpoints often
+    % drift below OSM geometry precision between adjacent frames. This
+    % tolerance avoids full-map raytrace repeats for numerically
+    % indistinguishable geometry while exporting the value in ChannelInfo.
+    config.Factories.Channel.ChannelModels.RayTracing.Config.RayCachePositionToleranceM = 0.01;
+    config.Factories.Channel.ChannelModels.RayTracing.Config.SlowStageInfoThresholdSec = 30;
     config.Factories.Channel.ChannelModels.RayTracing.Config.PropagationModelConfig.Method = 'sbr';
     config.Factories.Channel.ChannelModels.RayTracing.Config.PropagationModelConfig.MaxNumReflections = 3;
     config.Factories.Channel.ChannelModels.RayTracing.Config.PropagationModelConfig.MaxNumDiffractions = 0;

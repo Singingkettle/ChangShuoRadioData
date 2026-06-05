@@ -1,8 +1,7 @@
 function results = run_csrd_release_readiness(varargin)
 %RUN_CSRD_RELEASE_READINESS Read-only release readiness gate for CSRD.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 run_csrd_release_readiness 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   RESULTS = run_csrd_release_readiness() validates the frozen v0.4
 %   baseline and release documentation without running a simulation.
@@ -107,9 +106,8 @@ end
 
 function payload = localReadJson(path)
     % localReadJson - Production declaration in CSRD.
-    % 中文说明：localReadJson 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(exist(path, 'file') == 2, ...
     'CSRD:Release:MissingBaseline', ...
     'Baseline JSON does not exist: %s', path);
@@ -119,9 +117,8 @@ end
 
 function docs = localRequiredDocs(projectRoot)
     % localRequiredDocs - Production declaration in CSRD.
-    % 中文说明：localRequiredDocs 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 phaseDir = fullfile(projectRoot, 'docs', 'audits', 'phases');
 reportDir = fullfile(projectRoot, 'docs', 'audits', 'reports');
 docs = {
@@ -152,9 +149,8 @@ end
 
 function checks = localValidateRequiredDocs(projectRoot)
     % localValidateRequiredDocs - Production declaration in CSRD.
-    % 中文说明：localValidateRequiredDocs 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 docs = localRequiredDocs(projectRoot);
 checks = repmat( ...
     struct('Path', '', 'Needles', {{}}, 'Matched', false), ...
@@ -181,9 +177,8 @@ end
 
 function status = localGitStatus(projectRoot)
     % localGitStatus - Production declaration in CSRD.
-    % 中文说明：localGitStatus 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 [code, out] = system(sprintf('git -C "%s" status --short', projectRoot));
 if code ~= 0
     status = "";
@@ -195,9 +190,8 @@ end
 
 function localAssertString(actual, expected, id)
     % localAssertString - Production declaration in CSRD.
-    % 中文说明：localAssertString 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(strcmp(char(actual), expected), id, ...
     'Expected "%s", got "%s".', expected, char(actual));
 end
@@ -205,8 +199,7 @@ end
 
 function localAssertScalar(actual, expected, predicate, id, message)
     % localAssertScalar - Production declaration in CSRD.
-    % 中文说明：localAssertScalar 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 assert(predicate(actual, expected), id, '%s', message);
 end

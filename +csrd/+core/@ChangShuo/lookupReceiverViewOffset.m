@@ -1,8 +1,7 @@
 function projectedOffset = lookupReceiverViewOffset(txScenarioConfig, rxInfo, rxIdx, channelOutput)
     %LOOKUPRECEIVERVIEWOFFSET Phase 3 per-Rx ProjectedCenterOffsetHz lookup.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 lookupReceiverViewOffset 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   projectedOffset = csrd.core.ChangShuo.lookupReceiverViewOffset( ...
     %       txScenarioConfig, rxInfo, rxIdx, channelOutput)

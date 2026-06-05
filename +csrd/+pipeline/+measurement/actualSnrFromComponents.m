@@ -1,6 +1,5 @@
 function snrDb = actualSnrFromComponents(signalPowerW, noisePowerW)
 %ACTUALSNRFROMCOMPONENTS Explicit-power SNR in dB (no estimation).
-% 中文说明：提供 CSRD 生产链路中的 actualSnrFromComponents 实现。
 %
 % Phase 4 §3.1 measurement helper. Returns 10*log10(signalPowerW/noisePowerW)
 % with strict input hygiene. Caller passes already-known component powers

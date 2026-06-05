@@ -7,7 +7,7 @@ classdef CalculateTransmissionStateTest < matlab.unittest.TestCase
     %   Random temporal pattern when the engine ran a different frame count.
     %   These tests cover the modern csrd.pipeline.scenario.checkTransmissionInterval
     %   contract: prefer FrameDuration, fall back to ObservationDuration /
-    %   NumFrames, never invent a magic number.
+    %   NumFrames, and fail fast when timing is incomplete or out of range.
 
     methods (Test)
 
@@ -52,16 +52,11 @@ classdef CalculateTransmissionStateTest < matlab.unittest.TestCase
             testCase.verifyEqual(idx, 2);
         end
 
-        function noTimingFieldsReturnsInactiveAndWarns(testCase)
-            pattern = struct('Intervals', [0, 1.0]); % no NumFrames or FrameDuration
-            warningState = warning('off', 'CSRD:Scenario:MissingFrameTiming');
-            cleanup = onCleanup(@() warning(warningState)); %#ok<NASGU>
-            [active, idx, s, e] = csrd.pipeline.scenario.checkTransmissionInterval(1, pattern);
-            testCase.verifyFalse(active, ...
-                'Without timing info the helper must NOT silently say "active".');
-            testCase.verifyEqual(idx, 0);
-            testCase.verifyEqual(s, 0);
-            testCase.verifyEqual(e, 0);
+        function noTimingFieldsFailsFast(testCase)
+            pattern = struct('Intervals', [0, 1.0]);
+            testCase.verifyError(@() ...
+                csrd.pipeline.scenario.checkTransmissionInterval(1, pattern), ...
+                'CSRD:Scenario:MissingFrameTiming');
         end
 
         function emptyIntervalsReturnsInactive(testCase)
@@ -71,12 +66,12 @@ classdef CalculateTransmissionStateTest < matlab.unittest.TestCase
             testCase.verifyEqual(idx, 0);
         end
 
-        function frameOutsideNumFramesIssuesWarning(testCase)
+        function frameOutsideNumFramesFailsFast(testCase)
             pattern = struct( ...
                 'Intervals', [0, 10], ...
                 'FrameDuration', 0.1, ...
                 'NumFrames', 5);
-            testCase.verifyWarning(@() ...
+            testCase.verifyError(@() ...
                 csrd.pipeline.scenario.checkTransmissionInterval(99, pattern), ...
                 'CSRD:Scenario:FrameOutOfRange');
         end

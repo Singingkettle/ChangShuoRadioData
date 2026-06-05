@@ -1,6 +1,5 @@
 function obstacles = updateDynamicObstacles(obj, currentObstacles, deltaTime)
     % updateDynamicObstacles - Update dynamic obstacle positions
-    % 中文说明：提供 CSRD 生产链路中的 updateDynamicObstacles 实现。
     %
     % Input Arguments:
     %   currentObstacles - Current dynamic obstacles

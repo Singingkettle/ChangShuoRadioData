@@ -1,6 +1,5 @@
 classdef ContinuousFrameWindowContractTest < matlab.unittest.TestCase
     % ContinuousFrameWindowContractTest
-    % 中文说明：验证 Continuous 发射也必须使用当前帧时间窗，而不是整段 ObservationDuration。
 
     methods (Test)
 
@@ -41,8 +40,13 @@ frameDuration = frameSamples / sampleRate;
 cfg = struct();
 cfg.Global.FrameNumSamples = frameSamples;
 cfg.Global.NumFramesPerScenario = numFrames;
-cfg.Global.ObservationDuration = frameDuration * numFrames;
-cfg.Global.TimeResolution = frameDuration;
+framePlan = struct( ...
+    'FrameNumSamples', frameSamples, ...
+    'FrameDurationSec', frameDuration, ...
+    'ObservationDurationSec', frameDuration * numFrames, ...
+    'NumFramesPerScenario', numFrames, ...
+    'Source', 'Test.ScenarioPlan.Frame');
+cfg.ScenarioPlan = struct('Frame', framePlan);
 cfg.Receiver.Type = 'Simulation';
 cfg.Receiver.SampleRate = sampleRate;
 cfg.Receiver.NumAntennas = 1;

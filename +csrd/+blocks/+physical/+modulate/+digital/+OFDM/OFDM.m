@@ -1,6 +1,5 @@
 classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
     % OFDM - Orthogonal Frequency Division Multiplexing Modulator
-    % 中文说明：提供 CSRD 生产链路中的 OFDM 实现。
     %
     % This class implements OFDM modulation with configurable parameters and
     % support for MIMO transmission.
@@ -23,7 +22,7 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
     %   genSecondStageModulator - Creates OFDM modulation stage
 
     %
-    % References / 参考资料:
+    % References:
     % - https://www.mathworks.com/help/5g/ug/resampling-filter-design-in-ofdm-functions.html
     % - Regarding OFDM signal sampling simulation, essentially a conversion process:
     %   https://www.mathworks.com/help/dsp/ug/overview-of-multirate-filters.html
@@ -49,14 +48,12 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function [y, bw] = baseModulator(obj, x)
             % baseModulator - Production declaration in CSRD.
-            % 中文说明：baseModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             x = obj.firstStageModulator(x);
 
             % Resolve the spatial abstraction before shaping the OFDM grid.
-            % 中文说明：先明确多天线抽象，再整理 OFDM 资源栅格，避免隐式把多流当 OSTBC。
             spatialMode = obj.resolveSpatialMode();
             switch spatialMode
                 case 'OSTBC'
@@ -124,9 +121,8 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function firstStageModulator = genFirstStageModulator(obj)
             % genFirstStageModulator - Production declaration in CSRD.
-            % 中文说明：genFirstStageModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if contains(lower(obj.ModulatorConfig.base.mode), "psk")
                 firstStageModulator = @(x)pskmod(x, ...
@@ -145,9 +141,8 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function pilotModulator = genPilotModulator(obj)
             % genPilotModulator - Production declaration in CSRD.
-            % 中文说明：genPilotModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if contains(lower(obj.ModulatorConfig.pilot.mode), "psk")
                 pilotModulatorOrder = randsample([2, 4, 8, 16, 32, 64], 1);
@@ -170,9 +165,8 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function secondStageModulator = genSecondStageModulator(obj)
             % genSecondStageModulator - Production declaration in CSRD.
-            % 中文说明：genSecondStageModulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             p = obj.ModulatorConfig.ofdm;
 
             secondStageModulator = comm.OFDMModulator( ...
@@ -205,9 +199,8 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function modulatorHandle = genModulatorHandle(obj)
             % genModulatorHandle - Production declaration in CSRD.
-            % 中文说明：genModulatorHandle 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.IsDigital = true;
 
             if obj.NumTransmitAntennas > 2
@@ -254,7 +247,6 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
                     if obj.NumTransmitAntennas > 1
                         % Keep the configured hardware antenna count stable; reduce the
                         % per-antenna pilot count when the random pilot request is too large.
-                        % 保持配置的硬件天线数量不变；随机 pilot 数过大时缩减每根天线的 pilot 数。
                         maxPilotsPerAntenna = floor(length(validRange) / obj.NumTransmitAntennas);
                         if maxPilotsPerAntenna < 1
                             error('CSRD:Modulation:OFDMInsufficientPilotCarriers', ...
@@ -325,9 +317,8 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function mode = resolveSpatialMode(obj)
             % resolveSpatialMode - Return the explicit OFDM multi-antenna mode.
-            % 中文说明：返回显式 OFDM 多天线模式；单天线等价为 OSTBC 直通。
-            % Inputs / 输入: object ModulatorConfig.mimo.Mode.
-            % 输出 / Outputs: 'OSTBC' or 'SpatialMultiplexing'.
+            % Inputs: object ModulatorConfig.mimo.Mode.
+            % Outputs: 'OSTBC' or 'SpatialMultiplexing'.
             mode = 'OSTBC';
             if isfield(obj.ModulatorConfig, 'mimo') && ...
                     isstruct(obj.ModulatorConfig.mimo) && ...
@@ -348,9 +339,8 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
 
         function streams = reshapeSpatialMultiplexingStreams(obj, symbols)
             % reshapeSpatialMultiplexingStreams - Split symbols into antenna streams.
-            % 中文说明：把调制符号按列分配到发射流，直接匹配 comm.OFDMModulator 的第三维。
-            % Inputs / 输入: column/vector of first-stage constellation symbols.
-            % 输出 / Outputs: [symbolsPerStream x NumTransmitAntennas] stream matrix.
+            % Inputs: column/vector of first-stage constellation symbols.
+            % Outputs: [symbolsPerStream x NumTransmitAntennas] stream matrix.
             symbols = symbols(:);
             nTx = obj.NumTransmitAntennas;
             usable = floor(numel(symbols) / nTx) * nTx;
@@ -367,9 +357,8 @@ end
 
 function shuffledArray = shuffleArray(array)
     % Generate random permutation of indices
-    % 中文说明：shuffleArray 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     randomIndices = randperm(numel(array));
     % Reorder the original array using random indices
     shuffledArray = array(randomIndices);

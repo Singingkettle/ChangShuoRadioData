@@ -1,6 +1,7 @@
 function summary = measureSignalSummary(signal, sampleRate, observableBwHz, varargin)
 %MEASURESIGNALSUMMARY Compute receiver-view measurements in one pass.
-% 中文说明：一次完成 OBW、频谱质心、包络和频率占用测量，减少重复校验和数据整理。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 if nargin < 3 || isempty(observableBwHz)
     observableBwHz = NaN;
@@ -38,6 +39,9 @@ summary.MeasurementSemantics = '';
 end
 
 function signalCol = localValidateAndCollapse(signal, sampleRate)
+    % localValidateAndCollapse - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isempty(signal)
     error('CSRD:Measurement:EmptySignal', ...
         'measureSignalSummary: input signal is empty.');
@@ -59,6 +63,9 @@ end
 end
 
 function bwHz = localPeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
+    % localPeakRelativeObw - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 N = length(signalCol);
 if N < 8
     spec = abs(fftshift(fft(double(signalCol)))).^2;
@@ -129,6 +136,9 @@ end
 end
 
 function mass = localRangeMass(cumEnergy, lIdx, rIdx)
+    % localRangeMass - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if lIdx <= 1
     mass = cumEnergy(rIdx);
 else
@@ -137,6 +147,9 @@ end
 end
 
 function fcHz = localSpectrumCentroid(signalCol, sampleRate)
+    % localSpectrumCentroid - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 N = length(signalCol);
 spec = fftshift(fft(double(signalCol)));
 psd = abs(spec) .^ 2;
@@ -150,6 +163,9 @@ fcHz = sum(fAxis .* psd) / totalPower;
 end
 
 function info = localDetectEnvelope(signalCol, sampleRate, options)
+    % localDetectEnvelope - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if nargin < 3 || isempty(options)
     options = struct();
 end
@@ -200,6 +216,9 @@ info = struct( ...
 end
 
 function info = localEmptyEnvelope(options)
+    % localEmptyEnvelope - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 info = struct( ...
     'TimeOccupancy', 0, ...
     'NumBursts', 0, ...

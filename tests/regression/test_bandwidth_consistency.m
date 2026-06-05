@@ -9,10 +9,10 @@ function test_bandwidth_consistency()
     rng(1234);
 
     masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
-    masterConfig.Log.Level = 'ERROR';
-    masterConfig.Log.SaveToFile = false;
-    masterConfig.Log.DisplayInConsole = false;
-    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
+    masterConfig.RuntimePlan.Logging.Policy = 'LargeMC';
+    masterConfig.RuntimePlan.Logging.FileEnabled = false;
+    masterConfig.RuntimePlan.Logging.ConsoleEnabled = false;
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.RuntimePlan.Logging);
 
     factory = csrd.factories.ModulationFactory('Config', masterConfig.Factories.Modulation);
     cleanupObj = onCleanup(@() release(factory)); %#ok<NASGU>

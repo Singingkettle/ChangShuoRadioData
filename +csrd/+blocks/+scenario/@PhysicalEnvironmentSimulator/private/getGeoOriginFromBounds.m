@@ -1,6 +1,7 @@
 function [originLat, originLon] = getGeoOriginFromBounds(bounds)
 %GETGEOORIGINFROMBOUNDS Resolve OSM local tangent-plane origin.
-% 中文说明：从 OSM 边界解析本地米制坐标原点，经纬度单位为 degree。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 if ~isstruct(bounds) || ~isfield(bounds, 'MinLatitude') || ...
         ~isfield(bounds, 'MaxLatitude') || ~isfield(bounds, 'MinLongitude') || ...
         ~isfield(bounds, 'MaxLongitude')

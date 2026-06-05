@@ -1,6 +1,5 @@
 function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(obj, ...
         transmitters, rxConfigs)
-    % 中文说明：提供 CSRD 生产链路中的 generateScenarioTransmitterConfigurations 实现。
     % generateScenarioTransmitterConfigurations - Generate fixed transmitter configurations
     %
     % DESIGN PRINCIPLE:
@@ -162,7 +161,8 @@ end
 
 function unit = getEntityPositionUnit(entity)
     % getEntityPositionUnit - Return explicit physical coordinate unit.
-    % 中文说明：Position 是米制坐标，GeoPositionDeg 只用于地理传播模型。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isfield(entity, 'PositionUnit') && ~isempty(entity.PositionUnit)
     unit = char(string(entity.PositionUnit));
 else
@@ -172,9 +172,8 @@ end
 
 function velocity = requireEntityVelocity(entity, entityType)
     % requireEntityVelocity - Production declaration in CSRD.
-    % 中文说明：requireEntityVelocity 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isfield(entity, 'Velocity') || isempty(entity.Velocity) || ...
             ~isnumeric(entity.Velocity) || numel(entity.Velocity) ~= 3 || ...
             any(~isfinite(entity.Velocity(:)))
@@ -189,9 +188,8 @@ end
 
 function params = getTransmitterParams(config)
     % getTransmitterParams - Extract transmitter parameters from config
-    % 中文说明：getTransmitterParams 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 
     params = struct();
     
@@ -227,9 +225,8 @@ end
 
 function params = getModulationParams(config)
     % getModulationParams - Extract modulation parameters from config
-    % 中文说明：getModulationParams 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % DESIGN PRINCIPLE:
     %   - Types from config (for random selection)
@@ -284,9 +281,8 @@ end
 
 function params = getMessageParams(config)
     % getMessageParams - Extract message parameters from config
-    % 中文说明：getMessageParams 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % DESIGN PRINCIPLE:
     %   - Types from config (for random selection)
@@ -314,17 +310,16 @@ end
 
 function params = getTemporalParams(config)
     % getTemporalParams - Extract temporal behavior parameters from config
-    % 中文说明：getTemporalParams 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     
     params = struct();
     
     % Default values
     params.PatternTypes = {'Continuous', 'Burst', 'Scheduled', 'Random'};
     params.PatternDistribution = [0.4, 0.3, 0.2, 0.1];
-    params.ObservationDuration = 1.0;
-    params.NumFramesPerScenario = 10;
+    params.ObservationDuration = [];
+    params.NumFramesPerScenario = [];
     
     % Burst pattern defaults
     params.Burst.OnDuration.Min = 0.01;
@@ -354,14 +349,21 @@ function params = getTemporalParams(config)
     % shared by every transmitter or a 1xNumTx cell array of Nx2 matrices.
     params.Explicit.Intervals = [];
 
-    % Override with config values
-    if isfield(config, 'Global')
-        if isfield(config.Global, 'ObservationDuration')
-            params.ObservationDuration = config.Global.ObservationDuration;
+    if isfield(config, 'ScenarioPlan') && isstruct(config.ScenarioPlan) && ...
+            isfield(config.ScenarioPlan, 'Frame') && ...
+            isstruct(config.ScenarioPlan.Frame)
+        framePlan = config.ScenarioPlan.Frame;
+        if isfield(framePlan, 'ObservationDurationSec')
+            params.ObservationDuration = framePlan.ObservationDurationSec;
         end
-        if isfield(config.Global, 'NumFramesPerScenario')
-            params.NumFramesPerScenario = config.Global.NumFramesPerScenario;
+        if isfield(framePlan, 'NumFramesPerScenario')
+            params.NumFramesPerScenario = framePlan.NumFramesPerScenario;
         end
+    end
+    if isempty(params.ObservationDuration) || isempty(params.NumFramesPerScenario)
+        error('CSRD:ScenarioPlan:MissingFrameContract', ...
+            ['CommunicationBehavior requires ScenarioPlan.Frame.', ...
+             'ObservationDurationSec and NumFramesPerScenario.']);
     end
     
     if isfield(config, 'TemporalBehavior')
@@ -390,9 +392,8 @@ end
 
 function merged = mergeStructs(base, override)
     % mergeStructs - Merge two structs, override takes precedence
-    % 中文说明：mergeStructs 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     merged = base;
     if isstruct(override)
         fields = fieldnames(override);
@@ -404,9 +405,8 @@ end
 
 function selectedType = selectTransmitterType(types)
     % selectTransmitterType - Randomly select a transmitter type
-    % 中文说明：selectTransmitterType 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isempty(types)
         selectedType = 'Simulation';
     elseif iscell(types)
@@ -418,9 +418,8 @@ end
 
 function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulationFamily)
     % selectNumAntennasForModulation - Keep hardware compatible with the
-    % 中文说明：selectNumAntennasForModulation 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % Phase 8 service-driven modulation family before the blueprint
     % validator sees it.
     family = char(string(modulationFamily));
@@ -449,9 +448,8 @@ end
 
 function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
     % applyRegulatoryTemporalPattern - Production declaration in CSRD.
-    % 中文说明：applyRegulatoryTemporalPattern 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     recommended = char(string(temporalPattern));
     if isempty(recommended) || strcmp(recommended, pattern.Type)
         return;
@@ -482,9 +480,8 @@ end
 
 function totalDuration = calculateTotalTransmissionDuration(transmissionPattern)
     % calculateTotalTransmissionDuration - Sum up all transmission intervals
-    % 中文说明：calculateTotalTransmissionDuration 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     
     intervals = transmissionPattern.Intervals;
     if isempty(intervals) || (size(intervals, 1) == 1 && all(intervals == 0))
@@ -500,9 +497,8 @@ end
 
 function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     % generateModulationConfig - Generate modulation config from scenario params
-    % 中文说明：generateModulationConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Symbol Rate Calculation:
     %   SymbolRate = Bandwidth / (1 + RolloffFactor)
@@ -558,9 +554,8 @@ end
 
 function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
     % generateRegulatoryModulationConfig - Generate modulation config from a
-    % 中文说明：generateRegulatoryModulationConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     % regulatory service plan rather than from an unconstrained type list.
     modConfig = struct();
     modConfig.Type = char(string(emitterPlan.ModulationFamily));
@@ -594,9 +589,8 @@ end
 
 function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
     % buildRegulatoryModulatorConfig - Production declaration in CSRD.
-    % 中文说明：buildRegulatoryModulatorConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
@@ -627,9 +621,8 @@ end
 
 function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
     % buildLegacyModulatorConfig - Production declaration in CSRD.
-    % 中文说明：buildLegacyModulatorConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
@@ -680,9 +673,8 @@ end
 
 function mode = localValidateOFDMMimoMode(modConfig)
     % localValidateOFDMMimoMode - Resolve the explicit OFDM spatial abstraction.
-    % 中文说明：解析 OFDM 多天线抽象，避免把 OSTBC 和独立空间流混成隐式行为。
-    % Inputs / 输入: modulation config with optional OFDMMimoMode.
-    % 输出 / Outputs: validated mode string stored in ModulatorConfig.mimo.Mode.
+    % Inputs: modulation config with optional OFDMMimoMode.
+    % Outputs: validated mode string stored in ModulatorConfig.mimo.Mode.
     if isfield(modConfig, 'OFDMMimoMode') && ~isempty(modConfig.OFDMMimoMode)
         mode = char(string(modConfig.OFDMMimoMode));
     else
@@ -700,9 +692,8 @@ end
 
 function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgParams)
     % generateMessageConfig - Generate message config from scenario params
-    % 中文说明：generateMessageConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Message Length Calculation:
     %   Length = SymbolRate × BitsPerSymbol × TransmissionDuration
@@ -742,9 +733,8 @@ end
 
 function order = selectModulationOrder(modType, modParams)
     % selectModulationOrder - Select modulation order based on type
-    % 中文说明：selectModulationOrder 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Orders are from scenario config DefaultOrders
     
@@ -786,9 +776,8 @@ end
 
 function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
     % generateTemporalPattern - Generate temporal transmission pattern
-    % 中文说明：generateTemporalPattern 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     
     pattern = struct();
     
@@ -870,6 +859,8 @@ end
 
 function intervals = selectExplicitIntervals(explicitParams, txIndex, observationDuration)
     % selectExplicitIntervals - Resolve per-transmitter explicit bursts.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if ~isstruct(explicitParams) || ~isfield(explicitParams, 'Intervals') || ...
             isempty(explicitParams.Intervals)
         error('CSRD:Scenario:MissingExplicitIntervals', ...
@@ -911,9 +902,8 @@ end
 
 function intervals = generateBurstIntervals(pattern, observationDuration)
     % generateBurstIntervals - Production declaration in CSRD.
-    % 中文说明：generateBurstIntervals 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     intervals = [];
     t = pattern.InitialDelay;
     while t < observationDuration
@@ -931,9 +921,8 @@ end
 
 function intervals = generateScheduledIntervals(pattern, observationDuration)
     % generateScheduledIntervals - Production declaration in CSRD.
-    % 中文说明：generateScheduledIntervals 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     intervals = [];
     frameLength = pattern.SlotDuration * pattern.NumSlots;
     slotStart = (pattern.AssignedSlot - 1) * pattern.SlotDuration;
@@ -954,9 +943,8 @@ end
 
 function intervals = generateRandomIntervals(~, randomParams, observationDuration, numBursts)
     % generateRandomIntervals - Production declaration in CSRD.
-    % 中文说明：generateRandomIntervals 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     intervals = [];
     for i = 1:numBursts
         startRatio = randomParams.StartTimeRatio.Min + rand() * (randomParams.StartTimeRatio.Max - randomParams.StartTimeRatio.Min);

@@ -68,9 +68,12 @@ cfg = csrd.test_support.applyCanonicalFrameContract(cfg, 0.002, 1);
 cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
 cfg.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = 1;
 cfg.Factories.Scenario.CommunicationBehavior.Modulation.Types = {'PSK'};
+cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 
 runner = csrd.SimulationRunner( ...
-    'RunnerConfig', cfg.Runner, 'FactoryConfigs', cfg.Factories);
+    'RunnerConfig', cfg.Runner, ...
+    'FactoryConfigs', cfg.Factories, ...
+    'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
 cleanupObj = onCleanup(@() localRelease(runner)); %#ok<NASGU>
 step(runner, 1, 1);

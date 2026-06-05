@@ -1,11 +1,9 @@
 classdef RFPropagationCapabilitiesTest < matlab.unittest.TestCase
     %RFPROPAGATIONCAPABILITIESTEST Verify OSM RayTracing runtime probing.
-    % 中文说明：验证 RF propagation 能力探针不会把 p-code 或对象方法误判为缺失。
 
     methods (Test)
         function detectsInstalledRayTracingSymbols(testCase)
             % detectsInstalledRayTracingSymbols - Check symbol availability report.
-            % 中文说明：检查 siteviewer、txsite、raytrace 和 RayTracingChannel 的符号探测结果。
             caps = csrd.runtime.capabilities.rfPropagationCapabilities();
             fprintf('RF propagation capability report:\n');
             fprintf('  siteviewer: exist=%d which=%s\n', ...
@@ -36,7 +34,6 @@ classdef RFPropagationCapabilitiesTest < matlab.unittest.TestCase
 
         function buildingOsmSmokePassesWhenCapabilitiesExist(testCase)
             % buildingOsmSmokePassesWhenCapabilitiesExist - Create hidden OSM siteviewer.
-            % 中文说明：在能力可用时创建并释放隐藏 OSM 建筑 siteviewer，验证真实 runtime 链路。
             projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
             buildingFiles = dir(fullfile(projectRoot, 'data', 'map', 'osm', ...
                 'Dense_Urban_Mid_Rise', '*.osm'));

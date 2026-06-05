@@ -1,5 +1,5 @@
 classdef ModulationFactory < matlab.System
-        % 中文说明：提供 CSRD 生产链路中的 ModulationFactory 实现。
+% ModulationFactory - CSRD MATLAB declaration.
 
     properties
         % Config: Struct containing the configuration for modulation types.
@@ -18,9 +18,8 @@ classdef ModulationFactory < matlab.System
 
         function obj = ModulationFactory(varargin)
             % ModulationFactory - Production declaration in CSRD.
-            % 中文说明：ModulationFactory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
             obj.modulatorCache = containers.Map('KeyType', 'char', 'ValueType', 'any');
             % Logger initialization now in setupImpl
@@ -32,16 +31,14 @@ classdef ModulationFactory < matlab.System
 
         function validateInputsImpl(~, ~, ~, ~, ~, ~, ~)
             % validateInputsImpl - Production declaration in CSRD.
-            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
             % setupImpl - Production declaration in CSRD.
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if isempty(obj.Config) || ~isstruct(obj.Config)
                 error('ModulationFactory:ConfigError', 'Config property must be a valid struct.');
@@ -64,9 +61,8 @@ classdef ModulationFactory < matlab.System
 
         function outputSignalStruct = stepImpl(obj, inputData, frameId, txIdStr, segmentId, segmentModulationConfig, segmentPlacementConfig)
             % segmentModulationConfig: struct from scenario, e.g., Scenario.Transmitters.Segments.Modulation
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % segmentPlacementConfig: struct from scenario, e.g., Scenario.Transmitters.Segments.Placement
 
             if ~isfield(segmentModulationConfig, 'TypeID') || isempty(segmentModulationConfig.TypeID)
@@ -421,9 +417,8 @@ classdef ModulationFactory < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Production declaration in CSRD.
-            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('ModulationFactory releaseImpl called.');
             blockKeys = keys(obj.modulatorCache);
 
@@ -442,9 +437,8 @@ classdef ModulationFactory < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Production declaration in CSRD.
-            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('ModulationFactory resetImpl called.');
             blockKeys = keys(obj.modulatorCache);
 
@@ -466,7 +460,8 @@ end
 
 function signal = normalizeSignalAntennaShape(signal, expectedAntennas, modulatorClass)
     % normalizeSignalAntennaShape - Enforce [samples x txAntennas].
-    % 中文说明：调制器输出必须按“采样点 x 发射天线”组织，禁止把天线维误当时间维。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if nargin < 3 || isempty(modulatorClass)
         modulatorClass = '<unknown>';
     end
@@ -518,9 +513,8 @@ end
 
 function summary = summarizeModulatorForLog(modulator)
     % summarizeModulatorForLog - Production declaration in CSRD.
-    % 中文说明：summarizeModulatorForLog 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     summary = struct('Class', class(modulator));
     props = {'ModulatorOrder', 'SampleRate', 'SamplePerSymbol', ...
         'NumTransmitAntennas', 'NumSymbols', 'NumDataSubcarriers', ...
@@ -540,9 +534,8 @@ end
 
 function adaptedConfig = adaptModulatorConfig(rawConfig, modulatorTypeID)
     % adaptModulatorConfig - Production declaration in CSRD.
-    % 中文说明：adaptModulatorConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     adaptedConfig = struct();
     if ~isstruct(rawConfig)
         return;
@@ -563,9 +556,8 @@ end
 
 function adaptedConfig = adaptScenarioModulatorConfig(segmentModulationConfig, modulatorTypeID)
     % adaptScenarioModulatorConfig - Production declaration in CSRD.
-    % 中文说明：adaptScenarioModulatorConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     adaptedConfig = struct();
     if ~isstruct(segmentModulationConfig)
         return;
@@ -584,9 +576,8 @@ end
 
 function adaptedConfig = adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID)
     % adaptSegmentModulatorConfig - Production declaration in CSRD.
-    % 中文说明：adaptSegmentModulatorConfig 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     adaptedConfig = struct();
     if ~isstruct(segmentModulationConfig)
         return;
@@ -604,9 +595,8 @@ end
 
 function cfg = ensurePulseShapeDefaults(cfg, modulatorTypeID)
     % ensurePulseShapeDefaults - Production declaration in CSRD.
-    % 中文说明：ensurePulseShapeDefaults 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     pulseShapedTypes = {'PSK', 'OQPSK', 'QAM', 'Mill88QAM', ...
         'APSK', 'DVBSAPSK', 'ASK', 'OOK', 'PAM'};
     if ~ismember(char(string(modulatorTypeID)), pulseShapedTypes)
@@ -647,9 +637,8 @@ end
 
 function merged = mergeStructs(baseStruct, overrideStruct)
     % mergeStructs - Production declaration in CSRD.
-    % 中文说明：mergeStructs 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isstruct(baseStruct) || isempty(fieldnames(baseStruct))
         if isstruct(overrideStruct)
             merged = overrideStruct;

@@ -1,8 +1,7 @@
 function profile = Broadcast_AM_MW()
 %BROADCAST_AM_MW v0 band profile: medium-wave AM broadcast (531-1602 kHz).
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 Broadcast_AM_MW 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Source numbers: docs/audits/2026-04-...refactor.md §5.bis A (row 2).
 % Schema:        docs/audits/phases/phase-2-blueprint.md §3.1.3.A.

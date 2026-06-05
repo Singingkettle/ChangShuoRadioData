@@ -1,6 +1,5 @@
 function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
     %BUILDSEGMENTCONFIGFROMTXSCENARIO Phase 3 strict-construction segment builder.
-    % 中文说明：提供 CSRD 生产链路中的 buildSegmentConfigFromTxScenario 实现。
     %
     %   segmentConfig = csrd.core.ChangShuo.buildSegmentConfigFromTxScenario( ...
     %       txScenario, segIdx)
@@ -173,6 +172,10 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
     segmentConfig.Placement.FrameRelativeStartTime = max(0, startTime - frameWindow(1));
     segmentConfig.Placement.FrameRelativeEndTime = max( ...
         segmentConfig.Placement.FrameRelativeStartTime, endTime - frameWindow(1));
+    segmentConfig.Placement.MidpointTime = startTime + duration / 2;
+    segmentConfig.Placement.GeometryEvaluationTimeSec = ...
+        segmentConfig.Placement.MidpointTime;
+    segmentConfig.Placement.GeometryEvaluationPolicy = 'SegmentMidpoint';
 
     if ~isfield(txScenario, 'ReceiverViews') || isempty(txScenario.ReceiverViews) ...
             || ~isstruct(txScenario.ReceiverViews) ...
@@ -203,6 +206,9 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
 end
 
 function tf = localDurationResolvesToNoSamples(txScenario, durationSec)
+    % localDurationResolvesToNoSamples - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     tf = false;
     if isempty(durationSec) || ~isnumeric(durationSec) || ...
             ~isscalar(durationSec) || ~isfinite(durationSec) || ...
@@ -230,6 +236,8 @@ end
 
 function lengthBits = localPerSegmentMessageLength(messageConfig, modulationConfig, durationSec)
     % localPerSegmentMessageLength - Derive payload bits from this segment.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     if isfield(messageConfig, 'LengthMin') && ~isempty(messageConfig.LengthMin)
         lengthMin = double(messageConfig.LengthMin);
     else

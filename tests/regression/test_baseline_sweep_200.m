@@ -305,7 +305,8 @@ cfg = masterCfg;
 cfg.Runner.NumScenarios     = 1;
 cfg.Runner.RandomSeed       = 20260424 + sid; % deterministic per sid
 cfg.Runner.Toolbox.Level    = 'minimal';
-cfg.Runner.Log.Policy       = 'Standard';
+cfg.Logging.Policy          = 'Standard';
+cfg.Logging.Progress.Mode   = 'Detailed';
 cfg.Runner.Data.OutputDirectory = fullfile(runRoot, ...
     sprintf('scenario_%06d', sid));
 cfg.Runner.Data.CompressData = false;
@@ -406,8 +407,11 @@ csrd.runtime.logger.GlobalLogManager.initialize(bootstrapLog, perScenarioDir);
 policy = csrd.runtime.logger.policy.LogPolicy('Standard');
 policy.apply();
 
+cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 runner = csrd.SimulationRunner( ...
-    'RunnerConfig', cfg.Runner, 'FactoryConfigs', cfg.Factories);
+    'RunnerConfig', cfg.Runner, ...
+    'FactoryConfigs', cfg.Factories, ...
+    'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
 step(runner, 1, 1);
 
@@ -1001,7 +1005,6 @@ end
 % =========================================================================
 function localAssertExitConditions(metrics, mode, numScenarios, ...
         baselineDir, baselinePath, schemaVersion)
-% phase-0-baseline.md §9 "完成判据" enumerated as C1..C7. Most of C1..C4
 % are owned by the unit/regression suites; here we enforce the
 % baseline-level subset (C5/C6/C7).
 diag = metrics.Diagnostics;

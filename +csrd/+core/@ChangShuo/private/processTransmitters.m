@@ -1,8 +1,7 @@
 function [txsSignalSegments, TxInfos] = processTransmitters(obj, FrameId, numTxThisFrame)
     %PROCESSTRANSMITTERS Phase 3 strict-construction transmitter fan-out.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processTransmitters 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   Iterates every transmitter scheduled for FrameId and dispatches to
     %   processSingleTransmitter. Phase 3 (audit §3.4 / §17.5 P3-6) removed

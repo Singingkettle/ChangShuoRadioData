@@ -1,6 +1,5 @@
 classdef DocumentationGenerator < handle
     % DocumentationGenerator - Comprehensive Documentation Generation System for CSRD Framework
-    % 中文说明：提供 CSRD 生产链路中的 DocumentationGenerator 实现。
     %
     % This class implements an advanced documentation generation system specifically
     % designed for the ChangShuoRadioData (CSRD) radio communication simulation
@@ -258,9 +257,8 @@ classdef DocumentationGenerator < handle
 
         function obj = DocumentationGenerator(varargin)
             % DocumentationGenerator - Constructor for comprehensive documentation generator
-            % 中文说明：DocumentationGenerator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new DocumentationGenerator instance with configurable
             % generation parameters, output formats, and publishing options.
@@ -325,9 +323,8 @@ classdef DocumentationGenerator < handle
 
         function documentation = generateDocumentation(obj)
             % generateDocumentation - Generate complete documentation suite
-            % 中文说明：generateDocumentation 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Generates comprehensive documentation for the entire CSRD framework
             % including API references, user guides, technical documentation,
@@ -394,9 +391,8 @@ classdef DocumentationGenerator < handle
 
         function apiReference = generateAPIReference(obj)
             % generateAPIReference - Generate comprehensive API reference documentation
-            % 中文说明：generateAPIReference 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates detailed API reference documentation for all CSRD framework
             % components including classes, functions, properties, and methods
@@ -435,9 +431,8 @@ classdef DocumentationGenerator < handle
 
         function userGuide = generateUserGuide(obj)
             % generateUserGuide - Generate comprehensive user guides and tutorials
-            % 中文说明：generateUserGuide 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates user-friendly guides, tutorials, and documentation for
             % getting started with the CSRD framework, common use cases,
@@ -469,9 +464,8 @@ classdef DocumentationGenerator < handle
 
         function technicalDocs = generateTechnicalDocs(obj)
             % generateTechnicalDocs - Generate technical documentation and specifications
-            % 中文说明：generateTechnicalDocs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates in-depth technical documentation including architecture
             % overviews, algorithm descriptions, performance analysis, and
@@ -504,9 +498,8 @@ classdef DocumentationGenerator < handle
 
         function initializeDefaultConfiguration(obj)
             % Initialize default documentation generation configuration
-            % 中文说明：initializeDefaultConfiguration 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.Configuration = struct();
             obj.Configuration.OutputFormats = {'HTML', 'Markdown'};
@@ -525,9 +518,8 @@ classdef DocumentationGenerator < handle
 
         function parseInputArguments(obj, varargin)
             % Parse input arguments and update configuration
-            % 中文说明：parseInputArguments 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             p = inputParser;
             addParameter(p, 'Configuration', obj.Configuration, @isstruct);
@@ -552,9 +544,8 @@ classdef DocumentationGenerator < handle
 
         function initializeTemplates(obj)
             % Initialize documentation templates
-            % 中文说明：initializeTemplates 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Class documentation template
             obj.Templates('ClassTemplate') = obj.createClassTemplate();
@@ -575,9 +566,8 @@ classdef DocumentationGenerator < handle
 
         function initializeOutputFormats(obj)
             % Initialize output format specifications
-            % 中文说明：initializeOutputFormats 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % HTML format
             obj.OutputFormats('HTML') = obj.createHTMLFormatSpec();
@@ -595,9 +585,8 @@ classdef DocumentationGenerator < handle
 
         function initializeContentSources(obj)
             % Initialize content source configuration
-            % 中文说明：initializeContentSources 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.ContentSources = struct();
             obj.ContentSources.SourcePaths = {'+csrd'};
@@ -610,9 +599,8 @@ classdef DocumentationGenerator < handle
 
         function initializePublishingOptions(obj)
             % Initialize publishing configuration
-            % 中文说明：initializePublishingOptions 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.PublishingOptions = struct();
             obj.PublishingOptions.AutoDeploy = false;
@@ -625,9 +613,8 @@ classdef DocumentationGenerator < handle
 
         function initializeDocumentationInfrastructure(obj)
             % Initialize documentation generation infrastructure
-            % 中文说明：initializeDocumentationInfrastructure 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Initialize parser
             obj.parser = obj.createDocumentationParser();

@@ -11,7 +11,9 @@ function test_map_config_validation()
 
     scenarioConfig.PhysicalEnvironment.Map.Types = {'Statistical', 'OSM'};
     scenarioConfig.PhysicalEnvironment.Map.Ratio = [1.0];
-    factory = csrd.factories.ScenarioFactory('Config', scenarioConfig);
+    cfg = csrd.test_support.buildRuntimePlanForTest(scenarioConfig);
+    factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+        'RuntimePlan', cfg.RuntimePlan);
     try
         setup(factory);
         error('test_map_config_validation:MissingError', ...
@@ -25,7 +27,9 @@ function test_map_config_validation()
     scenarioConfig = masterConfig.Factories.Scenario;
     scenarioConfig.PhysicalEnvironment.Map.Types = {'Statistical', 'OSM'};
     scenarioConfig.PhysicalEnvironment.Map.Ratio = [1.0, -1.0];
-    factory = csrd.factories.ScenarioFactory('Config', scenarioConfig);
+    cfg = csrd.test_support.buildRuntimePlanForTest(scenarioConfig);
+    factory = csrd.factories.ScenarioFactory('Config', cfg.Factories.Scenario, ...
+        'RuntimePlan', cfg.RuntimePlan);
     try
         setup(factory);
         error('test_map_config_validation:MissingError', ...

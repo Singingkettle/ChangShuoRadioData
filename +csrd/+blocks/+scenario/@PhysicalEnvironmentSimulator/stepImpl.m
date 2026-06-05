@@ -1,6 +1,5 @@
 function [entities, environment] = stepImpl(obj, frameId)
     % stepImpl - Update physical environment state for current frame
-    % 中文说明：提供 CSRD 生产链路中的 stepImpl 实现。
     %
     % Updates the physical environment state including entity positions,
     % mobility states, and environmental conditions based on the internal
@@ -14,6 +13,14 @@ function [entities, environment] = stepImpl(obj, frameId)
     %   environment - Current environmental state and conditions
 
     obj.logger.debug('Frame %d: Updating physical environment (dt=%.9g)', frameId, obj.timeResolution);
+
+    if frameId == 1 && isKey(obj.frameHistory, frameId)
+        frameState = obj.frameHistory(frameId);
+        entities = frameState.entities;
+        environment = frameState.environment;
+        obj.logger.debug('Frame 1: Reusing planned t=0 physical state.');
+        return;
+    end
 
     % Get previous state from internal history
     previousState = getPreviousState(obj, frameId);
@@ -40,7 +47,7 @@ function [entities, environment] = stepImpl(obj, frameId)
     frameState.entities = entities;
     frameState.environment = environment;
     frameState.timeResolution = obj.timeResolution;
-    frameState.timestamp = frameId * obj.timeResolution;
+    frameState.timestamp = (frameId - 1) * obj.timeResolution;
     obj.frameHistory(frameId) = frameState;
 
     % Store in state history for scenario replay functionality

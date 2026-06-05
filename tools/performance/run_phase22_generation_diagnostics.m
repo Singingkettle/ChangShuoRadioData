@@ -1,6 +1,7 @@
 function summary = run_phase22_generation_diagnostics(varargin)
 %RUN_PHASE22_GENERATION_DIAGNOSTICS Run generation diagnostics via simulation.m.
-% 中文说明：通过 tools/simulation.m 入口收集大量生成故障和性能热点证据。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 p = inputParser();
 p.FunctionName = 'run_phase22_generation_diagnostics';
@@ -71,6 +72,9 @@ end
 end
 
 function shape = localConfigShape(configPath)
+    % localConfigShape - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 shape = struct('ConfigPath', configPath, 'Loaded', false);
 try
     cfg = csrd.runtime.config_loader(configPath);
@@ -79,18 +83,23 @@ try
     if isfield(cfg.Runner, 'Performance')
         shape.Performance = cfg.Runner.Performance;
     end
-    runtime = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
-        struct('Scenario', cfg.Factories.Scenario), struct());
-    shape.FrameNumSamples = runtime.FrameNumSamples;
-    shape.SampleRateHz = runtime.SampleRateHz;
-    shape.FrameDurationSec = runtime.FrameDurationSec;
-    shape.NumFramesPerScenario = runtime.NumFramesPerScenario;
+    scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+        cfg.RuntimePlan, cfg.Factories.Scenario, ...
+        struct('ScenarioId', 1, 'RandomSeed', cfg.Runner.RandomSeed));
+    shape.FramePolicy = cfg.RuntimePlan.FramePolicy;
+    shape.FrameNumSamples = scenarioPlan.Frame.FrameNumSamples;
+    shape.SampleRateHz = scenarioPlan.Frame.SampleRateHz;
+    shape.FrameDurationSec = scenarioPlan.Frame.FrameDurationSec;
+    shape.NumFramesPerScenario = scenarioPlan.Frame.NumFramesPerScenario;
 catch ME
     shape.Error = sprintf('%s: %s', ME.identifier, ME.message);
 end
 end
 
 function run = localMaybeRun(shouldRun, runner)
+    % localMaybeRun - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 run = struct('Ran', false, 'Status', 'NotRun', 'ElapsedSec', NaN, ...
     'ErrorIdentifier', '', 'ErrorMessage', '');
 if ~shouldRun
@@ -117,6 +126,9 @@ run.ElapsedSec = toc(t);
 end
 
 function tf = localDetailHasFailures(detail)
+    % localDetailHasFailures - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = false;
 if ~isstruct(detail)
     return;
@@ -138,6 +150,9 @@ end
 end
 
 function detail = localRunViaSimulation(baseConfig, artifactDir, tag)
+    % localRunViaSimulation - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 configPath = localWriteProfileConfig(baseConfig, artifactDir, tag, [], []);
 simulation(1, 1, configPath);
 perf = localLatestPerformanceTrace(artifactDir);
@@ -151,6 +166,9 @@ detail = struct( ...
 end
 
 function detail = localRunStress(artifactDir, stressCount)
+    % localRunStress - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 results = repmat(struct('Index', 0, 'Status', '', 'ElapsedSec', NaN, ...
     'GeneratedConfig', '', 'ErrorIdentifier', '', 'ErrorMessage', ''), ...
     stressCount, 1);
@@ -181,6 +199,9 @@ detail.Failed = sum(strcmp({results.Status}, 'Failed'));
 end
 
 function perf = localLatestPerformanceTrace(artifactDir)
+    % localLatestPerformanceTrace - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 files = dir(fullfile(artifactDir, '**', 'phase21-stage-timing-worker*.mat'));
 perf = struct('Found', false);
 if isempty(files)
@@ -199,6 +220,9 @@ end
 end
 
 function localAssertNoHardFailures(perf, tag)
+    % localAssertNoHardFailures - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if ~isstruct(perf) || ~isfield(perf, 'Found') || ~perf.Found || ...
         ~isfield(perf, 'Summary')
     return;
@@ -213,6 +237,9 @@ end
 end
 
 function configPath = localWriteProfileConfig(baseConfig, artifactDir, tag, numScenarios, seed)
+    % localWriteProfileConfig - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 configDir = fullfile(artifactDir, 'generated_configs');
 if ~isfolder(configDir)
     mkdir(configDir);
@@ -241,13 +268,18 @@ fprintf(fid, 'config.Runner.Performance.ArtifactDirectory = ''%s'';\n', ...
 fprintf(fid, 'config.Runner.Data.OutputDirectory = ''CSRD2025_phase22_%s'';\n', ...
     localEscape(safeTag));
 fprintf(fid, 'config.Runner.Data.PrettyPrintAnnotations = false;\n');
-fprintf(fid, 'config.Runner.Log.Policy = ''LargeMC'';\n');
-fprintf(fid, 'config.Log.Level = ''INFO'';\n');
+fprintf(fid, 'config.Logging.Policy = ''LargeMC'';\n');
+fprintf(fid, 'config.Logging.File.Enabled = true;\n');
+fprintf(fid, 'config.Logging.Console.Enabled = false;\n');
+fprintf(fid, 'config.Logging.Progress.Mode = ''Summary'';\n');
 fprintf(fid, 'end\n');
 clear cleanup;
 end
 
 function ok = localAllRunsPassed(runs)
+    % localAllRunsPassed - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 ok = true;
 names = fieldnames(runs);
 for idx = 1:numel(names)
@@ -261,6 +293,9 @@ end
 end
 
 function localWriteJson(pathText, payload)
+    % localWriteJson - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fid = fopen(pathText, 'w');
 if fid == -1
     error('CSRD:Phase22:JsonOpenFailed', ...
@@ -272,6 +307,9 @@ clear cleanup;
 end
 
 function localPrintSummary(summary)
+    % localPrintSummary - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fprintf('Phase 22 generation diagnostics written to:\n  %s\n  %s\n', ...
     summary.SummaryPath, summary.JsonPath);
 names = fieldnames(summary.Runs);
@@ -284,15 +322,24 @@ end
 end
 
 function text = localEscape(text)
+    % localEscape - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 text = strrep(char(string(text)), '''', '''''');
 end
 
 function tf = localNonnegativeInteger(value)
+    % localNonnegativeInteger - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 tf = isnumeric(value) && isscalar(value) && isfinite(value) && ...
     value >= 0 && floor(value) == value;
 end
 
 function projectRoot = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 end

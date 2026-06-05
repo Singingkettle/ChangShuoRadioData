@@ -1,6 +1,7 @@
 function config = csrd2025_osm_large_map_validation()
     % csrd2025_osm_large_map_validation - Specific OSM RayTracing smoke.
-    % 中文说明：显式指定一个 OSM 文件做 RayTracing smoke；OSM 文件大小不再是分级合同。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 
     config.baseConfigs = {
                           '_base_/logging/default.m',
@@ -38,19 +39,16 @@ function config = csrd2025_osm_large_map_validation()
     config.Runner.Performance.EnableStageTiming = true;
     config.Runner.Performance.ArtifactDirectory = ...
         fullfile('artifacts', 'performance', 'phase26_specific_osm');
-    config.Runner.Log.Policy = 'LargeMC';
+    config.Logging.Name = 'CSRD-Phase26-OSM-SpecificMap';
+    config.Logging.Policy = 'LargeMC';
+    config.Logging.Console.Enabled = true;
+    config.Logging.File.Enabled = true;
+    config.Logging.Progress.Mode = 'Summary';
 
-    config.Log.Name = 'CSRD-Phase26-OSM-SpecificMap';
-    config.Log.Level = 'INFO';
-    config.Log.SaveToFile = true;
-    config.Log.DisplayInConsole = true;
-    config.Log.SessionLogging = true;
-
-    config.Factories.Scenario.Global.NumFramesPerScenario = 1;
-    config.Factories.Scenario.Global.FrameNumSamples = 1024;
-    config.Factories.Scenario.Global.FrameDuration = 2.048e-5;
-    config.Factories.Scenario.Global.TimeResolution = 2.048e-5;
-    config.Factories.Scenario.Global.ObservationDuration = 2.048e-5;
+    config.Factories.Scenario.FramePolicy.FrameNumSamples.Mode = 'Fixed';
+    config.Factories.Scenario.FramePolicy.FrameNumSamples.Value = 1024;
+    config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Mode = 'Fixed';
+    config.Factories.Scenario.FramePolicy.NumFramesPerScenario.Value = 1;
 
     config.Factories.Scenario.PhysicalEnvironment.Map.Types = {'OSM'};
     config.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;

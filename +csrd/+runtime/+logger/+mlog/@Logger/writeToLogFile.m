@@ -1,8 +1,7 @@
 function writeToLogFile(obj, msgObj)
     % Writes a message to the log file
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 writeToLogFile 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 
     % Copyright 2018-2024 The MathWorks Inc.
 
@@ -95,13 +94,11 @@ function writeToLogFile(obj, msgObj)
 end
 
 function isSameFolder = isSameFolder(folder1, folder2)
-    % 获取文件夹的绝对路径
     % isSameFolder - Production declaration in CSRD.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     folder1 = what(folder1);
     folder2 = what(folder2);
 
-    % 判断两个路径是否相同
     isSameFolder = isequal(folder1.path, folder2.path);
 end

@@ -1,8 +1,7 @@
 function [signalSegmentsPerTx, TxInfo] = processSingleTransmitter(obj, FrameId, txIdx)
     % processSingleTransmitter - Process a single transmitter configuration
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processSingleTransmitter 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method handles the complete processing of one transmitter including
     % configuration validation, message generation, and modulation for all segments.

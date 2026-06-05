@@ -1,6 +1,5 @@
 function entityProperties = initializeEntityProperties(obj, entityType)
     % initializeEntityProperties - Initialize physical properties for entity type
-    % 中文说明：提供 CSRD 生产链路中的 initializeEntityProperties 实现。
     %
     % Input Arguments:
     %   entityType - Type of entity to initialize properties for

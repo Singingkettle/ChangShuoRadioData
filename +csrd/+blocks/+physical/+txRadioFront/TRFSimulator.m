@@ -1,6 +1,5 @@
 classdef TRFSimulator < matlab.System
     % TRFSimulator - Advanced Transmitter Radio Front-End Simulator
-    % 中文说明：提供 CSRD 生产链路中的 TRFSimulator 实现。
     %
     % This class implements a comprehensive transmitter radio front-end simulation
     % featuring advanced complex exponential frequency translation to replace traditional
@@ -16,7 +15,7 @@ classdef TRFSimulator < matlab.System
     %   - Power scaling and DC offset modeling
     %   - Receiver-centric target sample rate configuration
     %
-    % References / 参考资料:
+    % References:
     %   - MATLAB Communications Toolbox QAM with RF Impairments example
     %   - USRP zero-IF design architecture (https://kb.ettus.com/UHD)
     %   - ORACLE paper: "Optimized Radio clAssification through Convolutional neuraL nEtworks"
@@ -155,9 +154,8 @@ classdef TRFSimulator < matlab.System
 
         function iqImbalanceHandle = genIqImbalance(obj)
             % genIqImbalance - Generate IQ imbalance function handle
-            % 中文说明：genIqImbalance 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a function handle that applies amplitude and phase imbalance
             % to simulate real-world quadrature demodulator imperfections. The
@@ -185,9 +183,8 @@ classdef TRFSimulator < matlab.System
 
         function phaseNoiseObject = genPhaseNoise(obj, sampleRateHz)
             % genPhaseNoise - Generate phase noise system object
-            % 中文说明：genPhaseNoise 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates and configures a Communications Toolbox phase noise system object
             % to model oscillator phase noise in the transmitter. The phase noise
@@ -265,9 +262,8 @@ classdef TRFSimulator < matlab.System
 
         function nonlinearityObject = genMemoryLessNonlinearity(obj)
             %GENMEMORYLESSNONLINEARITY Build a comm.MemorylessNonlinearity
-            % 中文说明：genMemoryLessNonlinearity 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % System object for the PA stage. The implementation follows
             % the official MATLAB documentation Dependencies table for
             % `comm.MemorylessNonlinearity`: only the property set declared
@@ -318,9 +314,8 @@ classdef TRFSimulator < matlab.System
 
         function args = assembleCubicPolynomialArgs(~, cfg)
             % assembleCubicPolynomialArgs - Production declaration in CSRD.
-            % 中文说明：assembleCubicPolynomialArgs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             args = {'Method', 'Cubic polynomial', ...
                 'LinearGain', cfg.LinearGain, ...
                 'TOISpecification', cfg.TOISpecification};
@@ -343,9 +338,8 @@ classdef TRFSimulator < matlab.System
 
         function args = assembleHyperbolicTangentArgs(~, cfg)
             % assembleHyperbolicTangentArgs - Production declaration in CSRD.
-            % 中文说明：assembleHyperbolicTangentArgs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             args = {'Method', 'Hyperbolic tangent', ...
                 'LinearGain',      cfg.LinearGain, ...
                 'IIP3',            cfg.IIP3, ...
@@ -356,9 +350,8 @@ classdef TRFSimulator < matlab.System
 
         function args = assembleSalehGhorbaniArgs(~, cfg, methodName)
             % assembleSalehGhorbaniArgs - Production declaration in CSRD.
-            % 中文说明：assembleSalehGhorbaniArgs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             args = {'Method', methodName, ...
                 'InputScaling',  cfg.InputScaling, ...
                 'AMAMParameters', cfg.AMAMParameters, ...
@@ -368,9 +361,8 @@ classdef TRFSimulator < matlab.System
 
         function args = assembleModifiedRappArgs(~, cfg)
             % assembleModifiedRappArgs - Production declaration in CSRD.
-            % 中文说明：assembleModifiedRappArgs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             args = {'Method', 'Modified Rapp model', ...
                 'LinearGain',            cfg.LinearGain, ...
                 'Smoothness',            cfg.Smoothness, ...
@@ -382,9 +374,8 @@ classdef TRFSimulator < matlab.System
 
         function args = assembleLookupTableArgs(~, cfg)
             % assembleLookupTableArgs - Production declaration in CSRD.
-            % 中文说明：assembleLookupTableArgs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if ~isfield(cfg, 'Table') || isempty(cfg.Table) || size(cfg.Table, 2) ~= 3
                 error('TRFSimulator:InvalidLookupTable', ...
                     ['Lookup table requires an Nx3 [Pin_dBm, Pout_dBm, ' ...
@@ -396,9 +387,8 @@ classdef TRFSimulator < matlab.System
 
         function setupImpl(obj, ~)
             % setupImpl - Initialize transmitter radio front-end system components
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Sets up all necessary RF impairment models and system objects for
             % the transmitter chain. This method is called automatically when
@@ -416,9 +406,8 @@ classdef TRFSimulator < matlab.System
 
         function translatedSignal = frequencyTranslate(obj, inputSignal, targetFrequency, signalSampleRate)
             % frequencyTranslate - Apply complex exponential frequency translation
-            % 中文说明：frequencyTranslate 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Performs frequency translation using complex exponential multiplication
             % to replace traditional DUC interpolation. This approach provides clean
@@ -475,9 +464,8 @@ classdef TRFSimulator < matlab.System
 
         function resampledSignal = resampleToTarget(obj, inputSignal, inputSampleRate)
             % resampleToTarget - Resample signal to target sample rate when needed
-            % 中文说明：resampleToTarget 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Performs sample rate conversion to match the target sample rate only
             % when necessary. If the input sample rate already matches the target,
@@ -560,9 +548,8 @@ classdef TRFSimulator < matlab.System
 
         function outputSignal = stepImpl(obj, inputSignal)
             % stepImpl - Process input signal through complete transmitter RF chain
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Executes the complete transmitter radio front-end processing chain
             % including RF impairments, sample rate conversion, and complex
@@ -628,8 +615,6 @@ classdef TRFSimulator < matlab.System
                 toc(stageStart), traceMeta);
 
             % Step 3: Apply oscillator phase noise on the current baseband grid.
-            % 中文说明：PhaseNoise 与当前信号采样网格绑定；不要每帧重建，也不要为了
-            % “看起来统一”强行搬到目标采样率，实测会显著增加短帧 setup 成本。
             obj.ensurePhaseNoiseSampleRate(inputSampleRate);
             stageStart = tic;
             processedSignal = obj.applyPhaseNoise(processedSignal);
@@ -646,7 +631,6 @@ classdef TRFSimulator < matlab.System
                 toc(stageStart), traceMeta);
 
             % Step 5: Resample to the receiver observation rate.
-            % 中文说明：先升采样到接收机观测采样率，避免高频点在调制器低采样率下混叠。
             stageStart = tic;
             resampledSignal = obj.resampleToTarget(processedSignal, inputSampleRate);
             resampleMeta = traceMeta;
@@ -655,7 +639,6 @@ classdef TRFSimulator < matlab.System
                 toc(stageStart), resampleMeta);
 
             % Step 6: Translate on the target-rate grid used by ReceiverView.
-            % 中文说明：频移必须在 TargetSampleRate 网格上执行，才能与标注中的频点一致。
             stageStart = tic;
             frequencyTranslatedSignal = obj.frequencyTranslate( ...
                 resampledSignal, carrierFreq, obj.TargetSampleRate);
@@ -689,6 +672,8 @@ classdef TRFSimulator < matlab.System
 
         function outputSignal = applyPhaseNoise(obj, inputSignal)
             % applyPhaseNoise - Apply configured oscillator phase noise backend.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             if isa(obj.PhaseNoise, 'matlab.System')
                 outputSignal = obj.PhaseNoise(inputSignal);
                 return;
@@ -699,6 +684,8 @@ classdef TRFSimulator < matlab.System
 
         function outputSignal = applyMemorylessNonlinearity(obj, inputSignal)
             % applyMemorylessNonlinearity - Apply PA model per antenna column.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             %
             % comm.MemorylessNonlinearity is physically memoryless. Applying it
             % column-by-column is equivalent for independent antenna streams and
@@ -718,6 +705,8 @@ classdef TRFSimulator < matlab.System
 
         function outputSignal = applyFastSpectralPhaseNoise(obj, inputSignal)
             % applyFastSpectralPhaseNoise - Fast PSD-mask phase noise synthesis.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             %
             % MathWorks comm.PhaseNoise models y_k = x_k exp(j phi_k), where
             % phi_k is filtered Gaussian noise following the configured phase
@@ -773,6 +762,9 @@ classdef TRFSimulator < matlab.System
         end
 
         function noiseValues = randnLikePhaseNoise(obj, numRows, numCols, realOnly)
+            % randnLikePhaseNoise - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             if nargin < 4
                 realOnly = false;
             end
@@ -796,6 +788,9 @@ classdef TRFSimulator < matlab.System
         end
 
         function validateFastPhaseNoiseMask(~, levelsDbcHz, offsetsHz, sampleRateHz)
+            % validateFastPhaseNoiseMask - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             if isempty(levelsDbcHz) || isempty(offsetsHz) || ...
                     numel(levelsDbcHz) ~= numel(offsetsHz)
                 error('CSRD:TRF:InvalidPhaseNoiseMask', ...
@@ -819,6 +814,9 @@ classdef TRFSimulator < matlab.System
         end
 
         function twoSidedPsd = phaseNoiseTwoSidedPsd(~, freqsHz, offsetsHz, levelsDbcHz)
+            % phaseNoiseTwoSidedPsd - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             freqsHz = max(double(freqsHz), eps);
             if numel(offsetsHz) == 1
                 % Scalar masks use the documented 1/f characteristic that
@@ -853,7 +851,8 @@ classdef TRFSimulator < matlab.System
 
         function ensurePhaseNoiseSampleRate(obj, inputSampleRate)
             % ensurePhaseNoiseSampleRate - Keep phase noise object on active grid.
-            % 中文说明：PhaseNoise 的 SampleRate 必须跟当前处理网格一致，且不能每帧重建。
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             if isempty(obj.PhaseNoise) || ...
                     ~isfinite(obj.PhaseNoiseSampleRateHz) || ...
                     abs(obj.PhaseNoiseSampleRateHz - inputSampleRate) > ...
@@ -873,9 +872,8 @@ classdef TRFSimulator < matlab.System
 
         function obj = TRFSimulator(varargin)
             % TRFSimulator - Constructor for transmitter radio front-end simulator
-            % 中文说明：TRFSimulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new TRFSimulator instance with configurable properties.
             % The constructor accepts name-value pairs for setting object properties
@@ -921,6 +919,8 @@ end
 
 function y = resampleOneSampleAntennaMatrix(x, upsampleFactor, downsampleFactor)
 %RESAMPLEONESAMPLEANTENNAMATRIX Preserve antenna columns for 1-sample frames.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 % MATLAB resample treats a 1-by-N matrix as one row-vector channel. In this
 % edge case, resample each antenna stream independently so the output remains
 % samples-by-antennas for downstream channel objects.

@@ -1,6 +1,5 @@
 function test_phase13_full_coverage_config_load()
 %TEST_PHASE13_FULL_COVERAGE_CONFIG_LOAD Validate the Phase 13 formal config.
-% 中文说明：静态验证正式全量覆盖配置和矩阵调度器，不生成数据。
 
 fprintf('=== Phase 13 full coverage config load test ===\n');
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));

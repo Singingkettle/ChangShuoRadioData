@@ -1,6 +1,5 @@
 function [minLat, minLon, maxLat, maxLon] = calculateBoundingBox(obj, lat_deg, lon_deg, size_km)
     % calculateBoundingBox - Calculate bounding box coordinates
-    % 中文说明：提供 CSRD 生产链路中的 calculateBoundingBox 实现。
     %
     % This method calculates the bounding box coordinates centered at
     % the given latitude and longitude, with the specified size in kilometers.

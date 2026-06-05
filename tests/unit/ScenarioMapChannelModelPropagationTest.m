@@ -43,7 +43,11 @@ classdef ScenarioMapChannelModelPropagationTest < matlab.unittest.TestCase
             phys.Environment.MapType = 'OSM';
             phys.Environment.OSMMapFile = emptyOsm;
             phys.Environment.ChannelModel = 'AWGN';
-            phys.TimeResolution = cfg.Global.FrameDuration;
+            runtimeCfg = csrd.test_support.buildRuntimePlanForTest(cfg);
+            scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+                runtimeCfg.RuntimePlan, runtimeCfg.Factories.Scenario, ...
+                struct('ScenarioId', 1, 'RandomSeed', runtimeCfg.Runner.RandomSeed));
+            phys.TimeResolution = scenarioPlan.Frame.FrameDurationSec;
 
             simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator( ...
                 'Config', phys);
@@ -73,7 +77,9 @@ end
 
 function [tx, rx, layout] = localRunScenarioFactory(cfg)
 csrd.runtime.logger.GlobalLogManager.reset();
-sf = csrd.factories.ScenarioFactory('Config', cfg);
+runtimeCfg = csrd.test_support.buildRuntimePlanForTest(cfg);
+sf = csrd.factories.ScenarioFactory('Config', runtimeCfg.Factories.Scenario, ...
+    'RuntimePlan', runtimeCfg.RuntimePlan);
 setup(sf);
 cleanupObj = onCleanup(@() localRelease(sf)); %#ok<NASGU>
 [tx, rx, layout] = step(sf, 1);

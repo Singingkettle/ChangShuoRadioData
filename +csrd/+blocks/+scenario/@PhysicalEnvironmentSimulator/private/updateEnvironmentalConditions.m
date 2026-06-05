@@ -1,15 +1,14 @@
 function environment = updateEnvironmentalConditions(obj, frameId, timeResolution)
     % updateEnvironmentalConditions - Update environmental factors
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 updateEnvironmentalConditions 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Updates environmental conditions that may affect communication
     % and entity behavior, including weather, obstacles, and terrain.
 
     environment = obj.currentEnvironment;
     environment.FrameId = frameId;
-    environment.Time = frameId * timeResolution;
+    environment.Time = (frameId - 1) * timeResolution;
 
     % Update weather conditions (simple model)
     if isfield(obj.Config, 'Environment') && isfield(obj.Config.Environment, 'Weather')

@@ -1,6 +1,5 @@
 classdef CommunicationBehaviorSimulator < matlab.System
     % CommunicationBehaviorSimulator - Communication Behavior Modeling and Simulation
-    % 中文说明：提供 CSRD 生产链路中的 CommunicationBehaviorSimulator 实现。
     %
     % This class implements comprehensive communication behavior modeling for wireless
     % scenarios, including modulation scheme selection, frequency allocation, bandwidth
@@ -132,9 +131,8 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         function obj = CommunicationBehaviorSimulator(varargin)
             % CommunicationBehaviorSimulator - Constructor for communication behavior simulator
-            % 中文说明：CommunicationBehaviorSimulator 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Creates a new communication behavior simulator with configurable
             % frequency allocation, modulation selection, and transmission pattern
@@ -156,12 +154,15 @@ classdef CommunicationBehaviorSimulator < matlab.System
         [txConfigs, rxConfigs, globalLayout] = stepImpl(obj, frameId, entities)
     end
 
+    methods
+        [txConfigs, rxConfigs, globalLayout, entities] = planScenario(obj, entities)
+    end
+
     methods (Static, Hidden)
         function rvs = projectReceiverViews(txSpectrum, rxConfigs, fallbackObservableRange)
             % projectReceiverViews - Phase 3 ReceiverView projection algorithm
-            % 中文说明：projectReceiverViews 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             %   Given an emitter's placed Spectrum struct (PlannedFreqOffset
             %   + PlannedBandwidth) and the array of receiver configs, returns
@@ -250,9 +251,8 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         function out = normalizeReceiverList(rxConfigs)
             % normalizeReceiverList - Internal helper for projectReceiverViews.
-            % 中文说明：normalizeReceiverList 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if iscell(rxConfigs)
                 out = rxConfigs(:)';
             elseif isstruct(rxConfigs)
@@ -265,9 +265,8 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         function r = resolveObservableRange(rxc, fallbackRange) %#ok<INUSD>
             % resolveObservableRange - Internal helper for projectReceiverViews.
-            % 中文说明：resolveObservableRange 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if ~isstruct(rxc)
                 error('CSRD:Scenario:MissingReceiverObservableRange', ...
                     'Receiver config must be a struct with ObservableRange.');
@@ -294,9 +293,8 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         function validateFrequencyAllocationStrategy(strategyName)
             % validateFrequencyAllocationStrategy - Phase 2 (D7) strategy gate.
-            % 中文说明：validateFrequencyAllocationStrategy 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             %   Phase 2 collapses FrequencyAllocation.Strategy down to the
             %   single supported value 'ReceiverCentric'. The legacy
@@ -366,6 +364,9 @@ classdef CommunicationBehaviorSimulator < matlab.System
 end
 
 function r = localValidateObservableRange(r)
+    % localValidateObservableRange - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
     r = double(reshape(r, 1, 2));
     if any(~isfinite(r)) || r(2) <= r(1)
         error('CSRD:Scenario:InvalidReceiverObservableRange', ...

@@ -1,6 +1,5 @@
 classdef OsmCoordinateUnitContractTest < matlab.unittest.TestCase
     % OsmCoordinateUnitContractTest
-    % 中文说明：OSM 场景同时发布米制 Position 和地理 GeoPositionDeg。
 
     methods (Test)
 

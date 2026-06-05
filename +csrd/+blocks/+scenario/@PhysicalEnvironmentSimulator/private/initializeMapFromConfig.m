@@ -1,26 +1,11 @@
 function initializeMapFromConfig(obj)
-    % initializeMapFromConfig - Initialize map based on configuration
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 initializeMapFromConfig 实现。
-    %
-    % This method initializes the map based on the MapType in configuration:
-    % - 'Statistical': Uses logical boundaries for statistical channel modeling
-    % - 'OSM': Loads OSM file and creates site viewer for ray tracing
+    %INITIALIZEMAPFROMCONFIG Initialize the explicitly configured map model.
 
     if obj.mapInitialized
-        return; % Already initialized
+        return;
     end
 
-    % Determine map type from configuration
-    mapType = 'Statistical'; % Default
-
-    if isfield(obj.Config, 'Environment') && isfield(obj.Config.Environment, 'MapType')
-        mapType = obj.Config.Environment.MapType;
-    elseif isfield(obj.Config, 'Map') && isfield(obj.Config.Map, 'Type')
-        mapType = obj.Config.Map.Type;
-    end
-
+    mapType = localResolveMapType(obj.Config);
     obj.logger.debug('Initializing map with type: %s', mapType);
 
     switch mapType
@@ -29,9 +14,32 @@ function initializeMapFromConfig(obj)
         case {'Statistical', 'Grid'}
             initializeStatisticalMap(obj);
         otherwise
-            obj.logger.warning('Unknown map type: %s, defaulting to Statistical', mapType);
-            initializeStatisticalMap(obj);
+            error('CSRD:Scenario:UnsupportedMapType', ...
+                'Unsupported map type "%s". Supported map types are OSM, Statistical, and Grid.', ...
+                mapType);
     end
 
     obj.mapInitialized = true;
+end
+
+function mapType = localResolveMapType(config)
+if ~isstruct(config)
+    error('CSRD:Scenario:MissingMapType', ...
+        'PhysicalEnvironmentSimulator.Config must be a struct with Map.Type or Environment.MapType.');
+end
+
+if isfield(config, 'Environment') && isstruct(config.Environment) && ...
+        isfield(config.Environment, 'MapType') && ~isempty(config.Environment.MapType)
+    mapType = char(string(config.Environment.MapType));
+    return;
+end
+
+if isfield(config, 'Map') && isstruct(config.Map) && ...
+        isfield(config.Map, 'Type') && ~isempty(config.Map.Type)
+    mapType = char(string(config.Map.Type));
+    return;
+end
+
+error('CSRD:Scenario:MissingMapType', ...
+    'PhysicalEnvironmentSimulator requires Config.Map.Type or Config.Environment.MapType.');
 end

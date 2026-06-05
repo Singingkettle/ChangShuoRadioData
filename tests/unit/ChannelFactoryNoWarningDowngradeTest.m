@@ -1,6 +1,5 @@
 classdef ChannelFactoryNoWarningDowngradeTest < matlab.unittest.TestCase
     % ChannelFactoryNoWarningDowngradeTest - Channel config failures are hard.
-    % 中文说明：信道属性、距离、天线写入失败不能 warning 后继续生成。
 
     methods (Test)
         function assignmentFailuresAreNotWarnings(testCase)

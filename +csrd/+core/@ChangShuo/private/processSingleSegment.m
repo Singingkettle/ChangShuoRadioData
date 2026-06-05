@@ -1,8 +1,7 @@
 function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxScenario, currentTxId, segIdx)
     % processSingleSegment - Process a single segment for message generation and modulation
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 processSingleSegment 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This method handles the complete processing of one segment including
     % message generation and modulation.
@@ -85,6 +84,10 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             currentSegmentScenario.Placement.FrameRelativeStartTime;
         modulatedSignalSegment.FrameRelativeEndTime = ...
             currentSegmentScenario.Placement.FrameRelativeEndTime;
+        modulatedSignalSegment.GeometryEvaluationTimeSec = ...
+            currentSegmentScenario.Placement.GeometryEvaluationTimeSec;
+        modulatedSignalSegment.GeometryEvaluationPolicy = ...
+            currentSegmentScenario.Placement.GeometryEvaluationPolicy;
         modulatedSignalSegment.FrequencyOffset = currentSegmentScenario.Placement.FrequencyOffset;
 
         % Modulators are required to set SampleRate explicitly. The
@@ -140,6 +143,14 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             currentSegmentScenario.Placement.FrameRelativeEndTime;
         modulatedSignalSegment.Planned.DurationSec = ...
             currentSegmentScenario.Placement.Duration;
+        modulatedSignalSegment.Planned.ScenarioStartTimeSec = ...
+            currentSegmentScenario.Placement.StartTime;
+        modulatedSignalSegment.Planned.ScenarioEndTimeSec = ...
+            currentSegmentScenario.Placement.EndTime;
+        modulatedSignalSegment.Planned.GeometryEvaluationTimeSec = ...
+            currentSegmentScenario.Placement.GeometryEvaluationTimeSec;
+        modulatedSignalSegment.Planned.GeometryEvaluationPolicy = ...
+            currentSegmentScenario.Placement.GeometryEvaluationPolicy;
         if isfield(currentTxScenario, 'Spectrum') && ...
                 isstruct(currentTxScenario.Spectrum) && ...
                 isfield(currentTxScenario.Spectrum, 'ReceiverSampleRate') && ...

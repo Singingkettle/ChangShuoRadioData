@@ -151,11 +151,13 @@ cfg.Regulatory.ServiceTier = 'Tier1';
 cfg.Regulatory.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
 cfg.Regulatory.MonitoringBand.FixedBandId = 'CN_NR_N78';
 cfg.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
-cfg.Global.NumFramesPerScenario = 1;
-cfg.Global.FrameNumSamples = round(0.01 * cfg.Receiver.SampleRate);
-cfg.Global.FrameDuration = cfg.Global.FrameNumSamples / cfg.Receiver.SampleRate;
-cfg.Global.ObservationDuration = cfg.Global.FrameDuration * ...
-    cfg.Global.NumFramesPerScenario;
+frameNumSamples = round(0.01 * cfg.Receiver.SampleRate);
+frameDuration = frameNumSamples / cfg.Receiver.SampleRate;
+cfg.ScenarioPlan.Frame = struct( ...
+    'FrameNumSamples', frameNumSamples, ...
+    'FrameDurationSec', frameDuration, ...
+    'ObservationDurationSec', frameDuration, ...
+    'NumFramesPerScenario', 1);
 end
 
 

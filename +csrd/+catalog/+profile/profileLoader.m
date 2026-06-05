@@ -1,6 +1,5 @@
 function profile = profileLoader(category, name)
 %PROFILELOADER Load a Phase 2 reference profile by (category, name).
-% 中文说明：提供 CSRD 生产链路中的 profileLoader 实现。
 %
 % Phase 2 profile library entry point. Returns a fully-validated profile
 % struct from one of four registered categories.
@@ -50,9 +49,8 @@ end
 
 function validateProfileSchema(category, name, profile)
 %VALIDATEPROFILESCHEMA Enforce per-category required-field contract.
-% 中文说明：validateProfileSchema 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 
     if ~isstruct(profile) || ~isscalar(profile)
         error('CSRD:Profile:SchemaInvalid', ...

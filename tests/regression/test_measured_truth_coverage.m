@@ -297,7 +297,7 @@ function cfg = localApplyCohort(masterCfg, cohort, runRoot, sid)
     cfg.Runner.NumScenarios     = 1;
     cfg.Runner.RandomSeed       = 20260427 + sid;
     cfg.Runner.Toolbox.Level    = 'minimal';
-    cfg.Runner.Log.Policy       = 'Standard';
+    cfg.Logging.Policy          = 'Standard';
     cfg.Runner.Data.OutputDirectory = fullfile(runRoot, ...
         sprintf('scenario_%06d', sid));
     cfg.Runner.Data.CompressData = false;
@@ -354,8 +354,11 @@ end
 
 
 function annotationPath = localRunOneScenario(cfg, ~)
+    cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
     runner = csrd.SimulationRunner( ...
-        'RunnerConfig', cfg.Runner, 'FactoryConfigs', cfg.Factories);
+        'RunnerConfig', cfg.Runner, ...
+        'FactoryConfigs', cfg.Factories, ...
+        'RuntimePlan', cfg.RuntimePlan);
     setup(runner);
     step(runner, 1, 1);
 

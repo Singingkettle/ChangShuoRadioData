@@ -49,8 +49,9 @@ stay real instead of drifting back to random sampling.
   worker sharding, and JSON summary output.
 - `csrd.support.docs.auditProductionComments` owns production file enumeration,
   bilingual header checks, reference heading normalization, and manifest output.
-- The production comment audit manifest is written to
-  `docs/audits/reports/phase-13-production-comment-audit.json`.
+- Large production comment audit manifests are regenerated under ignored
+  artifacts instead of committed under `docs/`:
+  `artifacts/audits/reports/phase-13-production-comment-audit.json`.
 
 ## Verification Log
 

@@ -1,5 +1,5 @@
 classdef ReceiveFactory < matlab.System
-        % 中文说明：提供 CSRD 生产链路中的 ReceiveFactory 实现。
+% ReceiveFactory - CSRD MATLAB declaration.
 
     properties
         % Config: Struct containing the configuration for receiver types.
@@ -18,9 +18,8 @@ classdef ReceiveFactory < matlab.System
 
         function obj = ReceiveFactory(varargin)
             % ReceiveFactory - Production declaration in CSRD.
-            % 中文说明：ReceiveFactory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             setProperties(obj, nargin, varargin{:});
             obj.cachedReceiverBlocks = containers.Map;
         end
@@ -31,16 +30,14 @@ classdef ReceiveFactory < matlab.System
 
         function validateInputsImpl(~, ~, ~, ~, ~)
             % validateInputsImpl - Production declaration in CSRD.
-            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
             % setupImpl - Production declaration in CSRD.
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             if isempty(obj.Config) || ~isstruct(obj.Config)
                 error('ReceiveFactory:ConfigError', 'Config property must be a valid struct.');
@@ -57,9 +54,8 @@ classdef ReceiveFactory < matlab.System
 
         function receivedDataStruct = stepImpl(obj, inputSignalStruct, frameId, rxInfoThisRx, receiverScenarioConfig)
             % inputSignalStruct: from ChannelFactory (signal after passing through channel)
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % rxInfoThisRx: The specific RxInfo struct for this receiver
             % receiverScenarioConfig: RxPlan struct from ScenarioConfig.Receivers
 
@@ -200,9 +196,8 @@ classdef ReceiveFactory < matlab.System
 
         function configureReceiverBlock(obj, rxBlock, typeConfig, rxInfoThisRx, receiverScenarioConfig)
             % Configure the receiver block with parameters from typeConfig
-            % 中文说明：configureReceiverBlock 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % Parameters are randomly selected from the defined ranges
 
             obj.logger.debug('Configuring receiver block with RF impairment parameters');
@@ -277,9 +272,8 @@ classdef ReceiveFactory < matlab.System
 
         function nonlinConfig = configureNonlinearity(obj, nonlinField)
             %CONFIGURENONLINEARITY Build a `comm.MemorylessNonlinearity` config.
-            % 中文说明：configureNonlinearity 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             %   v0.4 deep refactor: the config produced here populates
             %   ONLY the property set the System object accepts for the
@@ -340,9 +334,8 @@ classdef ReceiveFactory < matlab.System
 
         function cfg = buildCubicPolynomialConfig(obj, src)
             % buildCubicPolynomialConfig - Production declaration in CSRD.
-            % 中文说明：buildCubicPolynomialConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = struct();
             cfg.Method = 'Cubic polynomial';
             cfg.LinearGain = obj.randomInRange(src.LinearGain(1), src.LinearGain(2));
@@ -364,9 +357,8 @@ classdef ReceiveFactory < matlab.System
 
         function cfg = buildHyperbolicTangentConfig(obj, src)
             % buildHyperbolicTangentConfig - Production declaration in CSRD.
-            % 中文说明：buildHyperbolicTangentConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = struct();
             cfg.Method = 'Hyperbolic tangent';
             cfg.LinearGain      = obj.randomInRange(src.LinearGain(1),     src.LinearGain(2));
@@ -378,9 +370,8 @@ classdef ReceiveFactory < matlab.System
 
         function cfg = buildSalehModelConfig(obj, src)
             % buildSalehModelConfig - Production declaration in CSRD.
-            % 中文说明：buildSalehModelConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = struct();
             cfg.Method = 'Saleh model';
             cfg.InputScaling   = obj.randomInRange(src.InputScaling(1),   src.InputScaling(2));
@@ -395,9 +386,8 @@ classdef ReceiveFactory < matlab.System
 
         function cfg = buildGhorbaniModelConfig(obj, src)
             % buildGhorbaniModelConfig - Production declaration in CSRD.
-            % 中文说明：buildGhorbaniModelConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = struct();
             cfg.Method = 'Ghorbani model';
             cfg.InputScaling   = obj.randomInRange(src.InputScaling(1),  src.InputScaling(2));
@@ -416,9 +406,8 @@ classdef ReceiveFactory < matlab.System
 
         function cfg = buildModifiedRappModelConfig(obj, src)
             % buildModifiedRappModelConfig - Production declaration in CSRD.
-            % 中文说明：buildModifiedRappModelConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = struct();
             cfg.Method = 'Modified Rapp model';
             cfg.LinearGain            = obj.randomInRange(src.LinearGain(1),            src.LinearGain(2));
@@ -431,9 +420,8 @@ classdef ReceiveFactory < matlab.System
 
         function cfg = buildLookupTableConfig(~, src)
             % buildLookupTableConfig - Production declaration in CSRD.
-            % 中文说明：buildLookupTableConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             cfg = struct();
             cfg.Method = 'Lookup table';
             if ~isfield(src, 'Table') || isempty(src.Table) || size(src.Table, 2) ~= 3
@@ -447,9 +435,8 @@ classdef ReceiveFactory < matlab.System
 
         function value = resolvePowerLimit(obj, raw, defaultValue)
             % resolvePowerLimit - Production declaration in CSRD.
-            % 中文说明：resolvePowerLimit 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if isempty(raw)
                 value = defaultValue;
                 return;
@@ -472,9 +459,8 @@ classdef ReceiveFactory < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Production declaration in CSRD.
-            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('ReceiveFactory releaseImpl called.');
             blockKeys = keys(obj.cachedReceiverBlocks);
 
@@ -498,9 +484,8 @@ classdef ReceiveFactory < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Production declaration in CSRD.
-            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             obj.logger.debug('ReceiveFactory resetImpl called.');
             blockKeys = keys(obj.cachedReceiverBlocks);
 
@@ -523,9 +508,8 @@ classdef ReceiveFactory < matlab.System
 
         function receiverTypes = getReceiverTypes(obj)
             % Get available receiver types from configuration
-            % 中文说明：getReceiverTypes 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             excludeFields = {'LogDetails', 'Description', 'Types'};
             allFields = fieldnames(obj.factoryConfig);
             receiverTypes = setdiff(allFields, excludeFields);
@@ -533,9 +517,8 @@ classdef ReceiveFactory < matlab.System
 
         function value = randomInRange(~, minVal, maxVal)
             % Generate random value in specified range
-            % 中文说明：randomInRange 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if minVal == maxVal
                 value = minVal;
             else
@@ -549,9 +532,8 @@ end
 
 function value = resolveField(s, flatName, nestedAlt)
     % resolveField - Production declaration in CSRD.
-    % 中文说明：resolveField 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if isfield(s, flatName)
         value = s.(flatName);
     elseif strcmp(flatName, 'Type') && isfield(s, 'Hardware') && isstruct(s.Hardware) && isfield(s.Hardware, 'Type')

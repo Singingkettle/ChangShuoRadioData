@@ -1,6 +1,5 @@
 function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
     % generateScenarioReceiverConfigurations - Generate unified receiver configurations
-    % 中文说明：提供 CSRD 生产链路中的 generateScenarioReceiverConfigurations 实现。
     %
     % DESIGN PRINCIPLE:
     %   All spectrum monitoring receivers share the SAME unified configuration.
@@ -66,7 +65,8 @@ end
 
 function unit = getEntityPositionUnit(entity)
     % getEntityPositionUnit - Return explicit physical coordinate unit.
-    % 中文说明：Position 是米制坐标，GeoPositionDeg 只用于地理传播模型。
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 if isfield(entity, 'PositionUnit') && ~isempty(entity.PositionUnit)
     unit = char(string(entity.PositionUnit));
 else
@@ -76,9 +76,8 @@ end
 
 function velocity = requireEntityVelocity(entity, entityType)
     % requireEntityVelocity - Production declaration in CSRD.
-    % 中文说明：requireEntityVelocity 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     if ~isfield(entity, 'Velocity') || isempty(entity.Velocity) || ...
             ~isnumeric(entity.Velocity) || numel(entity.Velocity) ~= 3 || ...
             any(~isfinite(entity.Velocity(:)))

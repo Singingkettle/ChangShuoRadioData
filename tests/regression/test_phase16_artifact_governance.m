@@ -1,6 +1,5 @@
 function test_phase16_artifact_governance()
 %TEST_PHASE16_ARTIFACT_GOVERNANCE Ensure generated outputs stay untracked.
-% 中文说明：检查 data/artifacts 产物策略，防止测试或目视检查输出进入 git。
 
 fprintf('=== Phase 16 Artifact Governance Test ===\n');
 

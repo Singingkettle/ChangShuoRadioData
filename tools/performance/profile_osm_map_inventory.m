@@ -1,6 +1,7 @@
 function summary = profile_osm_map_inventory(varargin)
 %PROFILE_OSM_MAP_INVENTORY Inventory OSM files and balanced coverage order.
-% 中文说明：只扫描 data/map/osm 下的 .osm 元数据和 building 标签，不做大小分级。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 
 p = inputParser();
 p.FunctionName = 'profile_osm_map_inventory';
@@ -103,12 +104,18 @@ end
 end
 
 function entry = localEmptyEntry()
+    % localEmptyEntry - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 entry = struct('Path', '', 'RelativePath', '', 'Category', '', ...
     'SizeMB', NaN, 'HasBuildings', false, 'CoverageIndex', NaN, ...
     'BuildingCheckError', '');
 end
 
 function topEntries = localTopBySize(entries, count)
+    % localTopBySize - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 topEntries = entries([]);
 if isempty(entries) || count <= 0
     return;
@@ -118,6 +125,9 @@ topEntries = entries(order(1:count));
 end
 
 function category = localCategoryFromRelativePath(relPath)
+    % localCategoryFromRelativePath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 parts = split(string(strrep(relPath, '\', '/')), '/');
 if numel(parts) >= 2
     category = char(parts(1));
@@ -127,6 +137,9 @@ end
 end
 
 function localWriteJson(pathText, payload)
+    % localWriteJson - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 fid = fopen(pathText, 'w');
 if fid == -1
     error('CSRD:OSMInventory:JsonOpenFailed', ...
@@ -137,11 +150,17 @@ fprintf(fid, '%s', jsonencode(payload));
 end
 
 function projectRoot = localProjectRoot()
+    % localProjectRoot - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 end
 
 function order = localDeterministicOrder(items, seedValue, label)
+    % localDeterministicOrder - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 n = numel(items);
 keys = zeros(n, 1);
 for idx = 1:n
@@ -153,6 +172,9 @@ order = order(:)';
 end
 
 function value = localStableHash(text)
+    % localStableHash - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 bytes = uint8(unicode2native(char(string(text)), 'UTF-8'));
 hash = 5381;
 modulus = 2^31 - 1;
@@ -163,6 +185,9 @@ value = double(hash);
 end
 
 function relPath = localRelativePath(baseDir, fullPath)
+    % localRelativePath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 baseDir = localNormalizePath(baseDir);
 fullPath = localNormalizePath(fullPath);
 baseForMatch = baseDir;
@@ -177,6 +202,9 @@ end
 end
 
 function pathText = localNormalizePath(pathText)
+    % localNormalizePath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 pathText = strrep(char(string(pathText)), '\', '/');
 pathText = regexprep(pathText, '/+', '/');
 if strlength(pathText) > 1

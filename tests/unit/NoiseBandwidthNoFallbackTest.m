@@ -1,6 +1,5 @@
 classdef NoiseBandwidthNoFallbackTest < matlab.unittest.TestCase
     % NoiseBandwidthNoFallbackTest - Phase 18 forbids magic noise BW.
-    % 中文说明：链路预算噪声带宽必须来自显式候选，不能回退到 50 MHz。
 
     methods (Test)
         function allMissingNoiseBandwidthCandidatesFail(testCase)

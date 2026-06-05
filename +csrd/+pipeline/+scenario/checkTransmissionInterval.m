@@ -1,8 +1,5 @@
 function [isActive, intervalIdx, startTime, endTime] = checkTransmissionInterval(frameId, pattern)
     %CHECKTRANSMISSIONINTERVAL Determine whether a frame falls in any active interval.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 checkTransmissionInterval 实现。
     %
     %   [isActive, intervalIdx, startTime, endTime] = ...
     %       csrd.pipeline.scenario.checkTransmissionInterval(frameId, pattern)
@@ -19,11 +16,8 @@ function [isActive, intervalIdx, startTime, endTime] = checkTransmissionInterval
     %     1. pattern.FrameDuration                                (preferred)
     %     2. pattern.ObservationDuration / pattern.NumFrames
     %
-    %   When neither is available the function returns isActive=false and
-    %   issues a warning. There is intentionally no magic-number fallback
-    %   such as NumFrames=10, which previously caused Burst / Scheduled /
-    %   Random temporal patterns to silently misalign whenever the engine
-    %   ran with a different frame count than the planner assumed.
+    %   Missing timing or out-of-range frame ids fail fast because returning
+    %   an inactive frame would silently hide a broken scenario plan.
 
     isActive = false;
     intervalIdx = 0;
@@ -45,16 +39,15 @@ function [isActive, intervalIdx, startTime, endTime] = checkTransmissionInterval
     end
 
     if isempty(frameDuration)
-        warning('CSRD:Scenario:MissingFrameTiming', ...
+        error('CSRD:Scenario:MissingFrameTiming', ...
             ['checkTransmissionInterval could not derive frame duration. ', ...
              'Provide pattern.FrameDuration or both pattern.NumFrames and ', ...
              'pattern.ObservationDuration.']);
-        return;
     end
 
     if isfield(pattern, 'NumFrames') && ~isempty(pattern.NumFrames) && pattern.NumFrames > 0 && ...
             (frameId < 1 || frameId > pattern.NumFrames)
-        warning('CSRD:Scenario:FrameOutOfRange', ...
+        error('CSRD:Scenario:FrameOutOfRange', ...
             'frameId %d is outside [1, %d] for this temporal pattern.', frameId, pattern.NumFrames);
     end
 

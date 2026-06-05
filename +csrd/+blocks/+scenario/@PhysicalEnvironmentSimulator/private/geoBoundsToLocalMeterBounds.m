@@ -1,6 +1,7 @@
 function meterBounds = geoBoundsToLocalMeterBounds(bounds)
 %GEOBOUNDSTOLOCALMETERBOUNDS Convert OSM bounds to [xmin xmax ymin ymax].
-% 中文说明：把 OSM 经纬度边界转换为本地米制边界，用于移动约束。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 corners = [
     bounds.MinLatitude, bounds.MinLongitude
     bounds.MinLatitude, bounds.MaxLongitude

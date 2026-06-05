@@ -1,6 +1,5 @@
 classdef ScenarioFactory < matlab.System
     % ScenarioFactory - Scenario instantiation and layout planning factory
-    % 中文说明：提供 CSRD 生产链路中的 ScenarioFactory 实现。
     %
     % This factory is responsible for instantiating specific scenarios based on
     % dual-component architecture: PhysicalEnvironment and CommunicationBehavior.
@@ -25,6 +24,9 @@ classdef ScenarioFactory < matlab.System
         % Expected structure: Config.Factories.Scenario.PhysicalEnvironment and
         %                    Config.Factories.Scenario.CommunicationBehavior
         Config struct
+
+        % RuntimePlan: Canonical derived runtime facts for this run
+        RuntimePlan struct
     end
 
     properties (SetAccess = private)
@@ -56,15 +58,18 @@ classdef ScenarioFactory < matlab.System
 
         % Initialization flag
         isSimulatorsInitialized logical = false
+
+        % Scenario construction plan. Built once before the first receiver
+        % frame of each scenario, then treated as frozen.
+        currentScenarioPlan struct = struct()
     end
 
     methods
 
         function obj = ScenarioFactory(varargin)
             % ScenarioFactory - Constructor for scenario factory
-            % 中文说明：ScenarioFactory 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Syntax:
             %   obj = ScenarioFactory()
@@ -84,16 +89,14 @@ classdef ScenarioFactory < matlab.System
 
         function validateInputsImpl(~, ~)
             % validateInputsImpl - Production declaration in CSRD.
-            % 中文说明：validateInputsImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
         end
 
         function setupImpl(obj)
             % setupImpl - Initialize scenario factory components
-            % 中文说明：setupImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % DESIGN PRINCIPLE:
             %   ScenarioFactory receives ONLY its own config (scenario blueprint).
@@ -124,9 +127,8 @@ classdef ScenarioFactory < matlab.System
 
         function [instantiatedTxs, instantiatedRxs, globalLayout] = stepImpl(obj, frameId)
             % stepImpl - Generate scenario for a frame
-            % 中文说明：stepImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Phase 2 (audit §16.7 / phase-2-blueprint.md §3.4.6):
             %   1. Initialize physical environment + communication behaviour
@@ -153,6 +155,8 @@ classdef ScenarioFactory < matlab.System
             % fallback that turned every non-skip exception into an empty
             % cell + struct('Error', ...) result. Errors now propagate
             % fail-fast (Q-extra C-1).
+
+            obj.ensureScenarioPlanStarted();
 
             if ~obj.isSimulatorsInitialized
                 obj.initializeSimulators();
@@ -188,15 +192,15 @@ classdef ScenarioFactory < matlab.System
                     break;
                 end
 
-                if frameId ~= 1
+                if frameId ~= 1 || localScenarioPlanIsFrozen(obj.currentScenarioPlan)
                     rejectCode = '<unknown>';
                     if ~isempty(lastReport.FailedChecks)
                         rejectCode = lastReport.FailedChecks(1).Code;
                     end
                     error('CSRD:Blueprint:Unsamplable', ...
-                        ['Frame %d (mid-scenario) failed feasibility check ''%s''. ', ...
-                         'Mid-scenario blueprints cannot be resampled because ', ...
-                         'scenario-level configurations are frozen at frame 1.'], ...
+                        ['Frame %d failed feasibility check ''%s''. ', ...
+                         'Frame execution cannot resample scenario-level ', ...
+                         'facts because ScenarioPlan is already frozen.'], ...
                         frameId, rejectCode);
                 end
 
@@ -233,6 +237,10 @@ classdef ScenarioFactory < matlab.System
             globalLayout.ValidationReport = lastReport;
             globalLayout.NumBlueprintAttempts = attempt;
 
+            obj.enrichScenarioPlan(entities, environment, txConfigs, ...
+                rxConfigs, globalLayout);
+            globalLayout.ScenarioPlan = obj.currentScenarioPlan;
+
             obj.LastValidationReport   = lastReport;
             obj.LastBlueprintResamples = max(0, attempt - 1);
             obj.LastBlueprintHash      = lastReport.BlueprintHash;
@@ -244,9 +252,8 @@ classdef ScenarioFactory < matlab.System
 
         function releaseImpl(obj)
             % releaseImpl - Release cached scenario planning blocks and simulators
-            % 中文说明：releaseImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.logger.debug('ScenarioFactory releaseImpl called.');
 
@@ -270,6 +277,7 @@ classdef ScenarioFactory < matlab.System
             obj.selectedOSMOrdinal = NaN;
             obj.selectedOSMCandidateCount = NaN;
             obj.currentScenarioConfig = struct();
+            obj.currentScenarioPlan = struct();
 
             % Release cached blocks
             blockKeys = keys(obj.cachedScenarioBlocks);
@@ -289,9 +297,8 @@ classdef ScenarioFactory < matlab.System
 
         function resetImpl(obj)
             % resetImpl - Reset cached scenario planning blocks
-            % 中文说明：resetImpl 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.logger.debug('ScenarioFactory resetImpl called.');
             blockKeys = keys(obj.cachedScenarioBlocks);
@@ -315,15 +322,18 @@ classdef ScenarioFactory < matlab.System
             obj.selectedOSMOrdinal = NaN;
             obj.selectedOSMCandidateCount = NaN;
             obj.currentScenarioConfig = struct();
+            obj.currentScenarioPlan = struct();
         end
 
         function initializeSimulators(obj)
             % initializeSimulators - Initialize simulators once per scenario
-            % 中文说明：initializeSimulators 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             obj.logger.debug('Initializing scenario simulators...');
+
+            obj.ensureFactoryConfigReady();
+            obj.ensureScenarioPlanStarted();
 
             % Select map type and OSM file (if applicable)
             obj.selectedMapType = obj.selectMapTypeByRatio();
@@ -370,9 +380,8 @@ classdef ScenarioFactory < matlab.System
 
         function mapType = selectMapTypeByRatio(obj)
             % selectMapTypeByRatio - Select map/channel modeling type based on configured ratios
-            % 中文说明：selectMapTypeByRatio 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Two approaches:
             %   Statistical: Virtual scene + statistical channel models
@@ -426,9 +435,8 @@ classdef ScenarioFactory < matlab.System
 
         function validateMapConfiguration(obj)
             % validateMapConfiguration - Production declaration in CSRD.
-            % 中文说明：validateMapConfiguration 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             if ~isfield(obj.factoryConfig, 'PhysicalEnvironment') || ...
                     ~isfield(obj.factoryConfig.PhysicalEnvironment, 'Map')
                 return;
@@ -467,9 +475,8 @@ classdef ScenarioFactory < matlab.System
 
         function osmFile = selectBalancedOSMFile(obj)
             % selectBalancedOSMFile - Select OSM file by deterministic coverage order.
-            % 中文说明：OSM 默认选择按文件级均匀覆盖，不按文件大小分级或过滤。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Uses Map.OSM configuration:
             %   Map.OSM.SpecificFile - If set, use this file directly
@@ -545,6 +552,8 @@ classdef ScenarioFactory < matlab.System
 
         function resolvedPath = resolveOsmPath(obj, pathText)
             %RESOLVEOSMPATH Resolve SpecificFile relative to project root.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             resolvedPath = char(string(pathText));
             if obj.isAbsolutePath(resolvedPath)
                 return;
@@ -559,15 +568,16 @@ classdef ScenarioFactory < matlab.System
 
         function recordOsmSelection(obj, osmFile, policy)
             %RECORDOSMSELECTION Persist OSM selection metadata for MapProfile.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
             obj.selectedOSMSelectionPolicy = char(string(policy));
             obj.selectedOSMFileSizeMB = localFileSizeMB(osmFile);
         end
 
         function osmFiles = findOSMFiles(obj, baseDir, pattern)
             % findOSMFiles - Recursively find OSM files in directory
-            % 中文说明：findOSMFiles 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Input Arguments:
             %   baseDir - Base directory to search
@@ -605,9 +615,8 @@ classdef ScenarioFactory < matlab.System
 
         function physicalEnvConfig = getPhysicalEnvironmentConfig(obj)
             % getPhysicalEnvironmentConfig - Extract physical environment configuration
-            % 中文说明：getPhysicalEnvironmentConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % Applies selected map type (Statistical or OSM) and configures
             % appropriate boundaries and channel model settings.
@@ -679,31 +688,25 @@ classdef ScenarioFactory < matlab.System
             % Phase 3 (audit §17.5 P3-5): pass through Global so
             % createEntity can size its Snapshot pre-allocation by the
             % real per-scenario frame count instead of the legacy 100.
-            if isfield(obj.factoryConfig, 'Global')
-                physicalEnvConfig.Global = obj.factoryConfig.Global;
-            end
+            physicalEnvConfig.Global = localBlueprintGlobal( ...
+                obj.factoryConfig, obj.currentScenarioPlan);
 
-            % Physical state evolves once per receiver frame. Reusing an
-            % unrelated TimeResolution silently desynchronizes mobility,
-            % Doppler, signal placement, and annotation execution truth.
-            frameContract = csrd.pipeline.runtime.resolveFrameRuntimeContract( ...
-                struct('Scenario', obj.factoryConfig), struct());
-            physicalEnvConfig.TimeResolution = frameContract.FrameDurationSec;
+            % Physical state evolves once per receiver frame. ScenarioPlan
+            % is the only source for the resolved per-scenario frame duration.
+            framePlan = obj.requireScenarioFramePlan();
+            physicalEnvConfig.TimeResolution = framePlan.FrameDurationSec;
         end
 
         function commBehaviorConfig = getCommunicationBehaviorConfig(obj)
             % getCommunicationBehaviorConfig - Extract communication behavior configuration
-            % 中文说明：getCommunicationBehaviorConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             % Use configured CommunicationBehavior directly
             commBehaviorConfig = obj.factoryConfig.CommunicationBehavior;
 
-            % Pass through global time parameters needed by CommBehaviorSim
-            if isfield(obj.factoryConfig, 'Global')
-                commBehaviorConfig.Global = obj.factoryConfig.Global;
-            end
+            commBehaviorConfig.RuntimePlan = obj.RuntimePlan;
+            commBehaviorConfig.ScenarioPlan = obj.currentScenarioPlan;
 
             % Ensure required defaults
             if ~isfield(commBehaviorConfig, 'FrequencyAllocation')
@@ -729,9 +732,8 @@ classdef ScenarioFactory < matlab.System
 
         function runtime = resolveCommunicationRuntimeCapabilities(obj, commBehaviorConfig)
             % resolveCommunicationRuntimeCapabilities - Publish map/channel limits to planning.
-            % 中文说明：把当前场景选择的传播模型能力传给通信规划层，避免下游失败后 fallback。
-            % Inputs / 输入: selected map type and communication config.
-            % 输出 / Outputs: runtime capability struct for CommunicationBehavior.
+            % Inputs: selected map type and communication config.
+            % Outputs: runtime capability struct for CommunicationBehavior.
             runtime = struct();
             runtime.ChannelModel = '';
             runtime.RequiredCarrierFrequencyRangeHz = [];
@@ -760,11 +762,97 @@ classdef ScenarioFactory < matlab.System
             end
         end
 
+        function ensureScenarioPlanStarted(obj, scenarioId)
+            % ensureScenarioPlanStarted - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
+            obj.ensureFactoryConfigReady();
+            if nargin < 2 || isempty(scenarioId)
+                runtime = localGetScenarioRuntime(obj.factoryConfig);
+                scenarioId = localRuntimePositiveInteger(runtime, 'ScenarioId', 1);
+            else
+                runtime = localGetScenarioRuntime(obj.factoryConfig);
+                runtime.ScenarioId = double(scenarioId);
+            end
+            if ~isempty(obj.currentScenarioPlan) && ...
+                    isstruct(obj.currentScenarioPlan) && ...
+                    isfield(obj.currentScenarioPlan, 'ScenarioId')
+                return;
+            end
+            obj.currentScenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+                obj.RuntimePlan, obj.factoryConfig, runtime);
+        end
+
+        function ensureFactoryConfigReady(obj)
+            % ensureFactoryConfigReady - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
+            if ~isempty(obj.factoryConfig) && isstruct(obj.factoryConfig)
+                return;
+            end
+            if isempty(obj.Config) || ~isstruct(obj.Config)
+                error('ScenarioFactory:ConfigError', ...
+                    'Config must be a valid struct before scenario planning.');
+            end
+            obj.factoryConfig = obj.Config;
+            if ~isfield(obj.factoryConfig, 'PhysicalEnvironment')
+                error('ScenarioFactory:ConfigError', ...
+                    'PhysicalEnvironment configuration required.');
+            end
+            if ~isfield(obj.factoryConfig, 'CommunicationBehavior')
+                error('ScenarioFactory:ConfigError', ...
+                    'CommunicationBehavior configuration required.');
+            end
+            obj.logger = csrd.runtime.logger.GlobalLogManager.getLogger();
+            obj.validateMapConfiguration();
+        end
+
+        function enrichScenarioPlan(obj, entities, environment, txConfigs, ...
+                rxConfigs, globalLayout)
+                    % enrichScenarioPlan - CSRD MATLAB declaration.
+                    % Inputs: see function signature and validation.
+                    % Outputs: see return values and contract fields.
+            if isempty(obj.currentScenarioPlan) || ~isstruct(obj.currentScenarioPlan)
+                obj.ensureScenarioPlanStarted();
+            end
+            plan = obj.currentScenarioPlan;
+            plan.Map = localScenarioPlanMap(environment, ...
+                obj.selectedOSMSelectionPolicy, obj.selectedOSMFileSizeMB);
+            plan.GeometryPolicy = struct( ...
+                'Evaluation', 'SegmentMidpoint', ...
+                'Source', 'ScenarioPlan');
+            plan.Entities = struct( ...
+                'Initial', localNormalizeInitialEntitiesAtZero(entities));
+            plan.Receivers = rxConfigs;
+            plan.Transmitters = txConfigs;
+            plan.Communication = localScenarioPlanCommunication( ...
+                txConfigs, globalLayout);
+            numRx = numel(rxConfigs);
+            plan.DatasetAccounting = struct( ...
+                'NumReceivers', numRx, ...
+                'NumFramesPerScenario', plan.Frame.NumFramesPerScenario, ...
+                'NumReceiverFrames', plan.Frame.NumFramesPerScenario * numRx);
+            obj.currentScenarioPlan = plan;
+        end
+
+        function framePlan = requireScenarioFramePlan(obj)
+            % requireScenarioFramePlan - CSRD MATLAB declaration.
+            % Inputs: see function signature and validation.
+            % Outputs: see return values and contract fields.
+            if isempty(obj.currentScenarioPlan) || ...
+                    ~isstruct(obj.currentScenarioPlan) || ...
+                    ~isfield(obj.currentScenarioPlan, 'Frame') || ...
+                    ~isstruct(obj.currentScenarioPlan.Frame)
+                error('CSRD:ScenarioPlan:MissingFrameContract', ...
+                    'ScenarioFactory current ScenarioPlan.Frame is required.');
+            end
+            framePlan = obj.currentScenarioPlan.Frame;
+        end
+
         function storeFrameState(obj, frameId, entities, environment, txConfigs, rxConfigs)
             % storeFrameState - Store current frame state for next frame continuity
-            % 中文说明：storeFrameState 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
 
             frameState = struct();
             frameState.entities = entities;
@@ -796,9 +884,8 @@ classdef ScenarioFactory < matlab.System
 
         function mergedConfig = mergeConfigs(obj, baseConfig, overrideConfig)
             % mergeConfigs - Merge two configuration structures
-            % 中文说明：mergeConfigs 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This method recursively merges configuration structures, with
             % overrideConfig taking precedence over baseConfig.
@@ -839,11 +926,78 @@ classdef ScenarioFactory < matlab.System
         % Phase 2 internal API exposed for unit-test probes only.
         % Phase 3 may demote these to (Access = protected) once integration
         % tests cover the full stepImpl path end-to-end.
+        function scenarioPlan = planScenario(obj, scenarioId)
+            %PLANSCENARIO Build and freeze a scenario construction plan.
+            obj.ensureFactoryConfigReady();
+            if nargin < 2 || isempty(scenarioId)
+                runtime = localGetScenarioRuntime(obj.factoryConfig);
+                scenarioId = localRuntimePositiveInteger(runtime, 'ScenarioId', 1);
+            end
+            obj.ensureScenarioPlanStarted(scenarioId);
+
+            if ~obj.isSimulatorsInitialized
+                obj.initializeSimulators();
+                obj.isSimulatorsInitialized = true;
+            end
+
+            [entities, environment] = obj.physicalEnvironmentSimulator.planInitialState();
+            [maxResamples, validatorEnabled] = obj.getValidatorConfig();
+
+            attempt = 0;
+            lastReport = localDisabledValidationReport();
+            while true
+                attempt = attempt + 1;
+                [txConfigs, rxConfigs, layout, entities] = ...
+                    obj.communicationBehaviorSimulator.planScenario(entities);
+                layout.FrameId = 1;
+                layout.Environment = environment;
+                layout.Entities = entities;
+
+                if validatorEnabled
+                    blueprint = obj.assembleBlueprint(1, txConfigs, ...
+                        rxConfigs, layout, environment);
+                    lastReport = csrd.pipeline.blueprint ...
+                        .BlueprintFeasibilityValidator.validate(blueprint);
+                end
+
+                if ~validatorEnabled || lastReport.IsFeasible
+                    break;
+                end
+
+                if attempt >= maxResamples
+                    rejectCode = localFirstFailedCheckCode(lastReport);
+                    error('CSRD:Blueprint:Unsamplable', ...
+                        ['Scenario plan: %d communication resample attempts ', ...
+                         'exhausted. Last failed check: ''%s''.'], ...
+                        attempt, rejectCode);
+                end
+
+                rejectCode = localFirstFailedCheckCode(lastReport);
+                obj.logger.debug(['Scenario plan attempt %d rejected by ', ...
+                    '''%s''; resampling communication plan.'], ...
+                    attempt, rejectCode);
+                release(obj.communicationBehaviorSimulator);
+                setup(obj.communicationBehaviorSimulator);
+            end
+
+            layout.BlueprintHash = lastReport.BlueprintHash;
+            layout.ValidationReport = lastReport;
+            layout.NumBlueprintAttempts = attempt;
+            obj.enrichScenarioPlan(entities, environment, txConfigs, ...
+                rxConfigs, layout);
+            obj.currentScenarioPlan.ValidationReport = lastReport;
+            obj.currentScenarioPlan.NumBlueprintAttempts = attempt;
+
+            obj.LastValidationReport = lastReport;
+            obj.LastBlueprintResamples = max(0, attempt - 1);
+            obj.LastBlueprintHash = lastReport.BlueprintHash;
+            scenarioPlan = obj.currentScenarioPlan;
+        end
+
         function [maxResamples, validatorEnabled] = getValidatorConfig(obj)
             % getValidatorConfig - Production declaration in CSRD.
-            % 中文说明：getValidatorConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             maxResamples     = 50;
             validatorEnabled = true;
             if isfield(obj.factoryConfig, 'Validator')
@@ -859,9 +1013,8 @@ classdef ScenarioFactory < matlab.System
 
         function applyTestConfig(obj, configStruct)
             % Test-only setter that bypasses the matlab.System
-            % 中文说明：applyTestConfig 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             % once-locked-property restriction. Used by unit tests to
             % drive the resample loop without spinning up the full
             % simulator stack.
@@ -871,9 +1024,8 @@ classdef ScenarioFactory < matlab.System
         function blueprint = assembleBlueprint(obj, frameId, txConfigs, rxConfigs, ...
                 communicationLayout, environment)
             % assembleBlueprint - Phase 2 transitional schema (§3.4.3).
-            % 中文说明：assembleBlueprint 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % The struct is intentionally minimal: every field is OPTIONAL
             % from the Validator's perspective, and missing fields cause
@@ -885,8 +1037,9 @@ classdef ScenarioFactory < matlab.System
             blueprint.Emitters  = txConfigs;
             blueprint.Receivers = rxConfigs;
             blueprint.CommunicationLayout = communicationLayout;
-            if isfield(obj.factoryConfig, 'Global')
-                blueprint.Global = obj.factoryConfig.Global;
+            blueprintGlobal = localBlueprintGlobal(obj.factoryConfig, obj.currentScenarioPlan);
+            if ~isempty(fieldnames(blueprintGlobal))
+                blueprint.Global = blueprintGlobal;
             end
             if isfield(obj.factoryConfig, 'Validator')
                 blueprint.Validator = obj.factoryConfig.Validator;
@@ -923,9 +1076,8 @@ classdef ScenarioFactory < matlab.System
 
         function isAbsolute = isAbsolutePath(pathStr)
             % isAbsolutePath - Check if a path is absolute
-            % 中文说明：isAbsolutePath 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             %
             % This is a helper function to determine if a given path string
             % represents an absolute path, handling both Windows and Unix-style paths.
@@ -959,7 +1111,8 @@ end
 
 function model = localMapChannelModel(mapConfig, mapType, defaultModel)
 %LOCALMAPCHANNELMODEL Resolve explicit map-specific channel model.
-% 中文说明：读取当前 map 类型声明的传播模型；缺失时使用调用者给出的场景默认值。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 model = char(string(defaultModel));
 if ~isstruct(mapConfig) || ~isfield(mapConfig, mapType)
     return;
@@ -972,9 +1125,173 @@ if isstruct(typedConfig) && isfield(typedConfig, 'ChannelModel') && ...
 end
 end
 
+function report = localDisabledValidationReport()
+%LOCALDISABLEDVALIDATIONREPORT Blueprint validator report for disabled mode.
+report = struct('IsFeasible', true, 'BlueprintHash', '', ...
+    'NumChecksRun', 0, 'NumChecksPassed', 0, 'NumChecksFailed', 0, ...
+    'FailedChecks', csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
+    'WarnChecks', csrd.pipeline.blueprint.BlueprintFeasibilityValidator.emptyFailureArray(), ...
+    'Provenance', struct('ValidatorVersion', 'disabled', 'Timestamp', ''));
+end
+
+function code = localFirstFailedCheckCode(report)
+%LOCALFIRSTFAILEDCHECKCODE Return a readable validator failure code.
+code = '<unknown>';
+if isstruct(report) && isfield(report, 'FailedChecks') && ...
+        ~isempty(report.FailedChecks) && ...
+        isfield(report.FailedChecks(1), 'Code') && ...
+        ~isempty(report.FailedChecks(1).Code)
+    code = char(string(report.FailedChecks(1).Code));
+end
+end
+
+function tf = localScenarioPlanIsFrozen(plan)
+%LOCALSCENARIOPLANISFROZEN True after scenario-level facts are sealed.
+tf = isstruct(plan) && isfield(plan, 'DatasetAccounting') && ...
+    isfield(plan, 'Communication') && isfield(plan, 'Entities');
+end
+
+function globalConfig = localBlueprintGlobal(factoryConfig, scenarioPlan)
+%LOCALBLUEPRINTGLOBAL Build blueprint global facts from ScenarioPlan.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
+globalConfig = struct();
+if isstruct(factoryConfig) && isfield(factoryConfig, 'Global') && ...
+        isstruct(factoryConfig.Global)
+    globalConfig = factoryConfig.Global;
+end
+if ~isstruct(scenarioPlan) || ~isfield(scenarioPlan, 'Frame') || ...
+        ~isstruct(scenarioPlan.Frame)
+    return;
+end
+
+framePlan = scenarioPlan.Frame;
+if isfield(framePlan, 'FrameNumSamples')
+    globalConfig.FrameNumSamples = framePlan.FrameNumSamples;
+end
+if isfield(framePlan, 'NumFramesPerScenario')
+    globalConfig.NumFramesPerScenario = framePlan.NumFramesPerScenario;
+    globalConfig.NumFrames = framePlan.NumFramesPerScenario;
+end
+if isfield(framePlan, 'FrameDurationSec')
+    globalConfig.FrameDurationSec = framePlan.FrameDurationSec;
+    globalConfig.FrameDuration = framePlan.FrameDurationSec;
+end
+if isfield(framePlan, 'ObservationDurationSec')
+    globalConfig.ObservationDurationSec = framePlan.ObservationDurationSec;
+end
+end
+
+function mapPlan = localScenarioPlanMap(environment, selectionPolicy, osmFileSizeMB)
+    % localScenarioPlanMap - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+mapPlan = struct( ...
+    'SelectedType', '', ...
+    'OSMFile', '', ...
+    'ChannelModel', '', ...
+    'SelectionPolicy', '', ...
+    'OSMFileSizeMB', NaN, ...
+    'MapProfile', struct(), ...
+    'Boundaries', []);
+if isstruct(environment)
+    if isfield(environment, 'MapType')
+        mapPlan.SelectedType = environment.MapType;
+    end
+    if isfield(environment, 'OSMMapFile')
+        mapPlan.OSMFile = environment.OSMMapFile;
+    end
+    if isfield(environment, 'ChannelModel')
+        mapPlan.ChannelModel = environment.ChannelModel;
+    end
+    if isfield(environment, 'MapProfile') && isstruct(environment.MapProfile)
+        mapPlan.MapProfile = environment.MapProfile;
+        if isfield(environment.MapProfile, 'Boundaries')
+            mapPlan.Boundaries = environment.MapProfile.Boundaries;
+        end
+    end
+    if isempty(mapPlan.Boundaries) && isfield(environment, 'Map') && ...
+            isstruct(environment.Map) && ...
+            isfield(environment.Map, 'MapProfile') && ...
+            isstruct(environment.Map.MapProfile)
+        mapPlan.MapProfile = environment.Map.MapProfile;
+        if isfield(environment.Map.MapProfile, 'Boundaries')
+            mapPlan.Boundaries = environment.Map.MapProfile.Boundaries;
+        end
+    end
+    if isempty(mapPlan.Boundaries) && isfield(environment, 'MapBoundaries')
+        mapPlan.Boundaries = environment.MapBoundaries;
+    end
+end
+mapPlan.SelectionPolicy = selectionPolicy;
+mapPlan.OSMFileSizeMB = osmFileSizeMB;
+end
+
+function entities = localNormalizeInitialEntitiesAtZero(entities)
+%LOCALNORMALIZEINITIALENTITIESATZERO Stamp ScenarioPlan entity base time.
+for idx = 1:numel(entities)
+    entities(idx).CreationTime = 0;
+    entities(idx).LastUpdateTime = 0;
+    if isfield(entities(idx), 'StateHistory')
+        entities(idx).StateHistory = [];
+    end
+    if isfield(entities(idx), 'Snapshots') && iscell(entities(idx).Snapshots) && ...
+            ~isempty(entities(idx).Snapshots)
+        if isempty(entities(idx).Snapshots{1})
+            continue;
+        end
+        entities(idx).Snapshots{1}.Timestamp = 0;
+        entities(idx).Snapshots{1}.FrameId = 1;
+    end
+end
+end
+
+function commPlan = localScenarioPlanCommunication(txConfigs, globalLayout)
+    % localScenarioPlanCommunication - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+commPlan = struct();
+commPlan.TransmissionSchedule = localTransmissionSchedule(txConfigs);
+if isstruct(globalLayout)
+    if isfield(globalLayout, 'FrequencyAllocation')
+        commPlan.FrequencyAllocation = globalLayout.FrequencyAllocation;
+    end
+    if isfield(globalLayout, 'RegulatoryPlan')
+        commPlan.RegulatoryPlan = globalLayout.RegulatoryPlan;
+    end
+end
+end
+
+function schedule = localTransmissionSchedule(txConfigs)
+    % localTransmissionSchedule - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
+schedule = repmat(struct('TxID', '', 'Temporal', struct()), 0, 1);
+for k = 1:numel(txConfigs)
+    if iscell(txConfigs)
+        tx = txConfigs{k};
+    else
+        tx = txConfigs(k);
+    end
+    entry = struct('TxID', sprintf('Tx%d', k), 'Temporal', struct());
+    if isstruct(tx)
+        if isfield(tx, 'ID') && ~isempty(tx.ID)
+            entry.TxID = char(string(tx.ID));
+        elseif isfield(tx, 'EntityID') && ~isempty(tx.EntityID)
+            entry.TxID = char(string(tx.EntityID));
+        end
+        if isfield(tx, 'Temporal') && isstruct(tx.Temporal)
+            entry.Temporal = tx.Temporal;
+        end
+    end
+    schedule(end + 1) = entry; %#ok<AGROW>
+end
+end
+
 function sizeMB = localFileSizeMB(pathText)
 %LOCALFILESIZEMB Return file size in MB without touching file contents.
-% 中文说明：只读取文件元数据；用于 OSM 选择证据和性能诊断。
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 sizeMB = NaN;
 if isempty(pathText)
     return;
@@ -987,6 +1304,8 @@ end
 
 function runtime = localGetScenarioRuntime(factoryConfig)
 %LOCALGETSCENARIORUNTIME Return SimulationRunner-injected planning context.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 runtime = struct();
 if isstruct(factoryConfig) && isfield(factoryConfig, 'Runtime') && ...
         isstruct(factoryConfig.Runtime)
@@ -996,6 +1315,8 @@ end
 
 function value = localRuntimePositiveInteger(runtime, fieldName, defaultValue)
 %LOCALRUNTIMEPOSITIVEINTEGER Read a positive integer runtime field.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 value = defaultValue;
 if ~isstruct(runtime) || ~isfield(runtime, fieldName) || ...
         isempty(runtime.(fieldName))
@@ -1010,6 +1331,8 @@ end
 
 function seedValue = localRuntimeSeedValue(runtime)
 %LOCALRUNTIMESEEDVALUE Stable numeric seed for balanced schedules.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 seedValue = 0;
 if ~isstruct(runtime) || ~isfield(runtime, 'RandomSeed') || ...
         isempty(runtime.RandomSeed)
@@ -1027,6 +1350,8 @@ end
 function [idx, osmOrdinal] = localBalancedMapTypeIndex(types, ratios, ...
         scenarioId, totalScenarios, seedValue)
 %LOCALBALANCEDMAPTYPEINDEX Deterministic map schedule preserving ratios.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 types = cellstr(string(types));
 ratios = double(ratios(:));
 ratios = ratios ./ sum(ratios);
@@ -1096,6 +1421,8 @@ end
 
 function order = localDeterministicOrder(items, seedValue, label)
 %LOCALDETERMINISTICORDER Stable pseudo-random order without touching global RNG.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 n = numel(items);
 keys = zeros(n, 1);
 for idx = 1:n
@@ -1108,6 +1435,8 @@ end
 
 function value = localStableHash(text)
 %LOCALSTABLEHASH Java-free deterministic 31-bit djb2-style hash.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 bytes = uint8(unicode2native(char(string(text)), 'UTF-8'));
 hash = 5381;
 modulus = 2^31 - 1;
@@ -1119,6 +1448,8 @@ end
 
 function relPath = localRelativePath(baseDir, fullPath)
 %LOCALRELATIVEPATH Return a normalized path relative to baseDir when possible.
+% Inputs: see function signature and validation.
+% Outputs: see return values and contract fields.
 baseDir = localNormalizePath(baseDir);
 fullPath = localNormalizePath(fullPath);
 baseForMatch = baseDir;
@@ -1134,6 +1465,9 @@ end
 end
 
 function pathText = localNormalizePath(pathText)
+    % localNormalizePath - CSRD MATLAB declaration.
+    % Inputs: see function signature and validation.
+    % Outputs: see return values and contract fields.
 pathText = strrep(char(string(pathText)), '\', '/');
 pathText = regexprep(pathText, '/+', '/');
 if strlength(pathText) > 1

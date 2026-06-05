@@ -1,13 +1,11 @@
 classdef RegulatoryValidator
     %REGULATORYVALIDATOR Validate regional spectrum catalogs and selections.
-    % 中文说明：提供 CSRD 生产链路中的 RegulatoryValidator 实现。
 
     methods (Static)
         function validateCatalog(catalog, varargin)
             % validateCatalog - Production declaration in CSRD.
-            % 中文说明：validateCatalog 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             opts = parseOptions(varargin{:});
             requireScalarStruct(catalog, 'catalog');
             requiredCatalog = {'RegionId', 'RegionName', 'Authority', 'SourceRefs', 'Bands'};
@@ -30,9 +28,8 @@ classdef RegulatoryValidator
 
         function validateBand(band, varargin)
             % validateBand - Production declaration in CSRD.
-            % 中文说明：validateBand 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             opts = parseOptions(varargin{:});
             requireScalarStruct(band, 'band');
             required = {'RegionId', 'BandId', 'ServiceTier', 'FrequencyRangeHz', ...
@@ -111,9 +108,8 @@ classdef RegulatoryValidator
 
         function validateEmitterPlan(plan, catalog, receiverPlan)
             % validateEmitterPlan - Production declaration in CSRD.
-            % 中文说明：validateEmitterPlan 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             requireScalarStruct(plan, 'plan');
             requireFields(plan, {'RegionId', 'BandId', 'SelectedCenterFrequencyHz', ...
                 'BandwidthHz', 'ModulationFamily', 'Regulatory'}, 'plan');
@@ -158,9 +154,8 @@ classdef RegulatoryValidator
 
         function truth = emptyRegulatoryTruth()
             % emptyRegulatoryTruth - Production declaration in CSRD.
-            % 中文说明：emptyRegulatoryTruth 在 CSRD 生产链路中执行对应处理。
-            % Inputs / 输入: see signature arguments and local validation.
-            % 输出 / Outputs: see signature return values and contract fields.
+            % Inputs: see signature arguments and local validation.
+            % Outputs: see signature return values and contract fields.
             truth = struct( ...
                 'RegionId', 'UNSPECIFIED', ...
                 'Authority', '', ...
@@ -181,9 +176,8 @@ end
 
 function opts = parseOptions(varargin)
     % parseOptions - Production declaration in CSRD.
-    % 中文说明：parseOptions 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 opts.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
 if mod(numel(varargin), 2) ~= 0
     error('CSRD:Spectrum:InvalidOptions', 'Options must be name-value pairs.');
@@ -197,9 +191,8 @@ end
 
 function requireScalarStruct(value, context)
     % requireScalarStruct - Production declaration in CSRD.
-    % 中文说明：requireScalarStruct 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if ~isstruct(value) || ~isscalar(value)
     error('CSRD:Spectrum:InvalidStruct', '%s must be a scalar struct.', context);
 end
@@ -208,9 +201,8 @@ end
 
 function requireFields(value, fields, context)
     % requireFields - Production declaration in CSRD.
-    % 中文说明：requireFields 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 for k = 1:numel(fields)
     if ~isfield(value, fields{k})
         error('CSRD:Spectrum:MissingField', ...
@@ -222,9 +214,8 @@ end
 
 function requireText(value, context)
     % requireText - Production declaration in CSRD.
-    % 中文说明：requireText 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if ~((ischar(value) && (isempty(value) || isrow(value))) || ...
         (isstring(value) && isscalar(value))) || isempty(char(string(value)))
     error('CSRD:Spectrum:InvalidText', '%s must be non-empty text.', context);
@@ -234,9 +225,8 @@ end
 
 function requireNonemptyCellstr(value, context)
     % requireNonemptyCellstr - Production declaration in CSRD.
-    % 中文说明：requireNonemptyCellstr 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if ~iscell(value) || isempty(value)
     error('CSRD:Spectrum:InvalidCellText', '%s must be a non-empty cell array.', context);
 end
@@ -248,9 +238,8 @@ end
 
 function band = findBand(bands, bandId)
     % findBand - Production declaration in CSRD.
-    % 中文说明：findBand 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 band = [];
 for k = 1:numel(bands)
     if strcmp(char(string(bands(k).BandId)), char(string(bandId)))

@@ -1,6 +1,5 @@
 function entities = initializeEntities(obj, frameId)
     % initializeEntities - Create initial entity positions and states
-    % 中文说明：提供 CSRD 生产链路中的 initializeEntities 实现。
     %
     % Generates initial entity configurations including transmitters and
     % receivers with randomized positions, velocities, and properties

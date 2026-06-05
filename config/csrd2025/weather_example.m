@@ -1,8 +1,7 @@
 function config = weather_example()
     % weather_example - Weather configuration example for PhysicalEnvironment
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 weather_example 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % This example demonstrates how to configure weather conditions
     % for the PhysicalEnvironmentSimulator in CSRD2025.
@@ -35,10 +34,11 @@ function config = weather_example()
     config.Runner.Engine.ResetBetweenScenarios = true;
 
     % Logging Configuration
-    config.Log.Name = 'WeatherExample';
-    config.Log.Level = 'DEBUG';
-    config.Log.SaveToFile = true;
-    config.Log.DisplayInConsole = true;
+    config.Logging.Name = 'WeatherExample';
+    config.Logging.Policy = 'Dev';
+    config.Logging.Console.Enabled = true;
+    config.Logging.File.Enabled = true;
+    config.Logging.Progress.Mode = 'Detailed';
 
     % Override Weather Configuration for Different Weather Scenarios
     % Example 1: Hot and Humid Tropical Weather

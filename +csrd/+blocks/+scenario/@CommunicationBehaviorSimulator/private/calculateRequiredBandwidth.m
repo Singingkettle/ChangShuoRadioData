@@ -1,8 +1,7 @@
 function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
     % calculateRequiredBandwidth - Calculate required bandwidth based on modulation
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 calculateRequiredBandwidth 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % IMPORTANT NOTE: This is an APPROXIMATE bandwidth calculation used only
     % for frequency planning purposes during simulation setup. It serves as

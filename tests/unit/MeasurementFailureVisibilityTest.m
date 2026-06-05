@@ -1,6 +1,5 @@
 classdef MeasurementFailureVisibilityTest < matlab.unittest.TestCase
     % MeasurementFailureVisibilityTest - Live measurement failures are visible.
-    % 中文说明：有信号测量失败必须抛 CSRD:Measurement，空信号才允许 NaN。
 
     methods (Test)
         function productionCodeThrowsMeasurementErrors(testCase)

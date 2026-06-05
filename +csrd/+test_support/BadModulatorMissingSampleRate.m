@@ -7,6 +7,9 @@ classdef BadModulatorMissingSampleRate < matlab.System
 
     methods (Access = protected)
         function out = stepImpl(obj, ~)
+            % stepImpl - Return a modulator output without SampleRate.
+            % Inputs: obj plus ignored input payload.
+            % Outputs: malformed modulator output struct.
             out = struct();
             out.Signal = complex(ones(8, obj.NumTransmitAntennas));
             out.Bandwidth = obj.TargetBandwidth;

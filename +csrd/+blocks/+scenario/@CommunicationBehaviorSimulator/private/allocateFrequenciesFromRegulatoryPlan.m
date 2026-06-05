@@ -1,9 +1,8 @@
 function [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan(obj, txConfigs, ...
         rxConfigs, observableRange, globalLayout)
     %allocateFrequenciesFromRegulatoryPlan Preserve Phase 8 catalog placements.
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
-    % 中文说明：提供 CSRD 生产链路中的 allocateFrequenciesFromRegulatoryPlan 实现。
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     % Frequency center, bandwidth, and absolute RF center are selected by
     % RegionSpectrumSelector before this point. This allocation step only
@@ -63,9 +62,8 @@ end
 
 function f = getAbsoluteCenterHz(txConfig)
     % getAbsoluteCenterHz - Production declaration in CSRD.
-    % 中文说明：getAbsoluteCenterHz 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 f = NaN;
 if isfield(txConfig, 'Spectrum') && ...
         isfield(txConfig.Spectrum, 'AbsoluteCenterFrequencyHz')

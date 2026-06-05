@@ -1,8 +1,7 @@
 function [clean, manifest] = sanitizeForJson(value, options)
 %SANITIZEFORJSON Recursively coerce a value into a jsonencode-safe form.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 sanitizeForJson 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(value)
 %   [clean, manifest] = csrd.pipeline.annotation.sanitizeForJson(value, options)
@@ -73,9 +72,8 @@ end
 % =========================================================================
 function opts = localFillDefaults(opts)
     % localFillDefaults - Production declaration in CSRD.
-    % 中文说明：localFillDefaults 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 defaults = struct( ...
     'NumericPolicy', 'null', ...
     'MaxDepth', uint32(64));
@@ -101,9 +99,8 @@ end
 % =========================================================================
 function [out, state] = localSanitize(in, state)
     % localSanitize - Production declaration in CSRD.
-    % 中文说明：localSanitize 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 state.depth = state.depth + 1;
 if state.depth > state.opts.MaxDepth
     out = sprintf('<truncated:depth>%u', state.opts.MaxDepth);
@@ -200,9 +197,8 @@ end
 % =========================================================================
 function [out, state] = localSanitizeStruct(in, state)
     % localSanitizeStruct - Production declaration in CSRD.
-    % 中文说明：localSanitizeStruct 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if isscalar(in)
     out = struct();
     fns = fieldnames(in);
@@ -245,9 +241,8 @@ end
 
 function s = localBlankStruct(fields)
     % localBlankStruct - Production declaration in CSRD.
-    % 中文说明：localBlankStruct 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 s = struct();
 for k = 1:numel(fields)
     s.(fields{k}) = [];
@@ -257,9 +252,8 @@ end
 % =========================================================================
 function [out, state] = localSanitizeCell(in, state)
     % localSanitizeCell - Production declaration in CSRD.
-    % 中文说明：localSanitizeCell 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 out = cell(size(in));
 parentPath = state.path;
 for k = 1:numel(in)
@@ -272,9 +266,8 @@ end
 % =========================================================================
 function [out, state] = localSanitizeNumeric(in, state)
 % Logical arrays go through unchanged.
-% 中文说明：localSanitizeNumeric 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 if islogical(in)
     out = in;
     return;
@@ -332,9 +325,8 @@ end
 % =========================================================================
 function [out, state] = localSanitizeDatetime(in, state)
     % localSanitizeDatetime - Production declaration in CSRD.
-    % 中文说明：localSanitizeDatetime 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 in.TimeZone = 'UTC';
 fmt = 'yyyy-MM-dd''T''HH:mm:ss''Z''';
 if isscalar(in)
@@ -371,9 +363,8 @@ end
 % =========================================================================
 function [out, state] = localSanitizeMap(in, state)
     % localSanitizeMap - Production declaration in CSRD.
-    % 中文说明：localSanitizeMap 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 out = struct();
 keys = in.keys;
 parentPath = state.path;
@@ -389,9 +380,8 @@ end
 % =========================================================================
 function [out, state] = localSanitizeTable(in, state)
 % Convert table/timetable to struct array; preserves row order.
-% 中文说明：localSanitizeTable 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 parentPath = state.path;
 if exist('istimetable', 'builtin') == 5 && istimetable(in)
     in = timetable2table(in);
@@ -422,9 +412,8 @@ end
 % =========================================================================
 function out = localNumericReplacement(kind, opts)
     % localNumericReplacement - Production declaration in CSRD.
-    % 中文说明：localNumericReplacement 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 switch opts.NumericPolicy
     case 'null'
         out = []; % jsonencode([]) -> "null" (per MathWorks docs)
@@ -443,18 +432,16 @@ end
 % =========================================================================
 function out = localMissingValue(opts)
     % localMissingValue - Production declaration in CSRD.
-    % 中文说明：localMissingValue 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 out = localNumericReplacement('NaN', opts);
 end
 
 % =========================================================================
 function name = localKeyToFieldName(key)
     % localKeyToFieldName - Production declaration in CSRD.
-    % 中文说明：localKeyToFieldName 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if isnumeric(key)
     name = sprintf('k_%g', key);
 else
@@ -465,9 +452,8 @@ end
 % =========================================================================
 function p = localJoinPath(parent, child)
     % localJoinPath - Production declaration in CSRD.
-    % 中文说明：localJoinPath 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 if isempty(parent)
     p = child;
 else
@@ -478,9 +464,8 @@ end
 % =========================================================================
 function state = localRecord(state, reason, originalClass, newType)
     % localRecord - Production declaration in CSRD.
-    % 中文说明：localRecord 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
 entry = struct( ...
     'Path', state.path, ...
     'OriginalClass', originalClass, ...
@@ -492,9 +477,8 @@ end
 % =========================================================================
 function out = localStackToCell(stack)
 % Compact MException stack into a cell of {file:line:name} chars; this is
-% 中文说明：localStackToCell 在 CSRD 生产链路中执行对应处理。
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 % what we want stored in JSON, NOT a struct array (which jsonencode would
 % nest awkwardly).
 if isempty(stack)

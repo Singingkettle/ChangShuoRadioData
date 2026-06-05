@@ -12,10 +12,13 @@ function test_osm_building_raytracing()
     buildingOsm = fullfile(buildingFiles(1).folder, buildingFiles(1).name);
 
     masterConfig = csrd.runtime.config_loader('csrd2025/csrd2025.m');
-    masterConfig.Log.Level = 'ERROR';
-    masterConfig.Log.SaveToFile = false;
-    masterConfig.Log.DisplayInConsole = false;
-    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.Log);
+    masterConfig.RuntimePlan.Logging.Policy = 'LargeMC';
+    masterConfig.RuntimePlan.Logging.FileEnabled = false;
+    masterConfig.RuntimePlan.Logging.ConsoleEnabled = false;
+    csrd.runtime.logger.GlobalLogManager.initialize(masterConfig.RuntimePlan.Logging);
+    scenarioPlan = csrd.pipeline.runtime.buildScenarioPlan( ...
+        masterConfig.RuntimePlan, masterConfig.Factories.Scenario, ...
+        struct('ScenarioId', 1, 'RandomSeed', masterConfig.Runner.RandomSeed));
 
     physConfig = masterConfig.Factories.Scenario.PhysicalEnvironment;
     physConfig.Environment.MapType = 'OSM';
@@ -26,7 +29,7 @@ function test_osm_building_raytracing()
     physConfig.Entities.Transmitters.Count.Max = 1;
     physConfig.Entities.Receivers.Count.Min = 1;
     physConfig.Entities.Receivers.Count.Max = 1;
-    physConfig.TimeResolution = masterConfig.Factories.Scenario.Global.FrameDuration;
+    physConfig.TimeResolution = scenarioPlan.Frame.FrameDurationSec;
 
     physSim = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', physConfig);
     physCleanup = onCleanup(@() release(physSim)); %#ok<NASGU>
@@ -49,10 +52,12 @@ function test_osm_building_raytracing()
     mc.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
     mc.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = [1.0];
+    mc = csrd.test_support.buildRuntimePlanForTest(mc);
 
     engine = csrd.core.ChangShuo();
     engineCleanup = onCleanup(@() release(engine)); %#ok<NASGU>
     engine.FactoryConfigs = mc.Factories;
+    engine.RuntimePlan = mc.RuntimePlan;
     setup(engine, 1);
     [scenarioData, scenarioAnnotation] = step(engine, 1);
     assert(~isempty(scenarioData) && ~isempty(scenarioAnnotation), ...

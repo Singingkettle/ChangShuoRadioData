@@ -1,8 +1,7 @@
 function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 %OBWACTUAL Occupied bandwidth (Hz) of a complex baseband signal.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 obwActual 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 % Phase 4 §3.1 measurement-package wrapper used by
 % `Truth.Measured.{SourcePlane,FramePlane}` and the construction-side
@@ -147,9 +146,8 @@ end
 % =====================================================================
 function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
     %COMPUTEPEAKRELATIVEOBW Peak-relative-thresholded 99 %-energy OBW.
-    % 中文说明：computePeakRelativeObw 在 CSRD 生产链路中执行对应处理。
-    % Inputs / 输入: see signature arguments and local validation.
-    % 输出 / Outputs: see signature return values and contract fields.
+    % Inputs: see signature arguments and local validation.
+    % Outputs: see signature return values and contract fields.
     %
     %   1. Compute a smoothed two-sided PSD with pwelch (Hamming window,
     %      8 segments with 50 % overlap; deterministic).

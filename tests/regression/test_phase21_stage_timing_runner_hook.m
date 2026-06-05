@@ -1,6 +1,5 @@
 function test_phase21_stage_timing_runner_hook()
 %TEST_PHASE21_STAGE_TIMING_RUNNER_HOOK Verify opt-in runner timing artifacts.
-% 中文说明：使用轻量 fake engine 验证阶段计时只写 ignored/runtime artifact。
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(projectRoot);
@@ -19,20 +18,25 @@ runnerCfg.Data.CompressData = false;
 runnerCfg.Data.PrettyPrintAnnotations = false;
 runnerCfg.Engine.Handle = 'Phase0FakeEngine';
 runnerCfg.Toolbox.Level = 'minimal';
-runnerCfg.Log = struct( ...
-    'Name', 'CSRD-Phase21-StageTiming', ...
-    'Level', 'DEBUG', ...
-    'SaveToFile', true, ...
-    'DisplayInConsole', false, ...
-    'Policy', 'LargeMC');
 runnerCfg.Performance.EnableStageTiming = true;
 runnerCfg.Performance.ArtifactDirectory = fullfile(tempRoot, 'perf');
 
+masterCfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
+masterCfg.Runner = runnerCfg;
+masterCfg.Logging.Name = 'CSRD-Phase21-StageTiming';
+masterCfg.Logging.Policy = 'LargeMC';
+masterCfg.Logging.File.Enabled = true;
+masterCfg.Logging.Console.Enabled = false;
+masterCfg.Logging.Progress.Mode = 'Summary';
+masterCfg = csrd.pipeline.runtime.buildRuntimePlan(masterCfg);
+
 csrd.runtime.logger.GlobalLogManager.initialize( ...
-    runnerCfg.Log, fullfile(tempRoot, 'logs'));
+    masterCfg.RuntimePlan.Logging, fullfile(tempRoot, 'logs'));
 
 runner = csrd.SimulationRunner( ...
-    'RunnerConfig', runnerCfg, 'FactoryConfigs', struct());
+    'RunnerConfig', runnerCfg, ...
+    'FactoryConfigs', masterCfg.Factories, ...
+    'RuntimePlan', masterCfg.RuntimePlan);
 setup(runner);
 step(runner, 1, 1);
 release(runner);

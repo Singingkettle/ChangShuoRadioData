@@ -1,8 +1,7 @@
 function baselinePath = run_phase5_mc_validation(varargin)
 %RUN_PHASE5_MC_VALIDATION Phase 5 MC baseline entry point.
-% Inputs / 输入: see signature arguments and local validation.
-% 输出 / Outputs: see signature return values and contract fields.
-% 中文说明：提供 CSRD 生产链路中的 run_phase5_mc_validation 实现。
+% Inputs: see signature arguments and local validation.
+% Outputs: see signature return values and contract fields.
 %
 %   run_phase5_mc_validation() runs the canonical 1000-scenario Phase 5
 %   sweep and writes docs/baselines/2026-04-final-v04.json.

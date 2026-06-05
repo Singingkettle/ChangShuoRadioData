@@ -1,6 +1,5 @@
 classdef Level < uint8
     %LEVEL Enumeration of log levels
-    % 中文说明：提供 CSRD 生产链路中的 Level 实现。
     %   This class enumerates log message threshholds
     %
     % Syntax:
