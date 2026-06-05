@@ -43,7 +43,7 @@ classdef PhysicalEnvironmentSimulator < matlab.System
     %   config.Map.Boundaries = [-1000, 1000, -1000, 1000]; % [xmin, xmax, ymin, ymax]
     %   config.Entities.Transmitters.Count = [2, 6];
     %   config.Entities.Receivers.Count = [1, 3];
-    %   config.Mobility.DefaultModel = 'RandomWalk';
+    %   config.Mobility.DefaultModel = 'ConstantVelocity';
     %   config.TimeResolution = frameDurationSec; % seconds per receiver frame
     %
     %   simulator = csrd.blocks.scenario.PhysicalEnvironmentSimulator('Config', config);

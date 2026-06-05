@@ -55,11 +55,6 @@ classdef MultiBurstPerFrameTest < matlab.unittest.TestCase
             testCase.verifyEqual(idx, 1, ...
                 'Mid-frame-start interval must be caught by the overlap rule.');
 
-            % Suppress the FrameOutOfRange warning emitted by the legacy
-            % helper when callers set NumFrames; it is irrelevant to the
-            % comparison being made here.
-            warnState = warning('off', 'CSRD:Scenario:FrameOutOfRange');
-            cleanup = onCleanup(@() warning(warnState));
             [legacyActive, ~] = ...
                 csrd.pipeline.scenario.checkTransmissionInterval(1, pattern);
             testCase.verifyFalse(legacyActive, ...
