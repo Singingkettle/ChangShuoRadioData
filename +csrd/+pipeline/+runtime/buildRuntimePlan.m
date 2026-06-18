@@ -23,7 +23,7 @@ truth = csrd.pipeline.runtime.validateRuntimeTruthContracts( ...
     config.Factories, config.Runner);
 
 plan = struct();
-plan.Version = 'Phase33RunPlan.v1';
+plan.Version = 'RuntimePlan.v1';
 plan.ConfigFingerprint = csrd.pipeline.runtime.runtimeConfigFingerprint( ...
     config.Runner, config.Factories);
 plan.FramePolicy = framePolicy;

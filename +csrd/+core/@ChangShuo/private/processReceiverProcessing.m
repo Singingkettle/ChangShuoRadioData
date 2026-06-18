@@ -42,14 +42,13 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             frameShape = combinedSignal.FrameShape;
             framePlan = localFramePlanForAnnotation(obj, FrameId);
 
-            % Apply receiver processing using ReceiveFactory
-            % Handle both cell array and struct array formats
+            % Apply receiver processing using ReceiveFactory. Receivers is a
+            % cell array or struct array by contract; no silent empty-config
+            % fallback (that would mask a broken scenario plan).
             if iscell(obj.ScenarioConfig.Receivers)
                 rxScenarioConfig = obj.ScenarioConfig.Receivers{rxIdx};
-            elseif isstruct(obj.ScenarioConfig.Receivers)
-                rxScenarioConfig = obj.ScenarioConfig.Receivers(rxIdx);
             else
-                rxScenarioConfig = struct();
+                rxScenarioConfig = obj.ScenarioConfig.Receivers(rxIdx);
             end
             processedOutput = step(obj.Factories.Receive, combinedSignal, ...
                 FrameId, rxInfo, rxScenarioConfig);
@@ -68,11 +67,9 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
 
             FrameData{rxIdx} = struct();
             FrameData{rxIdx}.ReceiverID = rxInfo.ID;
-            if isfield(processedOutput, 'Signal')
-                FrameData{rxIdx}.Signal = processedOutput.Signal;
-            else
-                FrameData{rxIdx}.Signal = [];
-            end
+            % processedOutput.Signal is always populated above (coerced or
+            % zero-filled), so no second existence check is needed here.
+            FrameData{rxIdx}.Signal = processedOutput.Signal;
             FrameData{rxIdx}.SampleRate = rxInfo.SampleRate;
             FrameData{rxIdx}.Duration = frameShape.DurationSec;
             FrameData{rxIdx}.FrameLengthSamples = frameShape.NumSamples;
@@ -254,6 +251,8 @@ function design = buildDesignTruth(comp)
     design.ModulationFamily  = getFieldOrEmpty(plannedSrc, 'ModulationFamily', '');
     design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
     design.ModulationSpatialMode = getFieldOrEmpty(plannedSrc, 'ModulationSpatialMode', '');
+    design.MessageSource     = getFieldOrEmpty(plannedSrc, 'MessageSource', '');
+    design.IsDigital         = getFieldOrDefault(plannedSrc, 'IsDigital', true);
     design.PayloadLengthBits = getFieldOrDefault(plannedSrc, 'PayloadLengthBits', NaN);
     design.NumTransmitAntennas = getFieldOrDefault(plannedSrc, 'NumTransmitAntennas', NaN);
     design.Regulatory = getFieldOrDefault(plannedSrc, 'Regulatory', ...

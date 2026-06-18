@@ -21,7 +21,7 @@ annotation 分别记录设计事实、执行事实和测量事实。
 | 生成单个场景 | `+csrd/+core/@ChangShuo` |
 | 构建运行策略 | `csrd.pipeline.runtime.buildRuntimePlan` |
 | 构建场景计划 | `csrd.pipeline.runtime.buildScenarioPlan` |
-| 读取标注 | `csrd.pipeline.annotation.readAnnotationV2` |
+| 读取标注 | `csrd.pipeline.annotation.readAnnotation` |
 
 从仓库根目录运行：
 
@@ -47,7 +47,7 @@ config_loader
       -> ScenarioPlan     冻结的场景施工图纸
       -> frame loop       按计划逐帧执行
       -> receiver frames  实际接收信号缓冲区
-      -> annotation v2    Design / Execution / Measured 三层真值
+      -> annotation    Design / Execution / Measured 三层真值
 ```
 
 关键合同：
@@ -130,24 +130,12 @@ addpath(fullfile(pwd, 'tools', 'ci'))
 run_csrd_ci_smoke('IncludePhase4', false, 'BaselineScenarios', 1)
 ```
 
-高风险边界审计：
-
-```matlab
-addpath(pwd)
-addpath(fullfile(pwd, 'tools', 'audit'))
-run_phase34_boundary_quality_audit( ...
-    'RunTargeted', true, ...
-    'RunStress', true, ...
-    'StressCount', 6, ...
-    'StopOnFailure', true)
-```
-
 常用聚焦测试：
 
 ```matlab
 runtests('tests/unit/ScenarioPlanBuildTest.m')
 runtests('tests/unit/ScenarioPlanFrozenBeforeFrameExecutionTest.m')
-runtests('tests/unit/BuildSourceAnnotationV2Test.m')
+runtests('tests/unit/BuildSourceAnnotationTest.m')
 runtests('tests/unit/MeasurementCompletenessHookTest.m')
 ```
 
@@ -155,7 +143,7 @@ runtests('tests/unit/MeasurementCompletenessHookTest.m')
 
 - [`docs/README.md`](docs/README.md)：英文文档索引。
 - [`docs/configuration.md`](docs/configuration.md)：当前配置和运行计划合同。
-- [`docs/annotation-v2-schema.md`](docs/annotation-v2-schema.md)：annotation v2 消费合同。
+- [`docs/annotation-schema.md`](docs/annotation-schema.md)：annotation 消费合同。
 - [`docs/audits/manual-full-code-review-guide.md`](docs/audits/manual-full-code-review-guide.md)：人工代码 review 指南。
 - [`docs/audits/`](docs/audits/)：历史审计快照，只作为证据，不作为当前操作规范。
 

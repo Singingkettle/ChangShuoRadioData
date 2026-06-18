@@ -41,6 +41,9 @@ function rxConfigs = generateScenarioReceiverConfigurations(obj, receivers)
         rxPlan.Observation.CenterFrequency = unifiedConfig.CenterFrequency;
         rxPlan.Observation.RealCarrierFrequency = unifiedConfig.RealCarrierFrequency;
         rxPlan.Observation.ObservableRange = unifiedConfig.ObservableRange;
+        if isfield(unifiedConfig, 'Sdr') && isstruct(unifiedConfig.Sdr)
+            rxPlan.Observation.Sdr = unifiedConfig.Sdr;
+        end
         if ~isempty(obj.scenarioRegulatoryPlan) && ...
                 isfield(obj.scenarioRegulatoryPlan, 'Receiver')
             rxPlan.Observation.Regulatory = struct( ...

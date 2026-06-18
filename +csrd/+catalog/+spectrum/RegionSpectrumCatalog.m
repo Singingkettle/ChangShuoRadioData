@@ -75,6 +75,8 @@ catalog.Bands = [
     band(catalog, 'CN_ISM_24', 'Tier1', [2400e6 2483.5e6], 'ISM', '2.4 GHz WLAN/Bluetooth/Zigbee/ISM', 'Shared', 'Simplex', 5e6, [], {1e6, 2e6, 20e6, 40e6}, {'OFDM','GFSK','OQPSK'}, 'Burst', 0.9, 'StandardMapping', refs)
     band(catalog, 'CN_ISM_58', 'Tier1', [5725e6 5850e6], 'ISM', '5.8 GHz WLAN/ISM/SRD', 'Shared', 'Simplex', 5e6, [], {20e6, 40e6}, {'OFDM'}, 'Burst', 0.65, 'StandardMapping', refs)
     band(catalog, 'CN_SRD_433', 'Tier1', [433.05e6 434.79e6], 'ShortRangeDevice', '433 MHz short-range devices', 'Shared', 'Simplex', 25e3, [], {12.5e3, 25e3, 100e3}, {'OOK','FSK','GFSK'}, 'Burst', 0.4, 'EngineeringApproximation', refs)
+    band(catalog, 'CN_AERO_VHF', 'Tier1', [118e6 137e6], 'Aeronautical', 'VHF aeronautical mobile voice (airband, ICAO Annex 10 DSB-AM)', 'Primary', 'Simplex', 25e3, [], {25e3}, {'DSBAM'}, 'Burst', 0.4, 'StandardMapping', refs)
+    band(catalog, 'CN_MARITIME_VHF', 'Tier1', [156e6 162e6], 'Maritime', 'VHF maritime mobile voice (ITU RR Appendix 18 FM)', 'Primary', 'Simplex', 25e3, [], {12.5e3, 25e3}, {'FM'}, 'Burst', 0.35, 'StandardMapping', refs)
     ];
 end
 
@@ -100,6 +102,8 @@ catalog.Bands = [
     band(catalog, 'US_C_BAND', 'Tier1', [3700e6 3980e6], 'Mobile', 'C-band 5G broadband', 'Primary', 'TDD', 100e3, [], {20e6, 40e6}, {'OFDM','QAM'}, 'Scheduled', 0.75, 'StandardMapping', refs)
     band(catalog, 'US_ISM_24', 'Tier1', [2400e6 2483.5e6], 'ISM', '2.4 GHz WLAN/ISM', 'Shared', 'Simplex', 5e6, [], {1e6, 2e6, 20e6, 40e6}, {'OFDM','GFSK','OQPSK'}, 'Burst', 0.85, 'StandardMapping', refs)
     band(catalog, 'US_UNII_5G', 'Tier1', [5150e6 5895e6], 'ISM', '5 GHz U-NII/WLAN', 'Shared', 'Simplex', 5e6, [], {20e6, 40e6}, {'OFDM'}, 'Burst', 0.7, 'StandardMapping', refs)
+    band(catalog, 'US_AERO_VHF', 'Tier1', [118e6 137e6], 'Aeronautical', 'VHF aeronautical mobile voice (airband, ICAO Annex 10 DSB-AM)', 'Primary', 'Simplex', 25e3, [], {25e3}, {'DSBAM'}, 'Burst', 0.4, 'StandardMapping', refs)
+    band(catalog, 'US_MARITIME_VHF', 'Tier1', [156e6 162e6], 'Maritime', 'VHF maritime mobile voice (ITU RR Appendix 18 FM)', 'Primary', 'Simplex', 25e3, [], {12.5e3, 25e3}, {'FM'}, 'Burst', 0.35, 'StandardMapping', refs)
     ];
 end
 
@@ -124,6 +128,8 @@ catalog.Bands = [
     band(catalog, 'EU_NR_3500', 'Tier1', [3400e6 3800e6], 'Mobile', '3.5 GHz NR broadband', 'Primary', 'TDD', 100e3, [], {20e6, 40e6}, {'OFDM','QAM'}, 'Scheduled', 0.85, 'StandardMapping', refs)
     band(catalog, 'EU_ISM_24', 'Tier1', [2400e6 2483.5e6], 'ISM', '2.4 GHz WLAN/ISM', 'Shared', 'Simplex', 5e6, [], {1e6, 2e6, 20e6, 40e6}, {'OFDM','GFSK','OQPSK'}, 'Burst', 0.8, 'StandardMapping', refs)
     band(catalog, 'EU_RLAN_5G', 'Tier1', [5150e6 5875e6], 'ISM', '5 GHz RLAN', 'Shared', 'Simplex', 5e6, [], {20e6, 40e6}, {'OFDM'}, 'Burst', 0.65, 'StandardMapping', refs)
+    band(catalog, 'EU_AERO_VHF', 'Tier1', [118e6 137e6], 'Aeronautical', 'VHF aeronautical mobile voice (airband, ICAO Annex 10 DSB-AM, 8.33 kHz)', 'Primary', 'Simplex', 8.33e3, [], {8.33e3, 25e3}, {'DSBAM'}, 'Burst', 0.4, 'StandardMapping', refs)
+    band(catalog, 'EU_MARITIME_VHF', 'Tier1', [156e6 162e6], 'Maritime', 'VHF maritime mobile voice (ITU RR Appendix 18 FM)', 'Primary', 'Simplex', 25e3, [], {12.5e3, 25e3}, {'FM'}, 'Burst', 0.35, 'StandardMapping', refs)
     ];
 end
 
@@ -146,6 +152,8 @@ catalog.Bands = [
     band(catalog, 'JP_NR_45', 'Tier1', [4500e6 4900e6], 'Mobile', '4.5 GHz NR broadband', 'Primary', 'TDD', 100e3, [], {20e6, 40e6}, {'OFDM','QAM'}, 'Scheduled', 0.65, 'StandardMapping', refs)
     band(catalog, 'JP_ISM_24', 'Tier1', [2400e6 2497e6], 'ISM', '2.4 GHz WLAN/ISM', 'Shared', 'Simplex', 5e6, [], {1e6, 2e6, 20e6, 40e6}, {'OFDM','GFSK','OQPSK'}, 'Burst', 0.8, 'StandardMapping', refs)
     band(catalog, 'JP_RLAN_5G', 'Tier1', [5150e6 5730e6], 'ISM', '5 GHz RLAN', 'Shared', 'Simplex', 5e6, [], {20e6, 40e6}, {'OFDM'}, 'Burst', 0.6, 'StandardMapping', refs)
+    band(catalog, 'JP_AERO_VHF', 'Tier1', [118e6 137e6], 'Aeronautical', 'VHF aeronautical mobile voice (airband, ICAO Annex 10 DSB-AM)', 'Primary', 'Simplex', 25e3, [], {25e3}, {'DSBAM'}, 'Burst', 0.4, 'StandardMapping', refs)
+    band(catalog, 'JP_MARITIME_VHF', 'Tier1', [156e6 162e6], 'Maritime', 'VHF maritime mobile voice (ITU RR Appendix 18 FM)', 'Primary', 'Simplex', 25e3, [], {12.5e3, 25e3}, {'FM'}, 'Burst', 0.35, 'StandardMapping', refs)
     ];
 end
 
@@ -170,6 +178,8 @@ catalog.Bands = [
     band(catalog, 'KR_ISM_24', 'Tier1', [2400e6 2483.5e6], 'ISM', '2.4 GHz WLAN/ISM', 'Shared', 'Simplex', 5e6, [], {1e6, 2e6, 20e6, 40e6}, {'OFDM','GFSK','OQPSK'}, 'Burst', 0.8, 'StandardMapping', refs)
     band(catalog, 'KR_RLAN_5G', 'Tier1', [5150e6 5850e6], 'ISM', '5 GHz RLAN', 'Shared', 'Simplex', 5e6, [], {20e6, 40e6}, {'OFDM'}, 'Burst', 0.6, 'StandardMapping', refs)
     band(catalog, 'KR_SRD_920', 'Tier1', [917e6 923.5e6], 'ShortRangeDevice', '920 MHz SRD/RFID/LPWAN', 'Shared', 'Simplex', 100e3, [], {125e3, 250e3, 500e3}, {'FSK','GFSK','OQPSK'}, 'Burst', 0.4, 'EngineeringApproximation', refs)
+    band(catalog, 'KR_AERO_VHF', 'Tier1', [118e6 137e6], 'Aeronautical', 'VHF aeronautical mobile voice (airband, ICAO Annex 10 DSB-AM)', 'Primary', 'Simplex', 25e3, [], {25e3}, {'DSBAM'}, 'Burst', 0.4, 'StandardMapping', refs)
+    band(catalog, 'KR_MARITIME_VHF', 'Tier1', [156e6 162e6], 'Maritime', 'VHF maritime mobile voice (ITU RR Appendix 18 FM)', 'Primary', 'Simplex', 25e3, [], {12.5e3, 25e3}, {'FM'}, 'Burst', 0.35, 'StandardMapping', refs)
     ];
 end
 

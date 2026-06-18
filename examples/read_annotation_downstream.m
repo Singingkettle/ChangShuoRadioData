@@ -1,10 +1,10 @@
-function summary = read_annotation_v2_downstream(annotationPath, cocoOutputPath)
-%READ_ANNOTATION_V2_DOWNSTREAM Downstream annotation v2 reader example.
+function summary = read_annotation_downstream(annotationPath, cocoOutputPath)
+%READ_ANNOTATION_DOWNSTREAM Downstream annotation reader example.
 %
-%   SUMMARY = read_annotation_v2_downstream(ANNOTATIONPATH) validates a CSRD
-%   annotation v2 JSON file and returns source/frame counts.
+%   SUMMARY = read_annotation_downstream(ANNOTATIONPATH) validates a CSRD
+%   annotation JSON file and returns source/frame counts.
 %
-%   SUMMARY = read_annotation_v2_downstream(ANNOTATIONPATH, COCOOUTPUTPATH)
+%   SUMMARY = read_annotation_downstream(ANNOTATIONPATH, COCOOUTPUTPATH)
 %   also writes the minimal receiver-frequency COCO export.
 
 if nargin < 1 || isempty(annotationPath)
@@ -19,7 +19,7 @@ projectRoot = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectRoot);
 addpath(fullfile(projectRoot, 'tools'));
 
-reader = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
     'RequireSources', true, ...
     'RequireRuntimeHeader', true);
 coco = convert_csrd_to_coco(annotationPath, cocoOutputPath);
@@ -35,6 +35,6 @@ summary = struct( ...
     'NumSkippedSources', coco.csrd_export.num_skipped_sources, ...
     'CocoCoordinateSystem', coco.info.coordinate_system);
 
-fprintf('CSRD annotation v2: %d frames, %d sources, %d COCO annotations\n', ...
+fprintf('CSRD annotation: %d frames, %d sources, %d COCO annotations\n', ...
     summary.NumFrames, summary.NumSources, summary.NumCocoAnnotations);
 end

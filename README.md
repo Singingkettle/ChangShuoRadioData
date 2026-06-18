@@ -23,7 +23,7 @@ what was planned, executed, and measured.
 | Generate one scenario | `+csrd/+core/@ChangShuo` |
 | Build run policies | `csrd.pipeline.runtime.buildRuntimePlan` |
 | Build per-scenario plan | `csrd.pipeline.runtime.buildScenarioPlan` |
-| Read annotations | `csrd.pipeline.annotation.readAnnotationV2` |
+| Read annotations | `csrd.pipeline.annotation.readAnnotation` |
 
 Minimal run from the repository root:
 
@@ -49,7 +49,7 @@ config_loader
       -> ScenarioPlan     frozen scenario construction plan
       -> frame loop       per-frame execution from the plan
       -> receiver frames  actual signal buffers
-      -> annotation v2    Design / Execution / Measured truth planes
+      -> annotation    Design / Execution / Measured truth planes
 ```
 
 Important contracts:
@@ -126,24 +126,12 @@ addpath(fullfile(pwd, 'tools', 'ci'))
 run_csrd_ci_smoke('IncludePhase4', false, 'BaselineScenarios', 1)
 ```
 
-High-risk targeted audit:
-
-```matlab
-addpath(pwd)
-addpath(fullfile(pwd, 'tools', 'audit'))
-run_phase34_boundary_quality_audit( ...
-    'RunTargeted', true, ...
-    'RunStress', true, ...
-    'StressCount', 6, ...
-    'StopOnFailure', true)
-```
-
 Useful focused tests:
 
 ```matlab
 runtests('tests/unit/ScenarioPlanBuildTest.m')
 runtests('tests/unit/ScenarioPlanFrozenBeforeFrameExecutionTest.m')
-runtests('tests/unit/BuildSourceAnnotationV2Test.m')
+runtests('tests/unit/BuildSourceAnnotationTest.m')
 runtests('tests/unit/MeasurementCompletenessHookTest.m')
 ```
 
@@ -154,7 +142,7 @@ Start here:
 - [docs/README.md](docs/README.md): documentation index.
 - [docs/configuration.md](docs/configuration.md): current configuration and
   runtime-plan contract.
-- [docs/annotation-v2-schema.md](docs/annotation-v2-schema.md): annotation v2
+- [docs/annotation-schema.md](docs/annotation-schema.md): annotation
   consumer contract.
 - [docs/audits/manual-full-code-review-guide.md](docs/audits/manual-full-code-review-guide.md):
   human review guide.

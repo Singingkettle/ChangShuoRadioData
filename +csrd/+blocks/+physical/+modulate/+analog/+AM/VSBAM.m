@@ -171,11 +171,11 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             if strcmp(obj.ModulatorConfig.mode, 'upper')
                 % Upper sideband mode: keep upper sideband, partially filter lower
                 imaginaryComponent = messageSpectrum .* (flipud(obj.vestigialFilterResponse) - obj.vestigialFilterResponse);
-                bandWidth = [-obj.ModulatorConfig.cutoff, obw(messageSignal, obj.SampleRate)];
+                bandWidth = [-obj.ModulatorConfig.cutoff, csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate)];
             else
                 % Lower sideband mode: keep lower sideband, partially filter upper
                 imaginaryComponent = messageSpectrum .* (obj.vestigialFilterResponse - flipud(obj.vestigialFilterResponse));
-                bandWidth = [-obw(messageSignal, obj.SampleRate), obj.ModulatorConfig.cutoff];
+                bandWidth = [-csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate), obj.ModulatorConfig.cutoff];
             end
 
             % Convert filtered spectrum back to time domain

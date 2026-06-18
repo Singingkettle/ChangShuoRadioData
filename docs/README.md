@@ -15,7 +15,7 @@ contracts.
 | [`../README.md`](../README.md) | Project overview, current entry points, runtime model, validation commands. |
 | [`configuration.md`](configuration.md) | Raw config authorities, `RuntimePlan` policies, per-scenario `ScenarioPlan`, rejected legacy fields. |
 | [`architecture/source-layout.md`](architecture/source-layout.md) | Current source package responsibilities and production data flow. |
-| [`annotation-v2-schema.md`](annotation-v2-schema.md) | Annotation v2 contract: `Truth.Design`, `Truth.Execution`, `Truth.Measured`, receiver view. |
+| [`annotation-schema.md`](annotation-schema.md) | Annotation contract: `Truth.Design`, `Truth.Execution`, `Truth.Measured`, receiver view. |
 | [`README_Weather.md`](README_Weather.md) | Weather configuration path, units, defaults, and ScenarioPlan timing notes. |
 | [`audits/manual-full-code-review-guide.md`](audits/manual-full-code-review-guide.md) | Human review workflow for reading the full codebase without losing cross-module contracts. |
 
@@ -48,7 +48,7 @@ tools/simulation.m
   -> csrd.factories.ScenarioFactory.planScenario
   -> physical environment / communication behavior / waveform / RF / channel
   -> receiver frame assembly
-  -> annotation v2 export
+  -> annotation export
 ```
 
 See [`architecture/source-layout.md`](architecture/source-layout.md) for the
@@ -60,7 +60,6 @@ Useful review-time entry points:
 
 ```matlab
 run_csrd_ci_smoke('IncludePhase4', false, 'BaselineScenarios', 1)
-run_phase34_boundary_quality_audit('StopOnFailure', true, 'StressCount', 6)
 simulation(1, 1, 'csrd2025/csrd2025.m')
 ```
 

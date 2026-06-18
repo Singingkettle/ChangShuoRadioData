@@ -9,7 +9,7 @@ englishDocs = [
     "docs/README.md"
     "docs/configuration.md"
     "docs/architecture/source-layout.md"
-    "docs/annotation-v2-schema.md"
+    "docs/annotation-schema.md"
     "docs/README_Refactoring.md"
     "docs/README_Weather.md"
 ];

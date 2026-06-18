@@ -40,7 +40,7 @@ summary.ChannelModels = strings(0, 1);
 
 for k = 1:numel(annotationFiles)
     annotationPath = fullfile(annotationFiles(k).folder, annotationFiles(k).name);
-    result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+    result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
         'RequireSources', true, 'RequireRuntimeHeader', true);
     for s = 1:numel(result.Sources)
         source = result.Sources{s};

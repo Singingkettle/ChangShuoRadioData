@@ -1,11 +1,11 @@
-# CSRD Annotation V2 Schema
+# CSRD Annotation Schema
 
-Status: Annotation v2 current contract, updated for scenario-level
+Status: Annotation current contract, updated for scenario-level
 `ScenarioPlan` generation.
 
-This document describes the frozen annotation v2 shape used by the refactored
-CSRD pipeline. Annotation v2 is not a compatibility layer for legacy v1 fields.
-Consumers should read it through `csrd.pipeline.annotation.readAnnotationV2`.
+This document describes the frozen annotation shape used by the refactored
+CSRD pipeline. Annotation is not a compatibility layer for legacy v1 fields.
+Consumers should read it through `csrd.pipeline.annotation.readAnnotation`.
 
 ## Core Rule
 
@@ -36,7 +36,7 @@ The root annotation contains `Frames`. A runtime header is expected for release
 artifacts:
 
 ```matlab
-reader = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
     'RequireSources', true, ...
     'RequireRuntimeHeader', true);
 ```
@@ -45,7 +45,7 @@ reader = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
 
 | Field | Meaning |
 |-------|---------|
-| `Schema` | Always `annotation-v2` for this reader |
+| `Schema` | Always `annotation` for this reader |
 | `NumFrames` | Number of receiver frames in the annotation |
 | `NumSources` | Number of visible or hidden source records across frames |
 | `NumReceivers` | Unique receiver IDs |

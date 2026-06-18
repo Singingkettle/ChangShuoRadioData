@@ -59,7 +59,7 @@ function summary = test_simulation_entrypoint_coverage_sweep(varargin)
         csrd.runtime.logger.GlobalLogManager.reset();
 
         annotationPath = localFindAnnotation(projectRoot, mode, c);
-        result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+        result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
             'RequireSources', true, 'RequireRuntimeHeader', true);
         caseCoverage = localAssertCaseResult(result, c);
         coverage = localMergeCoverage(coverage, caseCoverage);

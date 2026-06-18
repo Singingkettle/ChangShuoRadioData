@@ -122,7 +122,7 @@ classdef DSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             modulatedSignal = messageSignal + carrierAmplitude;
 
             % Calculate DSB-AM bandwidth as twice the measured message bandwidth.
-            messageBandwidth = obw(messageSignal, obj.SampleRate);
+            messageBandwidth = csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate);
             bandWidth = 2 * messageBandwidth;
 
         end

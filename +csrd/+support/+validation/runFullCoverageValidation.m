@@ -68,7 +68,7 @@ for idx = 1:numel(cases)
     try
         simulation(1, 1, configPath);
         annotationPath = localFindAnnotation(projectRoot, caseOutputDirectory);
-        result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+        result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
             'RequireSources', true, 'RequireRuntimeHeader', true);
         caseCoverage = localAssertCaseResult(result, c);
         coverage = localMergeCoverage(coverage, caseCoverage);
