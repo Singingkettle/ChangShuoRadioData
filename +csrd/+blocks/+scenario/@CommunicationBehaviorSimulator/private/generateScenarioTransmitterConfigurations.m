@@ -96,7 +96,19 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
         % Hardware group
         txPlan.Hardware.Type = selectTransmitterType(txParams.Types);
-        txPlan.Hardware.Power = randomInRange(obj, txParams.Power.Min, txParams.Power.Max);
+        % Transmit power follows the regulatory service class (broadcast
+        % towers high, short-range devices low) when regulatory planning is
+        % active; otherwise it falls back to the flat scenario range.
+        if regulatoryEnabled && isfield(regulatoryEmitterPlan, 'PowerDbmRange') && ...
+                numel(regulatoryEmitterPlan.PowerDbmRange) == 2 && ...
+                all(isfinite(regulatoryEmitterPlan.PowerDbmRange))
+            txPlan.Hardware.Power = randomInRange(obj, ...
+                regulatoryEmitterPlan.PowerDbmRange(1), ...
+                regulatoryEmitterPlan.PowerDbmRange(2));
+        else
+            txPlan.Hardware.Power = randomInRange(obj, ...
+                txParams.Power.Min, txParams.Power.Max);
+        end
 
         % ===== CALCULATION FLOW (Order matters!) =====
         
@@ -149,7 +161,7 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
 
         % 4. Fourth: Generate MESSAGE config (length derived from symbol rate and duration)
         txPlan.Message = generateMessageConfig(obj, ...
-            txPlan.Modulation, totalTxDuration, msgParams);
+            txPlan.Modulation, totalTxDuration, msgParams, txPlan.EntityID);
 
         txConfigs{end+1} = txPlan;
     end
@@ -690,25 +702,53 @@ function mode = localValidateOFDMMimoMode(modConfig)
     mode = allowed{idx};
 end
 
-function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgParams)
+function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgParams, emitterId)
     % generateMessageConfig - Generate message config from scenario params
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
     %
     % Message Length Calculation:
     %   Length = SymbolRate × BitsPerSymbol × TransmissionDuration
-    
+    %
+    % Message source is a deterministic function of the modulation family,
+    % never a random draw: analog families (FM/PM/AM variants) must use the
+    % continuous audio source, digital families must use the random bit
+    % source. Feeding a 0/1 bit stream to an analog modulator (which scales
+    % or integrates a continuous baseband) produces a physically meaningless
+    % waveform, so the binding is enforced here rather than sampled from a
+    % configured type list.
+
     msgConfig = struct();
-    
-    % Select message type from scenario params
-    msgTypes = msgParams.Types;
-    if iscell(msgTypes)
-        selectedType = msgTypes{randi(length(msgTypes))};
-    else
-        selectedType = msgTypes;
+
+    % Resolve message source from the modulation family (analog -> Audio,
+    % digital -> RandomBit). msgParams.Types is no longer used for selection;
+    % it only documents the registered sources for legacy callers.
+    modulationFamily = '';
+    if isfield(modulationConfig, 'Family') && ~isempty(modulationConfig.Family)
+        modulationFamily = char(string(modulationConfig.Family));
+    elseif isfield(modulationConfig, 'Type') && ~isempty(modulationConfig.Type)
+        modulationFamily = char(string(modulationConfig.Type));
     end
-    msgConfig.Type = selectedType;
-    
+    if isempty(modulationFamily)
+        error('CSRD:Scenario:MissingModulationFamilyForMessage', ...
+            ['generateMessageConfig requires the modulation family to bind ', ...
+             'the message source; modulationConfig.Type/Family is empty.']);
+    end
+    msgConfig.Type = csrd.support.modulation.messageSourceForModulation(modulationFamily);
+    msgConfig.ModulationFamily = modulationFamily;
+    msgConfig.IsDigital = ~csrd.support.modulation.isAnalogModulationFamily(modulationFamily);
+
+    % Analog emitters draw their audio clip deterministically from a
+    % per-emitter seed so different transmitters carry different program
+    % material while a fixed scenario seed always reproduces the same clip.
+    if strcmp(msgConfig.Type, 'Audio')
+        if nargin < 5 || isempty(emitterId)
+            emitterId = '';
+        end
+        msgConfig.Seed = csrd.support.hash.shortInt32Hash( ...
+            sprintf('AudioSelect|%s|%s', char(string(emitterId)), modulationFamily));
+    end
+
     % Calculate message length based on symbol rate, bits per symbol, and duration
     symbolRate = modulationConfig.SymbolRate;
     bitsPerSymbol = modulationConfig.BitsPerSymbol;
@@ -768,8 +808,7 @@ function order = selectModulationOrder(modType, modParams)
     end
     
     % Ensure order is at least 2 for digital modulations
-    analogTypes = {'FM', 'PM', 'AM', 'SSBAM', 'DSBAM', 'DSBSCAM', 'VSBAM'};
-    if ~ismember(modType, analogTypes) && order < 2
+    if ~csrd.support.modulation.isAnalogModulationFamily(modType) && order < 2
         order = 2;
     end
 end

@@ -148,6 +148,19 @@ function config = scenario_factory()
     config.Factories.Scenario.CommunicationBehavior.Receiver.NumAntennas = 1;  % unified
     % NOTE: NoiseFigure, Sensitivity, AntennaGain detail params are in receive_factory.m
 
+    % ===================== SDR RECEIVER CAPABILITY =====================
+    % The monitoring receiver behaves like a real software-defined radio.
+    % The selected model's capability profile (tuning range, max instantaneous
+    % bandwidth, ADC bits, noise figure, channel count) bounds the scenario:
+    %   - the unified SampleRate (the captured IBW) is capped to the model IBW
+    %   - the unified NumAntennas is capped to the model channel count
+    %   - the monitoring band center must lie inside the model tuning range
+    % Supported models live in csrd.catalog.receiver.SdrReceiverCatalog
+    % (USRP_B210, USRP_N310, BladeRF_2, HackRF_One, RTL_SDR, Airspy_R2,
+    % SDRplay_RSPdx). USRP_B210 (70 MHz-6 GHz, 56 MHz IBW, 12-bit, 2 ch) is a
+    % representative wideband spectrum-monitoring SDR.
+    config.Factories.Scenario.CommunicationBehavior.Receiver.Sdr.Model = 'USRP_B210';
+
     % ===================== REGULATORY SPECTRUM PLANNING =====================
     % Phase 8 replaces arbitrary frequency / bandwidth / modulation sampling
     % with region-aware service planning. The physical scene is bound to a
@@ -166,6 +179,12 @@ function config = scenario_factory()
     % realistic occupied bandwidth, but the synthetic waveform sample rate
     % must still be high enough for the repository's Tx RF impairment chain.
     config.Factories.Scenario.CommunicationBehavior.Regulatory.MinimumModulatorSampleRateHz = 250e3;
+    % Transmit power follows the service class (broadcast towers radiate far
+    % more than handheld land-mobile radios or short-range devices). The
+    % selector applies realistic per-ServiceClass dBm defaults; override any
+    % class here, e.g.:
+    %   config...Regulatory.ServicePowerDbm.Broadcast = [43, 60];
+    %   config...Regulatory.ServicePowerDbm.ShortRangeDevice = [0, 14];
     
     % ===================== TRANSMITTER CONFIGURATION =====================
     % Scenario-level params: defines what the transmitter produces
@@ -230,12 +249,17 @@ function config = scenario_factory()
     %   dimension directly when validation needs independent antenna streams.
     config.Factories.Scenario.CommunicationBehavior.Modulation.OFDMMimoMode = 'OSTBC';
     
-    % ===================== MESSAGE (Type selection only) =====================
-    % Scenario selects TYPE from this list
-    % MessageFactory looks up DETAILS from message_factory.m
-    %
-    % DESIGN: Message length is CALCULATED from bandwidth and duration, not configured
-    config.Factories.Scenario.CommunicationBehavior.Message.Types = {'RandomBit'};
+    % ===================== MESSAGE (source derived from modulation) ==========
+    % The message source is NOT randomly selected: it is a deterministic
+    % function of the modulation family enforced in the planner
+    % (csrd.support.modulation.messageSourceForModulation):
+    %   analog modulation (FM/PM/AM variants) -> Audio
+    %   digital modulation (PSK/QAM/FSK/...)   -> RandomBit
+    % This list only documents the registered sources; it is no longer used
+    % to sample a source. MessageFactory looks up DETAILS from
+    % message_factory.m, and message length is CALCULATED from bandwidth and
+    % duration, not configured.
+    config.Factories.Scenario.CommunicationBehavior.Message.Types = {'RandomBit', 'Audio'};
     
     % ===================== TRANSMISSION PATTERN =====================
     config.Factories.Scenario.CommunicationBehavior.TransmissionPattern.DefaultType = 'Continuous';

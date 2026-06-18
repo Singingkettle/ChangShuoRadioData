@@ -115,8 +115,8 @@ classdef CatchSwallowRemovedTest < matlab.unittest.TestCase
                 'Phase 5: COCO converter must not parse legacy annotation.rx/tx paths.');
             testCase.verifyEmpty(regexp(code, 'annotation\.(rx|tx)', 'once'), ...
                 'Phase 6: COCO converter must not read legacy annotation.rx/tx paths.');
-            testCase.verifyTrue(contains(code, 'readAnnotationV2'), ...
-                'Phase 6: COCO converter must validate annotation v2 before export.');
+            testCase.verifyTrue(contains(code, 'readAnnotation'), ...
+                'Phase 6: COCO converter must validate annotation before export.');
         end
 
         % ---------- isScenarioSkipException contract -------------------

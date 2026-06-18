@@ -1,10 +1,10 @@
 function coco = convert_csrd_to_coco(annotationInput, outputPath, varargin)
-%CONVERT_CSRD_TO_COCO Convert CSRD annotation v2 to minimal COCO JSON.
+%CONVERT_CSRD_TO_COCO Convert CSRD annotation to minimal COCO JSON.
 % Inputs: see signature arguments and local validation.
 % Outputs: see signature return values and contract fields.
 %
 %   COCO = convert_csrd_to_coco(ANNOTATION_INPUT) validates a CSRD
-%   annotation v2 payload or JSON file and returns a COCO-style struct.
+%   annotation payload or JSON file and returns a COCO-style struct.
 %
 %   COCO = convert_csrd_to_coco(ANNOTATION_INPUT, OUTPUT_PATH) also writes
 %   the JSON output to OUTPUT_PATH.
@@ -17,7 +17,7 @@ function coco = convert_csrd_to_coco(annotationInput, outputPath, varargin)
 
 if nargin < 1 || isempty(annotationInput)
     error('CSRD:Tools:CocoMissingInput', ...
-        'convert_csrd_to_coco requires an annotation v2 path or struct.');
+        'convert_csrd_to_coco requires an annotation path or struct.');
 end
 if nargin < 2
     outputPath = '';
@@ -35,7 +35,7 @@ parse(p, varargin{:});
 imageWidth = double(p.Results.ImageWidth);
 imageHeight = double(p.Results.ImageHeight);
 
-reader = csrd.pipeline.annotation.readAnnotationV2(annotationInput, ...
+reader = csrd.pipeline.annotation.readAnnotation(annotationInput, ...
     'RequireSources', true);
 
 state = struct();
@@ -79,7 +79,7 @@ end
 
 coco = struct();
 coco.info = struct( ...
-    'description', 'CSRD annotation v2 receiver-frequency COCO export', ...
+    'description', 'CSRD annotation receiver-frequency COCO export', ...
     'version', 'csrd-coco-v2-minimal', ...
     'source_schema', reader.Summary.Schema, ...
     'coordinate_system', 'receiver_frequency_canvas');
@@ -295,7 +295,7 @@ function metadata = makeAnnotationMetadata(source, frame, bboxHz)
     % Outputs: see signature return values and contract fields.
 truth = source.Truth;
 metadata = struct( ...
-    'schema', 'annotation-v2-derived', ...
+    'schema', 'annotation-derived', ...
     'frame_id', frame.FrameId, ...
     'receiver_id', char(frame.ReceiverID), ...
     'tx_id', char(source.TxID), ...

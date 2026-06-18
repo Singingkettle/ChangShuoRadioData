@@ -4,7 +4,7 @@ function test_phase8_regulatory_pipeline_smoke()
     % Runs the normal SimulationRunner entrypoint with a China FM broadcast
     % monitoring band. The assertion is intentionally business-level:
     % the regulatory catalog must determine receiver RF center, Tx
-    % bandwidth/modulation, and Truth.Design.Regulatory in annotation v2.
+    % bandwidth/modulation, and Truth.Design.Regulatory in annotation.
 
     fprintf('=== Phase 8 regulatory pipeline smoke ===\n');
 
@@ -55,7 +55,7 @@ function test_phase8_regulatory_pipeline_smoke()
         {'Radar','Radiolocation','Radionavigation'};
 
     annotationPath = localRunOneScenario(cfg);
-    result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+    result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
         'RequireSources', true, 'RequireRuntimeHeader', true);
 
     sources = result.Sources;

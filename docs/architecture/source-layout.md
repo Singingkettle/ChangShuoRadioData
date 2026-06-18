@@ -14,7 +14,7 @@ tools/simulation.m
   -> csrd.factories.ScenarioFactory.planScenario
   -> ScenarioPlan + FramePlan execution
   -> receiver frame assembly
-  -> annotation v2 export
+  -> annotation export
 ```
 
 The central invariant is unchanged: signal data, scene state, and annotation
@@ -29,7 +29,7 @@ must describe the same event.
 - `+csrd/+core/@ChangShuo`: per-scenario execution engine.
 - `+csrd/+pipeline/+runtime/buildScenarioPlan.m`: scenario construction plan
   builder.
-- `+csrd/+pipeline/+annotation/readAnnotationV2.m`: annotation reader and
+- `+csrd/+pipeline/+annotation/readAnnotation.m`: annotation reader and
   schema gate.
 
 ## Package Responsibilities

@@ -131,14 +131,14 @@ function selected = resolveSelectedSuites(testType)
             selected = {'phase4'};
         case 'phase6'
             % Phase 6 (audit §18 / phase-6-release-hardening.md) curated
-            % release-hardening subset: annotation v2 reader validation
+            % release-hardening subset: annotation reader validation
             % plus the read-only release readiness regression. This suite
             % must not run a simulation or rewrite canonical baselines.
             selected = {'phase6'};
         case 'phase7'
             % Phase 7 (phase-7-downstream-release.md) curated subset:
             % downstream schema docs, release notes, and executable
-            % annotation v2 reader example. This suite is read-only except
+            % annotation reader example. This suite is read-only except
             % for tempdir fixtures created by the regression itself.
             selected = {'phase7'};
         case 'phase8'
@@ -477,7 +477,7 @@ function records = runPhase4Suite(testsDir, verbose)
         'MeasurementPackageTest', ...
         'ApplyDopplerShiftTest', ...
         'ChannelPropagationFailFastTest', ...
-        'BuildSourceAnnotationV2Test', ...
+        'BuildSourceAnnotationTest', ...
         'ReceiverViewPersistenceTest', ...
         'MeasurementCompletenessHookTest', ...
         'BlueprintFeasibilityValidatorTest'};
@@ -495,7 +495,7 @@ function records = runPhase6Suite(testsDir, verbose)
     % Phase 6 (audit §18 / phase-6-release-hardening.md) curated suite.
     %
     %   Pins the release-hardening layer without running a simulation:
-    %   annotation v2 reader validation plus release readiness checks over
+    %   annotation reader validation plus release readiness checks over
     %   the committed final-v04 baseline.
 
     projectRoot = fileparts(testsDir);
@@ -504,7 +504,7 @@ function records = runPhase6Suite(testsDir, verbose)
     addpath(fullfile(projectRoot, 'tools', 'release'));
     records = [];
 
-    phase6Unit = {'ReadAnnotationV2Test', 'ConvertCsrdToCocoTest'};
+    phase6Unit = {'ReadAnnotationTest', 'ConvertCsrdToCocoTest'};
     records = appendUnittestClasses(records, phase6Unit, 'phase6', verbose);
 
     phase6Reg = {'test_phase6_release_readiness', ...
@@ -542,8 +542,8 @@ function records = runPhase8Suite(testsDir, verbose)
         'RegionSpectrumSelectorTest', ...
         'ScenarioFactoryRegulatoryChinaTest', ...
         'AllModulationFactorySmokeTest', ...
-        'BuildSourceAnnotationV2Test', ...
-        'ReadAnnotationV2Test'};
+        'BuildSourceAnnotationTest', ...
+        'ReadAnnotationTest'};
     records = appendUnittestClasses(records, phase8Unit, 'phase8', verbose);
 
     phase8Reg = {'test_phase8_regulatory_pipeline_smoke', ...

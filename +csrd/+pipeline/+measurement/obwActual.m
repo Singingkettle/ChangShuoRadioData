@@ -43,7 +43,7 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 %   above the chosen ratio. With the default -3 dBc threshold (= peak/2):
 %
 %     - Clean RRC and noisy RRC at SNR=6..20 dB report identical
-%       bandwidths (validated in tools/phase4/diag_phase4_rrc_obw).
+%       bandwidths.
 %     - Clean OFDM and noisy OFDM agree to <0.1 % for the same SNR
 %       range.
 %     - The reported bandwidth is the -3 dB main-lobe footprint, which

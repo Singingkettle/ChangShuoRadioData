@@ -1,14 +1,14 @@
-classdef ReadAnnotationV2Test < matlab.unittest.TestCase
-    %READANNOTATIONV2TEST Phase 6 annotation v2 reader contract.
+classdef ReadAnnotationTest < matlab.unittest.TestCase
+    %READANNOTATIONTEST Phase 6 annotation reader contract.
 
     methods (Test)
         function validatesNestedFramesAndSummarizes(testCase)
             payload = localValidPayload();
-            result = csrd.pipeline.annotation.readAnnotationV2(payload, ...
+            result = csrd.pipeline.annotation.readAnnotation(payload, ...
                 'RequireSources', true, ...
                 'RequireRuntimeHeader', true);
 
-            testCase.verifyEqual(result.Summary.Schema, 'annotation-v2');
+            testCase.verifyEqual(result.Summary.Schema, 'annotation');
             testCase.verifyEqual(result.Summary.NumFrames, 1);
             testCase.verifyEqual(result.Summary.NumSources, 1);
             testCase.verifyEqual(result.Summary.NumReceivers, 1);
@@ -19,7 +19,7 @@ classdef ReadAnnotationV2Test < matlab.unittest.TestCase
             payload = localValidPayload();
             path = localWriteTempJson(testCase, payload);
 
-            result = csrd.pipeline.annotation.readAnnotationV2(path, ...
+            result = csrd.pipeline.annotation.readAnnotation(path, ...
                 'RequireSources', true);
 
             testCase.verifyEqual(result.Summary.SourcePath, path);
@@ -31,7 +31,7 @@ classdef ReadAnnotationV2Test < matlab.unittest.TestCase
             payload.Frames{1}{1}.SignalSources.Planned = struct();
 
             testCase.verifyError( ...
-                @() csrd.pipeline.annotation.readAnnotationV2(payload), ...
+                @() csrd.pipeline.annotation.readAnnotation(payload), ...
                 'CSRD:AnnotationV2:LegacyFieldPresent');
         end
 
@@ -42,7 +42,7 @@ classdef ReadAnnotationV2Test < matlab.unittest.TestCase
                 'FramePlane');
 
             testCase.verifyError( ...
-                @() csrd.pipeline.annotation.readAnnotationV2(payload), ...
+                @() csrd.pipeline.annotation.readAnnotation(payload), ...
                 'CSRD:AnnotationV2:MissingField');
         end
 
@@ -52,7 +52,7 @@ classdef ReadAnnotationV2Test < matlab.unittest.TestCase
                 MeasurementSemantics = 'execution_copy';
 
             testCase.verifyError( ...
-                @() csrd.pipeline.annotation.readAnnotationV2(payload), ...
+                @() csrd.pipeline.annotation.readAnnotation(payload), ...
                 'CSRD:AnnotationV2:UnexpectedSemantics');
         end
 
@@ -61,8 +61,29 @@ classdef ReadAnnotationV2Test < matlab.unittest.TestCase
             payload.Frames{1}{1}.SignalSources.Truth.Design.ModulationFamily = '';
 
             testCase.verifyError( ...
-                @() csrd.pipeline.annotation.readAnnotationV2(payload), ...
+                @() csrd.pipeline.annotation.readAnnotation(payload), ...
                 'CSRD:AnnotationV2:InvalidDesignValue');
+        end
+
+        function rejectsMessageSourceModulationMismatch(testCase)
+            % A digital family (QPSK) annotated with the Audio source is a
+            % broken binding and must be rejected by the truth-plane gate.
+            payload = localValidPayload();
+            payload.Frames{1}{1}.SignalSources.Truth.Design.MessageSource = 'Audio';
+
+            testCase.verifyError( ...
+                @() csrd.pipeline.annotation.readAnnotation(payload), ...
+                'CSRD:Annotation:MessageSourceModulationMismatch');
+        end
+
+        function rejectsIsDigitalMismatch(testCase)
+            % IsDigital must agree with the modulation family.
+            payload = localValidPayload();
+            payload.Frames{1}{1}.SignalSources.Truth.Design.IsDigital = false;
+
+            testCase.verifyError( ...
+                @() csrd.pipeline.annotation.readAnnotation(payload), ...
+                'CSRD:Annotation:IsDigitalModulationMismatch');
         end
     end
 end
@@ -97,6 +118,8 @@ design = struct( ...
     'PlannedSampleRate', 5e6, ...
     'ModulationFamily', 'QPSK', ...
     'ModulationOrder', 4, ...
+    'MessageSource', 'RandomBit', ...
+    'IsDigital', true, ...
     'PayloadLengthBits', 1024, ...
     'NumTransmitAntennas', 1);
 

@@ -16,7 +16,7 @@ execution starts.
 | `RuntimePlan` | `csrd.pipeline.runtime.buildRuntimePlan` | Run-level policies and config fingerprint | Scenario-resolved frame facts |
 | `ScenarioPlan` | `csrd.pipeline.runtime.buildScenarioPlan` | Concrete facts for one scenario | Values re-sampled during frame execution |
 | Execution metadata | RF/channel/receiver blocks | Actual sample-grid and model execution facts | Design guesses used as measured values |
-| Annotation v2 | annotation pipeline | Design, execution, measured truth planes | Silent fallback or unlabeled NaN |
+| Annotation | annotation pipeline | Design, execution, measured truth planes | Silent fallback or unlabeled NaN |
 
 ## Raw Config Authorities
 
@@ -123,5 +123,4 @@ cfg = csrd.runtime.config_loader('csrd2025/csrd2025.m');
 assert(isfield(cfg, 'RuntimePlan'));
 
 run_csrd_ci_smoke('IncludePhase4', false, 'BaselineScenarios', 1)
-run_phase34_boundary_quality_audit('StopOnFailure', true, 'StressCount', 6)
 ```

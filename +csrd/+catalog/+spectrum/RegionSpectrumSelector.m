@@ -17,6 +17,7 @@ classdef RegionSpectrumSelector
             % Inputs: see signature arguments and local validation.
             % Outputs: see signature return values and contract fields.
             regulatory = normalizeRegulatoryConfig(config);
+            regulatory = applyReceiverTuningRange(regulatory, receiverConfig);
             catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load(regulatory.RegionId);
             bands = filterBands(catalog.Bands, regulatory);
             if isempty(bands)
@@ -144,6 +145,41 @@ if isfield(raw, 'MaxBandwidthFractionOfSampleRate') && ...
         raw.MaxBandwidthFractionOfSampleRate <= 1
     regulatory.MaxBandwidthFractionOfSampleRate = raw.MaxBandwidthFractionOfSampleRate;
 end
+
+% Optional per-service transmit power overrides (dBm). When absent the
+% selector uses realistic per-ServiceClass defaults (broadcast towers high,
+% short-range devices low) instead of one flat range for every emitter.
+regulatory.ServicePowerDbm = struct();
+if isfield(raw, 'ServicePowerDbm') && isstruct(raw.ServicePowerDbm)
+    regulatory.ServicePowerDbm = raw.ServicePowerDbm;
+end
+end
+
+
+function regulatory = applyReceiverTuningRange(regulatory, receiverConfig)
+    % applyReceiverTuningRange - Constrain monitoring center to the SDR tuning range.
+    % Inputs: normalized regulatory config, unified receiver config.
+    % Outputs: regulatory config whose RequiredCarrierFrequencyRangeHz is
+    %   intersected with the receiver SDR tuning range, so a band whose
+    %   carrier the radio cannot physically tune to is never selected
+    %   (e.g. an RTL-SDR never monitors a 3.5 GHz NR band).
+    if ~isstruct(receiverConfig) || ~isfield(receiverConfig, 'Sdr') || ...
+            ~isstruct(receiverConfig.Sdr) || ...
+            ~isfield(receiverConfig.Sdr, 'TuningRangeHz')
+        return;
+    end
+    tuning = double(receiverConfig.Sdr.TuningRangeHz);
+    if numel(tuning) ~= 2 || any(~isfinite(tuning)) || tuning(1) >= tuning(2)
+        return;
+    end
+    tuning = reshape(tuning, 1, 2);
+    existing = regulatory.RequiredCarrierFrequencyRangeHz;
+    if isempty(existing)
+        regulatory.RequiredCarrierFrequencyRangeHz = tuning;
+    else
+        regulatory.RequiredCarrierFrequencyRangeHz = ...
+            [max(existing(1), tuning(1)), min(existing(2), tuning(2))];
+    end
 end
 
 
@@ -371,7 +407,8 @@ end
 bw = bwChoices(randi(numel(bwChoices)));
 centerHz = selectCenterInBand(band, bw, receiverPlan);
 family = chooseCellValue(band.AllowedModulationFamilies);
-order = defaultModulationOrder(family);
+order = selectModulationOrder(family, bw);
+powerRange = servicePowerRangeDbm(band.ServiceClass, regulatory);
 
 regTruth = csrd.catalog.spectrum.RegulatoryValidator.emptyRegulatoryTruth();
 regTruth.RegionId = catalog.RegionId;
@@ -397,6 +434,7 @@ plan.CenterOffsetHz = centerHz - receiverPlan.CenterFrequencyHz;
 plan.BandwidthHz = bw;
 plan.ModulationFamily = family;
 plan.ModulationOrder = order;
+plan.PowerDbmRange = powerRange;
 plan.TemporalPattern = band.TemporalPattern;
 plan.Regulatory = regTruth;
 
@@ -528,27 +566,104 @@ value = values{randi(numel(values))};
 end
 
 
-function order = defaultModulationOrder(family)
-    % defaultModulationOrder - Production declaration in CSRD.
-    % Inputs: see signature arguments and local validation.
-    % Outputs: see signature return values and contract fields.
+function order = selectModulationOrder(family, bandwidthHz)
+    % selectModulationOrder - Pick a modulation order feasible for the channel.
+    % Inputs: modulation family, allocated channel bandwidth (Hz).
+    % Outputs: a modulation order from the family-specific choices, capped so
+    %   that narrow channels do not carry implausibly high constellations.
+    %
+    % High-order QAM/PSK need both spectral room and high SNR. A narrowband
+    % land-mobile or SRD channel (a few tens of kHz) physically would not run
+    % 256-QAM, so the upper order is gated by the allocated bandwidth using a
+    % coarse, documented bandwidth->max-order ladder. The order is still drawn
+    % from the family choices via the scenario RNG so runs stay reproducible.
 family = char(string(family));
 switch family
     case {'FM','PM','AM','SSBAM','DSBAM','DSBSCAM','VSBAM'}
         order = 1;
+        return;
     case {'OOK','GMSK','MSK','OQPSK'}
         order = 2 + 2 * strcmp(family, 'OQPSK');
+        return;
     case {'FSK','CPFSK','GFSK'}
         choices = [2, 4];
-        order = choices(randi(numel(choices)));
     case {'PSK'}
         choices = [2, 4, 8];
-        order = choices(randi(numel(choices)));
     case {'QAM','OFDM'}
         choices = [16, 64, 256];
-        order = choices(randi(numel(choices)));
     otherwise
         order = 2;
+        return;
+end
+maxOrder = maxModulationOrderForBandwidth(bandwidthHz);
+feasible = choices(choices <= maxOrder);
+if isempty(feasible)
+    feasible = min(choices); % never drop below the family minimum
+end
+order = feasible(randi(numel(feasible)));
+end
+
+
+function maxOrder = maxModulationOrderForBandwidth(bandwidthHz)
+    % maxModulationOrderForBandwidth - Coarse bandwidth -> max-order ladder.
+    % Inputs: allocated channel bandwidth in Hz.
+    % Outputs: the highest modulation order considered realistic for that
+    %   bandwidth. Thresholds are engineering approximations: very narrow
+    %   voice/data channels stay low order; only wideband channels admit the
+    %   densest constellations.
+bw = double(bandwidthHz);
+if ~isfinite(bw) || bw <= 0
+    maxOrder = 4;
+elseif bw < 50e3        % narrowband voice/data (<50 kHz)
+    maxOrder = 4;
+elseif bw < 200e3       % land-mobile / narrowband data
+    maxOrder = 16;
+elseif bw < 1e6         % wide channels
+    maxOrder = 64;
+else                    % broadband (>= 1 MHz)
+    maxOrder = 256;
+end
+end
+
+
+function range = servicePowerRangeDbm(serviceClass, regulatory)
+    % servicePowerRangeDbm - Transmit power range (dBm) for a service class.
+    % Inputs: catalog ServiceClass string, normalized regulatory config.
+    % Outputs: [minDbm maxDbm] range that the planner samples from.
+    %
+    % Real emitters span a wide power range by role: broadcast towers radiate
+    % far more than handheld land-mobile radios or short-range devices. A
+    % single flat range for every emitter is unrealistic, so power is keyed to
+    % the service class. Defaults can be overridden per class through
+    % config.Regulatory.ServicePowerDbm.<ServiceClass> = [min max].
+name = char(string(serviceClass));
+if isfield(regulatory, 'ServicePowerDbm') && ...
+        isstruct(regulatory.ServicePowerDbm) && ...
+        isfield(regulatory.ServicePowerDbm, name)
+    override = double(regulatory.ServicePowerDbm.(name));
+    if isnumeric(override) && numel(override) == 2 && ...
+            all(isfinite(override)) && override(1) <= override(2)
+        range = reshape(override, 1, 2);
+        return;
+    end
+end
+switch name
+    case 'Broadcast'
+        range = [43, 60];   % FM/AM/TV transmitters (kW-class EIRP)
+    case 'Mobile'
+        range = [37, 49];   % cellular base-station downlink
+    case 'LandMobile'
+        range = [27, 40];   % mobile/handheld trunking radios
+    case 'Aeronautical'
+        range = [30, 44];   % airborne sets to ground stations (VHF AM)
+    case 'Maritime'
+        range = [27, 44];   % handheld 5 W to ship/coast 25 W (VHF FM)
+    case 'ISM'
+        range = [13, 30];   % WLAN/Bluetooth/ISM
+    case 'ShortRangeDevice'
+        range = [0, 14];    % SRD / LPWAN
+    otherwise
+        range = [10, 30];   % conservative legacy fallback
 end
 end
 
@@ -567,6 +682,7 @@ p = struct( ...
     'BandwidthHz', NaN, ...
     'ModulationFamily', '', ...
     'ModulationOrder', NaN, ...
+    'PowerDbmRange', [NaN NaN], ...
     'TemporalPattern', '', ...
     'Regulatory', csrd.catalog.spectrum.RegulatoryValidator.emptyRegulatoryTruth());
 end

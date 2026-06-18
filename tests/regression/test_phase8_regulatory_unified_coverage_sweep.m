@@ -4,7 +4,7 @@ function test_phase8_regulatory_unified_coverage_sweep()
     % This regression runs the public generation entrypoint across a
     % representative regulatory service matrix. It asserts that the chosen
     % frequency, bandwidth, modulation family, source references, and service
-    % metadata in annotation v2 are still traceable to the regional catalog.
+    % metadata in annotation are still traceable to the regional catalog.
 
     fprintf('=== Phase 8 regulatory unified coverage sweep ===\n');
 
@@ -47,7 +47,7 @@ function test_phase8_regulatory_unified_coverage_sweep()
         rng(20260428 + 100 + k, 'twister');
         cfg = localConfig(caseRoot, c, k);
         annotationPath = localRunOneScenario(cfg);
-        result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+        result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
             'RequireSources', true, 'RequireRuntimeHeader', true);
 
         [caseBands, caseServices, caseFamilies, n] = ...

@@ -133,6 +133,26 @@ function segmentConfig = buildSegmentConfigFromTxScenario(txScenario, segIdx)
     else
         segmentConfig.Modulation.TypeID = txScenario.Modulation.TypeID;
     end
+
+    % --- Message source / modulation family binding (fail-fast) ----------
+    % The message source is a deterministic function of the modulation
+    % family: analog families must use the Audio source, digital families
+    % the RandomBit source. Feeding random bits to an analog modulator
+    % produces a physically meaningless waveform, so any upstream regression
+    % that breaks this binding must crash here instead of silently emitting
+    % an inconsistent signal/annotation pair.
+    expectedMessageSource = csrd.support.modulation.messageSourceForModulation( ...
+        segmentConfig.Modulation.TypeID);
+    actualMessageSource = char(string(segmentConfig.Message.TypeID));
+    if ~strcmpi(actualMessageSource, expectedMessageSource)
+        error('CSRD:Construction:MessageSourceModulationMismatch', ...
+            ['buildSegmentConfigFromTxScenario: modulation family ''%s'' ', ...
+             'requires message source ''%s'' but the plan provided ''%s''. ', ...
+             'Analog modulation must use Audio and digital modulation must ', ...
+             'use RandomBit.'], char(string(segmentConfig.Modulation.TypeID)), ...
+            expectedMessageSource, actualMessageSource);
+    end
+
     segmentConfig.Message.Duration = duration;
     segmentConfig.Message.Length = localPerSegmentMessageLength( ...
         txScenario.Message, txScenario.Modulation, duration);

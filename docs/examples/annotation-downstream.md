@@ -1,17 +1,17 @@
-# Annotation V2 Downstream Example
+# Annotation Downstream Example
 
 Status: Phase 7 validated by `run_csrd_downstream_docs_readiness`.
 
-This example shows how a downstream consumer should read a CSRD annotation v2
+This example shows how a downstream consumer should read a CSRD annotation
 file and optionally export a minimal COCO JSON view. It does not run the
 simulator and does not inspect IQ samples.
 
-## Read And Validate Annotation V2
+## Read And Validate Annotation
 
 ```matlab
 addpath(pwd)
 
-reader = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
     'RequireSources', true, ...
     'RequireRuntimeHeader', true);
 
@@ -54,7 +54,7 @@ The COCO converter uses a receiver-frequency canvas:
 - Category names come from `Truth.Design.ModulationFamily`.
 - Bbox center comes from `ReceiverView.ProjectedCenterOffsetHz`.
 - Bbox width comes from `Truth.Measured.SourcePlane.OccupiedBandwidthHz`.
-- Time occupancy remains metadata because annotation v2 does not persist
+- Time occupancy remains metadata because annotation does not persist
   burst start/stop time extents.
 
 Invisible sources are not converted into visible bboxes. They are recorded in
@@ -67,9 +67,9 @@ The repository includes an executable helper:
 ```matlab
 addpath(fullfile(pwd, 'examples'))
 
-summary = read_annotation_v2_downstream(annotationPath, outputJsonPath);
+summary = read_annotation_downstream(annotationPath, outputJsonPath);
 ```
 
 The returned `summary` includes frame/source counts and COCO export counts. It
 is intended as a downstream integration starting point, not as a replacement for
-`readAnnotationV2`.
+`readAnnotation`.

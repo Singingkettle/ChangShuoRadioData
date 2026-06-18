@@ -87,10 +87,37 @@ function unifiedConfig = initializeUnifiedReceiverConfig(obj)
             unifiedConfig.NumAntennas = requirePositiveIntegerScalar( ...
                 rxConfig.NumAntennas, 'Receiver.NumAntennas');
         end
+
+        if isfield(rxConfig, 'Sdr') && isstruct(rxConfig.Sdr) && ...
+                isfield(rxConfig.Sdr, 'Model') && ~isempty(rxConfig.Sdr.Model)
+            unifiedConfig = applySdrProfile(unifiedConfig, rxConfig.Sdr.Model);
+        end
     end
 
     % Calculate observable range from sample rate (baseband: -fs/2 to +fs/2)
     unifiedConfig.ObservableRange = [-unifiedConfig.SampleRate/2, unifiedConfig.SampleRate/2];
+end
+
+function unifiedConfig = applySdrProfile(unifiedConfig, modelId)
+    % applySdrProfile - Constrain the unified receiver to an SDR capability.
+    % Inputs: unified receiver config, SDR model id.
+    % Outputs: unified config capped to the model's IBW and channel count,
+    %   with the capability profile attached for link-budget and annotation.
+    profile = csrd.catalog.receiver.SdrReceiverCatalog.load(modelId);
+    if unifiedConfig.SampleRate > profile.MaxInstantaneousBandwidthHz
+        unifiedConfig.SampleRate = profile.MaxInstantaneousBandwidthHz;
+    end
+    if unifiedConfig.NumAntennas > profile.NumChannels
+        unifiedConfig.NumAntennas = profile.NumChannels;
+    end
+    unifiedConfig.Sdr = struct( ...
+        'Model', profile.Model, ...
+        'Manufacturer', profile.Manufacturer, ...
+        'TuningRangeHz', profile.TuningRangeHz, ...
+        'MaxInstantaneousBandwidthHz', profile.MaxInstantaneousBandwidthHz, ...
+        'AdcBits', profile.AdcBits, ...
+        'NoiseFigureDb', profile.NoiseFigureDb, ...
+        'NumChannels', profile.NumChannels);
 end
 
 function value = requirePositiveScalar(value, fieldName)

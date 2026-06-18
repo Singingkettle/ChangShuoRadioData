@@ -54,7 +54,7 @@ for m = 1:numel(matFiles)
     end
 
     loaded = load(dataPath, 'scenarioData');
-    result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+    result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
         'RequireSources', true, 'RequireRuntimeHeader', true);
     frameCells = localFrameCells(loaded.scenarioData);
 
@@ -263,7 +263,7 @@ colormap turbo;
 colorbar;
 xlabel('Time (s)');
 ylabel('Frequency offset (MHz)');
-title('CSRD received IQ spectrogram with annotation v2 time-frequency boxes');
+title('CSRD received IQ spectrogram with annotation time-frequency boxes');
 hold on;
 
 rectCount = 0;

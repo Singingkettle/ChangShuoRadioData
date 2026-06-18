@@ -37,7 +37,7 @@ function test_phase8_regulatory_region_matrix_smoke()
         rng(20260428 + k, 'twister');
         cfg = localConfig(projectRoot, caseRoot, cases(k), k);
         annotationPath = localRunOneScenario(cfg);
-        result = csrd.pipeline.annotation.readAnnotationV2(annotationPath, ...
+        result = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
             'RequireSources', true, 'RequireRuntimeHeader', true);
         localAssertCase(result.Sources, cases(k));
     end

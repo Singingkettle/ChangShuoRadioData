@@ -15,7 +15,7 @@ The active architecture after the latest refactoring is:
   Tx/Rx plans, and the communication schedule.
 - Frame execution follows the frozen `ScenarioPlan`. Scenario-level facts must
   not be re-sampled inside the frame loop.
-- Annotation v2 separates `Truth.Design` from `ScenarioPlan`,
+- Annotation separates `Truth.Design` from `ScenarioPlan`,
   `Truth.Execution` from actual sample-grid insertion and channel/RF execution,
   and `Truth.Measured` from post-generation measurements.
 
@@ -44,7 +44,7 @@ facts must come from `RuntimePlan` policies or from the per-scenario
 1. [`../README.md`](../README.md)
 2. [`configuration.md`](configuration.md)
 3. [`architecture/source-layout.md`](architecture/source-layout.md)
-4. [`annotation-v2-schema.md`](annotation-v2-schema.md)
+4. [`annotation-schema.md`](annotation-schema.md)
 5. [`audits/manual-full-code-review-guide.md`](audits/manual-full-code-review-guide.md)
 
 ## Validation Pointers
@@ -53,12 +53,11 @@ High-signal checks before review:
 
 ```matlab
 run_csrd_ci_smoke('IncludePhase4', false, 'BaselineScenarios', 1)
-run_phase34_boundary_quality_audit('StopOnFailure', true, 'StressCount', 6)
 runtests({'RunPlanPolicyOnlyTest','ScenarioPlanBuildTest','ScenarioPlanFrozenBeforeFrameExecutionTest'})
 ```
 
 For OSM/RayTracing risks, cover both empty/flat and building-present paths.
-For annotation risks, check `BuildSourceAnnotationV2Test`,
+For annotation risks, check `BuildSourceAnnotationTest`,
 `MeasurementCompletenessHookTest`, and `ScenarioPlanAnnotationContractTest`.
 
 ## Historical Trail

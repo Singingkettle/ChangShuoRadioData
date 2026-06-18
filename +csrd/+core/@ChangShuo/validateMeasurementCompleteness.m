@@ -72,7 +72,7 @@ function validateMeasurementCompleteness(annotation)
     %   The walker is robust to the variation between cell-array vs
     %   struct-array vs single-frame-flattened layouts that
     %   jsonencode / stampRuntimeHeader / per-receiver wrapping can
-    %   produce, mirroring the BuildSourceAnnotationV2Test recursive
+    %   produce, mirroring the BuildSourceAnnotationTest recursive
     %   locate strategy.
 
     if nargin < 1 || isempty(annotation)
