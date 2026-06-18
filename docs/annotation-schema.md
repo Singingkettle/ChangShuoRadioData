@@ -91,11 +91,20 @@ Legacy v1 top-level fields are forbidden: `Realized`, `Planned`, `Temporal`,
 | `PlannedSampleRate` | Hz | Planned sample rate |
 | `ModulationFamily` | text | Design category, used by downstream classifiers |
 | `ModulationOrder` | scalar | Modulation order when applicable |
+| `MessageSource` | text | Baseband source: `Audio` (analog) or `RandomBit` (digital) |
+| `IsDigital` | logical | Whether the modulation family is digital |
 | `PayloadLengthBits` | bits | Planned payload length |
 | `NumTransmitAntennas` | count | Planned transmit antenna count |
 
 `Truth.Design.ModulationFamily` is the class label source for COCO conversion.
 It is not inferred from IQ.
+
+The message source is a deterministic function of the modulation family, not a
+free choice: analog families (FM/PM/AM variants) are driven by `Audio`, digital
+families (PSK/QAM/FSK/...) by `RandomBit`. The reader rejects any annotation
+whose `MessageSource`/`IsDigital` disagree with `ModulationFamily`
+(`CSRD:Annotation:MessageSourceModulationMismatch` /
+`CSRD:Annotation:IsDigitalModulationMismatch`).
 
 ## Truth.Execution
 
