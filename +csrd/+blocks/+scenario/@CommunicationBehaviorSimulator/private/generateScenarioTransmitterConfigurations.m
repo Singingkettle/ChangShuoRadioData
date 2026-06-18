@@ -910,6 +910,15 @@ function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
                 'Unsupported TemporalBehavior pattern type "%s".', ...
                 char(string(selectedType)));
     end
+
+    % Guarantee at least one active interval inside the observation window.
+    % generateBurst/Scheduled/Random return the [0, 0] no-activity sentinel
+    % for very short observations; without a fallback a planned transmitter
+    % would silently emit an all-idle (zero-source) scenario.
+    if isempty(pattern.Intervals) || ...
+            (size(pattern.Intervals, 1) == 1 && all(pattern.Intervals(1, :) == 0))
+        pattern.Intervals = [0, temporalParams.ObservationDuration];
+    end
 end
 
 function intervals = selectExplicitIntervals(explicitParams, txIndex, observationDuration)

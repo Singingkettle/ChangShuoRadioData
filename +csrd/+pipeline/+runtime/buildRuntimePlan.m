@@ -16,6 +16,7 @@ if ~isfield(config, 'Factories') || ~isstruct(config.Factories)
         'Factories config is required to build RuntimePlan.');
 end
 localRejectDeprecatedRawFields(config);
+config = localCapReceiverToSdr(config);
 
 framePolicy = localBuildFramePolicy(config.Factories);
 loggingPlan = localBuildLoggingPlan(config);
@@ -97,6 +98,36 @@ if localHasFieldRecursive(config.Factories, 'SegmentID')
     error('CSRD:RuntimePlan:DeprecatedRawField', ...
         'SegmentID is forbidden in raw configuration; use SegmentId.');
 end
+end
+
+function config = localCapReceiverToSdr(config)
+    % localCapReceiverToSdr - Cap the receiver authority to the SDR capability.
+    % Inputs: full config struct.
+    % Outputs: config whose CommunicationBehavior.Receiver SampleRate and
+    %   NumAntennas are capped to the selected SDR model's instantaneous
+    %   bandwidth and channel count. This must happen before the frame
+    %   contract and the scenario plan read the receiver sample rate, so the
+    %   planned frame shape matches the rate actually used at generation time.
+    if ~isfield(config.Factories, 'Scenario') || ...
+            ~isfield(config.Factories.Scenario, 'CommunicationBehavior') || ...
+            ~isfield(config.Factories.Scenario.CommunicationBehavior, 'Receiver')
+        return;
+    end
+    rx = config.Factories.Scenario.CommunicationBehavior.Receiver;
+    if ~isfield(rx, 'Sdr') || ~isstruct(rx.Sdr) || ...
+            ~isfield(rx.Sdr, 'Model') || isempty(rx.Sdr.Model)
+        return;
+    end
+    profile = csrd.catalog.receiver.SdrReceiverCatalog.load(rx.Sdr.Model);
+    if isfield(rx, 'SampleRate') && ~isempty(rx.SampleRate) && ...
+            rx.SampleRate > profile.MaxInstantaneousBandwidthHz
+        rx.SampleRate = profile.MaxInstantaneousBandwidthHz;
+    end
+    if isfield(rx, 'NumAntennas') && ~isempty(rx.NumAntennas) && ...
+            rx.NumAntennas > profile.NumChannels
+        rx.NumAntennas = profile.NumChannels;
+    end
+    config.Factories.Scenario.CommunicationBehavior.Receiver = rx;
 end
 
 function loggingPlan = localBuildLoggingPlan(config)
