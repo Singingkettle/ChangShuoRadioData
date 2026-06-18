@@ -155,6 +155,11 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %   - Vestigial portion prevents spectral overlap
             %   - Asymmetric spectrum around carrier frequency
 
+            % Normalize to a column vector. The frequency axis and vestigial
+            % filter are built as columns, so a row-vector message (which short
+            % segments can produce) would broadcast the spectrum product into an
+            % N-by-N matrix and break the final complex() assembly.
+            messageSignal = messageSignal(:);
             samplesPerFrame = length(messageSignal);
 
             % Generate frequency axis for FFT analysis

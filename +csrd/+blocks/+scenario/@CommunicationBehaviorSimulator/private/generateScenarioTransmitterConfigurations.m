@@ -455,7 +455,17 @@ function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulatio
             'Transmitter.NumAntennas range [%g, %g] is incompatible with supported range [1, 4].', ...
             minAnt, maxAnt);
     end
-    numAntennas = randi([minAllowed, maxAllowed]);
+    % Draw only from valid antenna bins ([1 2 4 8 16]); a raw integer range
+    % would yield non-bin counts (e.g. 3) that the blueprint validator rejects,
+    % wasting resample attempts and intermittently failing high-Tx scenarios.
+    antennaBins = [1 2 4 8 16];
+    candidates = antennaBins(antennaBins >= minAllowed & antennaBins <= maxAllowed);
+    if isempty(candidates)
+        error('CSRD:Scenario:InvalidTxAntennaRange', ...
+            ['Transmitter.NumAntennas range [%g, %g] contains no valid antenna ', ...
+             'bin from [1 2 4 8 16].'], minAnt, maxAnt);
+    end
+    numAntennas = candidates(randi(numel(candidates)));
 end
 
 function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
