@@ -35,6 +35,8 @@ addParameter(p, 'Regions', {}, @iscell);
 addParameter(p, 'Seed', 20260620, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'ReceiverSampleRate', 50e6, @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'Verbose', false, @(x) islogical(x) || isnumeric(x));
+addParameter(p, 'MaxBandsPerRegion', inf, @(x) isnumeric(x) && isscalar(x) && x >= 1);
+addParameter(p, 'ForceSdr', '', @(x) ischar(x) || isstring(x));
 parse(p, varargin{:});
 opt = p.Results;
 
@@ -66,9 +68,11 @@ seed = double(opt.Seed);
 for r = 1:numel(regions)
     region = regions{r};
     catalog = csrd.catalog.spectrum.RegionSpectrumCatalog.load(region);
-    for b = 1:numel(catalog.Bands)
+    bandCount = min(numel(catalog.Bands), opt.MaxBandsPerRegion);
+    for b = 1:bandCount
         band = catalog.Bands(b);
-        sdrModel = localPickSdr(band, sdrProfiles, opt.ReceiverSampleRate);
+        sdrModel = localResolveSdr(band, sdrProfiles, ...
+            opt.ReceiverSampleRate, char(opt.ForceSdr));
         for c = 1:numel(opt.ChannelModels)
             channelModel = opt.ChannelModels{c};
             for s = 1:opt.ScenariosPerCell
@@ -211,27 +215,52 @@ end
 end
 
 
+function model = localResolveSdr(band, sdrProfiles, requestedSampleRate, forceSdr)
+% localResolveSdr - Auto-pick a compatible SDR, or validate a forced model.
+% A forced model that cannot host the band yields '' (reported NoCompatibleSdr)
+% rather than a spurious failure, so per-SDR sweeps skip out-of-range bands.
+if isempty(forceSdr)
+    model = localPickSdr(band, sdrProfiles, requestedSampleRate);
+    return;
+end
+model = '';
+prof = localFindProfile(sdrProfiles, forceSdr);
+if ~isempty(prof) && localSdrHostsBand(prof, band, requestedSampleRate)
+    model = prof.Model;
+end
+end
+
+
 function model = localPickSdr(band, sdrProfiles, requestedSampleRate)
 % localPickSdr - First SDR whose tuning range and IBW can host the band.
 model = '';
-rangeHz = band.FrequencyRangeHz;
-minBw = inf;
-for k = 1:numel(band.RecommendedBandwidthsHz)
-    minBw = min(minBw, double(band.RecommendedBandwidthsHz{k}));
-end
 % Prefer wideband general-purpose models first.
 order = {'USRP_B210', 'USRP_N310', 'USRP_X410', 'BladeRF_2', ...
     'HackRF_One', 'Airspy_R2', 'SDRplay_RSPdx', 'RTL_SDR'};
 for o = 1:numel(order)
     prof = localFindProfile(sdrProfiles, order{o});
     if isempty(prof); continue; end
-    tune = prof.TuningRangeHz;
-    if rangeHz(1) < tune(1) || rangeHz(2) > tune(2); continue; end
-    ibw = min(requestedSampleRate, prof.MaxInstantaneousBandwidthHz);
-    if ibw * 0.8 < minBw; continue; end  % cannot fit the narrowest channel
-    model = prof.Model;
-    return;
+    if localSdrHostsBand(prof, band, requestedSampleRate)
+        model = prof.Model;
+        return;
+    end
 end
+end
+
+
+function tf = localSdrHostsBand(prof, band, requestedSampleRate)
+% localSdrHostsBand - True when the SDR tuning range and IBW can host the band.
+tf = false;
+rangeHz = band.FrequencyRangeHz;
+tune = prof.TuningRangeHz;
+if rangeHz(1) < tune(1) || rangeHz(2) > tune(2); return; end
+minBw = inf;
+for k = 1:numel(band.RecommendedBandwidthsHz)
+    minBw = min(minBw, double(band.RecommendedBandwidthsHz{k}));
+end
+ibw = min(requestedSampleRate, prof.MaxInstantaneousBandwidthHz);
+if ibw * 0.8 < minBw; return; end  % cannot fit the narrowest channel
+tf = true;
 end
 
 

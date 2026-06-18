@@ -15,6 +15,7 @@ addpath(fullfile(projectRoot, 'tests'));
 addpath(fullfile(projectRoot, 'tests', 'regression'));
 addpath(fullfile(projectRoot, 'tools', 'ci'));
 addpath(fullfile(projectRoot, 'tools', 'phase5'));
+addpath(fullfile(projectRoot, 'tools', 'coverage'));
 
 fprintf('=== CSRD CI smoke ===\n');
 fprintf('Project root: %s\n', projectRoot);
@@ -34,6 +35,11 @@ else
     fprintf('  Phase 4 curated suite ... SKIP\n');
 end
 
+fprintf('  Generation coverage smoke ...\n');
+coverage = run_csrd_coverage_smoke();
+assert(coverage.Success, 'CSRD:CI:CoverageSmokeFailed', ...
+    'Multi-region generation coverage smoke failed.');
+
 fprintf('  Phase 5 MC wrapper smoke ...\n');
 baselinePath = run_phase5_mc_validation(p.Results.BaselineScenarios, ...
     'Mode', 'smoke');
@@ -41,6 +47,7 @@ baselinePath = run_phase5_mc_validation(p.Results.BaselineScenarios, ...
 results = struct( ...
     'Success', true, ...
     'Phase4', phase4, ...
+    'Coverage', coverage, ...
     'BaselinePath', baselinePath, ...
     'BaselineScenarios', double(p.Results.BaselineScenarios));
 
