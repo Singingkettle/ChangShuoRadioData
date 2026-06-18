@@ -141,7 +141,7 @@ classdef DSBSCAM < csrd.blocks.physical.modulate.BaseModulator
 
             % Calculate DSB-SC AM bandwidth
             % Bandwidth is twice the message signal bandwidth due to double sideband transmission
-            messageBandwidth = obw(messageSignal, obj.SampleRate);
+            messageBandwidth = csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate);
             bandWidth = 2 * messageBandwidth;
 
         end

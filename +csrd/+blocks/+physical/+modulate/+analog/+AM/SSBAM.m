@@ -148,7 +148,7 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %   [signal, bw] = obj.baseModulator(messageSignal);
 
             % Calculate message signal bandwidth for spectrum planning.
-            messageBandwidth = obw(messageSignal, obj.SampleRate);
+            messageBandwidth = csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate);
 
             % Generate complex envelope based on sideband selection mode.
             if strcmp(obj.ModulatorConfig.mode, 'upper')

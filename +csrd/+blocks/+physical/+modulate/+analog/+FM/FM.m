@@ -108,7 +108,7 @@ classdef FM < csrd.blocks.physical.modulate.BaseModulator
             modulatedSignal = exp(1j * instantaneousPhase);
 
             % Calculate occupied bandwidth of the modulated signal
-            bandWidth = obw(modulatedSignal, obj.SampleRate);
+            bandWidth = csrd.support.modulation.occupiedBandwidthHz(modulatedSignal, obj.SampleRate);
 
         end
 

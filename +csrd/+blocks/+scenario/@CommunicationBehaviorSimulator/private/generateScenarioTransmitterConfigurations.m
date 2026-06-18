@@ -532,9 +532,15 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     modConfig.RolloffFactor = rolloffFactor;
     modConfig.OFDMMimoMode = modParams.OFDMMimoMode;
     
-    % Calculate symbol rate from bandwidth
-    modConfig.SymbolRate = bandwidth / (1 + rolloffFactor);
-    
+    % Calculate symbol rate from bandwidth, then snap it to an integer
+    % submultiple of the receiver sample rate. This keeps the Tx RF chain's
+    % modulator->receiver resample ratio a small, exact rational (the
+    % regulatory path achieves the same implicitly through discrete catalog
+    % bandwidths; the legacy continuous-bandwidth path would otherwise yield
+    % an intractable rational and fail in TRFSimulator.resampleToTarget).
+    modConfig.SymbolRate = snapSymbolRateToReceiverGrid(obj, ...
+        bandwidth / (1 + rolloffFactor));
+
     % Get samples per symbol
     if isstruct(modParams.SamplesPerSymbol)
         spsMin = modParams.SamplesPerSymbol.Min;
@@ -562,6 +568,16 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     
     obj.logger.debug('Scenario: Modulation %s, Order %d, SymbolRate %.2f kHz', ...
         modConfig.Type, modConfig.Order, modConfig.SymbolRate / 1e3);
+end
+
+function symbolRate = snapSymbolRateToReceiverGrid(obj, rawSymbolRate)
+    % snapSymbolRateToReceiverGrid - Snap symbol rate to a receiver submultiple.
+    % Inputs: communication simulator, raw symbol rate (Hz).
+    % Outputs: nearest symbol rate of the form ReceiverSampleRate / integer, so
+    %   the modulator-to-receiver resample ratio stays a small exact rational.
+    receiverRate = obj.unifiedReceiverConfig.SampleRate;
+    divisor = max(1, round(receiverRate / rawSymbolRate));
+    symbolRate = receiverRate / divisor;
 end
 
 function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
