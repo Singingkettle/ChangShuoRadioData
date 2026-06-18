@@ -580,6 +580,24 @@ function symbolRate = snapSymbolRateToReceiverGrid(obj, rawSymbolRate)
     symbolRate = receiverRate / divisor;
 end
 
+function symbolRate = snapNarrowSymbolRateToReceiverGrid(obj, rawSymbolRate)
+    % snapNarrowSymbolRateToReceiverGrid - Snap only narrow rates to the grid.
+    % Inputs: communication simulator, raw symbol rate (Hz).
+    % Outputs: for narrow channels (receiver-submultiple divisor >= 50, i.e. a
+    %   bandwidth distortion under ~2%), the nearest exact ReceiverSampleRate /
+    %   integer; wider channels are returned unchanged so the regulatory
+    %   catalog bandwidth is preserved exactly. Narrow odd channels such as the
+    %   8.33 kHz airband otherwise produce an intractable modulator-to-receiver
+    %   resample ratio in TRFSimulator.
+    receiverRate = obj.unifiedReceiverConfig.SampleRate;
+    divisor = max(1, round(receiverRate / rawSymbolRate));
+    if divisor >= 50
+        symbolRate = receiverRate / divisor;
+    else
+        symbolRate = rawSymbolRate;
+    end
+end
+
 function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
     % generateRegulatoryModulationConfig - Generate modulation config from a
     % Inputs: see signature arguments and local validation.
@@ -591,7 +609,13 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
     modConfig.Order = double(emitterPlan.ModulationOrder);
     modConfig.RolloffFactor = modParams.RolloffFactor;
     modConfig.OFDMMimoMode = modParams.OFDMMimoMode;
-    modConfig.SymbolRate = bandwidth / (1 + modParams.RolloffFactor);
+    % Narrow channels (e.g. 8.33 kHz airband) whose rate shares no factors with
+    % the receiver rate would yield an intractable modulator->receiver resample
+    % ratio in TRFSimulator. Snap only narrow rates onto an exact receiver
+    % submultiple (sub-2% bandwidth shift); wide channels keep their exact
+    % catalog bandwidth.
+    modConfig.SymbolRate = snapNarrowSymbolRateToReceiverGrid(obj, ...
+        bandwidth / (1 + modParams.RolloffFactor));
     if isstruct(modParams.SamplesPerSymbol)
         spsMin = modParams.SamplesPerSymbol.Min;
         spsMax = modParams.SamplesPerSymbol.Max;
