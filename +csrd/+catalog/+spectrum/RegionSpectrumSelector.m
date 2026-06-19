@@ -36,6 +36,14 @@ classdef RegionSpectrumSelector
                     regulatory.RegionId, regulatory.ServiceTier, range(1), range(2));
             end
 
+            bands = filterBandsByIbwServiceability(bands, sampleRateHz, regulatory);
+            if isempty(bands)
+                error('CSRD:Spectrum:NoServiceableBands', ...
+                    ['No regulatory bands in region %s have a channel that fits the ', ...
+                    'receiver instantaneous bandwidth %.0f Hz; the SDR is too narrow ', ...
+                    'for this region''s services.'], regulatory.RegionId, sampleRateHz);
+            end
+
             anchor = selectMonitoringAnchor(bands, regulatory);
             monitoringCenterHz = selectMonitoringCenter(anchor, sampleRateHz, regulatory);
             receiverPlan = struct( ...
@@ -253,6 +261,32 @@ if isfield(regulatory.MonitoringBand, 'FixedBandId') && ...
             ['Fixed monitoring BandId "%s" cannot place receiver carrier ', ...
             'in [%.0f, %.0f] Hz required by the current channel model.'], ...
             fixedId, supportedRange(1), supportedRange(2));
+    end
+end
+
+bands = bands(keep);
+end
+
+
+function bands = filterBandsByIbwServiceability(bands, sampleRateHz, regulatory)
+    % filterBandsByIbwServiceability - Keep bands with a channel that fits the IBW.
+    % A band whose narrowest channel exceeds the receiver instantaneous bandwidth
+    % cannot be served by this SDR. Dropping it stops a narrow-IBW SDR from
+    % selecting a monitoring band it cannot capture, which would otherwise fail
+    % emitter placement (CSRD:Spectrum:NoVisibleServiceBands) in mixed-service mode.
+keep = false(size(bands));
+for k = 1:numel(bands)
+    keep(k) = ~isempty(usableBandwidths(bands(k), sampleRateHz, regulatory));
+end
+
+if isfield(regulatory.MonitoringBand, 'FixedBandId') && ...
+        ~isempty(regulatory.MonitoringBand.FixedBandId)
+    fixedId = char(string(regulatory.MonitoringBand.FixedBandId));
+    fixedIdx = find(strcmpi({bands.BandId}, fixedId), 1, 'first');
+    if ~isempty(fixedIdx) && ~keep(fixedIdx)
+        error('CSRD:Spectrum:MonitoringBandNotServiceable', ...
+            ['Fixed monitoring BandId "%s" has no channel that fits the receiver ', ...
+            'instantaneous bandwidth %.0f Hz.'], fixedId, sampleRateHz);
     end
 end
 
