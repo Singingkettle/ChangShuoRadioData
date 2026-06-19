@@ -344,6 +344,15 @@ classdef ChannelFactory < matlab.System
 
             if isKey(obj.cachedChannelBlock, cacheKey)
                 block = obj.cachedChannelBlock(cacheKey);
+                % A cached block is locked after its first frame step. Release it
+                % so the per-frame geometry update (Distance, antenna counts,
+                % burst Seed) can write these non-tunable properties; without
+                % this, a moving entity on a fading channel crashes on frame 2
+                % ("cannot change non-tunable property Distance"). The
+                % burst-derived Seed keeps the fading realisation deterministic.
+                if isa(block, 'matlab.System') && isLocked(block)
+                    release(block);
+                end
                 return;
             end
 
