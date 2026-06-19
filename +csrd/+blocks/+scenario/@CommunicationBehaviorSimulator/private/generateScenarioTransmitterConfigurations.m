@@ -843,6 +843,14 @@ function order = selectModulationOrder(modType, modParams)
                 orders = [2, 4, 8];
             case {'GMSK', 'MSK', 'OOK'}
                 orders = 2;
+            case {'APSK', 'DVBSAPSK'}
+                orders = [16, 32, 64, 128, 256];  % ring constellations need >= 16
+            case 'Mill88QAM'
+                orders = [16, 32, 64, 256];
+            case 'OTFS'
+                orders = [4, 16, 64];  % inner QAM/PSK order
+            case {'ASK', 'PAM', 'SCFDMA'}
+                orders = [4, 8, 16, 32, 64];
             case {'FM', 'PM', 'AM', 'SSBAM', 'DSBAM', 'DSBSCAM', 'VSBAM'}
                 orders = 1;  % Analog: Order not used, but set to 1
             otherwise

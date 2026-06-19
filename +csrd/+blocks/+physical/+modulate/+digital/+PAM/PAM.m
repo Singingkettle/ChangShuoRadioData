@@ -58,12 +58,8 @@ classdef PAM < csrd.blocks.physical.modulate.BaseModulator
     %
     % See also: csrd.blocks.physical.modulate.BaseModulator, pammod, rcosdesign
 
-    properties
-        % SamplePerSymbol - Number of samples per symbol for pulse shaping
-        % Type: positive real scalar, Default: 2
-        % Note: Lower values provide computational efficiency but reduce filtering
-        SamplePerSymbol (1, 1) {mustBePositive, mustBeReal} = 2
-    end
+    % SamplePerSymbol is inherited from BaseModulator; do not redeclare it
+    % (a duplicate property declaration makes the class fail to load).
 
     properties (Access = protected)
         % filterCoeffs - Pulse shaping filter coefficients
