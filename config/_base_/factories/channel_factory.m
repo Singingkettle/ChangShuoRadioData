@@ -22,7 +22,7 @@ function config = channel_factory()
     % Rician Fading Channel
     config.Factories.Channel.ChannelModels.Rician.handle = 'csrd.blocks.physical.channel.MIMO';
     config.Factories.Channel.ChannelModels.Rician.Config.FadingDistribution = 'Rician';
-    config.Factories.Channel.ChannelModels.Rician.Config.KFactor = 10; % dB
+    config.Factories.Channel.ChannelModels.Rician.Config.KFactor = 10; % linear LOS/diffuse power ratio (> 0); comm.MIMOChannel uses linear, not dB
     config.Factories.Channel.ChannelModels.Rician.Config.MaximumDopplerShift = 50; % Hz
     config.Factories.Channel.ChannelModels.Rician.Config.PathDelays = [0, 1e-6]; % seconds
     config.Factories.Channel.ChannelModels.Rician.Config.AveragePathGains = [0, -3]; % dB
