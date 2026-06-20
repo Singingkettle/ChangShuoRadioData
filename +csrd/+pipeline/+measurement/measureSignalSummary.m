@@ -208,6 +208,21 @@ powerPerWindow = mean(powerMatrix, 1).';
 
 peakPower = max(powerPerWindow);
 if peakPower <= 0
+    % Every analyzed full window is silent. floor() drops the trailing
+    % partial window, so a burst sitting entirely in that tail would
+    % otherwise report TimeOccupancy=0 for a signal that clearly carries
+    % energy (mirrors the OBW whole-signal fallback). Report it as one
+    % active tail window instead of zeroing occupancy.
+    if sum(abs(double(signalCol)) .^ 2) > 0
+        info = struct( ...
+            'TimeOccupancy', 1 / (numWindows + 1), ...
+            'NumBursts', 1, ...
+            'BurstStartSec', (numWindows * windowSamples) / sampleRate, ...
+            'BurstStopSec', length(signalCol) / sampleRate, ...
+            'WindowSec', options.WindowSec, ...
+            'ThresholdDb', options.ThresholdDb);
+        return;
+    end
     info = localEmptyEnvelope(options);
     return;
 end

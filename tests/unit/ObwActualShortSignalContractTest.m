@@ -50,19 +50,46 @@ classdef ObwActualShortSignalContractTest < matlab.unittest.TestCase
                 'RelTol', 1e-9);
         end
 
+        function lateFrameTailBurstReportsPositiveTimeOccupancy(testCase)
+            % Regression (envelope twin of the OBW tail-discard bug): the
+            % per-window envelope used floor() window counting and discarded
+            % the trailing partial window, so a burst entirely in the frame
+            % tail reported TimeOccupancy=0 -- a live signal labelled "never
+            % on", internally contradicting a positive OccupiedBandwidthHz.
+            fs = 2.4e6;
+            rng(32000767, 'twister');
+            N = 21284; burstLen = 164;   % < windowSamples (240) -> in discarded tail
+            signal = complex(zeros(N, 1));
+            symbols = randi([0, 3], burstLen, 1);
+            signal(N - burstLen + 1:N) = exp(1j * 2 * pi * symbols / 4);
+
+            summary = csrd.pipeline.measurement.measureSignalSummary( ...
+                signal, fs, fs);
+            env = csrd.pipeline.measurement.detectBurstEnvelope(signal, fs);
+
+            % OBW says the signal is present; TimeOccupancy must agree (> 0).
+            testCase.verifyGreaterThan(summary.OccupiedBandwidthHz, 0);
+            testCase.verifyGreaterThan(summary.TimeOccupancy, 0);
+            testCase.verifyGreaterThan(env.TimeOccupancy, 0);
+        end
+
         function allZeroLongSignalStillReportsZero(testCase)
-            % The fallback must not manufacture bandwidth out of a genuinely
-            % silent buffer: an all-zero long signal still reports 0 Hz
-            % (the caller classifies it as NoSignal upstream).
+            % The fallback must not manufacture bandwidth or occupancy out of
+            % a genuinely silent buffer: an all-zero long signal still reports
+            % 0 Hz and 0 occupancy (the caller classifies it NoSignal upstream).
             fs = 2.4e6;
             signal = complex(zeros(20000, 1));
 
             bwActual = csrd.pipeline.measurement.obwActual(signal, fs);
             summary = csrd.pipeline.measurement.measureSignalSummary( ...
                 signal, fs, fs);
+            env = csrd.pipeline.measurement.detectBurstEnvelope(signal, fs);
 
             testCase.verifyEqual(bwActual, 0);
             testCase.verifyEqual(summary.OccupiedBandwidthHz, 0);
+            testCase.verifyEqual(summary.TimeOccupancy, 0);
+            testCase.verifyEqual(env.TimeOccupancy, 0);
+            testCase.verifyEqual(env.NumBursts, 0);
         end
 
     end

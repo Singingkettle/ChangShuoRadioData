@@ -350,8 +350,16 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane.FrequencyOccupancy   = NaN;
     sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
 
+    % Liveness is energy-based, not sample-count-based: an empty channel
+    % output (e.g. a link with no propagation paths) is zero-padded to the
+    % frame length by gateToDuration, producing a non-empty all-zero buffer
+    % with FrameSampleCount>0. Such a silent buffer must be classified
+    % NoSignal (occupied bandwidth legitimately measures 0), not a live
+    % signal -- otherwise the downstream requirePositiveMeasurement would
+    % reject the valid 0 and drop the whole frame.
     hasSignal = ~isempty(isolatedSignal) && size(isolatedSignal, 1) > 0 && ...
-        getFieldOrDefault(comp, 'FrameSampleCount', size(isolatedSignal, 1)) > 0;
+        getFieldOrDefault(comp, 'FrameSampleCount', size(isolatedSignal, 1)) > 0 && ...
+        any(abs(double(isolatedSignal(:))) > 0);
     if ~hasSignal
         sourcePlane.MeasurementStatus = 'NoSignal';
     else
@@ -421,6 +429,15 @@ function fp = computeFramePlaneCache(combinedSignal, sampleRate, observableBwHz)
     end
 
     sig = combinedSignal.Signal;
+    % Energy-based liveness (see buildMeasuredTruth): if every live-by-count
+    % component contributed only zero-padding (e.g. empty channel outputs),
+    % the combined buffer is silent and its occupied bandwidth legitimately
+    % measures 0. Classify it NoSignal rather than letting OBW=0 trip the
+    % requirePositiveMeasurement assertion and drop the frame.
+    if ~any(abs(double(sig(:))) > 0)
+        fp.MeasurementStatus = 'NoSignal';
+        return;
+    end
     fp.MeasurementStatus = 'Measured';
     % Phase 21: one summary call replaces three independent measurement
     % passes. Legacy visibility markers CSRD:Measurement:FrameCenterFrequencyFailed

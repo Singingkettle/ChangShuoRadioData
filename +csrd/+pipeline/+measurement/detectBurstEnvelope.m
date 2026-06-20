@@ -92,6 +92,20 @@ function info = detectBurstEnvelope(signal, sampleRate, options)
 
     peakPower = max(powerPerWindow);
     if peakPower <= 0
+        % Every analyzed full window is silent. floor() drops the trailing
+        % partial window, so a burst sitting entirely in that tail would
+        % otherwise report TimeOccupancy=0 for a signal that clearly carries
+        % energy. Report it as one active tail window instead of zeroing.
+        if sum(abs(double(signalCol)) .^ 2) > 0
+            info = struct( ...
+                'TimeOccupancy', 1 / (numWindows + 1), ...
+                'NumBursts',     1, ...
+                'BurstStartSec', (numWindows * windowSamples) / double(sampleRate), ...
+                'BurstStopSec',  length(signalCol) / double(sampleRate), ...
+                'WindowSec',     options.WindowSec, ...
+                'ThresholdDb',   options.ThresholdDb);
+            return;
+        end
         info = makeEmptyInfo(options);
         return;
     end
