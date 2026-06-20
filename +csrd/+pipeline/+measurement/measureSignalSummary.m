@@ -83,6 +83,17 @@ else
     fAxis = fAxis(:);
 end
 
+% pwelch (Welch's method) discards the trailing partial segment of the
+% signal. A short burst that sits entirely in that discarded tail yields an
+% all-zero windowed estimate even though the signal carries energy, which
+% would mis-measure the occupied bandwidth as zero. Fall back to a
+% whole-signal periodogram so every sample (including a late frame-tail
+% burst) is counted.
+if (isempty(spec) || sum(spec) <= 0) && sum(abs(double(signalCol)) .^ 2) > 0
+    spec = abs(fftshift(fft(double(signalCol)))) .^ 2;
+    fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
+end
+
 if isempty(spec) || sum(spec) <= 0
     bwHz = 0;
     return;
