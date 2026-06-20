@@ -388,7 +388,15 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
                     numTxAntennas, obj.NumTransmitAntennas);
             end
 
-            % Apply path loss attenuation
+            % Apply path loss attenuation. PathLoss is recomputed here from the
+            % CURRENT Distance: ChannelFactory updates Distance per frame, but
+            % PathLoss is otherwise derived only once in the constructor (from
+            % the default Distance = 1 m). Without this refresh every fading
+            % link would be attenuated by the 1 m path loss regardless of the
+            % real Tx-Rx separation, so the realised attenuation would not match
+            % the distance-based AppliedPathLoss/ComputedSNR recorded in the
+            % annotation (generated signal != annotation).
+            obj.PathLoss = obj.genPathLoss;
             % Convert dB to linear scale: 10^(dB/20) for amplitude scaling
             pathLossLinear = 10 ^ (obj.PathLoss / 20);
             attenuatedSignal = inputSignal.Signal / pathLossLinear;

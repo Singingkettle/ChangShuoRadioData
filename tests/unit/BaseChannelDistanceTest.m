@@ -67,6 +67,32 @@ classdef BaseChannelDistanceTest < matlab.unittest.TestCase
             end
         end
 
+        function mimoStepTracksUpdatedDistance(testCase)
+            % Regression for the frozen-path-loss bug: ChannelFactory updates
+            % Distance per frame, but PathLoss was derived only once at
+            % construction (from the default Distance = 1 m), so every fading
+            % link was attenuated by the 1 m path loss regardless of the real
+            % Tx-Rx separation. The MIMO step must recompute PathLoss from the
+            % current Distance so the realised attenuation tracks distance and
+            % matches the distance-based PathLoss recorded in the annotation.
+            carrier = 2.4e9;
+            ch = csrd.blocks.physical.channel.MIMO( ...
+                'CarrierFrequency', carrier, 'FadingDistribution', 'Rayleigh', ...
+                'PathDelays', 0, 'AveragePathGains', 0, 'MaximumDopplerShift', 1, ...
+                'SampleRate', 1e6);
+            in = struct('Signal', complex(ones(4096, 1)), 'SampleRate', 1e6, 'StartTime', 0);
+            ch.step(in);
+            nearPathLoss = ch.PathLoss;          % Distance = 1 m -> ~40 dB
+            release(ch); ch.Distance = 10000;
+            ch.step(in);
+            farPathLoss = ch.PathLoss;           % Distance = 10 km -> ~120 dB
+            testCase.verifyLessThan( ...
+                abs(farPathLoss - fspl(10000, physconst('light') / carrier)), 1, ...
+                'MIMO step must recompute PathLoss to the fspl value at the current Distance.');
+            testCase.verifyGreaterThan(farPathLoss - nearPathLoss, 50, ...
+                'Path loss at 10 km must greatly exceed the 1 m value (attenuation tracks distance).');
+        end
+
         function antennaModeIsSetCorrectly(testCase)
             ch = csrd.blocks.physical.channel.BaseChannel( ...
                 'NumTransmitAntennas', 2, 'NumReceiveAntennas', 4);
