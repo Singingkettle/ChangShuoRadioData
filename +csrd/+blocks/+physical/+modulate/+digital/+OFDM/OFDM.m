@@ -247,7 +247,13 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
                     if obj.NumTransmitAntennas > 1
                         % Keep the configured hardware antenna count stable; reduce the
                         % per-antenna pilot count when the random pilot request is too large.
-                        maxPilotsPerAntenna = floor(length(validRange) / obj.NumTransmitAntennas);
+                        % comm.OFDMModulator requires guard + DC-null + total pilots to be
+                        % STRICTLY less than FFTLength (>= 1 data subcarrier must remain).
+                        % validRange already excludes the guard bands and the DC bin, so
+                        % reserve one further carrier as data; otherwise a pilot count that
+                        % exactly fills validRange leaves zero data carriers when InsertDCNull
+                        % is true and the modulator throws comm:OFDM:NoDataCarriers.
+                        maxPilotsPerAntenna = floor((length(validRange) - 1) / obj.NumTransmitAntennas);
                         if maxPilotsPerAntenna < 1
                             error('CSRD:Modulation:OFDMInsufficientPilotCarriers', ...
                                 ['OFDM valid pilot carrier range cannot support %d ', ...

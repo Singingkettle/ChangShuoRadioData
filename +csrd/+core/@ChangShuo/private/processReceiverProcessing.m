@@ -625,7 +625,7 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
     for compIdx = 1:length(signalComponents)
         comp = signalComponents{compIdx};
         if isfield(comp, 'Signal') && ~isempty(comp.Signal)
-            startOffset = localFrameStartOffset(comp, sampleRate);
+            startOffset = localFrameStartOffset(comp, sampleRate, frameShape.NumSamples);
             compSig = localCollapseAntennaSignal(comp.Signal);
             if startOffset >= frameShape.NumSamples
                 comp = localUpdateComponentSampleGrid( ...
@@ -765,9 +765,9 @@ function [signalOut, info] = localCoerceProcessedFrameLength(signalIn, targetSam
         'Action', action);
 end
 
-function startOffset = localFrameStartOffset(comp, sampleRate)
+function startOffset = localFrameStartOffset(comp, sampleRate, frameSamples)
     % localFrameStartOffset - Convert source start time into frame samples.
-    % Inputs: component struct and receiver sample rate.
+    % Inputs: component struct, receiver sample rate, frame length in samples.
     % Outputs: zero-based sample offset inside the current frame.
     startTime = 0;
     if isfield(comp, 'FrameRelativeStartTime') && ~isempty(comp.FrameRelativeStartTime)
@@ -775,7 +775,17 @@ function startOffset = localFrameStartOffset(comp, sampleRate)
     elseif isfield(comp, 'StartTime') && ~isempty(comp.StartTime)
         startTime = comp.StartTime;
     end
-    startOffset = max(0, round(double(startTime) * sampleRate));
+    rawOffset = double(startTime) * sampleRate;
+    startOffset = max(0, round(rawOffset));
+    % A burst whose start lies strictly inside the frame must not be rounded
+    % onto/past the frame end -- that would make combineSignalComponents drop
+    % the whole burst even though the planner placed it here with overlap.
+    % Clamp such a rounding overshoot to the last valid sample; only a start
+    % that truly reaches the frame end (floor >= frameSamples) stays out of
+    % range and is dropped.
+    if startOffset >= frameSamples && floor(rawOffset) < frameSamples
+        startOffset = frameSamples - 1;
+    end
 end
 
 function y = localCollapseAntennaSignal(signal)

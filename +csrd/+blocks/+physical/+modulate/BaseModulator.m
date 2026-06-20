@@ -224,6 +224,15 @@ classdef BaseModulator < matlab.System
 
             % Convert bits to integer symbols before discrete modulation.
             if obj.ModulatorOrder > 1
+                % bit2int needs an integer number of bits per symbol, i.e. a
+                % power-of-two order. Fail fast with an actionable message
+                % instead of the cryptic bit2int "N must be a positive integer"
+                % error a layer down.
+                if mod(n, 1) ~= 0
+                    error('CSRD:Modulation:NonPowerOfTwoOrder', ...
+                        'Digital ModulatorOrder must be a power of two (got %g).', ...
+                        sum(obj.ModulatorOrder));
+                end
                 x.data = bit2int(x.data, n);
             end
 
