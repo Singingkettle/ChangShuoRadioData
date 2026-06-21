@@ -437,8 +437,13 @@ function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulatio
     family = char(string(modulationFamily));
     minAnt = numAntennaRange.Min;
     maxAnt = numAntennaRange.Max;
+    % OTFS is single-antenna-only in AntennaModulationMatrix ('OTFS' is
+    % Allowed at 1 antenna, Forbidden at 2/4/8/16); without it here the planner
+    % draws 2/4 antennas for OTFS, the blueprint validator rejects it, and the
+    % scenario is resampled up to 50 times (wasteful, and risks exhausting the
+    % resample budget). Keep this list consistent with the antenna matrix.
     singleAntennaFamilies = {'FM','PM','AM','SSBAM','DSBAM','DSBSCAM','VSBAM', ...
-        'FSK','MSK','CPFSK','GFSK','GMSK','OOK','PAM'};
+        'FSK','MSK','CPFSK','GFSK','GMSK','OOK','PAM','OTFS'};
     if ismember(family, singleAntennaFamilies)
         if minAnt > 1
             error('CSRD:Scenario:IncompatibleAntennaModulation', ...
@@ -485,18 +490,34 @@ function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
             pattern.EndTime = obsDur;
             pattern.Intervals = [0, obsDur];
         case 'Burst'
-            onDuration = min(obsDur, max(obsDur * 0.3, min(0.01, obsDur)));
-            offDuration = max(obsDur - onDuration, 0);
-            pattern.OnDuration = onDuration;
-            pattern.OffDuration = offDuration;
-            pattern.DutyCycle = onDuration / max(onDuration + offDuration, eps);
+            % Realize a repeating ON/OFF train (not a single full-front block)
+            % so later frames see the periodic emitter the 'Burst' label
+            % promises, instead of going silent after one block.
+            pattern.OnDuration = obsDur * 0.2;
+            pattern.OffDuration = obsDur * 0.2;
             pattern.InitialDelay = 0;
-            pattern.Intervals = [0, onDuration];
+            pattern.DutyCycle = pattern.OnDuration / ...
+                (pattern.OnDuration + pattern.OffDuration);
+            pattern.Intervals = generateBurstIntervals(pattern, obsDur);
         case 'Scheduled'
-            pattern.SlotDuration = obsDur;
-            pattern.NumSlots = 1;
+            % Realize a genuinely intermittent (slotted) emission so the signal
+            % matches the 'Scheduled' label, instead of a single full-window
+            % slot ([0, obsDur]) that is indistinguishable from a Continuous
+            % emitter while the annotation still advertises 'Scheduled'.
+            pattern.SlotDuration = obsDur * 0.2;
+            pattern.NumSlots = 4;
             pattern.AssignedSlot = 1;
-            pattern.Intervals = [0, obsDur];
+            pattern.DutyCycle = 1 / pattern.NumSlots;
+            pattern.Intervals = generateScheduledIntervals(pattern, obsDur);
+    end
+    % Guard against a degenerate rebuild collapsing to the no-activity
+    % sentinel: fall back to a truthful continuous emission rather than an
+    % empty/idle one mislabelled as Burst/Scheduled.
+    if isempty(pattern.Intervals) || ...
+            (size(pattern.Intervals, 1) == 1 && all(pattern.Intervals(1, :) == 0))
+        pattern.Type = 'Continuous';
+        pattern.DutyCycle = 1.0;
+        pattern.Intervals = [0, obsDur];
     end
 end
 
