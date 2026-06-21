@@ -283,9 +283,21 @@ function y = genOSTBCWithX(ostbc, x)
     % Returns:
     %   y - OSTBC encoded data matrix
 
-    rr = floor(ostbc.SymbolRate * 8);
-    valid_len = floor(size(x, 1) / rr);
-    valid_len = valid_len * rr;
+    % The OSTBC input length must be a multiple of the encoder's symbols per
+    % block, which is NOT floor(SymbolRate*8). That formula is only
+    % coincidentally correct for the rate-1/2 codes: the 2-antenna (Alamouti)
+    % encoder defaults to SymbolRate 3/4 and needs only even-length input
+    % (2 symbols/block), and the rate-3/4 codes need multiples of 3. The old
+    % formula used 6 for both, silently dropping up to 5 trailing payload
+    % symbols before encoding.
+    if ostbc.NumTransmitAntennas == 2
+        rr = 2;                         % Alamouti: even-length input
+    elseif abs(ostbc.SymbolRate - 0.5) < 1e-9
+        rr = 4;                         % rate-1/2 OSTBC: 4 symbols per block
+    else
+        rr = 3;                         % rate-3/4 OSTBC: 3 symbols per block
+    end
+    valid_len = floor(size(x, 1) / rr) * rr;
     y = ostbc(x(1:valid_len, :));
 
 end
