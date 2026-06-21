@@ -186,7 +186,23 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
                 modulatedSignalSegment.Planned.ModulationSpatialMode = ...
                     char(string(modSrc.ModulatorConfig.mimo.Mode));
             else
-                modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+                % No explicit mimo.Mode (the non-OFDM families): the modulator
+                % applies OSTBC whenever it has more than one transmit antenna
+                % (BaseModulator.genOSTBC), so the planned spatial mode must
+                % reflect that instead of being left empty for a multi-antenna,
+                % OSTBC-encoded signal.
+                numTxAnt = 1;
+                if isfield(currentTxScenario, 'Hardware') && ...
+                        isstruct(currentTxScenario.Hardware) && ...
+                        isfield(currentTxScenario.Hardware, 'NumAntennas') && ...
+                        ~isempty(currentTxScenario.Hardware.NumAntennas)
+                    numTxAnt = double(currentTxScenario.Hardware.NumAntennas);
+                end
+                if numTxAnt > 1
+                    modulatedSignalSegment.Planned.ModulationSpatialMode = 'OSTBC';
+                else
+                    modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+                end
             end
         else
             modulatedSignalSegment.Planned.ModulationFamily = '';
