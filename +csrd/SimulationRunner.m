@@ -644,6 +644,12 @@ classdef SimulationRunner < matlab.System
             catch saveError
                 obj.logger.error('Failed to save scenario data for scenario %d: %s', ...
                     scenarioId, saveError.message);
+                % The .mat is the signal of record; a failed save must be a hard
+                % scenario failure (counted Failed by the upstream engineError
+                % catch), not a silently-Success scenario with a missing signal
+                % file. Propagate before the annotation is written so the
+                % signal/annotation pair stays co-present-or-both-absent.
+                rethrow(saveError);
             end
 
             % Save scenario annotation
@@ -707,18 +713,23 @@ classdef SimulationRunner < matlab.System
                 fid = fopen(annotationPath, 'w');
 
                 if fid == -1
-                    obj.logger.error('Cannot open annotation file for writing: %s', annotationPath);
-                else
-                    fprintf(fid, '%s', jsonString);
-                    fclose(fid);
-                    obj.logger.debug('Saved annotation: %s', annotationPath);
+                    error('CSRD:Save:AnnotationOpenFailed', ...
+                        'Cannot open annotation file for writing: %s', annotationPath);
                 end
+                fprintf(fid, '%s', jsonString);
+                fclose(fid);
+                obj.logger.debug('Saved annotation: %s', annotationPath);
                 obj.recordPerformanceStage('Save.WriteAnnotationJson', toc(stageStart), ...
                     struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
             catch saveError
                 obj.logger.error('Failed to save annotation for scenario %d: %s', ...
                     scenarioId, saveError.message);
+                % Mirror the .mat save and the deliberately-unwrapped
+                % validateMeasurementCompleteness above: a failed annotation
+                % write is a hard scenario failure, not a silently-Success
+                % scenario with a signal file but no annotation.
+                rethrow(saveError);
             end
 
         end
