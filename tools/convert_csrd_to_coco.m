@@ -405,9 +405,32 @@ fid = fopen(outputPath, 'w');
 assert(fid > 0, 'CSRD:Tools:CocoWriteFailed', ...
     'Could not open COCO output for writing: %s', outputPath);
 cleanup = onCleanup(@() fclose(fid));
-fprintf(fid, '%s', jsonencode(clean, 'PrettyPrint', true));
+% COCO requires images/annotations/categories to be JSON arrays. jsonencode
+% emits an array only for a non-scalar struct array (or a cell of structs); a
+% single-element collection would otherwise serialize as a bare JSON object and
+% break pycocotools (createIndex iterates these as lists). Encode from a
+% cell-wrapped copy so the on-disk JSON is always an array of objects, while the
+% returned struct keeps its original shape (callers/tests are unaffected).
+forJson = clean;
+forJson.images = localAsObjectArray(forJson.images);
+forJson.annotations = localAsObjectArray(forJson.annotations);
+forJson.categories = localAsObjectArray(forJson.categories);
+forJson.licenses = localAsObjectArray(forJson.licenses);
+fprintf(fid, '%s', jsonencode(forJson, 'PrettyPrint', true));
 delete(cleanup);
 coco = clean;
+end
+
+
+function out = localAsObjectArray(value)
+% localAsObjectArray - Force a struct array (including 0- or 1-element) into a
+% cell of scalar structs so jsonencode always emits a JSON array of objects,
+% never a bare object. Non-struct values pass through unchanged.
+if iscell(value) || ~isstruct(value)
+    out = value;
+else
+    out = num2cell(reshape(value, 1, []));
+end
 end
 
 
