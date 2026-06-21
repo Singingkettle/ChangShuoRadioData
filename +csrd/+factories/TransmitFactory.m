@@ -192,6 +192,17 @@ classdef TransmitFactory < matlab.System
                 end
             end
 
+            % The planned per-service transmit power is carried as TxInfo.Power
+            % (dBm) but the TRF block exposes it as TxPowerDb (dBm); the
+            % name-match loop above never bridges the two, so without this
+            % explicit mapping every emitter would be scaled to the hard-coded
+            % default TxPowerDb=50 dBm regardless of its planned, annotated
+            % power (realized signal != annotation). Both are dBm, so copy
+            % directly.
+            if isfield(txInfoThisTx, 'Power') && isprop(txBlock, 'TxPowerDb')
+                txBlock.TxPowerDb = double(txInfoThisTx.Power);
+            end
+
             % Configure site-specific parameters
             if isfield(transmitterScenarioConfig, 'Site') && isprop(txBlock, 'SiteConfig')
                 txBlock.SiteConfig = transmitterScenarioConfig.Site;
