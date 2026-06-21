@@ -934,7 +934,14 @@ function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
             slotMax = min(schedParams.SlotDuration.Max, obsDur * 0.3);
             pattern.SlotDuration = randomInRange(obj, slotMin, slotMax);
             pattern.NumSlots = randi([schedParams.SlotsPerFrame.Min, schedParams.SlotsPerFrame.Max]);
-            pattern.AssignedSlot = randi(pattern.NumSlots);
+            % Only slots whose start lies inside the observation window produce
+            % a real interval; assigning a later slot returns the empty [0,0]
+            % sentinel, which the fallback below would otherwise turn into a
+            % CONTINUOUS emission still labelled 'Scheduled' (signal contradicts
+            % annotation). Clamp the assigned slot to the startable range so the
+            % emitter is a truthful slotted one.
+            maxStartableSlot = max(1, ceil(obsDur / pattern.SlotDuration));
+            pattern.AssignedSlot = randi(min(pattern.NumSlots, maxStartableSlot));
             pattern.Intervals = generateScheduledIntervals(pattern, obsDur);
             
         case 'Random'
@@ -959,6 +966,15 @@ function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
     % would silently emit an all-idle (zero-source) scenario.
     if isempty(pattern.Intervals) || ...
             (size(pattern.Intervals, 1) == 1 && all(pattern.Intervals(1, :) == 0))
+        % A degenerate pattern collapsed to the no-activity sentinel. The
+        % fallback emits continuously across the window, so relabel the pattern
+        % as Continuous to keep the annotation's Type/DutyCycle truthful to the
+        % realized signal instead of advertising a slotted/bursty emitter that
+        % never existed.
+        pattern.Type = 'Continuous';
+        pattern.DutyCycle = 1.0;
+        pattern.StartTime = 0;
+        pattern.EndTime = temporalParams.ObservationDuration;
         pattern.Intervals = [0, temporalParams.ObservationDuration];
     end
 end
