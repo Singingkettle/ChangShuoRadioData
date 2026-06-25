@@ -92,12 +92,15 @@ function order = localOrderForType(typeId)
 switch char(string(typeId))
     case {'APSK', 'DVBSAPSK', 'QAM', 'Mill88QAM', 'OFDM', 'OTFS', 'SCFDMA'}
         order = 16;
-    case {'ASK', 'PSK', 'OQPSK'}
+    case {'ASK', 'PAM', 'PSK', 'OQPSK'}
         order = 4;
     case {'CPFSK', 'GFSK', 'GMSK', 'MSK', 'FSK', 'OOK'}
         order = 2;
     otherwise
-        order = 1;
+        % Minimum valid digital order. Analog modulators ignore the order;
+        % any unlisted digital modulator still gets a usable (>= 2) value
+        % instead of the degenerate order = 1 that breaks pammod/pskmod etc.
+        order = 2;
 end
 end
 
