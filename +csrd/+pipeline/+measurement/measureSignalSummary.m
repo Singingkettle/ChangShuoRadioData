@@ -104,7 +104,31 @@ if peakVal <= 0
     return;
 end
 
-threshold = peakVal * 10^(peakRelDb / 10);
+% Primary estimate: narrowest band holding `pct` of the energy that survives a
+% peak-relative -3 dB clip. Tracks the signal and rejects the noise floor for
+% the common flat-spectrum case.
+bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
+    peakVal * 10 ^ (peakRelDb / 10), pct);
+
+% Collapse guard. When a signal has a flat occupied band a few dB below a
+% single localized spectral spike -- short bursts (low time-bandwidth product,
+% high spectral variance) or a frequency-selective channel peak -- the
+% peak-relative threshold sits ABOVE the flat band and clips it away,
+% collapsing the measured width to the spike's neighbourhood (e.g. a realized
+% ~17 MHz QAM measured at ~1.5 MHz). Detect that against a noise-floor-relative
+% estimate (threshold a fixed +6 dB above a robust low-percentile floor, which
+% keeps the whole occupied band) and fall back to it only when the
+% peak-relative result is implausibly narrow, so the common case is unchanged.
+floorThreshold = prctile(spec, 25) * 10 ^ (6 / 10);
+bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
+if bwFloor > 0 && bwHz < 0.3 * bwFloor
+    bwHz = bwFloor;
+end
+end
+
+function bwHz = localSpanForThreshold(spec, fAxis, sampleRate, threshold, pct)
+    % localSpanForThreshold - narrowest contiguous band holding pct% of the
+    % energy left after zeroing bins below `threshold`.
 denoised = spec;
 denoised(denoised < threshold) = 0;
 

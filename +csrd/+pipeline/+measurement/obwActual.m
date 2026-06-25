@@ -202,7 +202,29 @@ function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
         return;
     end
 
-    threshold = peakVal * 10^(peakRelDb / 10);
+    % Primary estimate: peak-relative -3 dB clip then narrowest 99 %-energy band.
+    bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
+        peakVal * 10 ^ (peakRelDb / 10), pct);
+
+    % Collapse guard (mirrors measureSignalSummary so the two estimators stay
+    % equivalent). A flat occupied band a few dB below a single localized
+    % spectral spike -- short bursts (high spectral variance) or a frequency-
+    % selective channel peak -- makes the peak-relative threshold sit ABOVE the
+    % flat band and clip it away, collapsing the width to the spike's
+    % neighbourhood. Fall back to a noise-floor-relative estimate (robust
+    % low-percentile floor + 6 dB, which keeps the whole occupied band) only
+    % when the peak-relative result is implausibly narrow.
+    floorThreshold = prctile(spec, 25) * 10 ^ (6 / 10);
+    bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
+    if bwFloor > 0 && bwHz < 0.3 * bwFloor
+        bwHz = bwFloor;
+    end
+end
+
+
+function bwHz = localSpanForThreshold(spec, fAxis, sampleRate, threshold, pct)
+    %LOCALSPANFORTHRESHOLD Narrowest contiguous band holding pct% of the energy
+    % left after zeroing bins below `threshold`.
     denoised = spec;
     denoised(denoised < threshold) = 0;
 

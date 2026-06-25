@@ -15,19 +15,15 @@ decisions or need a root-cause dig and are flagged for the owner.
 | `77f13f3` | **Visibility classifier midpoint-blind** (round-7 carry, low/latent) | `abs(projOffset) ± halfBw` vs half-width assumed a 0-centred window; wrong for asymmetric/heterogeneous receivers | classify by direct band overlap with the window; extracted + unit-tested (symmetric + asymmetric) |
 | `0c4b7e0` | **MIMO fading at the stale 200 kHz default rate** (HIGH) | the inner `comm.MIMOChannel` rate was only re-aligned when locked, but the per-frame block release leaves it fresh/unlocked, so it ran at the BaseChannel default 200 kHz vs the real 50 MHz — a ~250× time-base error that over-spread the Jakes/Doppler fading and shrank multipath delays to sub-sample, corrupting every fading link's realized signal + measured GT | set the inner rate to the input rate whenever it differs (release only if locked) |
 | _(round-9)_ | **Geometry NaN vectors corrupt the JSON round-trip** (HIGH, was flag #3) | a `[NaN NaN NaN]` GeometrySnapshot vector serialises to JSON `[[],[],[]]` and `jsondecode` reads it back as a CELL, not a double, so downstream `double()/norm()` throws and the COCO export carries the corrupted type | read-side coercion in `readAnnotation` (`localCoerceSourceGeometry`): the known-numeric GeometrySnapshot fields are coerced back to a double column (cell `[]` → NaN); the COCO path reads via `readAnnotation` so it benefits too. Regression test `ReadAnnotationGeometryRoundTripTest` asserts class `double` + `norm()` does not throw |
+| _(round-9)_ | **Wideband OBW collapses to ~1 FFT bin** (HIGH, was flag #1) | instrumented capture of a real collapsed source: a realized ~17 MHz QAM-16 (energy spread over the full band, RMS bandwidth ~14.7 MHz) measured at **1.56 MHz**. Root cause is NOT a spurious line — the occupied band is flat at ~−6 dB but a single localized spike (short burst / channel-selective peak) sits ~5 dB higher, so the peak-relative −3 dB threshold lands ABOVE the flat band and clips it away. Affected **33/212 (~15%)** of wide sources in a default-config probe | **collapse guard** in both `measureSignalSummary` + `obwActual` (kept equivalent): keep the peak-relative −3 dB estimate normally, but fall back to a noise-floor-relative estimate (25th-percentile floor + 6 dB, which keeps the whole occupied band) only when the peak-relative width is < 0.3× the floor-relative width. Post-fix probe: **0/… under-measured**, wide sources now read 79–98% of the realized BW; common cases unchanged. Regression test `ObwCollapseGuardTest` + measurement-equivalence suite |
 
 ## Flagged — need an owner decision or a deeper dig (6)
 
-1. **Wideband OBW collapses to ~1 FFT bin** (HIGH, measurement). For a fraction of wide (10–40 MHz)
-   sources the measured `OccupiedBandwidthHz` collapses to ~24 kHz although the signal is genuinely
-   broadband (99% energy spread over ~65k bins). Root cause: the `peak-relative -3 dB` OBW estimator
-   (`obwActual` / `measureSignalSummary`) latches onto a strong spectral line (one bin held ~31% of the
-   energy in a real wide QAM-64) and clips everything 3 dB below it, leaving the line's neighbourhood.
-   A clean synthetic broadband QAM does NOT collapse, so the trigger is a real-signal spectral line whose
-   source (a ~−5 dBc carrier/DC on a suppressed-carrier QAM) is itself suspicious and worth finding. Fix
-   direction: make the OBW robust to a single line (threshold off a robust statistic e.g. median, or use
-   a 99%-energy method with noise-floor removal), and/or find + fix the spurious carrier line. Needs a
-   focused root-cause dig before changing a core measurement.
+1. ~~**Wideband OBW collapses to ~1 FFT bin**~~ **FIXED (round-9)** — see the Fixed table. The
+   instrumented dig showed it is NOT a spurious line but a flat occupied band clipped away by the
+   peak-relative −3 dB threshold when a localized spike sits a few dB above it (short bursts / channel-
+   selective peaks). Fixed with a collapse guard that falls back to a noise-floor-relative estimate only
+   when the peak-relative width is implausibly narrow, in both estimators, validated end-to-end.
 
 2. **Double Doppler on MIMO fading** (HIGH, design decision). `comm.MIMOChannel` applies its internal
    zero-mean Jakes Doppler SPREAD, and `processChannelPropagation` ALSO applies an explicit deterministic
