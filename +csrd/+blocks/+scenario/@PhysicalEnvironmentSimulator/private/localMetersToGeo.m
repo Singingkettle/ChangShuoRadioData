@@ -3,7 +3,7 @@ function geoPositionDeg = localMetersToGeo(positionMeters, bounds)
 % Inputs: see function signature and validation.
 % Outputs: see return values and contract fields.
 [originLat, originLon] = getGeoOriginFromBounds(bounds);
-earthRadiusMeters = 6371008.8;
+earthRadiusMeters = getEarthRadiusMeters();
 lat0 = deg2rad(originLat);
 
 positionMeters = double(positionMeters(:)).';
