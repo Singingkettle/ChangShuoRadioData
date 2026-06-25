@@ -173,6 +173,15 @@ classdef ReceiveFactory < matlab.System
                         'Action', 'unavailable');
                 end
 
+                % Realized receiver thermal-noise power (input-referred, Watts)
+                % for the measured received-SNR GT. The per-emitter SNR is
+                % measured downstream as signal / (channel noise + this thermal
+                % noise), so the SNR reflects the real signal not the link budget.
+                if isprop(currentReceiverBlock, 'RealizedThermalNoiseInputReferredW')
+                    receivedDataStruct.RealizedThermalNoiseInputReferredW = ...
+                        currentReceiverBlock.RealizedThermalNoiseInputReferredW;
+                end
+
                 obj.logger.debug('Frame %d, Rx %s: Reception step successful.', frameId, rxIdStr);
             catch ME_step
                 % Phase 3 (audit §3.4 / §17.5 P3-6): the legacy fallback

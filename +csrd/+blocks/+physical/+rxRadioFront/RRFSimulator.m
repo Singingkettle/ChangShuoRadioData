@@ -40,6 +40,10 @@ classdef RRFSimulator < matlab.System
         IQImbalance         % function handle applying iqimbal
         SampleShifter       % comm.SampleRateOffset instance
         SampleRateOffsetInfo struct = struct()
+        % Realized receiver thermal-noise power (Watts), referred to the
+        % receiver-input (channel-output) scale, for the measured received-SNR
+        % GT. Measured per step() from the thermal-noise stage and the LNA gain.
+        RealizedThermalNoiseInputReferredW double = NaN
     end
 
     properties (Access = private)
@@ -309,6 +313,21 @@ classdef RRFSimulator < matlab.System
 
             obj.ensureThermalNoiseObject();
             xAwgn = obj.ThermalNoise(x);
+
+            % Measure the realized thermal-noise power for the received-SNR GT,
+            % referred back to the receiver-input (channel-output) scale where
+            % the per-emitter signal powers are measured, by dividing out the
+            % measured LNA power gain. This is the same additive noise the
+            % saved waveform carries, so the SNR GT reflects the real signal.
+            thermalNoisePowerPostLna = mean(abs(double(xAwgn(:) - x(:))) .^ 2);
+            inputPower = mean(abs(double(inputSignal(:))) .^ 2);
+            lnaOutputPower = mean(abs(double(x(:))) .^ 2);
+            if inputPower > 0 && lnaOutputPower > 0
+                lnaPowerGain = lnaOutputPower / inputPower;
+            else
+                lnaPowerGain = 1;
+            end
+            obj.RealizedThermalNoiseInputReferredW = thermalNoisePowerPostLna / lnaPowerGain;
 
             xIq = obj.IQImbalance(xAwgn);
 

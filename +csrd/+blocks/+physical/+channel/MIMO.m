@@ -414,6 +414,12 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             % Prepare comprehensive output structure
             outputSignal = inputSignal;
             outputSignal.Signal = fadedSignal;
+            % Realized signal power and (zero) channel-noise power for the
+            % measured received-SNR GT. A fading channel adds no noise of its
+            % own; the per-emitter SNR is then set by the receiver thermal noise
+            % alone, measured downstream.
+            outputSignal.ChannelSignalPowerW = mean(abs(fadedSignal(:)) .^ 2);
+            outputSignal.ChannelNoisePowerW = 0;
 
             % Add channel configuration information
             outputSignal.PathDelays = obj.PathDelays;

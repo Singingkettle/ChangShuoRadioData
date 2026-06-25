@@ -199,6 +199,26 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                         channelOutput, txInfoForLink, rxInfoForLink);
                     component.ChannelOutputWasEmptyBeforeGating = ...
                         isfield(channelOutput, 'Signal') && isempty(channelOutput.Signal);
+                    % Realized signal/channel-noise powers for the measured
+                    % received-SNR GT. AWGN reports both (its Signal already
+                    % carries the noise); noise-free channels (MIMO/RayTracing)
+                    % report a signal power with zero channel noise, or it is
+                    % computed here from the signal-only output.
+                    if isfield(channelOutput, 'ChannelSignalPowerW')
+                        component.ChannelSignalPowerW = channelOutput.ChannelSignalPowerW;
+                        if isfield(channelOutput, 'ChannelNoisePowerW')
+                            component.ChannelNoisePowerW = channelOutput.ChannelNoisePowerW;
+                        else
+                            component.ChannelNoisePowerW = 0;
+                        end
+                    elseif isfield(channelOutput, 'Signal') && ~isempty(channelOutput.Signal)
+                        component.ChannelSignalPowerW = ...
+                            mean(abs(double(channelOutput.Signal(:))) .^ 2);
+                        component.ChannelNoisePowerW = 0;
+                    else
+                        component.ChannelSignalPowerW = NaN;
+                        component.ChannelNoisePowerW = NaN;
+                    end
                     component = csrd.pipeline.signal.gateToDuration( ...
                         component, localComponentDurationSec(segmentSignal), ...
                         'ChannelOutput');

@@ -105,9 +105,20 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             framePlaneCache = computeFramePlaneCache( ...
                 combinedSignal, rxInfo.SampleRate, observableBwHz);
 
+            % Realized receiver thermal-noise power (input-referred) for the
+            % measured received-SNR GT: per emitter, SNR = realized signal power
+            % / (realized channel noise + this thermal noise). Shared across the
+            % emitters at this receiver.
+            thermalNoiseW = NaN;
+            if isstruct(processedOutput) && ...
+                    isfield(processedOutput, 'RealizedThermalNoiseInputReferredW')
+                thermalNoiseW = processedOutput.RealizedThermalNoiseInputReferredW;
+            end
+
             FrameAnnotation{rxIdx}.SignalSources = [];
             for compIdx = 1:length(combinedSignal.Components)
                 comp = combinedSignal.Components{compIdx};
+                comp.MeasuredReceivedSNRdB = localMeasuredReceivedSnr(comp, thermalNoiseW);
                 sourceInfo = buildSourceAnnotation(comp, comp.Signal, ...
                     rxInfo.SampleRate, observableBwHz, framePlaneCache);
                 FrameAnnotation{rxIdx}.SignalSources = [FrameAnnotation{rxIdx}.SignalSources, sourceInfo];
@@ -345,7 +356,12 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane = struct();
     sourcePlane.OccupiedBandwidthHz  = NaN;
     sourcePlane.CenterFrequencyHz    = NaN;
-    sourcePlane.SNRdB                = getFieldOrDefault(comp, 'AppliedSNRdB', NaN);
+    % GT principle: the Measured SNR is MEASURED from the realized signal
+    % (signal power / total realized additive noise), set per emitter in the
+    % receiver loop as MeasuredReceivedSNRdB. Fall back to the analytical
+    % AppliedSNRdB only when the realized powers were unavailable.
+    sourcePlane.SNRdB                = getFieldOrDefault(comp, 'MeasuredReceivedSNRdB', ...
+        getFieldOrDefault(comp, 'AppliedSNRdB', NaN));
     sourcePlane.TimeOccupancy        = NaN;
     sourcePlane.FrequencyOccupancy   = NaN;
     sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
@@ -592,6 +608,33 @@ function value = getFieldOrEmpty(s, fieldName, defaultValue)
         value = s.(fieldName);
     else
         value = defaultValue;
+    end
+end
+
+function snrDb = localMeasuredReceivedSnr(comp, thermalNoiseW)
+    % localMeasuredReceivedSnr - Measured per-emitter received SNR (dB): the
+    % realized per-emitter signal power over the total realized additive noise
+    % (channel noise + receiver thermal noise). Returns NaN when the realized
+    % powers are unavailable so the caller falls back to the analytical label.
+    snrDb = NaN;
+    sigW = getFieldOrDefault(comp, 'ChannelSignalPowerW', NaN);
+    if ~isnumeric(sigW) || ~isscalar(sigW) || ~isfinite(sigW)
+        return;
+    end
+    chanNoiseW = getFieldOrDefault(comp, 'ChannelNoisePowerW', NaN);
+    totalNoiseW = 0; haveNoise = false;
+    if isnumeric(chanNoiseW) && isscalar(chanNoiseW) && isfinite(chanNoiseW)
+        totalNoiseW = totalNoiseW + double(chanNoiseW); haveNoise = true;
+    end
+    if isnumeric(thermalNoiseW) && isscalar(thermalNoiseW) && isfinite(thermalNoiseW)
+        totalNoiseW = totalNoiseW + double(thermalNoiseW); haveNoise = true;
+    end
+    if ~haveNoise || ~(totalNoiseW > 0)
+        return;
+    end
+    snrDb = csrd.pipeline.measurement.actualSnrFromComponents(double(sigW), totalNoiseW);
+    if ~isfinite(snrDb)
+        snrDb = NaN;   % keep the finite-measurement contract; fall back to label
     end
 end
 
