@@ -367,9 +367,12 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     % GT principle: the Measured SNR is MEASURED from the realized signal
     % (signal power / total realized additive noise), set per emitter in the
     % receiver loop as MeasuredReceivedSNRdB. Fall back to the analytical
-    % AppliedSNRdB only when the realized powers were unavailable.
-    sourcePlane.SNRdB                = getFieldOrDefault(comp, 'MeasuredReceivedSNRdB', ...
-        getFieldOrDefault(comp, 'AppliedSNRdB', NaN));
+    % AppliedSNRdB only when the realized powers were unavailable. Initialised
+    % NaN (like the other measured scalars) so a NoSignal/silent buffer leaves
+    % it NaN -- the realized in-frame signal is absent, so a finite
+    % power-derived number would be a Measured-plane value for a buffer that
+    % isn't there. The live value is assigned in the hasSignal branch below.
+    sourcePlane.SNRdB                = NaN;
     sourcePlane.TimeOccupancy        = NaN;
     sourcePlane.FrequencyOccupancy   = NaN;
     sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
@@ -389,7 +392,9 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     else
         sourcePlane.MeasurementStatus = 'Measured';
         sourcePlane.SNRdB = requireFiniteMeasurement( ...
-            sourcePlane.SNRdB, 'Truth.Measured.SourcePlane.SNRdB');
+            getFieldOrDefault(comp, 'MeasuredReceivedSNRdB', ...
+                getFieldOrDefault(comp, 'AppliedSNRdB', NaN)), ...
+            'Truth.Measured.SourcePlane.SNRdB');
 
         % Phase 21: compute OBW, center frequency, envelope, and frequency
         % occupancy from one validated signal summary. Failure remains visible
