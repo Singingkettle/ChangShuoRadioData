@@ -820,12 +820,31 @@ function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgP
             sprintf('AudioSelect|%s|%s', char(string(emitterId)), modulationFamily));
     end
 
-    % Calculate message length based on symbol rate, bits per symbol, and duration
+    % Calculate message length based on symbol rate and duration.
     symbolRate = modulationConfig.SymbolRate;
     bitsPerSymbol = modulationConfig.BitsPerSymbol;
-    
-    % Calculate required bits (with some margin for framing overhead)
-    calculatedLength = ceil(symbolRate * bitsPerSymbol * txDuration * 1.1); % 10% overhead margin
+
+    if msgConfig.IsDigital
+        % Digital: the source is bits; the modulator groups them into symbols
+        % and upsamples by SamplesPerSymbol, so the SPS factor cancels and the
+        % required bit-count is symbolRate*bitsPerSymbol*duration (+margin).
+        calculatedLength = ceil(symbolRate * bitsPerSymbol * txDuration * 1.1);
+    else
+        % Analog (FM/PM/AM ...): the source (audio) is modulated sample-by-sample
+        % at the modulator rate symbolRate*SamplesPerSymbol with NO upsampling,
+        % so the source must supply that many samples to cover the burst.
+        % Without the SamplesPerSymbol factor the produced signal is only
+        % ~1/SamplesPerSymbol of the segment and gateToDuration zero-pads the
+        % rest with silence (45-86% of every analog burst).
+        samplesPerSymbol = 1;
+        if isfield(modulationConfig, 'SamplesPerSymbol') && ...
+                ~isempty(modulationConfig.SamplesPerSymbol) && ...
+                isfinite(modulationConfig.SamplesPerSymbol) && ...
+                modulationConfig.SamplesPerSymbol > 0
+            samplesPerSymbol = double(modulationConfig.SamplesPerSymbol);
+        end
+        calculatedLength = ceil(symbolRate * samplesPerSymbol * txDuration * 1.1);
+    end
     
     % Apply bounds from scenario config
     lengthMin = msgParams.Length.Min;

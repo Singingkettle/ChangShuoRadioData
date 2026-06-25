@@ -281,7 +281,28 @@ function lengthBits = localPerSegmentMessageLength(messageConfig, modulationConf
              'message length. Do not fall back to 1 bit/symbol.']);
     end
     bitsPerSymbol = double(modulationConfig.BitsPerSymbol);
-    calculatedLength = ceil(double(modulationConfig.SymbolRate) * ...
-        bitsPerSymbol * double(durationSec) * 1.1);
+    isDigital = true;
+    if isfield(messageConfig, 'IsDigital') && ~isempty(messageConfig.IsDigital)
+        isDigital = logical(messageConfig.IsDigital);
+    end
+    if isDigital
+        % Digital: bit-count; the SamplesPerSymbol upsampling cancels.
+        calculatedLength = ceil(double(modulationConfig.SymbolRate) * ...
+            bitsPerSymbol * double(durationSec) * 1.1);
+    else
+        % Analog: the source is modulated sample-by-sample at
+        % symbolRate*SamplesPerSymbol with no upsampling, so the length must
+        % include the SamplesPerSymbol factor or gateToDuration zero-pads most
+        % of the segment with silence (see generateMessageConfig).
+        samplesPerSymbol = 1;
+        if isfield(modulationConfig, 'SamplesPerSymbol') && ...
+                ~isempty(modulationConfig.SamplesPerSymbol) && ...
+                isfinite(modulationConfig.SamplesPerSymbol) && ...
+                modulationConfig.SamplesPerSymbol > 0
+            samplesPerSymbol = double(modulationConfig.SamplesPerSymbol);
+        end
+        calculatedLength = ceil(double(modulationConfig.SymbolRate) * ...
+            samplesPerSymbol * double(durationSec) * 1.1);
+    end
     lengthBits = max(lengthMin, min(lengthMax, calculatedLength));
 end
