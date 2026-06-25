@@ -14,6 +14,7 @@ decisions or need a root-cause dig and are flagged for the owner.
 |---|---|---|---|
 | `77f13f3` | **Visibility classifier midpoint-blind** (round-7 carry, low/latent) | `abs(projOffset) ± halfBw` vs half-width assumed a 0-centred window; wrong for asymmetric/heterogeneous receivers | classify by direct band overlap with the window; extracted + unit-tested (symmetric + asymmetric) |
 | `0c4b7e0` | **MIMO fading at the stale 200 kHz default rate** (HIGH) | the inner `comm.MIMOChannel` rate was only re-aligned when locked, but the per-frame block release leaves it fresh/unlocked, so it ran at the BaseChannel default 200 kHz vs the real 50 MHz — a ~250× time-base error that over-spread the Jakes/Doppler fading and shrank multipath delays to sub-sample, corrupting every fading link's realized signal + measured GT | set the inner rate to the input rate whenever it differs (release only if locked) |
+| _(round-9)_ | **Geometry NaN vectors corrupt the JSON round-trip** (HIGH, was flag #3) | a `[NaN NaN NaN]` GeometrySnapshot vector serialises to JSON `[[],[],[]]` and `jsondecode` reads it back as a CELL, not a double, so downstream `double()/norm()` throws and the COCO export carries the corrupted type | read-side coercion in `readAnnotation` (`localCoerceSourceGeometry`): the known-numeric GeometrySnapshot fields are coerced back to a double column (cell `[]` → NaN); the COCO path reads via `readAnnotation` so it benefits too. Regression test `ReadAnnotationGeometryRoundTripTest` asserts class `double` + `norm()` does not throw |
 
 ## Flagged — need an owner decision or a deeper dig (6)
 
@@ -37,12 +38,12 @@ decisions or need a root-cause dig and are flagged for the owner.
    follow the doc (suppress) or keep both (and document why). Location:
    `MIMO.m` infoImpl/stepImpl (set ChannelInfo.HasInternalDoppler), `processChannelPropagation.m:655-661`.
 
-3. **Geometry NaN vectors corrupt the JSON round-trip** (HIGH, serialization). When a GeometrySnapshot
-   vector is `[NaN NaN NaN]` (reachable when midpoint geometry is off and Position is unset),
-   `sanitizeForJson` num2cell's it and JSON `null` → `jsondecode` reads it back as a CELL, not a double,
-   so downstream `double()/norm()` throws and the COCO export carries the corrupted type. Fix on the
-   write side (don't NaN-cellify a numeric vector / always populate geometry) or the read side (coerce
-   null-cells back to numeric). `sanitizeForJson.m:296-316`, `processReceiverProcessing.m:341-352`.
+3. ~~**Geometry NaN vectors corrupt the JSON round-trip**~~ **FIXED (round-9)** — read-side coercion
+   in `readAnnotation` (`localCoerceSourceGeometry`) restores the known-numeric GeometrySnapshot fields
+   to a double column (cell `[]` → NaN); the COCO path reads via `readAnnotation` so it benefits.
+   Regression test `ReadAnnotationGeometryRoundTripTest`. (Chose read-side over write-side because the
+   honest value of unknown geometry IS NaN, which JSON cannot carry as a number — the round-trip can
+   only be repaired on read.)
 
 4. **Regulatory allocation lacks inter-emitter de-confliction** (HIGH, design gap). The regulatory path
    places each emitter independently with no min-separation, so two can land co-channel, yet each is
