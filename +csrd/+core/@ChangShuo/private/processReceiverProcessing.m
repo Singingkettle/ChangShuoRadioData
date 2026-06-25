@@ -114,11 +114,19 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
                     isfield(processedOutput, 'RealizedThermalNoiseInputReferredW')
                 thermalNoiseW = processedOutput.RealizedThermalNoiseInputReferredW;
             end
+            % ADC quantization-noise floor (input-referred), shared across the
+            % emitters at this receiver. Bounds the measured SNR by the
+            % converter's physical dynamic range (~6.02*AdcBits + 1.76 dB).
+            quantNoiseW = NaN;
+            if isstruct(processedOutput) && ...
+                    isfield(processedOutput, 'RealizedAdcQuantizationNoiseInputReferredW')
+                quantNoiseW = processedOutput.RealizedAdcQuantizationNoiseInputReferredW;
+            end
 
             FrameAnnotation{rxIdx}.SignalSources = [];
             for compIdx = 1:length(combinedSignal.Components)
                 comp = combinedSignal.Components{compIdx};
-                comp.MeasuredReceivedSNRdB = localMeasuredReceivedSnr(comp, thermalNoiseW);
+                comp.MeasuredReceivedSNRdB = localMeasuredReceivedSnr(comp, thermalNoiseW, quantNoiseW);
                 sourceInfo = buildSourceAnnotation(comp, comp.Signal, ...
                     rxInfo.SampleRate, observableBwHz, framePlaneCache);
                 FrameAnnotation{rxIdx}.SignalSources = [FrameAnnotation{rxIdx}.SignalSources, sourceInfo];
@@ -611,11 +619,12 @@ function value = getFieldOrEmpty(s, fieldName, defaultValue)
     end
 end
 
-function snrDb = localMeasuredReceivedSnr(comp, thermalNoiseW)
+function snrDb = localMeasuredReceivedSnr(comp, thermalNoiseW, quantNoiseW)
     % localMeasuredReceivedSnr - Measured per-emitter received SNR (dB): the
     % realized per-emitter signal power over the total realized additive noise
-    % (channel noise + receiver thermal noise). Returns NaN when the realized
-    % powers are unavailable so the caller falls back to the analytical label.
+    % (channel noise + receiver thermal noise + ADC quantization noise). Returns
+    % NaN when the realized powers are unavailable so the caller falls back to
+    % the analytical label.
     snrDb = NaN;
     sigW = getFieldOrDefault(comp, 'ChannelSignalPowerW', NaN);
     if ~isnumeric(sigW) || ~isscalar(sigW) || ~isfinite(sigW)
@@ -628,6 +637,9 @@ function snrDb = localMeasuredReceivedSnr(comp, thermalNoiseW)
     end
     if isnumeric(thermalNoiseW) && isscalar(thermalNoiseW) && isfinite(thermalNoiseW)
         totalNoiseW = totalNoiseW + double(thermalNoiseW); haveNoise = true;
+    end
+    if nargin >= 3 && isnumeric(quantNoiseW) && isscalar(quantNoiseW) && isfinite(quantNoiseW)
+        totalNoiseW = totalNoiseW + double(quantNoiseW); haveNoise = true;
     end
     if ~haveNoise || ~(totalNoiseW > 0)
         return;

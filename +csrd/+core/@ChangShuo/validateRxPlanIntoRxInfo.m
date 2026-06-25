@@ -124,4 +124,17 @@ function RxInfo = validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx)
     RxInfo.ObservableRange = rxPlan.Observation.ObservableRange;
     RxInfo.CenterFrequency = rxPlan.Observation.CenterFrequency;
     RxInfo.RealCarrierFrequency = rxPlan.Observation.RealCarrierFrequency;
+
+    % Carry the SDR ADC resolution through so the receiver RF chain can impose
+    % the converter's quantization-noise floor (it bounds the realizable SNR at
+    % ~6.02*AdcBits + 1.76 dB). Optional: absent/non-finite leaves ADC modeling
+    % disabled on the block. RxInfo field names match RRFSimulator properties,
+    % so configureReceiverBlock's isprop copy loop wires it automatically.
+    if isfield(rxPlan.Observation, 'Sdr') && isstruct(rxPlan.Observation.Sdr) ...
+            && isfield(rxPlan.Observation.Sdr, 'AdcBits')
+        adcBits = rxPlan.Observation.Sdr.AdcBits;
+        if isnumeric(adcBits) && isscalar(adcBits) && isfinite(adcBits) && adcBits > 0
+            RxInfo.AdcBits = double(adcBits);
+        end
+    end
 end

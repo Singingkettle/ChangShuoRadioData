@@ -181,6 +181,13 @@ classdef ReceiveFactory < matlab.System
                     receivedDataStruct.RealizedThermalNoiseInputReferredW = ...
                         currentReceiverBlock.RealizedThermalNoiseInputReferredW;
                 end
+                % ADC quantization-noise floor (input-referred): summed with the
+                % channel + thermal noise downstream so the measured SNR cannot
+                % exceed the converter's physical dynamic range.
+                if isprop(currentReceiverBlock, 'RealizedAdcQuantizationNoiseInputReferredW')
+                    receivedDataStruct.RealizedAdcQuantizationNoiseInputReferredW = ...
+                        currentReceiverBlock.RealizedAdcQuantizationNoiseInputReferredW;
+                end
 
                 obj.logger.debug('Frame %d, Rx %s: Reception step successful.', frameId, rxIdStr);
             catch ME_step

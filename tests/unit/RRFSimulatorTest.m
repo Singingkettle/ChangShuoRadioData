@@ -104,6 +104,49 @@ classdef RRFSimulatorTest < matlab.unittest.TestCase
             release(sim);
         end
 
+        function adcQuantizationDisabledByDefault(testCase)
+            % With no AdcBits set the converter stage is identity and reports no
+            % realized quantization noise (falls back to thermal-only SNR GT).
+            sim = RRFSimulatorTest.makeSimulator(0);
+            rng(3);
+            sig = complex(0.1 * randn(4096, 1), 0.1 * randn(4096, 1));
+            step(sim, sig);
+            testCase.verifyTrue(isnan(sim.RealizedAdcQuantizationNoiseInputReferredW), ...
+                'AdcBits unset (NaN) must leave ADC quantization disabled.');
+            release(sim);
+        end
+
+        function adcQuantizationCapsSnrAtConverterCeiling(testCase)
+            % A modeled N-bit ADC must bound the realized SNR at ~6.02*N + 1.76 dB.
+            % Feed a clean, strong signal (thermal noise negligible) so the
+            % realized quantization-noise floor sets the SNR, and check the
+            % input-referred quantization power implies the ideal ADC ceiling.
+            adcBits = 12;
+            sim = RRFSimulatorTest.makeSimulator(0);
+            sim.AdcBits = adcBits;
+            rng(4);
+            sig = complex(0.1 * randn(8192, 1), 0.1 * randn(8192, 1));
+            step(sim, sig);
+
+            qnW = sim.RealizedAdcQuantizationNoiseInputReferredW;
+            testCase.verifyTrue(isfinite(qnW) && qnW > 0, ...
+                'A modeled ADC must report a finite positive quantization-noise power.');
+            inPowerW = mean(abs(sig) .^ 2);
+            impliedCeilingDb = 10 * log10(inPowerW / qnW);
+            expectedCeilingDb = 6.02 * adcBits + 1.76;
+            testCase.verifyEqual(impliedCeilingDb, expectedCeilingDb, 'AbsTol', 3, ...
+                'Realized ADC quantization floor must imply the ~6.02N+1.76 dB SNR ceiling.');
+
+            % Fewer bits -> coarser converter -> strictly more quantization noise.
+            simCoarse = RRFSimulatorTest.makeSimulator(0);
+            simCoarse.AdcBits = 8;
+            step(simCoarse, sig);
+            testCase.verifyGreaterThan(simCoarse.RealizedAdcQuantizationNoiseInputReferredW, qnW, ...
+                'An 8-bit converter must add more quantization noise than a 12-bit one.');
+            release(sim);
+            release(simCoarse);
+        end
+
     end
 
     methods (Static, Access = private)

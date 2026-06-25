@@ -6,7 +6,8 @@ classdef RRFSimulator < matlab.System
     %   1. Low-noise amplifier nonlinearity (comm.MemorylessNonlinearity)
     %   2. Thermal noise (comm.ThermalNoise)
     %   3. IQ imbalance (iqimbal)
-    %   4. ADC sample-rate offset in ppm (comm.SampleRateOffset)
+    %   4. ADC quantization noise (additive, sized to 6.02*AdcBits + 1.76 dB)
+    %   5. ADC sample-rate offset in ppm (comm.SampleRateOffset)
     %
     % Stages historically declared but never wired (phase noise, AGC,
     % bandpass filter, Doppler frequency shifter) have been removed from
@@ -21,6 +22,7 @@ classdef RRFSimulator < matlab.System
         BandWidth {mustBePositive, mustBeReal, mustBeInteger} = 20e6 % Receiver bandwidth in Hz (updated default)
         CenterFrequency (1, 1) {mustBeReal, mustBeInteger} = 0 % Center frequency in Hz (now allows 0 for baseband-centric)
         SampleRateOffset (1, 1) {mustBeReal} = 0 % ADC clock offset in parts per million (ppm)
+        AdcBits (1, 1) {mustBeReal} = NaN % ADC resolution in bits; sets the quantization-noise floor (ideal SNR ceiling 6.02*AdcBits + 1.76 dB). NaN disables ADC quantization modeling.
         TimeDuration (1, 1) {mustBePositive, mustBeReal} = 0.1 % Total simulation duration in seconds
         MasterClockRate (1, 1) {mustBePositive, mustBeReal} = 20e6 % Master clock rate in Hz (updated default)
         DCOffset {mustBeReal} = -50 % DC offset in dB
@@ -44,6 +46,10 @@ classdef RRFSimulator < matlab.System
         % receiver-input (channel-output) scale, for the measured received-SNR
         % GT. Measured per step() from the thermal-noise stage and the LNA gain.
         RealizedThermalNoiseInputReferredW double = NaN
+        % Realized ADC quantization-noise power (Watts), referred to the same
+        % receiver-input scale, for the measured received-SNR GT. NaN when ADC
+        % modeling is disabled (AdcBits NaN/non-positive).
+        RealizedAdcQuantizationNoiseInputReferredW double = NaN
     end
 
     properties (Access = private)
@@ -297,7 +303,8 @@ classdef RRFSimulator < matlab.System
             %   1. LNA nonlinearity (comm.MemorylessNonlinearity)
             %   2. Thermal noise   (comm.ThermalNoise)
             %   3. IQ imbalance    (iqimbal)
-            %   4. ADC sample-rate offset (comm.SampleRateOffset, ppm)
+            %   4. ADC quantization noise (additive, 6.02*AdcBits + 1.76 dB)
+            %   5. ADC sample-rate offset (comm.SampleRateOffset, ppm)
             %
             % comm.SampleRateOffset is constructed only for non-zero ppm.
             % The 0 ppm path is an exact identity fast path; non-zero
@@ -331,20 +338,51 @@ classdef RRFSimulator < matlab.System
 
             xIq = obj.IQImbalance(xAwgn);
 
+            % ADC quantization noise. A real N-bit converter imposes a
+            % quantization noise floor that caps the realizable SNR at
+            % ~6.02*N + 1.76 dB; the rest of the RX chain has no amplitude
+            % quantization, so without this the measured received-SNR GT can
+            % exceed any physical ADC (medians ~58 dB, tails > 115 dB observed).
+            % Model it as additive noise sized to the ideal ADC SNR relative to
+            % the digitized signal power (the AGC is assumed to fill the
+            % converter to the received RMS). NaN/non-positive AdcBits leaves the
+            % signal unquantized (identity). A local RandStream seeded from the
+            % digitized signal keeps the draw reproducible without perturbing the
+            % global RNG used elsewhere in the pipeline.
+            xAdc = xIq;
+            obj.RealizedAdcQuantizationNoiseInputReferredW = NaN;
+            if isfinite(obj.AdcBits) && obj.AdcBits > 0
+                signalPowerAtAdc = mean(abs(double(xIq(:))) .^ 2);
+                if signalPowerAtAdc > 0
+                    adcSnrCeilingDb = 6.02 * double(obj.AdcBits) + 1.76;
+                    quantNoisePower = signalPowerAtAdc / 10 ^ (adcSnrCeilingDb / 10);
+                    seedBasis = abs(double(xIq(1:min(16, numel(xIq)))));
+                    seedVal = 1 + mod(sum(round(seedBasis(:) * 1e6)) + numel(xIq), 2 ^ 31 - 2);
+                    rs = RandStream('mt19937ar', 'Seed', seedVal);
+                    noiseStd = sqrt(quantNoisePower / 2);
+                    xAdc = xIq + noiseStd * (randn(rs, size(xIq)) + 1i * randn(rs, size(xIq)));
+                    % Refer the quantization noise to the receiver-input scale
+                    % (divide out the LNA power gain; IQ-imbalance power gain ~= 1)
+                    % so it sums with the channel and thermal noise on the scale
+                    % the measured SNR GT uses.
+                    obj.RealizedAdcQuantizationNoiseInputReferredW = quantNoisePower / lnaPowerGain;
+                end
+            end
+
             obj.ensureSampleShifterObject();
             if obj.SampleRateOffset == 0
-                outputSignal = xIq;
+                outputSignal = xAdc;
                 action = 'identity';
                 applied = false;
             else
-                outputSignal = obj.SampleShifter(xIq);
+                outputSignal = obj.SampleShifter(xAdc);
                 action = 'sample-rate-offset';
                 applied = true;
             end
             obj.SampleRateOffsetInfo = struct( ...
                 'Applied', applied, ...
                 'OffsetPpm', double(obj.SampleRateOffset), ...
-                'InputSamples', size(xIq, 1), ...
+                'InputSamples', size(xAdc, 1), ...
                 'OutputSamples', size(outputSignal, 1), ...
                 'Action', action);
         end
