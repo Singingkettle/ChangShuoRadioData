@@ -279,15 +279,15 @@ for s = 1:numel(sources)
     if ~isfield(rv, 'ProjectedLowerEdgeHz') || ~isfield(rv, 'ProjectedUpperEdgeHz')
         continue;
     end
-    lowerHz = double(rv.ProjectedLowerEdgeHz);
-    upperHz = double(rv.ProjectedUpperEdgeHz);
+    % Draw the box at the MEASURED center/bandwidth (the realized signal,
+    % including Doppler), consistent with the COCO bbox and the measured-over-
+    % planned GT rule -- not the planner's pre-Doppler Projected edges. Fall
+    % back to the planned edges only when the measurement is unavailable, and
+    % clamp to the receiver view (a measured band can spill slightly past +/-fs/2).
+    [lowerHz, upperHz] = localOverlayBandHz(src, rv, fs);
     if ~isfinite(lowerHz) || ~isfinite(upperHz) || upperHz <= lowerHz
         continue;
     end
-    assert(lowerHz >= -fs / 2 - 1 && upperHz <= fs / 2 + 1, ...
-        'CSRD:VisualCheck:RectangleOutOfBounds', ...
-        'Annotation rectangle [%.3f, %.3f] Hz is outside receiver view +/- %.3f Hz.', ...
-        lowerHz, upperHz, fs / 2);
     [x0, x1] = localSourceTimeBounds(src, duration);
     if x1 <= x0
         continue;
@@ -433,11 +433,9 @@ for s = 1:numel(sources)
     if ~isfield(rv, 'ProjectedLowerEdgeHz') || ~isfield(rv, 'ProjectedUpperEdgeHz')
         continue;
     end
-    lowerHz = double(rv.ProjectedLowerEdgeHz);
-    upperHz = double(rv.ProjectedUpperEdgeHz);
+    [lowerHz, upperHz] = localOverlayBandHz(src, rv, fs);
     [x0, x1] = localSourceTimeBounds(src, 1);
-    if isfinite(lowerHz) && isfinite(upperHz) && upperHz > lowerHz && ...
-            lowerHz >= -fs / 2 - 1 && upperHz <= fs / 2 + 1 && x1 > x0
+    if isfinite(lowerHz) && isfinite(upperHz) && upperHz > lowerHz && x1 > x0
         rectCount = rectCount + 1;
     end
 end
@@ -462,5 +460,34 @@ for k = 1:numel(summary.Records)
     fprintf(fid, '- Rectangles: %d\n', summary.Records(k).RectangleCount);
     fprintf(fid, '- Annotation: `%s`\n\n', summary.Records(k).AnnotationPath);
     fprintf(fid, '![%s](%s%s)\n\n', name, name, ext);
+end
+end
+
+function [lowerHz, upperHz] = localOverlayBandHz(src, rv, fs)
+% localOverlayBandHz - Frequency band of the GT box for the spectrogram overlay.
+% Uses the MEASURED center / occupied bandwidth (the realized, Doppler-shifted
+% signal), clamped to the receiver view, consistent with the COCO bbox; falls
+% back to the planner's projected edges only when the measurement is missing.
+lowerHz = NaN;
+upperHz = NaN;
+centerHz = NaN;
+bwHz = NaN;
+if isfield(src, 'Truth') && isstruct(src.Truth) && isfield(src.Truth, 'Measured') && ...
+        isstruct(src.Truth.Measured) && isfield(src.Truth.Measured, 'SourcePlane') && ...
+        isstruct(src.Truth.Measured.SourcePlane)
+    spm = src.Truth.Measured.SourcePlane;
+    if isfield(spm, 'CenterFrequencyHz') && ~isempty(spm.CenterFrequencyHz)
+        centerHz = double(spm.CenterFrequencyHz);
+    end
+    if isfield(spm, 'OccupiedBandwidthHz') && ~isempty(spm.OccupiedBandwidthHz)
+        bwHz = double(spm.OccupiedBandwidthHz);
+    end
+end
+if isfinite(centerHz) && isfinite(bwHz) && bwHz > 0
+    lowerHz = max(-fs / 2, centerHz - bwHz / 2);
+    upperHz = min(fs / 2, centerHz + bwHz / 2);
+elseif isfield(rv, 'ProjectedLowerEdgeHz') && isfield(rv, 'ProjectedUpperEdgeHz')
+    lowerHz = max(-fs / 2, double(rv.ProjectedLowerEdgeHz));
+    upperHz = min(fs / 2, double(rv.ProjectedUpperEdgeHz));
 end
 end
