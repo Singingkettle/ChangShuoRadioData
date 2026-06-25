@@ -62,6 +62,13 @@ function config = channel_factory()
     config.Factories.Channel.LinkBudget.ThermalNoisePSD = -174;      % dBm/Hz (kTB at 290K)
     config.Factories.Channel.LinkBudget.MinDistance = 0.01;           % km (clamp to avoid infinite gain)
     config.Factories.Channel.LinkBudget.EnableDistanceBasedSNR = true;
+    % Controlled target-SNR band (dB). Used only when EnableDistanceBasedSNR is
+    % false: each burst draws a uniform target SNR from this range so the dataset
+    % covers the spectrum-sensing-useful band instead of the physically-emergent
+    % (often very high) link-budget SNR. The link-budget value is still recorded
+    % as ComputedSNR/AnalyticalSNRdB for provenance, and the physical distance
+    % still drives path loss and Doppler.
+    config.Factories.Channel.LinkBudget.TargetSnrRangeDb = [-10, 30];
 
     % Default model selection by scenario map profile
     config.Factories.Channel.DefaultModels.Statistical = 'AWGN';

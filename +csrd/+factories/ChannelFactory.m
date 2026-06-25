@@ -176,9 +176,18 @@ classdef ChannelFactory < matlab.System
             obj.logger.debug('Link %s->%s: dist=%.1fm, PL=%.1fdB, SNR=%.1fdB', ...
                 txIdStr, rxIdStr, linkDistance_m, computedPathLoss_dB, computedSNR_dB);
 
+            % Resolve the SNR actually applied to the channel: the analytical
+            % link-budget value (distance-based mode) or a per-burst sample from
+            % the configured target range (controlled mode), used to shape the
+            % dataset SNR into the spectrum-sensing-useful band rather than the
+            % physically-emergent (often very high) link-budget value. ComputedSNR
+            % keeps the link-budget reference for provenance either way.
+            appliedSNR_dB = obj.resolveAppliedSnr(computedSNR_dB, linkDistance_m, ...
+                frameId, txIdStr, rxIdStr, channelLinkSpecificInfo);
+
             if ~obj.isRayTracingSelected
                 obj.configureStatisticalBlock(currentChannelBlock, frameId, txIdStr, rxIdStr, ...
-                    txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB);
+                    txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, appliedSNR_dB);
             end
 
             try
@@ -195,6 +204,14 @@ classdef ChannelFactory < matlab.System
 
                 receivedSignalStruct = obj.mergeChannelOutput(inputSignalStruct, channelBlockOutput);
                 receivedSignalStruct.LinkDistance = linkDistance_m;
+
+                % Controlled target-SNR for channels that carry no noise of
+                % their own (RayTracing propagation, fading): inject AWGN sized
+                % to the resolved target SNR so the realized SNR is controlled
+                % for every channel model, not just AWGN. No-op in distance-based
+                % mode or when the channel already established a noise floor.
+                receivedSignalStruct = obj.applyControlledSnrNoise(receivedSignalStruct, ...
+                    appliedSNR_dB, frameId, txIdStr, rxIdStr, channelLinkSpecificInfo);
 
                 % Always preserve the analytical FSPL value so AI/ML
                 % consumers can reason about the link budget that the
@@ -219,7 +236,7 @@ classdef ChannelFactory < matlab.System
                         channelBlockOutput.AppliedSNRdB;
                 elseif ~isfield(receivedSignalStruct, 'AppliedSNRdB') || ...
                         isempty(receivedSignalStruct.AppliedSNRdB)
-                    receivedSignalStruct.AppliedSNRdB = computedSNR_dB;
+                    receivedSignalStruct.AppliedSNRdB = appliedSNR_dB;
                 end
                 receivedSignalStruct.ChannelModel = channelModelName;
 
@@ -412,8 +429,90 @@ classdef ChannelFactory < matlab.System
             end
         end
 
+        function appliedSNR_dB = resolveAppliedSnr(obj, computedSNR_dB, linkDistance_m, ...
+                frameId, txIdStr, rxIdStr, channelLinkInfo)
+            % resolveAppliedSnr - The SNR to apply to the statistical channel.
+            %   Distance-based mode (LinkBudget.EnableDistanceBasedSNR=true):
+            %     the analytical link-budget SNR, unchanged.
+            %   Controlled mode (false): a per-burst uniform sample from
+            %     LinkBudget.TargetSnrRangeDb, shaping the dataset SNR into the
+            %     spectrum-sensing-useful band instead of the physically-emergent
+            %     (often very high) link-budget value. The sample is
+            %     deterministic per burst (reuses the channel-seed derivation,
+            %     so the same burst keeps the same SNR) and is drawn from a local
+            %     RandStream so it does not perturb the global RNG.
+            enableDistSNR = true;
+            if isfield(obj.factoryConfig, 'LinkBudget') && ...
+                    isfield(obj.factoryConfig.LinkBudget, 'EnableDistanceBasedSNR')
+                enableDistSNR = obj.factoryConfig.LinkBudget.EnableDistanceBasedSNR;
+            end
+            if enableDistSNR && linkDistance_m > 0
+                appliedSNR_dB = computedSNR_dB;
+                return;
+            end
+
+            rangeDb = [-10, 30];
+            if isfield(obj.factoryConfig, 'LinkBudget') && ...
+                    isfield(obj.factoryConfig.LinkBudget, 'TargetSnrRangeDb')
+                candidate = obj.factoryConfig.LinkBudget.TargetSnrRangeDb;
+                if isnumeric(candidate) && numel(candidate) == 2 && ...
+                        all(isfinite(candidate)) && candidate(2) >= candidate(1)
+                    rangeDb = double(candidate(:)');
+                end
+            end
+            baseSeed = obj.deriveChannelSeed(frameId, txIdStr, rxIdStr, channelLinkInfo);
+            snrSeed = 1 + mod(double(baseSeed) + 7919, 2 ^ 31 - 2);
+            rs = RandStream('mt19937ar', 'Seed', snrSeed);
+            appliedSNR_dB = rangeDb(1) + (rangeDb(2) - rangeDb(1)) * rand(rs);
+        end
+
+        function out = applyControlledSnrNoise(obj, out, appliedSNR_dB, ...
+                frameId, txIdStr, rxIdStr, channelLinkInfo)
+            % applyControlledSnrNoise - Realize the controlled target SNR for
+            %   channels that carry no noise of their own. AWGN channels already
+            %   realize the target via their SNRdB (ChannelNoisePowerW > 0) and
+            %   are left untouched; RayTracing propagation and fading channels
+            %   only attenuate/fade, so here we inject AWGN sized to
+            %   appliedSNR_dB relative to the realized signal power. No-op in
+            %   distance-based mode. The noise is deterministic per burst (local
+            %   RandStream, salted differently from the SNR draw) so it is
+            %   reproducible and does not perturb the global RNG.
+            enableDistSNR = true;
+            if isfield(obj.factoryConfig, 'LinkBudget') && ...
+                    isfield(obj.factoryConfig.LinkBudget, 'EnableDistanceBasedSNR')
+                enableDistSNR = obj.factoryConfig.LinkBudget.EnableDistanceBasedSNR;
+            end
+            if enableDistSNR
+                return;
+            end
+            if ~isstruct(out) || ~isfield(out, 'Signal') || isempty(out.Signal)
+                return;
+            end
+            alreadyNoised = isfield(out, 'ChannelNoisePowerW') && ...
+                isnumeric(out.ChannelNoisePowerW) && isscalar(out.ChannelNoisePowerW) && ...
+                isfinite(out.ChannelNoisePowerW) && out.ChannelNoisePowerW > 0;
+            if alreadyNoised
+                return;
+            end
+            sig = double(out.Signal);
+            signalPowerW = mean(abs(sig(:)) .^ 2);
+            if ~(signalPowerW > 0)
+                return;
+            end
+            targetNoiseW = signalPowerW / 10 ^ (double(appliedSNR_dB) / 10);
+            baseSeed = obj.deriveChannelSeed(frameId, txIdStr, rxIdStr, channelLinkInfo);
+            noiseSeed = 1 + mod(double(baseSeed) + 104729, 2 ^ 31 - 2);
+            rs = RandStream('mt19937ar', 'Seed', noiseSeed);
+            noiseStd = sqrt(targetNoiseW / 2);
+            out.Signal = sig + noiseStd * (randn(rs, size(sig)) + 1i * randn(rs, size(sig)));
+            % Record the clean signal power (pre-injection) and the injected
+            % noise power so the measured received-SNR GT reflects the target.
+            out.ChannelSignalPowerW = signalPowerW;
+            out.ChannelNoisePowerW = targetNoiseW;
+        end
+
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...
-                txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, computedSNR_dB)
+                txSpecificInfo, rxSpecificInfo, channelLinkSpecificInfo, linkDistance_m, appliedSNR_dB)
             % NOTE: linkDistance_m is in METERS to match the documented
             % Inputs: see signature arguments and local validation.
             % Outputs: see signature return values and contract fields.
@@ -428,18 +527,21 @@ classdef ChannelFactory < matlab.System
                 enableDistSNR = obj.factoryConfig.LinkBudget.EnableDistanceBasedSNR;
             end
 
-            if enableDistSNR && linkDistance_m > 0
-                if isprop(currentChannelBlock, 'SNRdB')
-                    currentChannelBlock.SNRdB = computedSNR_dB;
-                end
-                if isprop(currentChannelBlock, 'Distance')
-                    try
-                        % BaseChannel.Distance is documented in METERS.
-                        currentChannelBlock.Distance = max(linkDistance_m, 1);
-                    catch ME_dist
-                        error('CSRD:Channel:DistanceAssignmentFailed', ...
-                            'Could not update channel Distance: %s', ME_dist.message);
-                    end
+            % Apply the resolved SNR (link-budget value or controlled-target
+            % sample). AWGN scales its noise from SNRdB, so this sets the
+            % realized SNR; fading blocks without channel noise simply ignore it.
+            % The physical link Distance is still recorded for the distance-based
+            % fading / Doppler path.
+            if isprop(currentChannelBlock, 'SNRdB')
+                currentChannelBlock.SNRdB = appliedSNR_dB;
+            end
+            if enableDistSNR && linkDistance_m > 0 && isprop(currentChannelBlock, 'Distance')
+                try
+                    % BaseChannel.Distance is documented in METERS.
+                    currentChannelBlock.Distance = max(linkDistance_m, 1);
+                catch ME_dist
+                    error('CSRD:Channel:DistanceAssignmentFailed', ...
+                        'Could not update channel Distance: %s', ME_dist.message);
                 end
             end
 

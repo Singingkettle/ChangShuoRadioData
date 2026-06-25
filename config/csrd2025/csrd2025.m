@@ -84,6 +84,18 @@ function config = csrd2025()
     % - Receive: Receiver factory configuration (from _base_/factories/receive_factory.m)
     % All factory configurations will be automatically merged during config loading
 
+    % Dataset SNR shaping: use the controlled target-SNR mode so each burst's
+    % realized SNR is drawn uniformly from a spectrum-sensing-useful band rather
+    % than the physically-emergent link-budget value. Even at realistic
+    % distances the link-budget SNR is dominated by high broadcast/mobile
+    % transmit powers and narrowband noise bandwidths and sits far too high
+    % (median ~58 dB) for detection/classification training. The physical
+    % distance still drives path loss and Doppler, the link-budget SNR is still
+    % recorded as ComputedSNR provenance, and the receiver ADC dynamic range
+    % still bounds the realized SNR.
+    config.Factories.Channel.LinkBudget.EnableDistanceBasedSNR = false;
+    config.Factories.Channel.LinkBudget.TargetSnrRangeDb = [-10, 30];
+
     % Configuration metadata - matches initialize_csrd_configuration.m structure
     config.Metadata.Version = '2025.1.0';
     config.Metadata.CreatedDate = datetime('now');
