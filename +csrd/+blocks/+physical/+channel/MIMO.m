@@ -401,10 +401,19 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             pathLossLinear = 10 ^ (obj.PathLoss / 20);
             attenuatedSignal = inputSignal.Signal / pathLossLinear;
 
-            % Update channel with current sample rate (release and reconfigure if needed)
-            if isLocked(obj.MultipathChannel) && ...
-                    obj.MultipathChannel.SampleRate ~= inputSignal.SampleRate
-                release(obj.MultipathChannel);
+            % Align the inner channel to the REAL signal sample rate. The cached
+            % channel block is released per frame, so by the time we get here the
+            % comm.MIMOChannel is usually fresh/unlocked -- the old
+            % isLocked()-gated update therefore never fired, leaving the inner
+            % channel at the BaseChannel default SampleRate (200 kHz) while the
+            % signal runs at e.g. 50 MHz. That ~250x time-base error grossly
+            % over-spreads the Jakes/Doppler fading and shrinks the multipath
+            % PathDelays to sub-sample. Set the rate whenever it differs,
+            % releasing first only if the object is already locked.
+            if obj.MultipathChannel.SampleRate ~= inputSignal.SampleRate
+                if isLocked(obj.MultipathChannel)
+                    release(obj.MultipathChannel);
+                end
                 obj.MultipathChannel.SampleRate = inputSignal.SampleRate;
             end
 
