@@ -608,9 +608,15 @@ classdef TRFSimulator < matlab.System
             csrd.runtime.performance.trace('event', 'TRF.IQImbalance', ...
                 toc(stageStart), traceMeta);
 
-            % Step 2: Add DC offset to model transmitter bias and LO leakage
+            % Step 2: Add DC offset to model transmitter bias and LO leakage.
+            % DCOffset is a dB level; the DC term is an AMPLITUDE added to the
+            % (unit-power) baseband, so the dB->linear conversion must use the
+            % amplitude factor 10^(dB/20). Using the power factor 10^(dB/10)
+            % made the realized LO-leakage spur ~2x too many dB below the signal
+            % (e.g. -50 dB -> -100 dBc), disagreeing with the dB recorded in
+            % RFImpairments.DCOffset.
             stageStart = tic;
-            processedSignal = processedSignal + 10 ^ (obj.DCOffset / 10);
+            processedSignal = processedSignal + 10 ^ (obj.DCOffset / 20);
             csrd.runtime.performance.trace('event', 'TRF.DCOffset', ...
                 toc(stageStart), traceMeta);
 
