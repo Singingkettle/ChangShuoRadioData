@@ -50,6 +50,15 @@ function fcHz = spectrumCentroid(signal, sampleRate)
     N = length(signalCol);
     spec = fftshift(fft(double(signalCol)));
     psd = abs(spec) .^ 2;
+    % Float the integration threshold with the signal peak (matching the
+    % peak-relative OBW estimator) so broadband AWGN -- symmetric about 0 Hz --
+    % does not pull the measured center frequency toward baseband. Clipping
+    % bins below peak*10^(-3/10) tracks the signal peak instead of the noise
+    % floor; a clean single tone keeps its main lobe intact.
+    peakVal = max(psd);
+    if peakVal > 0
+        psd(psd < peakVal * 10 ^ (-3 / 10)) = 0;
+    end
     totalPower = sum(psd);
     if totalPower <= 0
         fcHz = 0;

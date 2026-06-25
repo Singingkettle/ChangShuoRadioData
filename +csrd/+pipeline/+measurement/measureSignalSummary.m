@@ -164,6 +164,17 @@ function fcHz = localSpectrumCentroid(signalCol, sampleRate)
 N = length(signalCol);
 spec = fftshift(fft(double(signalCol)));
 psd = abs(spec) .^ 2;
+% Float the integration threshold with the signal peak (matching the
+% peak-relative OBW estimator) before forming the energy-weighted mean.
+% Broadband AWGN is symmetric about 0 Hz, so integrating the raw PSD pulls the
+% measured center toward baseband by signalPower/(signalPower+inBandNoise) --
+% biasing the measured CenterFrequencyHz GT by MHz at realistic SNRs, worst for
+% edge-of-band emitters. Clipping bins below peak*10^(-3/10) tracks the signal
+% peak instead of the noise floor; a clean single tone keeps its main lobe.
+peakVal = max(psd);
+if peakVal > 0
+    psd(psd < peakVal * 10 ^ (-3 / 10)) = 0;
+end
 totalPower = sum(psd);
 if totalPower <= 0
     fcHz = 0;
