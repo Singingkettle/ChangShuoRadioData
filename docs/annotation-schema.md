@@ -86,7 +86,7 @@ Legacy v1 top-level fields are forbidden: `Realized`, `Planned`, `Temporal`,
 
 | Field | Unit | Meaning |
 |-------|------|---------|
-| `PlannedCenterFrequencyHz` | Hz | Blueprint center frequency |
+| `PlannedCenterFrequencyHz` | Hz | Planned source center as a **receiver-baseband offset** (same frame as `Execution.CenterFrequencyOffsetHz` and `ReceiverView.ProjectedCenterOffsetHz`), not an absolute RF carrier |
 | `PlannedBandwidthHz` | Hz | Blueprint bandwidth |
 | `PlannedSampleRate` | Hz | Planned sample rate |
 | `ModulationFamily` | text | Design category, used by downstream classifiers |
@@ -95,6 +95,15 @@ Legacy v1 top-level fields are forbidden: `Realized`, `Planned`, `Temporal`,
 | `IsDigital` | logical | Whether the modulation family is digital |
 | `PayloadLengthBits` | bits | Planned payload length |
 | `NumTransmitAntennas` | count | Planned transmit antenna count |
+
+All annotation frequencies are receiver-centered: the carrier `RealCarrierFrequency`
+deliberately never enters baseband/waveform generation (it drives only path loss,
+antenna pattern, and Doppler). `PlannedCenterFrequencyHz` is therefore a baseband
+offset relative to the receiver tuned center, in the same frame as the Execution
+and Measured center fields — despite the historical "CenterFrequency" name. A
+consumer that needs an absolute RF center must add the owning receiver's
+`RealCarrierFrequency`; reading this field as an absolute carrier is wrong by ~the
+tuned frequency.
 
 `Truth.Design.ModulationFamily` is the class label source for COCO conversion.
 It is not inferred from IQ.

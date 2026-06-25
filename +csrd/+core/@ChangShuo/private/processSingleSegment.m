@@ -135,6 +135,12 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         % flagged by `validateMeasurementCompleteness` / smoke tests).
         modulatedSignalSegment.Planned.PlannedBandwidthHz = ...
             currentSegmentScenario.Placement.TargetBandwidth;
+        % PlannedCenterFrequencyHz is a receiver-baseband offset (the
+        % ReceiverView projected center), NOT an absolute RF carrier: the
+        % carrier deliberately never enters baseband/Design (see
+        % docs/annotation-schema.md Truth.Design and the spectrum-blueprint
+        % refactor §C). This keeps it in the same frame as the Execution
+        % and Measured center fields so measured-vs-planned stays comparable.
         modulatedSignalSegment.Planned.PlannedCenterFrequencyHz = ...
             currentSegmentScenario.Placement.FrequencyOffset;
         modulatedSignalSegment.Planned.StartTimeSec = ...
