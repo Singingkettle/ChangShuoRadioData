@@ -21,14 +21,16 @@ value silently mislabels training data.
 | `19eb4eb` | **TX DCOffset dB→linear used the power factor `/10`** (MEDIUM) | `TRFSimulator` added the DC/LO-leakage term as `10^(DCOffset/10)`; DCOffset is a dB level and the term is an amplitude, so it must be `10^(dB/20)`. The realized DC spur was ~2× too many dB below the signal (−50 dB → −100 dBc), disagreeing with the dB recorded in `RFImpairments.DCOffset`. | use the amplitude factor `10^(DCOffset/20)` |
 | `8612673` | **COCO bbox center used the planned offset, not the measured center** (MEDIUM) | `makeFrequencyBbox` built the box center from `ReceiverView.ProjectedCenterOffsetHz` (the planner's pre-Doppler offset) while taking the width from the measured OBW — so with non-trivial Doppler the detection box was mis-centered on the realized lobe, inconsistent with the project's own measured-over-planned rule. | center on measured `SourcePlane.CenterFrequencyHz`; regression test with a Doppler-divergent center |
 
-## Flagged (1, low — spawned as a separate task)
+## Flagged (1, low) — RETRACTED as a false lead (`0435796`)
 
-- **`Design.PlannedCenterFrequencyHz` stores the receiver-baseband offset, not an absolute RF center**
-  (`processSingleSegment.m:138-139` assigns `Placement.FrequencyOffset`). The schema documents it as the
-  absolute "Blueprint center frequency". This is the **Design** (planning) plane — not GT — so impact is
-  low, and the value appears to be a deliberate "offset now, add the absolute carrier later" placeholder.
-  Left for the owner; a downstream consumer reading `metadata.design.PlannedCenterFrequencyHz` as an
-  absolute RF center would be off by ~the receiver tuned frequency.
+- **`Design.PlannedCenterFrequencyHz` stores the receiver-baseband offset, not an absolute RF center.**
+  Originally flagged because the schema doc called it an absolute "Blueprint center frequency". On review
+  the offset is **correct by design**: CSRD generates the complex-baseband / equivalent-lowpass envelope
+  and places emitters by complex-exponential offset relative to the receiver's tuned center — the
+  absolute GHz carrier is deliberately never synthesized (it is unsamplable under Nyquist; sampling
+  2.4 GHz would need >4.8 Gsps). The carrier is used only for the frequency-dependent physics (path loss,
+  Doppler). So the field SHOULD be an offset; only the schema doc was wrong. Fixed by clarifying the code
+  comment + schema doc (`0435796`). Not a bug.
 
 ## Verification
 `checkcode` clean on the changed code; TRFSimulatorTest, ConvertCsrdToCocoTest (incl. the new
