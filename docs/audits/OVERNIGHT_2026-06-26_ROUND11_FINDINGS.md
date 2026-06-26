@@ -18,8 +18,12 @@ bug), batched 4 dimensions at a time to stay under API rate limits, with 3-angle
 
 ## Flagged — need a focused dig (1 + 1 residual)
 
-- **Residual multicarrier narrow-band** (HIGH) — **ROOT-CAUSED (round-11 deep dig), design decision for
-  the owner.** After the 200/400 Hz fallback fix, ~26% of OFDM still realize ~586 kHz for a planned
+- **Residual multicarrier narrow-band** (HIGH) — **ROOT-CAUSED + FIXED (option A, owner-approved).**
+  The owner chose option A; implemented: `scs = min(max(15 kHz, 2/minBurst), bandwidth/12)` threaded
+  through the modulation-config builders + the OTFS branch. Median realized/planned OBW went from
+  ~0.015 (collapsed) to **0.99**. Residuals are fundamental OFDM-in-a-tiny-window feasibility limits
+  (very short bursts can't resolve a full-bandwidth symbol; sub-180 kHz channels hit the >= 12-subcarrier
+  floor) -- option B territory if ever needed. Original analysis below: After the 200/400 Hz fallback fix, ~26% of OFDM still realize ~586 kHz for a planned
   40 MHz. The earlier "grid not reaching the modulator" hypothesis was REFUTED by instrumentation: the
   OFDM modulators all use the correct grid (15 kHz SCS, FFT 1024/2048, SampleRate 15.36/30.72 MHz, 665/1331
   data subcarriers → a genuine 10–20 MHz signal). The real cause is a **symbol-vs-frame duration tension**:
