@@ -143,15 +143,21 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         
         % Calculate total transmission duration from intervals
         totalTxDuration = calculateTotalTransmissionDuration(txPlan.Temporal);
+        % Shortest single burst (on-interval): an OFDM/OTFS symbol must fit
+        % within one burst (the transmit gating cuts per burst), so the
+        % multicarrier subcarrier spacing is sized from this, NOT the summed
+        % total (which over-counts and yields a too-long symbol that truncates).
+        minBurstDuration = calculateMinTransmissionInterval(txPlan.Temporal);
 
         % 3. Third: Generate MODULATION config (symbol rate derived from bandwidth)
         if regulatoryEnabled
             txPlan.Modulation = generateRegulatoryModulationConfig(obj, ...
-                txPlan.Spectrum.PlannedBandwidth, modParams, regulatoryEmitterPlan);
+                txPlan.Spectrum.PlannedBandwidth, modParams, regulatoryEmitterPlan, ...
+                minBurstDuration);
             modulationFamily = regulatoryEmitterPlan.ModulationFamily;
         else
             txPlan.Modulation = generateModulationConfig(obj, ...
-                txPlan.Spectrum.PlannedBandwidth, modParams);
+                txPlan.Spectrum.PlannedBandwidth, modParams, minBurstDuration);
             modulationFamily = txPlan.Modulation.Type;
         end
         txPlan.Hardware.NumAntennas = selectNumAntennasForModulation( ...
@@ -538,7 +544,25 @@ function totalDuration = calculateTotalTransmissionDuration(transmissionPattern)
     end
 end
 
-function modConfig = generateModulationConfig(obj, bandwidth, modParams)
+function minInterval = calculateMinTransmissionInterval(transmissionPattern)
+    % calculateMinTransmissionInterval - Shortest single on-interval (burst).
+    % The transmit gating cuts the modulated signal per burst, so a multicarrier
+    % symbol must fit ONE burst; this returns the tightest such constraint.
+    intervals = transmissionPattern.Intervals;
+    if isempty(intervals) || (size(intervals, 1) == 1 && all(intervals == 0))
+        minInterval = 0;
+        return;
+    end
+    durations = intervals(:, 2) - intervals(:, 1);
+    durations = durations(durations > 0);
+    if isempty(durations)
+        minInterval = 0;
+    else
+        minInterval = min(durations);
+    end
+end
+
+function modConfig = generateModulationConfig(obj, bandwidth, modParams, burstDurationSec)
     % generateModulationConfig - Generate modulation config from scenario params
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
@@ -595,7 +619,7 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     else
         modConfig.BitsPerSymbol = 1;  % For analog modulations
     end
-    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth);
+    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec);
     
     obj.logger.debug('Scenario: Modulation %s, Order %d, SymbolRate %.2f kHz', ...
         modConfig.Type, modConfig.Order, modConfig.SymbolRate / 1e3);
@@ -629,7 +653,7 @@ function symbolRate = snapNarrowSymbolRateToReceiverGrid(obj, rawSymbolRate)
     end
 end
 
-function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
+function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan, burstDurationSec)
     % generateRegulatoryModulationConfig - Generate modulation config from a
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
@@ -664,21 +688,32 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
     else
         modConfig.BitsPerSymbol = 1;
     end
-    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth);
+    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec);
     obj.logger.debug(['Scenario: Regulatory modulation %s, Order %d, ', ...
         'SymbolRate %.2f kHz, Band=%s'], modConfig.Type, ...
         modConfig.Order, modConfig.SymbolRate / 1e3, emitterPlan.BandId);
 end
 
-function [fftLength, guard, scs, cpLen] = localOfdmGridForBandwidth(bandwidth)
-    % localOfdmGridForBandwidth - standards-faithful OFDM grid that tracks the
-    % planned channel bandwidth. Subcarrier spacing is FIXED at the LTE/5G-NR
-    % numerology-0 value (15 kHz); the FFT size and the number of used
-    % subcarriers scale with the bandwidth, so realized OBW = usableBins*scs
-    % approximates the planned bandwidth. The previous code instead inflated the
-    % spacing on a FIXED 1760-bin grid with a max(15 kHz, .) floor, which pinned
-    % realized OBW to 1760*15 kHz = 26.4 MHz for every channel <= 26.4 MHz.
-    scs = 15e3;
+function [fftLength, guard, scs, cpLen] = localOfdmGridForBandwidth(bandwidth, burstDurationSec)
+    % localOfdmGridForBandwidth - OFDM grid that tracks the planned channel
+    % bandwidth AND fits the burst duration. The subcarrier spacing sets the
+    % OFDM symbol duration (1/scs); the FFT size and used-subcarrier count scale
+    % with the bandwidth so realized OBW = usableBins*scs ~= bandwidth.
+    %
+    % Spacing is the LTE/5G-NR numerology-0 value (15 kHz, 66.7 us symbol) when
+    % the burst is long enough, but is RAISED so at least 2 OFDM symbols fit the
+    % burst (scs >= 2/burstDuration). The dataset's frames are 20-82 us, shorter
+    % than a 15 kHz symbol, so a fixed 15 kHz grid was truncated by the transmit
+    % gating to a sub-symbol fragment whose measured OBW collapsed to ~586 kHz.
+    if nargin < 2 || isempty(burstDurationSec) || ~(burstDurationSec > 0)
+        burstDurationSec = 2e-5;   % shortest dataset frame; keeps the grid valid if unknown
+    end
+    % Raise the spacing so >= 2 OFDM symbols fit the burst, but CAP it at
+    % bandwidth/12 so the realized OBW (= numUsed*scs) stays ~= the planned
+    % bandwidth (>= 12 subcarriers) instead of over-shooting Nyquist when the
+    % burst is very short (a too-large scs would force numUsed to the 12 floor
+    % and realize 12*scs >> bandwidth, then alias on the resample to 50 MHz).
+    scs = min(max(15e3, 2 / burstDurationSec), bandwidth / 12);
     numUsed = max(12, round(bandwidth / scs));         % used (data+pilot) subcarriers
     fftSet = [256, 512, 1024, 2048, 4096];             % comm.OFDMModulator-supported sizes
     idx = find(fftSet >= numUsed / 0.85, 1);           % leave ~15% for guard bands
@@ -692,7 +727,7 @@ function [fftLength, guard, scs, cpLen] = localOfdmGridForBandwidth(bandwidth)
     cpLen = round(fftLength / 14);                      % ~7% cyclic prefix (LTE normal CP)
 end
 
-function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
+function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec)
     % buildRegulatoryModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
@@ -700,7 +735,7 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
     switch char(string(modConfig.Type))
         case 'OFDM'
             [fftLength, guard, subcarrierSpacing, cpLen] = ...
-                localOfdmGridForBandwidth(bandwidth);
+                localOfdmGridForBandwidth(bandwidth, burstDurationSec);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
@@ -722,7 +757,7 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
     end
 end
 
-function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
+function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec)
     % buildLegacyModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
@@ -730,7 +765,7 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
     switch char(string(modConfig.Type))
         case 'OFDM'
             [fftLength, guard, subcarrierSpacing, cpLen] = ...
-                localOfdmGridForBandwidth(bandwidth);
+                localOfdmGridForBandwidth(bandwidth, burstDurationSec);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
@@ -741,11 +776,16 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             modulatorConfig.ofdm.Windowing = false;
             modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
         case 'OTFS'
-            % Realized OBW = (DelayLength-8)*scs. Fix the spacing at 15 kHz and
-            % scale the delay grid with the planned bandwidth so OBW tracks it,
-            % instead of the max(15 kHz, .) floor on a fixed 512-bin grid that
-            % pinned OBW to 504*15 kHz = 7.56 MHz for every channel <= 7.56 MHz.
-            subcarrierSpacing = 15e3;
+            % Realized OBW = (DelayLength-8)*scs; the OTFS symbol duration is
+            % 1/scs. Raise the spacing so >= 2 symbols fit the burst (same
+            % symbol-vs-frame fit as OFDM) and scale the delay grid with the
+            % planned bandwidth so OBW tracks it.
+            if nargin < 3 || isempty(burstDurationSec) || ~(burstDurationSec > 0)
+                burstDurationSec = 2e-5;
+            end
+            % Cap as in localOfdmGridForBandwidth so the realized OBW stays ~=
+            % the planned bandwidth and the symbol fits the burst.
+            subcarrierSpacing = min(max(15e3, 2 / burstDurationSec), bandwidth / 12);
             delayLength = max(16, round(bandwidth / subcarrierSpacing) + 8);
 
             modulatorConfig.base.mode = "qam";
@@ -759,7 +799,7 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             % (same grid as OFDM), instead of the max(15 kHz, .) floor on a fixed
             % 300-subcarrier grid that pinned OBW to 300*15 kHz = 4.5 MHz.
             [fftLength, guard, subcarrierSpacing, cpLen] = ...
-                localOfdmGridForBandwidth(bandwidth);
+                localOfdmGridForBandwidth(bandwidth, burstDurationSec);
             dataSubcarriers = fftLength - 2 * guard;
 
             modulatorConfig.base.mode = "qam";
