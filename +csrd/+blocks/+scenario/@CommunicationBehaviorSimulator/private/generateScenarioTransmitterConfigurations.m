@@ -670,6 +670,28 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
         modConfig.Order, modConfig.SymbolRate / 1e3, emitterPlan.BandId);
 end
 
+function [fftLength, guard, scs, cpLen] = localOfdmGridForBandwidth(bandwidth)
+    % localOfdmGridForBandwidth - standards-faithful OFDM grid that tracks the
+    % planned channel bandwidth. Subcarrier spacing is FIXED at the LTE/5G-NR
+    % numerology-0 value (15 kHz); the FFT size and the number of used
+    % subcarriers scale with the bandwidth, so realized OBW = usableBins*scs
+    % approximates the planned bandwidth. The previous code instead inflated the
+    % spacing on a FIXED 1760-bin grid with a max(15 kHz, .) floor, which pinned
+    % realized OBW to 1760*15 kHz = 26.4 MHz for every channel <= 26.4 MHz.
+    scs = 15e3;
+    numUsed = max(12, round(bandwidth / scs));         % used (data+pilot) subcarriers
+    fftSet = [256, 512, 1024, 2048, 4096];             % comm.OFDMModulator-supported sizes
+    idx = find(fftSet >= numUsed / 0.85, 1);           % leave ~15% for guard bands
+    if isempty(idx)
+        fftLength = fftSet(end);                       % clamp: > 4096 unsupported
+        numUsed = min(numUsed, round(0.85 * fftLength));
+    else
+        fftLength = fftSet(idx);
+    end
+    guard = max(1, round((fftLength - numUsed) / 2));  % so usableBins = fft-2*guard ~= numUsed
+    cpLen = round(fftLength / 14);                      % ~7% cyclic prefix (LTE normal CP)
+end
+
 function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
     % buildRegulatoryModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
@@ -677,16 +699,14 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
-            fftLength = 2048;
-            guard = 144;
-            usableBins = fftLength - 2 * guard;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / usableBins / 1e3) * 1e3);
+            [fftLength, guard, subcarrierSpacing, cpLen] = ...
+                localOfdmGridForBandwidth(bandwidth);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
             modulatorConfig.ofdm.NumGuardBandCarriers = [guard; guard];
             modulatorConfig.ofdm.InsertDCNull = true;
-            modulatorConfig.ofdm.CyclicPrefixLength = 144;
+            modulatorConfig.ofdm.CyclicPrefixLength = cpLen;
             modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.ofdm.Windowing = false;
             modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
@@ -709,16 +729,14 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
-            fftLength = 512;
-            guard = 32;
-            usableBins = fftLength - 2 * guard;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / usableBins / 1e3) * 1e3);
+            [fftLength, guard, subcarrierSpacing, cpLen] = ...
+                localOfdmGridForBandwidth(bandwidth);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
             modulatorConfig.ofdm.NumGuardBandCarriers = [guard; guard];
             modulatorConfig.ofdm.InsertDCNull = true;
-            modulatorConfig.ofdm.CyclicPrefixLength = 64;
+            modulatorConfig.ofdm.CyclicPrefixLength = cpLen;
             modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.ofdm.Windowing = false;
             modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);

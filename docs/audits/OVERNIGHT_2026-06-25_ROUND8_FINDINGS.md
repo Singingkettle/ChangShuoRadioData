@@ -25,14 +25,13 @@ decisions or need a root-cause dig and are flagged for the owner.
    selective peaks). Fixed with a collapse guard that falls back to a noise-floor-relative estimate only
    when the peak-relative width is implausibly narrow, in both estimators, validated end-to-end.
 
-2. **Double Doppler on MIMO fading** (HIGH, design decision). `comm.MIMOChannel` applies its internal
-   zero-mean Jakes Doppler SPREAD, and `processChannelPropagation` ALSO applies an explicit deterministic
-   `f_d = v·f_c/c` SHIFT (HasInternalDoppler is never set on the MIMO output). The design doc
-   (phase-4-measurement.md R1) prescribes setting `HasInternalDoppler=true` to suppress the explicit
-   shift. BUT physically the two model different effects — a zero-mean spread vs a deterministic mean
-   shift — so suppressing the explicit shift would drop the moving-Tx mean Doppler. Owner should decide:
-   follow the doc (suppress) or keep both (and document why). Location:
-   `MIMO.m` infoImpl/stepImpl (set ChannelInfo.HasInternalDoppler), `processChannelPropagation.m:655-661`.
+2. ~~**Double Doppler on MIMO fading**~~ **RESOLVED — NOT A BUG (round-9)**, keep both. A round-9
+   multi-agent investigation with adversarial verification confirmed the two effects are physically
+   DISTINCT: `comm.MIMOChannel`'s Jakes process is a zero-MEAN Doppler SPREAD (multipath fading dynamics),
+   while the explicit `f_d = v·f_c/c` is the deterministic MEAN shift from the bulk radial velocity. The
+   Jakes spectrum does not carry the carrier mean shift, so applying both is correct, not a double-count.
+   The design-doc note to set `HasInternalDoppler=true` would wrongly drop the moving-Tx mean Doppler. No
+   code change; behaviour is intentional.
 
 3. ~~**Geometry NaN vectors corrupt the JSON round-trip**~~ **FIXED (round-9)** — read-side coercion
    in `readAnnotation` (`localCoerceSourceGeometry`) restores the known-numeric GeometrySnapshot fields
@@ -41,19 +40,34 @@ decisions or need a root-cause dig and are flagged for the owner.
    honest value of unknown geometry IS NaN, which JSON cannot carry as a number — the round-trip can
    only be repaired on read.)
 
-4. **Regulatory allocation lacks inter-emitter de-confliction** (HIGH, design gap). The regulatory path
-   places each emitter independently with no min-separation, so two can land co-channel, yet each is
-   recorded as a clean isolated SourcePlane with `OverlapOccurred=false`. The default ReceiverCentric
-   path enforces non-overlap (errors `FrequencyPlacementFailed`); the regulatory path has no equivalent.
-   Owner decides: enforce non-overlap, or allow overlap but record honest provenance + co-channel labels.
-   `RegionSpectrumSelector.m:60-69`, `allocateFrequenciesFromRegulatoryPlan.m`, `performScenarioFrequencyAllocation.m:25-28`.
+4. ~~**Regulatory allocation lacks inter-emitter de-confliction**~~ **FIXED (round-9)** — chose the
+   monitoring-faithful option: allow co-channel collisions (realistic for a spectrum-sensing dataset) but
+   record them honestly. `allocateFrequenciesFromRegulatoryPlan` now accumulates the placed bands and
+   detects pairwise overlap via the existing `checkFrequencyOverlap`, stamping
+   `globalLayout.OverlapOccurred=true` + `OverlapReason='RegulatoryCatalogCoChannel'` instead of leaving
+   the hardcoded `false`. No emitter placement changes (waveforms identical); only the honesty of the
+   layout-level overlap label.
 
-5. **Regulatory OFDM 15 kHz subcarrier-spacing floor fixes realized OBW at ~26 MHz** regardless of the
-   planned channel (HIGH, design gap, bandwidth-nyquist lens). The OFDM realized bandwidth doesn't track
-   the planned channel bandwidth.
+5. ~~**Regulatory OFDM 15 kHz subcarrier-spacing floor fixes realized OBW at ~26 MHz**~~ **FIXED
+   (round-9)** — root cause: the OFDM grid inflated subcarrier *spacing* on a FIXED 1760-bin grid with a
+   `max(15 kHz, .)` floor, pinning realized OBW to 1760·15 kHz = 26.4 MHz for every channel ≤ 26.4 MHz
+   (1.3×–17× over the planned channel). New `localOfdmGridForBandwidth` helper keeps the spacing FIXED at
+   the standards value (15 kHz) and scales the FFT size + used subcarriers with the planned bandwidth, so
+   realized OBW tracks the planned channel. Validated end-to-end: 1.54/5/10/20/40 MHz channels realize
+   1.50/4.92/9.84/19.7/39.6 MHz (ratio 0.98–0.99). Applied to both the regulatory and legacy OFDM
+   builders. Regression test `OfdmBandwidthTracksPlannedTest`. (OTFS has the analogous `max(15 kHz, .)`
+   floor on a fixed delay grid — flagged below.)
 
-6. **Symbol-rate snap rounds up** (MEDIUM) and **ReceiverView visibility/edges + feasibility use
-   PlannedBandwidth** rather than the realized bandwidth (MEDIUM) — both bandwidth-nyquist lens.
+6. **Owner-call / lower-priority Design-plane items (round-9 triage):**
+   - **Symbol-rate snap rounds up** (MEDIUM): affects the realized rate slightly; the Measured plane
+     captures whatever is realized, so the GT stays correct. Not a measured-GT bug.
+   - **ReceiverView visibility/edges + feasibility use PlannedBandwidth** (MEDIUM): the realized signal's
+     bandwidth differs slightly from the pre-snap PlannedBandwidth, so the Design-plane edges are a touch
+     off the realized signal. The **Measured plane (GT) is unaffected**. The fix (reconcile
+     PlannedBandwidth to the snapped rate) is planning-stage only but **shifts random frequency placement**
+     → owner-call, deferred (not a measured-GT correctness bug).
+   - **OTFS 15 kHz floor**: same shape as the OFDM #5 bug (fixed delay grid + `max(15 kHz, .)`), pins OTFS
+     realized OBW at ~7.56 MHz for ≤7.56 MHz channels. Lower volume than OFDM; flagged for a follow-on.
 
 ## Verification (fixed items)
 `checkcode` clean on the changed code; ReceiverVisibilityClassifierTest (symmetric + asymmetric) +
