@@ -355,7 +355,7 @@ classdef OTFS < csrd.blocks.physical.modulate.BaseModulator
                 obj.ModulatorConfig.otfs.padType = randsample(["CP", "ZP", "RZP", "RCP", "NONE"], 1);
                 obj.ModulatorConfig.otfs.padLen = randi([12, 32], 1); % Padding length
                 obj.ModulatorConfig.otfs.DelayLength = randsample([128, 256, 512, 1024, 2048], 1); % M parameter
-                obj.ModulatorConfig.otfs.Subcarrierspacing = randsample([2, 4], 1) * 1e2; % [200, 400] Hz
+                obj.ModulatorConfig.otfs.Subcarrierspacing = 15e3; % standards SCS (was 200/400 Hz -> ~100x too narrow)
             end
 
             % Generate first and second stage modulators

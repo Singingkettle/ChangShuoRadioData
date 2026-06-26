@@ -227,7 +227,12 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
                 obj.ModulatorConfig.ofdm.NumGuardBandCarriers(2) = randi([5, 12], 1);
                 obj.ModulatorConfig.ofdm.InsertDCNull = randsample([true, false], 1);
                 obj.ModulatorConfig.ofdm.CyclicPrefixLength = randi([12, 32], 1);
-                obj.ModulatorConfig.ofdm.Subcarrierspacing = randsample([2, 4], 1) * 1e2;
+                % Standards subcarrier spacing (LTE/5G-NR numerology 0). The old
+                % default of 200/400 Hz pinned the realized OFDM occupied
+                % bandwidth to FFT*200..400 Hz (tens-to-hundreds of kHz, ~100x
+                % narrower than any real OFDM channel) whenever this fallback
+                % fired (an under-configured ModulatorConfig with no `base`).
+                obj.ModulatorConfig.ofdm.Subcarrierspacing = 15e3;
                 obj.usePilot = randsample([true, false], 1);
 
                 if obj.usePilot
