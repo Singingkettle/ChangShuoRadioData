@@ -188,6 +188,14 @@ function fcHz = localSpectrumCentroid(signalCol, sampleRate)
 N = length(signalCol);
 spec = fftshift(fft(double(signalCol)));
 psd = abs(spec) .^ 2;
+fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
+% Smooth the raw periodogram to suppress per-bin noise variance before the
+% threshold/collapse logic, so the decision sees the signal's spectral envelope
+% rather than noise spikes (matches the pwelch-smoothed OBW estimator). A box
+% average preserves the energy-weighted mean, so the centroid is unchanged.
+if N >= 256
+    psd = movmean(psd, 2 * round(N / 512) + 1);   % odd window -> symmetric
+end
 % Float the integration threshold with the signal peak (matching the
 % peak-relative OBW estimator) before forming the energy-weighted mean.
 % Broadband AWGN is symmetric about 0 Hz, so integrating the raw PSD pulls the
@@ -196,16 +204,69 @@ psd = abs(spec) .^ 2;
 % edge-of-band emitters. Clipping bins below peak*10^(-3/10) tracks the signal
 % peak instead of the noise floor; a clean single tone keeps its main lobe.
 peakVal = max(psd);
-if peakVal > 0
-    psd(psd < peakVal * 10 ^ (-3 / 10)) = 0;
+if peakVal <= 0
+    fcHz = 0;
+    return;
+end
+% Collapse guard (mirrors localPeakRelativeObw). When a localized spectral
+% spike sits a few dB above an otherwise-flat occupied band, the peak-relative
+% clip keeps only the spike and biases the centroid toward it. If the
+% peak-relative retained band is far narrower than a noise-floor-relative band
+% (25th-percentile floor + 6 dB, which keeps the whole occupied band),
+% integrate over the floor-relative band instead so the center tracks the true
+% occupied band rather than the spike.
+peakThreshold = peakVal * 10 ^ (-3 / 10);
+floorThreshold = prctile(psd, 25) * 10 ^ (6 / 10);
+peakClipped = psd;
+peakClipped(peakClipped < peakThreshold) = 0;
+floorClipped = psd;
+floorClipped(floorClipped < floorThreshold) = 0;
+floorSpan = localEnergySpan(floorClipped, fAxis);
+if floorSpan > 0 && localEnergySpan(peakClipped, fAxis) < 0.3 * floorSpan
+    psd = floorClipped;
+else
+    psd = peakClipped;
 end
 totalPower = sum(psd);
 if totalPower <= 0
     fcHz = 0;
     return;
 end
-fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
 fcHz = sum(fAxis .* psd) / totalPower;
+end
+
+function spanHz = localEnergySpan(psd, fAxis)
+    % localEnergySpan - width (Hz) of the NARROWEST contiguous band holding 99%
+    % of the energy. Robust to scattered low-energy noise tails (which a simple
+    % percentile span would let push the edges to the band limits): a genuine
+    % broadband signal yields a wide band, a narrow tone plus scattered noise
+    % yields a narrow band. fAxis is ascending.
+    total = sum(psd);
+    if total <= 0
+        spanHz = 0;
+        return;
+    end
+    target = 0.99 * total;
+    n = numel(psd);
+    cumE = cumsum(psd);
+    best = inf;
+    rIdx = 1;
+    for lIdx = 1:n
+        if rIdx < lIdx
+            rIdx = lIdx;
+        end
+        while rIdx < n && (cumE(rIdx) - cumE(lIdx) + psd(lIdx)) < target
+            rIdx = rIdx + 1;
+        end
+        if (cumE(rIdx) - cumE(lIdx) + psd(lIdx)) >= target
+            best = min(best, fAxis(rIdx) - fAxis(lIdx));
+        end
+    end
+    if ~isfinite(best)
+        spanHz = fAxis(end) - fAxis(1);
+    else
+        spanHz = best;
+    end
 end
 
 function info = localDetectEnvelope(signalCol, sampleRate, options)

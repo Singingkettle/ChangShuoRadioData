@@ -34,6 +34,14 @@ classdef ObwCollapseGuardTest < matlab.unittest.TestCase
                 'measureSignalSummary collapsed on the spike');
             % the two estimators must stay equivalent
             testCase.verifyEqual(sm.OccupiedBandwidthHz, bwA, 'RelTol', 0.05);
+
+            % The center frequency must also resist the spike: the band is
+            % centred near 0 Hz, so the measured center must track the band, not
+            % collapse onto the +4 MHz spike (peak-relative alone gives ~+4 MHz).
+            fc = csrd.pipeline.measurement.spectrumCentroid(x, fs);
+            testCase.verifyLessThan(abs(fc), 3e6, ...
+                'center frequency collapsed onto the spike instead of the band');
+            testCase.verifyEqual(sm.CenterFrequencyHz, fc, 'AbsTol', 1e5);
         end
 
         function cleanNarrowbandStaysNarrow(testCase)
