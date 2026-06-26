@@ -338,6 +338,13 @@ classdef RRFSimulator < matlab.System
 
             xIq = obj.IQImbalance(xAwgn);
 
+            % Receiver DC offset (LO self-mixing / converter bias) leaks a small
+            % DC term into the baseband, matching the TX-side convention
+            % (DCOffset is a dBc level -> additive amplitude). Previously the RX
+            % DCOffset was recorded as a realized impairment in the annotation but
+            % never actually applied, so the annotated impairment was a phantom.
+            xIq = xIq + 10 ^ (obj.DCOffset / 20);
+
             % ADC quantization noise. A real N-bit converter imposes a
             % quantization noise floor that caps the realizable SNR at
             % ~6.02*N + 1.76 dB; the rest of the RX chain has no amplitude

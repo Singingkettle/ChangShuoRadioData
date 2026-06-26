@@ -47,7 +47,11 @@ function [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan(obj, 
 
         proposedRange = [lowerEdge, upperEdge];
         for j = 1:size(usedRanges, 1)
-            if checkFrequencyOverlap(obj, proposedRange, usedRanges(j, :))
+            % Strict band-overlap (no MinSeparation margin): OverlapOccurred
+            % must record ACTUAL co-channel collisions, not near-but-separated
+            % placements. checkFrequencyOverlap adds the placement-deconfliction
+            % margin, which would over-report overlap here.
+            if proposedRange(1) < usedRanges(j, 2) && proposedRange(2) > usedRanges(j, 1)
                 globalLayout.OverlapOccurred = true;
                 globalLayout.OverlapReason = 'RegulatoryCatalogCoChannel';
                 break;

@@ -691,6 +691,28 @@ classdef SimulationRunner < matlab.System
             obj.recordPerformanceStage('Save.ValidateMeasurementCompleteness', toc(stageStart), ...
                 struct('WorkerId', workerId, 'ScenarioId', scenarioId));
 
+            % Normalize each frame's SignalSources to a cell so a single-source
+            % frame serializes as a JSON ARRAY rather than a bare object
+            % (inconsistent on-disk schema vs multi-source frames). readAnnotation
+            % accepts both struct-array and cell, so consumers are unaffected.
+            if isstruct(cleanAnnotation) && isscalar(cleanAnnotation) && ...
+                    isfield(cleanAnnotation, 'Frames')
+                framesNorm = cleanAnnotation.Frames;
+                if isstruct(framesNorm)
+                    framesNorm = num2cell(reshape(framesNorm, 1, []));
+                end
+                if iscell(framesNorm)
+                    % Each frame entry is itself a per-receiver collection (a
+                    % struct array or a cell of receiver annotations); normalize
+                    % each receiver annotation's SignalSources to a cell.
+                    for fIdx = 1:numel(framesNorm)
+                        framesNorm{fIdx} = ...
+                            csrd.SimulationRunner.normalizeReceiverSources(framesNorm{fIdx});
+                    end
+                end
+                cleanAnnotation.Frames = framesNorm;
+            end
+
             try
                 prettyPrintAnnotations = true;
                 if isfield(obj.RunnerConfig, 'Data') && ...
@@ -1311,6 +1333,32 @@ classdef SimulationRunner < matlab.System
     end
 
     methods (Static, Hidden)
+
+        function frameEntry = normalizeReceiverSources(frameEntry)
+            %NORMALIZERECEIVERSOURCES Force each receiver annotation's
+            % SignalSources to a cell so a single-source frame serializes as a
+            % JSON array (not a bare object). Accepts a per-receiver struct array
+            % or a cell of receiver-annotation structs.
+            if isstruct(frameEntry)
+                for ri = 1:numel(frameEntry)
+                    if isfield(frameEntry(ri), 'SignalSources') && ...
+                            isstruct(frameEntry(ri).SignalSources)
+                        frameEntry(ri).SignalSources = ...
+                            num2cell(reshape(frameEntry(ri).SignalSources, 1, []));
+                    end
+                end
+            elseif iscell(frameEntry)
+                for ri = 1:numel(frameEntry)
+                    rxEntry = frameEntry{ri};
+                    if isstruct(rxEntry) && isfield(rxEntry, 'SignalSources') && ...
+                            isstruct(rxEntry.SignalSources)
+                        rxEntry.SignalSources = ...
+                            num2cell(reshape(rxEntry.SignalSources, 1, []));
+                        frameEntry{ri} = rxEntry;
+                    end
+                end
+            end
+        end
 
         function seedValue = deriveScenarioSeed(baseSeed, scenarioId)
             %DERIVESCENARIOSEED Stable per-scenario RNG seed.

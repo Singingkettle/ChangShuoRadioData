@@ -176,6 +176,9 @@ Receiver-view fields are per source per receiver:
 | `IsVisible` | logical | Whether the source is visible in the receiver window |
 | `VisibilityReason` | text | Reason such as `InBand` or `OutOfBand` |
 
-COCO v2 minimal export uses `ReceiverView.ProjectedCenterOffsetHz` for bbox
-center and `Truth.Measured.SourcePlane.OccupiedBandwidthHz` for bbox width.
-Invisible sources are skipped and reported in `csrd_export.skipped_sources`.
+COCO minimal export uses `Truth.Measured.SourcePlane.CenterFrequencyHz` for the
+bbox center (the measured, Doppler-inclusive center) and
+`Truth.Measured.SourcePlane.OccupiedBandwidthHz` for the bbox width -- both from
+the Measured plane so the box reflects the realized RX signal, not the planned
+`ReceiverView.ProjectedCenterOffsetHz`. Invisible sources are skipped and
+reported in `csrd_export.skipped_sources`.

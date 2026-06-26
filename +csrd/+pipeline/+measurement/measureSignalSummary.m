@@ -193,8 +193,11 @@ fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
 % threshold/collapse logic, so the decision sees the signal's spectral envelope
 % rather than noise spikes (matches the pwelch-smoothed OBW estimator). A box
 % average preserves the energy-weighted mean, so the centroid is unchanged.
-if N >= 256
-    psd = movmean(psd, 2 * round(N / 512) + 1);   % odd window -> symmetric
+if N >= 8
+    % Odd window (symmetric) >= 3 for all N, scaling with N. A floor of 3
+    % (rather than only smoothing for N >= 256) keeps the centroid continuous
+    % across the short-signal boundary.
+    psd = movmean(psd, max(3, 2 * round(N / 512) + 1));
 end
 % Float the integration threshold with the signal peak (matching the
 % peak-relative OBW estimator) before forming the energy-weighted mean.
