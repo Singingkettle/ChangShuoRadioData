@@ -54,9 +54,11 @@ decisions or need a root-cause dig and are flagged for the owner.
    (1.3×–17× over the planned channel). New `localOfdmGridForBandwidth` helper keeps the spacing FIXED at
    the standards value (15 kHz) and scales the FFT size + used subcarriers with the planned bandwidth, so
    realized OBW tracks the planned channel. Validated end-to-end: 1.54/5/10/20/40 MHz channels realize
-   1.50/4.92/9.84/19.7/39.6 MHz (ratio 0.98–0.99). Applied to both the regulatory and legacy OFDM
-   builders. Regression test `OfdmBandwidthTracksPlannedTest`. (OTFS has the analogous `max(15 kHz, .)`
-   floor on a fixed delay grid — flagged below.)
+   1.50/4.92/9.84/19.7/39.6 MHz (ratio 0.98–0.99). **The same `max(15 kHz, .)`-floor bug was found and
+   fixed in the other two multicarrier modulators**: OTFS (fixed 512-delay grid, pinned ~7.56 MHz → scale
+   `DelayLength`) and SCFDMA (fixed 300-subcarrier grid, pinned ~4.5 MHz → reuse the OFDM grid helper),
+   both now tracking (OTFS 0.99–1.06, SCFDMA 0.98–0.99). Regression test
+   `MulticarrierBandwidthTracksPlannedTest` covers all three.
 
 6. **Owner-call / lower-priority Design-plane items (round-9 triage):**
    - **Symbol-rate snap rounds up** (MEDIUM): affects the realized rate slightly; the Measured plane
@@ -66,8 +68,7 @@ decisions or need a root-cause dig and are flagged for the owner.
      off the realized signal. The **Measured plane (GT) is unaffected**. The fix (reconcile
      PlannedBandwidth to the snapped rate) is planning-stage only but **shifts random frequency placement**
      → owner-call, deferred (not a measured-GT correctness bug).
-   - **OTFS 15 kHz floor**: same shape as the OFDM #5 bug (fixed delay grid + `max(15 kHz, .)`), pins OTFS
-     realized OBW at ~7.56 MHz for ≤7.56 MHz channels. Lower volume than OFDM; flagged for a follow-on.
+   - ~~OTFS / SCFDMA 15 kHz floor~~ **FIXED (round-9)** alongside OFDM #5 — see above.
 
 ## Verification (fixed items)
 `checkcode` clean on the changed code; ReceiverVisibilityClassifierTest (symmetric + asymmetric) +

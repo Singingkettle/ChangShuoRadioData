@@ -741,8 +741,12 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             modulatorConfig.ofdm.Windowing = false;
             modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
         case 'OTFS'
-            delayLength = 512;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / max(1, delayLength - 8) / 1e3) * 1e3);
+            % Realized OBW = (DelayLength-8)*scs. Fix the spacing at 15 kHz and
+            % scale the delay grid with the planned bandwidth so OBW tracks it,
+            % instead of the max(15 kHz, .) floor on a fixed 512-bin grid that
+            % pinned OBW to 504*15 kHz = 7.56 MHz for every channel <= 7.56 MHz.
+            subcarrierSpacing = 15e3;
+            delayLength = max(16, round(bandwidth / subcarrierSpacing) + 8);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.otfs.DelayLength = delayLength;
@@ -750,13 +754,17 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             modulatorConfig.otfs.padType = "CP";
             modulatorConfig.otfs.padLen = 16;
         case 'SCFDMA'
-            fftLength = 512;
-            dataSubcarriers = 300;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / dataSubcarriers / 1e3) * 1e3);
+            % Realized OBW = NumDataSubcarriers*scs. Scale the FFT + used
+            % subcarriers with the planned bandwidth at a fixed 15 kHz spacing
+            % (same grid as OFDM), instead of the max(15 kHz, .) floor on a fixed
+            % 300-subcarrier grid that pinned OBW to 300*15 kHz = 4.5 MHz.
+            [fftLength, guard, subcarrierSpacing, cpLen] = ...
+                localOfdmGridForBandwidth(bandwidth);
+            dataSubcarriers = fftLength - 2 * guard;
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.scfdma.FFTLength = fftLength;
-            modulatorConfig.scfdma.CyclicPrefixLength = 64;
+            modulatorConfig.scfdma.CyclicPrefixLength = cpLen;
             modulatorConfig.scfdma.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.scfdma.SubcarrierMappingInterval = 1;
             modulatorConfig.scfdma.NumDataSubcarriers = dataSubcarriers;
