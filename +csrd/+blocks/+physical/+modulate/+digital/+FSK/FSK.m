@@ -109,14 +109,12 @@ classdef FSK < csrd.blocks.physical.modulate.BaseModulator
             % Apply FSK modulation using pre-configured modulator
             modulatedSignal = obj.pureModulator(inputSymbols);
 
-            % Calculate bandwidth based on frequency separation if available
-            if ~isempty(obj.frequencySeparation)
-                % Estimate bandwidth using frequency separation and modulation order
-                bandWidth = obj.frequencySeparation * obj.ModulatorOrder;
-            else
-                % Fall back to occupied bandwidth analysis
-                bandWidth = obw(modulatedSignal, obj.SampleRate);
-            end
+            % Measure the realized occupied bandwidth directly, like every other
+            % modulator family. The previous freq_sep*M analytical estimate
+            % under-reported the true OBW by ~33-47% for M >= 4 (the realized
+            % FSK band is closer to freq_sep*(M-1) + 2*Rs plus the per-tone
+            % skirts, which a direct measurement captures).
+            bandWidth = obw(modulatedSignal, obj.SampleRate);
 
         end
 

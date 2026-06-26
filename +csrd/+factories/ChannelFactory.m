@@ -898,7 +898,20 @@ classdef ChannelFactory < matlab.System
                 configuredBW, rxBW, txBW);
 
             noisePower_dBm = noisePSD + 10 * log10(noiseBW) + noiseFig;
-            snr_dB = txPower_dBm - pathLoss_dB - noisePower_dBm;
+            % Include the Tx and Rx antenna gains in the link budget. Omitting
+            % them under-stated the received-signal power (hence the link-budget
+            % SNR) by Gtx + Grx dB for every directional/gain antenna.
+            txGain_dBi = 0;
+            if isfield(txInfo, 'AntennaGain') && isnumeric(txInfo.AntennaGain) && ...
+                    isscalar(txInfo.AntennaGain) && isfinite(txInfo.AntennaGain)
+                txGain_dBi = double(txInfo.AntennaGain);
+            end
+            rxGain_dBi = 0;
+            if isfield(rxInfo, 'AntennaGain') && isnumeric(rxInfo.AntennaGain) && ...
+                    isscalar(rxInfo.AntennaGain) && isfinite(rxInfo.AntennaGain)
+                rxGain_dBi = double(rxInfo.AntennaGain);
+            end
+            snr_dB = txPower_dBm + txGain_dBi - pathLoss_dB + rxGain_dBi - noisePower_dBm;
         end
 
         function releaseCachedBlocks(obj)
