@@ -501,7 +501,7 @@ classdef ChannelFactory < matlab.System
             end
             targetNoiseW = signalPowerW / 10 ^ (double(appliedSNR_dB) / 10);
             baseSeed = obj.deriveChannelSeed(frameId, txIdStr, rxIdStr, channelLinkInfo);
-            noiseSeed = 1 + mod(double(baseSeed) + 104729, 2 ^ 31 - 2);
+            noiseSeed = obj.frameSaltedNoiseSeed(baseSeed, frameId);
             rs = RandStream('mt19937ar', 'Seed', noiseSeed);
             noiseStd = sqrt(targetNoiseW / 2);
             out.Signal = sig + noiseStd * (randn(rs, size(sig)) + 1i * randn(rs, size(sig)));
@@ -588,8 +588,21 @@ classdef ChannelFactory < matlab.System
                     % collapsed two distinct bursts on the same Tx onto
                     % the same seed within one frame, breaking physical
                     % consistency.
-                    currentChannelBlock.Seed = obj.deriveChannelSeed( ...
+                    baseSeed = obj.deriveChannelSeed( ...
                         frameId, txIdStr, rxIdStr, channelLinkSpecificInfo);
+                    if isa(currentChannelBlock, 'csrd.blocks.physical.channel.AWGNChannel')
+                        % Additive thermal/channel noise is i.i.d. per
+                        % observation window, so the noise REALIZATION must vary
+                        % frame-to-frame (otherwise every frame of a scenario
+                        % carries a byte-identical noise mask a model can
+                        % memorize). Salt the noise seed with frameId; the noise
+                        % POWER still comes from the frame-stable SNRdB/target.
+                        % Fading geometry keeps the un-salted burst-stable seed.
+                        currentChannelBlock.Seed = ...
+                            obj.frameSaltedNoiseSeed(baseSeed, frameId);
+                    else
+                        currentChannelBlock.Seed = baseSeed;
+                    end
                 catch ME_seed
                     error('CSRD:Channel:SeedAssignmentFailed', ...
                         'Could not update channel Seed: %s', ME_seed.message);
@@ -645,6 +658,22 @@ classdef ChannelFactory < matlab.System
             if seedValue <= 0
                 seedValue = 1;
             end
+        end
+
+        function seedValue = frameSaltedNoiseSeed(~, baseSeed, frameId)
+            % frameSaltedNoiseSeed Frame-dependent additive-noise seed.
+            % Salts the burst-stable base seed with frameId so the additive
+            % thermal/channel-noise REALIZATION differs per observation window
+            % (thermal noise is i.i.d. across frames), while fading geometry --
+            % which uses the un-salted base seed -- stays burst-stable across
+            % frames (H13). The 104729 offset decorrelates the noise stream from
+            % the SNR-target draw (which uses 7919 and stays frame-stable).
+            if isempty(frameId) || ~isscalar(frameId) || ~isfinite(frameId)
+                fid = 0;
+            else
+                fid = double(max(0, frameId));
+            end
+            seedValue = 1 + mod(double(baseSeed) + 104729 + fid * 100003, 2 ^ 31 - 2);
         end
 
         function receivedSignalStruct = mergeChannelOutput(~, inputSignalStruct, channelBlockOutput)
