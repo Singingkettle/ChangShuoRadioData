@@ -41,6 +41,15 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
             'modulationConfig.Type is required for bandwidth planning.');
     end
 
+    % Modulation order (M). Needed by M-ary FSK whose occupied band grows with
+    % the number of tones; defaults to 2 for binary/analog where it is unused.
+    modOrder = 2;
+    if isfield(modulationConfig, 'Order') && isnumeric(modulationConfig.Order) && ...
+            isscalar(modulationConfig.Order) && isfinite(modulationConfig.Order) && ...
+            modulationConfig.Order >= 2
+        modOrder = double(modulationConfig.Order);
+    end
+
     % Bandwidth calculation based on modulation type
     switch modType
             % Linear digital modulation schemes
@@ -63,7 +72,14 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
 
             % Frequency Shift Keying
         case 'FSK'
-            bandwidth = symbolRate * 2.0; % Wider bandwidth for FSK
+            % M-ary FSK with an orthogonal tone spacing of ~1 symbol rate
+            % (modulation index h ~= 1, up to 1.2): the realized band spans the
+            % M tones, ~h·(M-1)·Rs plus ~2·Rs of skirts. The old fixed 2.0x
+            % factor ignored M and the modulator's separation tracked the
+            % (SPS-inflated) sample rate, so high-SPS narrow FSK overran its
+            % channel >15x. See FSK.genModulatorHandle (separation now scales
+            % with the symbol rate, not the sample rate).
+            bandwidth = symbolRate * (1.2 * (modOrder - 1) + 2);
 
             % Continuous Phase Modulation (bandwidth efficient)
         case {'CPFSK', 'GFSK'}

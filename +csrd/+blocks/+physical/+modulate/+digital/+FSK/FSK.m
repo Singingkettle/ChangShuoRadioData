@@ -163,11 +163,19 @@ classdef FSK < csrd.blocks.physical.modulate.BaseModulator
             % FSK is inherently single-antenna modulation
             obj.NumTransmitAntennas = 1;
 
-            % Calculate maximum allowable frequency separation
-            maximumFrequencySeparation = obj.SampleRate / (obj.ModulatorOrder - 1);
-
-            % Select frequency separation as 40-50% of maximum (rounded to 100 Hz)
-            obj.frequencySeparation = round((rand(1) * 0.1 + 0.4) * maximumFrequencySeparation / 100) * 100;
+            % Orthogonal-FSK tone spacing scales with the SYMBOL RATE
+            % (modulation index h = 1..1.2), NOT the sample rate, so the
+            % realized OBW (~M*Rs) tracks the planned channel instead of ~45% of
+            % the (SPS-inflated) sample rate -- a narrow high-SPS FSK previously
+            % overran its channel >15x because the spacing followed the sample
+            % rate. Cap to the largest spacing that still fits all M tones inside
+            % the sample rate (the previous behaviour) when the symbol rate is
+            % too high for the order.
+            symbolRate = obj.SampleRate / obj.SamplePerSymbol;
+            maximumFrequencySeparation = 0.45 * obj.SampleRate / (obj.ModulatorOrder - 1);
+            orthogonalSeparation = (1 + 0.2 * rand(1)) * symbolRate;
+            obj.frequencySeparation = max(100, ...
+                round(min(orthogonalSeparation, maximumFrequencySeparation) / 100) * 100);
 
             % Configure FSK modulation parameters if not provided
             if ~isfield(obj.ModulatorConfig, 'SymbolOrder')
