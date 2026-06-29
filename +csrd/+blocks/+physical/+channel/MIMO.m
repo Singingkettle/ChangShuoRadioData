@@ -441,8 +441,13 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             % Realized signal power and (zero) channel-noise power for the
             % measured received-SNR GT. A fading channel adds no noise of its
             % own; the per-emitter SNR is then set by the receiver thermal noise
-            % alone, measured downstream.
-            outputSignal.ChannelSignalPowerW = mean(abs(fadedSignal(:)) .^ 2);
+            % alone, measured downstream. Record the COLLAPSED monitor-stream
+            % power (the receiver saves sum(antennas); see
+            % localCollapseAntennaSignal): the per-column mean would under-state
+            % the saved per-emitter signal by ~NumReceiveAntennas and bias the
+            % measured SNR low against the absolute receiver thermal/ADC noise.
+            % For a single receive antenna sum(.,2) is a no-op (SISO unaffected).
+            outputSignal.ChannelSignalPowerW = mean(abs(sum(fadedSignal, 2)) .^ 2);
             outputSignal.ChannelNoisePowerW = 0;
 
             % Add channel configuration information

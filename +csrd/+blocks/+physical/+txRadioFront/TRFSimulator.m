@@ -630,9 +630,38 @@ classdef TRFSimulator < matlab.System
             csrd.runtime.performance.trace('event', 'TRF.PhaseNoise', ...
                 toc(stageStart), phaseMeta);
 
-            % Step 4: Apply memoryless nonlinearity to model power amplifier characteristics
+            % Step 4: Apply the memoryless nonlinearity (power-amplifier model).
+            % A memoryless PA generates 3rd-order (and higher) spectral regrowth
+            % occupying ~3x the signal bandwidth. Run on the modulator's native
+            % grid, that regrowth exceeds the input Nyquist whenever the
+            % oversampling margin is small (low samples-per-symbol, e.g. SPS=2
+            % with a high RRC rolloff fills the input Nyquist) and FOLDS/aliases
+            % back IN-BAND, corrupting the realized waveform and so the
+            % measured-GT OBW/EVM. Oversample so the regrowth is contained on
+            % the PA grid, apply the PA, then decimate back: the decimation
+            % anti-alias filter REMOVES the out-of-band regrowth (as the
+            % receiver's band-limiting would) instead of letting it alias, while
+            % keeping the genuine in-band distortion. The decimation returns the
+            % signal to inputSampleRate, so Step 5's conversion is unchanged.
             stageStart = tic;
-            processedSignal = obj.applyMemorylessNonlinearity(processedSignal);
+            paOverFactor = 1;
+            if isfinite(obj.BandWidth) && obj.BandWidth > 0
+                % Aim for ~4x oversampling over the worst-case occupied band
+                % (<=2x BandWidth for RRC rolloff up to 1), i.e. a PA grid
+                % >= 8x BandWidth, so the dominant regrowth stays inside the PA
+                % Nyquist. Bounded to keep the intermediate grid affordable.
+                desiredPaRate = 8 * double(obj.BandWidth);
+                if desiredPaRate > inputSampleRate
+                    paOverFactor = min(6, ceil(desiredPaRate / inputSampleRate));
+                end
+            end
+            if paOverFactor > 1
+                processedSignal = resample(processedSignal, paOverFactor, 1);
+                processedSignal = obj.applyMemorylessNonlinearity(processedSignal);
+                processedSignal = resample(processedSignal, 1, paOverFactor);
+            else
+                processedSignal = obj.applyMemorylessNonlinearity(processedSignal);
+            end
             csrd.runtime.performance.trace('event', 'TRF.MemorylessNonlinearity', ...
                 toc(stageStart), traceMeta);
 

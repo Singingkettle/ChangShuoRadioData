@@ -98,6 +98,13 @@ if isempty(spec) || sum(spec) <= 0
     bwHz = 0;
     return;
 end
+
+% Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
+% narrowest-contiguous-span search does not bridge the empty middle and
+% inflate the OBW toward Fs. The span is invariant under the circular shift
+% (mirrors obwActual so the two estimators stay equivalent).
+spec = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
+
 peakVal = max(spec);
 if peakVal <= 0
     bwHz = 0;
@@ -119,7 +126,13 @@ bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
 % estimate (threshold a fixed +6 dB above a robust low-percentile floor, which
 % keeps the whole occupied band) and fall back to it only when the
 % peak-relative result is implausibly narrow, so the common case is unchanged.
-floorThreshold = prctile(spec, 25) * 10 ^ (6 / 10);
+% The floor percentile must stay BELOW the minimum noise fraction: an emitter
+% may occupy up to MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving
+% >=20% noise bins, so a 25th-percentile floor would land INSIDE a wideband
+% occupied band and defeat the guard (the floor estimate then collapses to the
+% spike just like the peak-relative one). The 10th percentile stays in the
+% noise floor for occupancies up to 90%.
+floorThreshold = prctile(spec, 10) * 10 ^ (6 / 10);
 bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
 if bwFloor > 0 && bwHz < 0.3 * bwFloor
     bwHz = bwFloor;
@@ -189,6 +202,10 @@ N = length(signalCol);
 spec = fftshift(fft(double(signalCol)));
 psd = abs(spec) .^ 2;
 fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
+% Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
+% energy-weighted mean does not collapse the centre toward baseband (mirrors
+% spectrumCentroid). fcShiftHz is added back at the end.
+[psd, fcShiftHz] = csrd.pipeline.measurement.circularRecenterSpectrum(psd, sampleRate);
 % Smooth the raw periodogram to suppress per-bin noise variance before the
 % threshold/collapse logic, so the decision sees the signal's spectral envelope
 % rather than noise spikes (matches the pwelch-smoothed OBW estimator). A box
@@ -219,7 +236,10 @@ end
 % integrate over the floor-relative band instead so the center tracks the true
 % occupied band rather than the spike.
 peakThreshold = peakVal * 10 ^ (-3 / 10);
-floorThreshold = prctile(psd, 25) * 10 ^ (6 / 10);
+% 10th-percentile floor (not 25th): an emitter may occupy up to 80% of the
+% band, so a 25th-percentile floor would land inside a wideband occupied band
+% and defeat the guard (mirrors localPeakRelativeObw / obwActual).
+floorThreshold = prctile(psd, 10) * 10 ^ (6 / 10);
 peakClipped = psd;
 peakClipped(peakClipped < peakThreshold) = 0;
 floorClipped = psd;
@@ -235,7 +255,7 @@ if totalPower <= 0
     fcHz = 0;
     return;
 end
-fcHz = sum(fAxis .* psd) / totalPower;
+fcHz = sum(fAxis .* psd) / totalPower + fcShiftHz;
 end
 
 function spanHz = localEnergySpan(psd, fAxis)

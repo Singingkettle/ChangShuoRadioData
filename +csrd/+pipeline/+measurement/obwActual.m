@@ -196,6 +196,12 @@ function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
         return;
     end
 
+    % Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
+    % narrowest-contiguous-span search below does not bridge the empty middle
+    % and inflate the OBW toward Fs. The span is invariant under the circular
+    % shift, so nothing is added back (fAxis is left unchanged).
+    spec = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
+
     peakVal = max(spec);
     if peakVal <= 0
         bwHz = 0;
@@ -213,8 +219,13 @@ function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
     % flat band and clip it away, collapsing the width to the spike's
     % neighbourhood. Fall back to a noise-floor-relative estimate (robust
     % low-percentile floor + 6 dB, which keeps the whole occupied band) only
-    % when the peak-relative result is implausibly narrow.
-    floorThreshold = prctile(spec, 25) * 10 ^ (6 / 10);
+    % when the peak-relative result is implausibly narrow. The floor percentile
+    % must stay below the minimum noise fraction: an emitter may occupy up to
+    % MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving >=20% noise
+    % bins, so a 25th-percentile floor would land INSIDE a wideband occupied
+    % band and defeat the guard. The 10th percentile stays in the noise floor
+    % for occupancies up to 90% (mirrors measureSignalSummary).
+    floorThreshold = prctile(spec, 10) * 10 ^ (6 / 10);
     bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
     if bwFloor > 0 && bwHz < 0.3 * bwFloor
         bwHz = bwFloor;

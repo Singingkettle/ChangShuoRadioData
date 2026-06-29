@@ -51,6 +51,10 @@ function fcHz = spectrumCentroid(signal, sampleRate)
     spec = fftshift(fft(double(signalCol)));
     psd = abs(spec) .^ 2;
     fAxis = ((0:N - 1)' - floor(N / 2)) * (double(sampleRate) / N);
+    % Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
+    % energy-weighted mean below does not collapse the centre toward baseband.
+    % fcShiftHz is added back at the end to recover the absolute centre.
+    [psd, fcShiftHz] = csrd.pipeline.measurement.circularRecenterSpectrum(psd, sampleRate);
     % Smooth the raw periodogram to suppress per-bin noise variance before the
     % threshold/collapse logic, so the decision sees the signal's spectral
     % envelope rather than noise spikes (matches the pwelch-smoothed OBW
@@ -78,7 +82,10 @@ function fcHz = spectrumCentroid(signal, sampleRate)
     % noise-floor-relative band (25th-percentile floor + 6 dB, which keeps the
     % whole occupied band), integrate over the floor-relative band instead.
     peakThreshold = peakVal * 10 ^ (-3 / 10);
-    floorThreshold = prctile(psd, 25) * 10 ^ (6 / 10);
+    % 10th-percentile floor (not 25th): an emitter may occupy up to 80% of the
+    % band, so a 25th-percentile floor would land inside a wideband occupied
+    % band and defeat the guard (mirrors obwActual / measureSignalSummary).
+    floorThreshold = prctile(psd, 10) * 10 ^ (6 / 10);
     peakClipped = psd;
     peakClipped(peakClipped < peakThreshold) = 0;
     floorClipped = psd;
@@ -95,7 +102,7 @@ function fcHz = spectrumCentroid(signal, sampleRate)
         return;
     end
 
-    fcHz = sum(fAxis .* psd) / totalPower;
+    fcHz = sum(fAxis .* psd) / totalPower + fcShiftHz;
 end
 
 function spanHz = localEnergySpan(psd, fAxis)

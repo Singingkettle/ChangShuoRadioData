@@ -499,16 +499,28 @@ classdef ChannelFactory < matlab.System
             if ~(signalPowerW > 0)
                 return;
             end
+            % Size the per-column injected noise to the controlled target vs the
+            % per-column signal power (unchanged), so the injected WAVEFORM is
+            % identical for every antenna count.
             targetNoiseW = signalPowerW / 10 ^ (double(appliedSNR_dB) / 10);
             baseSeed = obj.deriveChannelSeed(frameId, txIdStr, rxIdStr, channelLinkInfo);
             noiseSeed = obj.frameSaltedNoiseSeed(baseSeed, frameId);
             rs = RandStream('mt19937ar', 'Seed', noiseSeed);
             noiseStd = sqrt(targetNoiseW / 2);
             out.Signal = sig + noiseStd * (randn(rs, size(sig)) + 1i * randn(rs, size(sig)));
-            % Record the clean signal power (pre-injection) and the injected
-            % noise power so the measured received-SNR GT reflects the target.
-            out.ChannelSignalPowerW = signalPowerW;
-            out.ChannelNoisePowerW = targetNoiseW;
+            % Record the realized signal + channel-noise power at the COLLAPSED
+            % monitor-stream scale. The receiver saves sum(antennas) (see
+            % localCollapseAntennaSignal), whose per-emitter signal power is
+            % ~NumReceiveAntennas x the per-column power, while the downstream
+            % thermal/ADC noise is an absolute floor referenced to that summed
+            % stream. Recording per-column powers here would bias the measured
+            % SNR low by ~10*log10(NumReceiveAntennas) dB whenever thermal/ADC
+            % noise is non-negligible. The injected waveform is unchanged; only
+            % the GT bookkeeping is brought to the summed-stream scale (for a
+            % single antenna sum(.,2) is a no-op, so SISO is unaffected).
+            numRxColumns = size(sig, 2);
+            out.ChannelSignalPowerW = mean(abs(sum(sig, 2)) .^ 2);
+            out.ChannelNoisePowerW = targetNoiseW * numRxColumns;
         end
 
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...
