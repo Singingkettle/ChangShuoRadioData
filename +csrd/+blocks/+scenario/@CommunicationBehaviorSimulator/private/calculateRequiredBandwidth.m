@@ -83,7 +83,13 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
 
             % Continuous Phase Modulation (bandwidth efficient)
         case {'CPFSK', 'GFSK'}
-            bandwidth = symbolRate * 1.0; % Bandwidth efficient CPM
+            % M-ary continuous-phase FSK (modulation index h ~= 1): the realized
+            % band spans the M frequency levels (~M*Rs), nearly identical to
+            % plain FSK (measured M=2->2.2, M=4->4.5, M=8->7.9 x Rs). The old
+            % fixed 1.0x factor (binary GMSK-like efficiency) under-allocated up
+            % to ~8x for 8-ary CPM. The Gaussian/CPM smoothing barely changes the
+            % 99% OBW, so reuse the FSK plan that accounts for the tone count.
+            bandwidth = symbolRate * (1.2 * (modOrder - 1) + 2);
         case {'GMSK', 'MSK'}
             bandwidth = symbolRate * 0.8; % Very bandwidth efficient
 
