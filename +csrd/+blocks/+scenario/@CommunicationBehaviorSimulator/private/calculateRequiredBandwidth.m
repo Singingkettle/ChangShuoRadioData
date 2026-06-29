@@ -81,9 +81,14 @@ function bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
 
             % Analog modulation schemes
         case 'FM'
-            % Carson's rule: BW = 2(Δf + fm)
-            % Using moderate modulation index
-            bandwidth = symbolRate * 2.5; % Wide bandwidth for FM
+            % Carson's rule: BW = 2(Δf + fm) with a realistic narrowband-FM
+            % modulation index beta = 2 (Δf = 2·fm). With fm ~= symbolRate this
+            % is BW = 2(2·fm + fm) = 6·fm. The modulator's FrequencyDeviation is
+            % set to bandwidth/3 (= 2·symbolRate) so the realized FM occupies
+            % its planned channel instead of overrunning it ~7x (the old 2.5x
+            % factor implied beta ~= 0.25 while the modulator used a fixed 75 kHz
+            % broadcast deviation -> beta ~= 5).
+            bandwidth = symbolRate * 6; % Carson BW for narrowband FM (beta = 2)
         case 'PM'
             bandwidth = symbolRate * 2.0; % Wide bandwidth for PM
 
