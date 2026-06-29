@@ -137,4 +137,20 @@ function RxInfo = validateRxPlanIntoRxInfo(rxPlan, FrameId, rxIdx)
             RxInfo.AdcBits = double(adcBits);
         end
     end
+
+    % Carry the SDR profile noise figure through so the receiver's realized
+    % thermal-noise floor matches the annotated Sdr.NoiseFigureDb and differs
+    % per SDR model (H10). Without this, ReceiveFactory falls back to a fresh
+    % random [10,20] dB draw that is profile-independent and disagrees with the
+    % annotated NF by up to ~14 dB, biasing the measured received-SNR GT.
+    % RRFSimulator has no NoiseFigure property, so the factory reads this field
+    % explicitly when building ThermalNoiseConfig (it is not auto-wired).
+    if isfield(rxPlan.Observation, 'Sdr') && isstruct(rxPlan.Observation.Sdr) ...
+            && isfield(rxPlan.Observation.Sdr, 'NoiseFigureDb')
+        noiseFigureDb = rxPlan.Observation.Sdr.NoiseFigureDb;
+        if isnumeric(noiseFigureDb) && isscalar(noiseFigureDb) && ...
+                isfinite(noiseFigureDb) && noiseFigureDb >= 0
+            RxInfo.NoiseFigure = double(noiseFigureDb);
+        end
+    end
 end

@@ -262,10 +262,24 @@ classdef ReceiveFactory < matlab.System
                 noiseField = typeConfig.ThermalNoise;
 
                 if isfield(noiseField, 'NoiseFigure')
-                    nfRange = noiseField.NoiseFigure;
-                    thermalConfig.NoiseFigure = obj.randomInRange(nfRange(1), nfRange(2));
+                    if isfield(rxInfoThisRx, 'NoiseFigure') && ...
+                            isnumeric(rxInfoThisRx.NoiseFigure) && ...
+                            isscalar(rxInfoThisRx.NoiseFigure) && ...
+                            isfinite(rxInfoThisRx.NoiseFigure)
+                        % Prefer the SDR profile's noise figure (selected once
+                        % per receiver from the SdrReceiverCatalog at the
+                        % blueprint stage and carried on RxInfo), so the realized
+                        % thermal floor matches the annotated Sdr.NoiseFigureDb
+                        % and differs per SDR model. Fall back to the factory
+                        % range only when no profile NF was threaded (e.g.
+                        % non-SDR-profile test receivers).
+                        thermalConfig.NoiseFigure = double(rxInfoThisRx.NoiseFigure);
+                    else
+                        nfRange = noiseField.NoiseFigure;
+                        thermalConfig.NoiseFigure = obj.randomInRange(nfRange(1), nfRange(2));
+                    end
                     obj.logger.debug('Set ThermalNoise NoiseFigure: %.2f dB', thermalConfig.NoiseFigure);
-                    
+
                     % Calculate NoiseTemperature from NoiseFigure
                     % NoiseTemperature = T0 * (NoiseFigure_linear - 1)
                     % where T0 = 290K (reference temperature)
