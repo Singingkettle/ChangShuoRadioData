@@ -166,15 +166,18 @@ runtests('tests/unit/MeasurementCompletenessHookTest.m')
 
 Start here:
 
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md): generate your first dataset
+  (requirements, OSM data, the run, the output, troubleshooting).
 - [docs/README.md](docs/README.md): documentation index.
 - [docs/configuration.md](docs/configuration.md): current configuration and
   runtime-plan contract.
 - [docs/annotation-schema.md](docs/annotation-schema.md): annotation
   consumer contract.
-- [docs/audits/manual-full-code-review-guide.md](docs/audits/manual-full-code-review-guide.md):
-  human review guide.
-- [docs/audits/](docs/audits/): historical audit snapshots. These are evidence,
-  not current operating instructions.
+
+Historical refactoring audits, phase notes, and overnight bug-hunt findings are
+preserved on the
+[`archive/history-2026-06-30`](https://github.com/Singingkettle/ChangShuoRadioData/tree/archive/history-2026-06-30)
+branch, not on `main`.
 
 If you need the older JSAC-era behavior, use the historical stable revision:
 [a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).

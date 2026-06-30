@@ -1,3 +1,5 @@
+[English](annotation-downstream.md) | [中文](annotation-downstream.zh-CN.md)
+
 # Annotation Downstream Example
 
 Status: Phase 7 validated by `run_csrd_downstream_docs_readiness`.

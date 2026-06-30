@@ -1,3 +1,5 @@
+[English](GETTING_STARTED.md) | [中文](GETTING_STARTED.zh-CN.md)
+
 # Getting Started — Generate Your First Dataset
 
 This guide takes you from a fresh clone to a generated CSRD dataset on disk. CSRD

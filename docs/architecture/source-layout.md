@@ -1,3 +1,5 @@
+[English](source-layout.md) | [中文](source-layout.zh-CN.md)
+
 # CSRD Source Layout
 
 This page describes the current source tree. Historical audit documents may
@@ -99,4 +101,5 @@ record it in `ScenarioPlan`.
 - Generated test configs write under `artifacts/tests/generated_configs/`.
 - Long-running diagnostics and performance traces write under `artifacts/`.
 - Large generated audit manifests write under `artifacts/audits/reports/`.
-- Durable human conclusions belong in `docs/audits/`.
+- Historical refactoring/audit conclusions are preserved on the
+  `archive/history-2026-06-30` branch, not on `main`.

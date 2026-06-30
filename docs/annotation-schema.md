@@ -1,3 +1,5 @@
+[English](annotation-schema.md) | [中文](annotation-schema.zh-CN.md)
+
 # CSRD Annotation Schema
 
 Status: Annotation current contract, updated for scenario-level
