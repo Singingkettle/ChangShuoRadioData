@@ -13,6 +13,33 @@ design. A run provides policies, each scenario first builds a frozen
 `ScenarioPlan`, every frame is generated from that plan, and annotations record
 what was planned, executed, and measured.
 
+## Quick Start
+
+**New here? Read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for the full
+walkthrough: requirements, OSM map data, the run, the output layout, and
+troubleshooting.
+
+In short, from the repository root in MATLAB:
+
+```matlab
+addpath(pwd)
+addpath(fullfile(pwd, 'tools'))
+simulation(1, 1, 'csrd2025/csrd2025.m')
+```
+
+Generated data lands under `data/CSRD2025/session_*/` (per-scenario annotation
+JSON + IQ `.mat`).
+
+**Before the first run** you need:
+- MATLAB **R2025a** with the **Communications**, **Signal Processing**, **Phased
+  Array System**, and **Antenna** toolboxes.
+- **OSM map data** under `data/map/osm/` — the default config is ~90% OSM ray
+  tracing, so an empty map directory fails fast with `CSRD:Scenario:MissingOSMFile`.
+  Get it with `pip install requests && python tools/download_osm.py`, or switch to
+  the statistical-only channel (`Map.Types = {'Statistical'}`).
+
+See [GETTING_STARTED.md](docs/GETTING_STARTED.md) for details.
+
 ## Current Entry Points
 
 | Task | Entry |

@@ -21,6 +21,10 @@ the first place to learn the current codebase.
 - `HANDOVER_2026-04-26.md` and `HANDOVER_2026-05-03.md` are historical
   snapshots from previous refactoring passes.
 - `phases/` records phase-level decisions and verification notes.
+- `overnight/` collects the dated overnight stress / measured-GT bug-hunt
+  findings (2026-06-20 … 2026-06-29, rounds 2–13). Each is a point-in-time
+  report of what a hunt found and fixed; read them newest-first for the most
+  recent state. See [`overnight/README.md`](overnight/README.md).
 - `reports/` keeps small human-written reports. Large generated JSON manifests
   are not committed anymore.
 - `manual-full-code-review-guide.md` is current enough to use for human review,
