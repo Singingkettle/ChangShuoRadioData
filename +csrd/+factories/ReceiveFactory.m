@@ -173,6 +173,22 @@ classdef ReceiveFactory < matlab.System
                         'Action', 'unavailable');
                 end
 
+                % Realized receiver thermal-noise power (input-referred, Watts)
+                % for the measured received-SNR GT. The per-emitter SNR is
+                % measured downstream as signal / (channel noise + this thermal
+                % noise), so the SNR reflects the real signal not the link budget.
+                if isprop(currentReceiverBlock, 'RealizedThermalNoiseInputReferredW')
+                    receivedDataStruct.RealizedThermalNoiseInputReferredW = ...
+                        currentReceiverBlock.RealizedThermalNoiseInputReferredW;
+                end
+                % ADC quantization-noise floor (input-referred): summed with the
+                % channel + thermal noise downstream so the measured SNR cannot
+                % exceed the converter's physical dynamic range.
+                if isprop(currentReceiverBlock, 'RealizedAdcQuantizationNoiseInputReferredW')
+                    receivedDataStruct.RealizedAdcQuantizationNoiseInputReferredW = ...
+                        currentReceiverBlock.RealizedAdcQuantizationNoiseInputReferredW;
+                end
+
                 obj.logger.debug('Frame %d, Rx %s: Reception step successful.', frameId, rxIdStr);
             catch ME_step
                 % Phase 3 (audit §3.4 / §17.5 P3-6): the legacy fallback
@@ -246,10 +262,24 @@ classdef ReceiveFactory < matlab.System
                 noiseField = typeConfig.ThermalNoise;
 
                 if isfield(noiseField, 'NoiseFigure')
-                    nfRange = noiseField.NoiseFigure;
-                    thermalConfig.NoiseFigure = obj.randomInRange(nfRange(1), nfRange(2));
+                    if isfield(rxInfoThisRx, 'NoiseFigure') && ...
+                            isnumeric(rxInfoThisRx.NoiseFigure) && ...
+                            isscalar(rxInfoThisRx.NoiseFigure) && ...
+                            isfinite(rxInfoThisRx.NoiseFigure)
+                        % Prefer the SDR profile's noise figure (selected once
+                        % per receiver from the SdrReceiverCatalog at the
+                        % blueprint stage and carried on RxInfo), so the realized
+                        % thermal floor matches the annotated Sdr.NoiseFigureDb
+                        % and differs per SDR model. Fall back to the factory
+                        % range only when no profile NF was threaded (e.g.
+                        % non-SDR-profile test receivers).
+                        thermalConfig.NoiseFigure = double(rxInfoThisRx.NoiseFigure);
+                    else
+                        nfRange = noiseField.NoiseFigure;
+                        thermalConfig.NoiseFigure = obj.randomInRange(nfRange(1), nfRange(2));
+                    end
                     obj.logger.debug('Set ThermalNoise NoiseFigure: %.2f dB', thermalConfig.NoiseFigure);
-                    
+
                     % Calculate NoiseTemperature from NoiseFigure
                     % NoiseTemperature = T0 * (NoiseFigure_linear - 1)
                     % where T0 = 290K (reference temperature)

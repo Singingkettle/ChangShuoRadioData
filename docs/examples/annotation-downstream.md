@@ -52,7 +52,7 @@ The COCO converter uses a receiver-frequency canvas:
 - `images[*].width` is the receiver observable frequency axis.
 - `images[*].height` is a one-row minimal canvas.
 - Category names come from `Truth.Design.ModulationFamily`.
-- Bbox center comes from `ReceiverView.ProjectedCenterOffsetHz`.
+- Bbox center comes from `Truth.Measured.SourcePlane.CenterFrequencyHz`.
 - Bbox width comes from `Truth.Measured.SourcePlane.OccupiedBandwidthHz`.
 - Time occupancy remains metadata because annotation does not persist
   burst start/stop time extents.

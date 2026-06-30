@@ -143,15 +143,21 @@ function [txConfigs, globalLayout] = generateScenarioTransmitterConfigurations(o
         
         % Calculate total transmission duration from intervals
         totalTxDuration = calculateTotalTransmissionDuration(txPlan.Temporal);
+        % Shortest single burst (on-interval): an OFDM/OTFS symbol must fit
+        % within one burst (the transmit gating cuts per burst), so the
+        % multicarrier subcarrier spacing is sized from this, NOT the summed
+        % total (which over-counts and yields a too-long symbol that truncates).
+        minBurstDuration = calculateMinTransmissionInterval(txPlan.Temporal);
 
         % 3. Third: Generate MODULATION config (symbol rate derived from bandwidth)
         if regulatoryEnabled
             txPlan.Modulation = generateRegulatoryModulationConfig(obj, ...
-                txPlan.Spectrum.PlannedBandwidth, modParams, regulatoryEmitterPlan);
+                txPlan.Spectrum.PlannedBandwidth, modParams, regulatoryEmitterPlan, ...
+                minBurstDuration);
             modulationFamily = regulatoryEmitterPlan.ModulationFamily;
         else
             txPlan.Modulation = generateModulationConfig(obj, ...
-                txPlan.Spectrum.PlannedBandwidth, modParams);
+                txPlan.Spectrum.PlannedBandwidth, modParams, minBurstDuration);
             modulationFamily = txPlan.Modulation.Type;
         end
         txPlan.Hardware.NumAntennas = selectNumAntennasForModulation( ...
@@ -437,8 +443,13 @@ function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulatio
     family = char(string(modulationFamily));
     minAnt = numAntennaRange.Min;
     maxAnt = numAntennaRange.Max;
+    % OTFS is single-antenna-only in AntennaModulationMatrix ('OTFS' is
+    % Allowed at 1 antenna, Forbidden at 2/4/8/16); without it here the planner
+    % draws 2/4 antennas for OTFS, the blueprint validator rejects it, and the
+    % scenario is resampled up to 50 times (wasteful, and risks exhausting the
+    % resample budget). Keep this list consistent with the antenna matrix.
     singleAntennaFamilies = {'FM','PM','AM','SSBAM','DSBAM','DSBSCAM','VSBAM', ...
-        'FSK','MSK','CPFSK','GFSK','GMSK','OOK','PAM'};
+        'FSK','MSK','CPFSK','GFSK','GMSK','OOK','PAM','OTFS'};
     if ismember(family, singleAntennaFamilies)
         if minAnt > 1
             error('CSRD:Scenario:IncompatibleAntennaModulation', ...
@@ -455,7 +466,17 @@ function numAntennas = selectNumAntennasForModulation(numAntennaRange, modulatio
             'Transmitter.NumAntennas range [%g, %g] is incompatible with supported range [1, 4].', ...
             minAnt, maxAnt);
     end
-    numAntennas = randi([minAllowed, maxAllowed]);
+    % Draw only from valid antenna bins ([1 2 4 8 16]); a raw integer range
+    % would yield non-bin counts (e.g. 3) that the blueprint validator rejects,
+    % wasting resample attempts and intermittently failing high-Tx scenarios.
+    antennaBins = [1 2 4 8 16];
+    candidates = antennaBins(antennaBins >= minAllowed & antennaBins <= maxAllowed);
+    if isempty(candidates)
+        error('CSRD:Scenario:InvalidTxAntennaRange', ...
+            ['Transmitter.NumAntennas range [%g, %g] contains no valid antenna ', ...
+             'bin from [1 2 4 8 16].'], minAnt, maxAnt);
+    end
+    numAntennas = candidates(randi(numel(candidates)));
 end
 
 function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
@@ -475,18 +496,34 @@ function pattern = applyRegulatoryTemporalPattern(pattern, temporalPattern)
             pattern.EndTime = obsDur;
             pattern.Intervals = [0, obsDur];
         case 'Burst'
-            onDuration = min(obsDur, max(obsDur * 0.3, min(0.01, obsDur)));
-            offDuration = max(obsDur - onDuration, 0);
-            pattern.OnDuration = onDuration;
-            pattern.OffDuration = offDuration;
-            pattern.DutyCycle = onDuration / max(onDuration + offDuration, eps);
+            % Realize a repeating ON/OFF train (not a single full-front block)
+            % so later frames see the periodic emitter the 'Burst' label
+            % promises, instead of going silent after one block.
+            pattern.OnDuration = obsDur * 0.2;
+            pattern.OffDuration = obsDur * 0.2;
             pattern.InitialDelay = 0;
-            pattern.Intervals = [0, onDuration];
+            pattern.DutyCycle = pattern.OnDuration / ...
+                (pattern.OnDuration + pattern.OffDuration);
+            pattern.Intervals = generateBurstIntervals(pattern, obsDur);
         case 'Scheduled'
-            pattern.SlotDuration = obsDur;
-            pattern.NumSlots = 1;
+            % Realize a genuinely intermittent (slotted) emission so the signal
+            % matches the 'Scheduled' label, instead of a single full-window
+            % slot ([0, obsDur]) that is indistinguishable from a Continuous
+            % emitter while the annotation still advertises 'Scheduled'.
+            pattern.SlotDuration = obsDur * 0.2;
+            pattern.NumSlots = 4;
             pattern.AssignedSlot = 1;
-            pattern.Intervals = [0, obsDur];
+            pattern.DutyCycle = 1 / pattern.NumSlots;
+            pattern.Intervals = generateScheduledIntervals(pattern, obsDur);
+    end
+    % Guard against a degenerate rebuild collapsing to the no-activity
+    % sentinel: fall back to a truthful continuous emission rather than an
+    % empty/idle one mislabelled as Burst/Scheduled.
+    if isempty(pattern.Intervals) || ...
+            (size(pattern.Intervals, 1) == 1 && all(pattern.Intervals(1, :) == 0))
+        pattern.Type = 'Continuous';
+        pattern.DutyCycle = 1.0;
+        pattern.Intervals = [0, obsDur];
     end
 end
 
@@ -507,7 +544,25 @@ function totalDuration = calculateTotalTransmissionDuration(transmissionPattern)
     end
 end
 
-function modConfig = generateModulationConfig(obj, bandwidth, modParams)
+function minInterval = calculateMinTransmissionInterval(transmissionPattern)
+    % calculateMinTransmissionInterval - Shortest single on-interval (burst).
+    % The transmit gating cuts the modulated signal per burst, so a multicarrier
+    % symbol must fit ONE burst; this returns the tightest such constraint.
+    intervals = transmissionPattern.Intervals;
+    if isempty(intervals) || (size(intervals, 1) == 1 && all(intervals == 0))
+        minInterval = 0;
+        return;
+    end
+    durations = intervals(:, 2) - intervals(:, 1);
+    durations = durations(durations > 0);
+    if isempty(durations)
+        minInterval = 0;
+    else
+        minInterval = min(durations);
+    end
+end
+
+function modConfig = generateModulationConfig(obj, bandwidth, modParams, burstDurationSec)
     % generateModulationConfig - Generate modulation config from scenario params
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
@@ -564,7 +619,7 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams)
     else
         modConfig.BitsPerSymbol = 1;  % For analog modulations
     end
-    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth);
+    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec);
     
     obj.logger.debug('Scenario: Modulation %s, Order %d, SymbolRate %.2f kHz', ...
         modConfig.Type, modConfig.Order, modConfig.SymbolRate / 1e3);
@@ -580,7 +635,25 @@ function symbolRate = snapSymbolRateToReceiverGrid(obj, rawSymbolRate)
     symbolRate = receiverRate / divisor;
 end
 
-function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan)
+function symbolRate = snapNarrowSymbolRateToReceiverGrid(obj, rawSymbolRate)
+    % snapNarrowSymbolRateToReceiverGrid - Snap only narrow rates to the grid.
+    % Inputs: communication simulator, raw symbol rate (Hz).
+    % Outputs: for narrow channels (receiver-submultiple divisor >= 50, i.e. a
+    %   bandwidth distortion under ~2%), the nearest exact ReceiverSampleRate /
+    %   integer; wider channels are returned unchanged so the regulatory
+    %   catalog bandwidth is preserved exactly. Narrow odd channels such as the
+    %   8.33 kHz airband otherwise produce an intractable modulator-to-receiver
+    %   resample ratio in TRFSimulator.
+    receiverRate = obj.unifiedReceiverConfig.SampleRate;
+    divisor = max(1, round(receiverRate / rawSymbolRate));
+    if divisor >= 50
+        symbolRate = receiverRate / divisor;
+    else
+        symbolRate = rawSymbolRate;
+    end
+end
+
+function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParams, emitterPlan, burstDurationSec)
     % generateRegulatoryModulationConfig - Generate modulation config from a
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
@@ -591,7 +664,13 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
     modConfig.Order = double(emitterPlan.ModulationOrder);
     modConfig.RolloffFactor = modParams.RolloffFactor;
     modConfig.OFDMMimoMode = modParams.OFDMMimoMode;
-    modConfig.SymbolRate = bandwidth / (1 + modParams.RolloffFactor);
+    % Narrow channels (e.g. 8.33 kHz airband) whose rate shares no factors with
+    % the receiver rate would yield an intractable modulator->receiver resample
+    % ratio in TRFSimulator. Snap only narrow rates onto an exact receiver
+    % submultiple (sub-2% bandwidth shift); wide channels keep their exact
+    % catalog bandwidth.
+    modConfig.SymbolRate = snapNarrowSymbolRateToReceiverGrid(obj, ...
+        bandwidth / (1 + modParams.RolloffFactor));
     if isstruct(modParams.SamplesPerSymbol)
         spsMin = modParams.SamplesPerSymbol.Min;
         spsMax = modParams.SamplesPerSymbol.Max;
@@ -609,29 +688,60 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
     else
         modConfig.BitsPerSymbol = 1;
     end
-    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth);
+    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec);
     obj.logger.debug(['Scenario: Regulatory modulation %s, Order %d, ', ...
         'SymbolRate %.2f kHz, Band=%s'], modConfig.Type, ...
         modConfig.Order, modConfig.SymbolRate / 1e3, emitterPlan.BandId);
 end
 
-function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
+function [fftLength, guard, scs, cpLen] = localOfdmGridForBandwidth(bandwidth, burstDurationSec)
+    % localOfdmGridForBandwidth - OFDM grid that tracks the planned channel
+    % bandwidth AND fits the burst duration. The subcarrier spacing sets the
+    % OFDM symbol duration (1/scs); the FFT size and used-subcarrier count scale
+    % with the bandwidth so realized OBW = usableBins*scs ~= bandwidth.
+    %
+    % Spacing is the LTE/5G-NR numerology-0 value (15 kHz, 66.7 us symbol) when
+    % the burst is long enough, but is RAISED so at least 2 OFDM symbols fit the
+    % burst (scs >= 2/burstDuration). The dataset's frames are 20-82 us, shorter
+    % than a 15 kHz symbol, so a fixed 15 kHz grid was truncated by the transmit
+    % gating to a sub-symbol fragment whose measured OBW collapsed to ~586 kHz.
+    if nargin < 2 || isempty(burstDurationSec) || ~(burstDurationSec > 0)
+        burstDurationSec = 2e-5;   % shortest dataset frame; keeps the grid valid if unknown
+    end
+    % Raise the spacing so >= 2 OFDM symbols fit the burst, but CAP it at
+    % bandwidth/12 so the realized OBW (= numUsed*scs) stays ~= the planned
+    % bandwidth (>= 12 subcarriers) instead of over-shooting Nyquist when the
+    % burst is very short (a too-large scs would force numUsed to the 12 floor
+    % and realize 12*scs >> bandwidth, then alias on the resample to 50 MHz).
+    scs = min(max(15e3, 2 / burstDurationSec), bandwidth / 12);
+    numUsed = max(12, round(bandwidth / scs));         % used (data+pilot) subcarriers
+    fftSet = [256, 512, 1024, 2048, 4096];             % comm.OFDMModulator-supported sizes
+    idx = find(fftSet >= numUsed / 0.85, 1);           % leave ~15% for guard bands
+    if isempty(idx)
+        fftLength = fftSet(end);                       % clamp: > 4096 unsupported
+        numUsed = min(numUsed, round(0.85 * fftLength));
+    else
+        fftLength = fftSet(idx);
+    end
+    guard = max(1, round((fftLength - numUsed) / 2));  % so usableBins = fft-2*guard ~= numUsed
+    cpLen = round(fftLength / 14);                      % ~7% cyclic prefix (LTE normal CP)
+end
+
+function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec)
     % buildRegulatoryModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
-            fftLength = 2048;
-            guard = 144;
-            usableBins = fftLength - 2 * guard;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / usableBins / 1e3) * 1e3);
+            [fftLength, guard, subcarrierSpacing, cpLen] = ...
+                localOfdmGridForBandwidth(bandwidth, burstDurationSec);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
             modulatorConfig.ofdm.NumGuardBandCarriers = [guard; guard];
             modulatorConfig.ofdm.InsertDCNull = true;
-            modulatorConfig.ofdm.CyclicPrefixLength = 144;
+            modulatorConfig.ofdm.CyclicPrefixLength = cpLen;
             modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.ofdm.Windowing = false;
             modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
@@ -640,6 +750,10 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
             modulatorConfig.span = 10;
             modulatorConfig.SymbolMapping = "Gray";
             modulatorConfig.PhaseOffset = 0;
+        case 'FM'
+            % Narrowband-FM deviation scaled to the planned channel (see the
+            % buildLegacyModulatorConfig 'FM' case + calculateRequiredBandwidth).
+            modulatorConfig.FrequencyDeviation = max(1e3, bandwidth / 3);
         otherwise
             if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0
                 modulatorConfig.beta = modConfig.RolloffFactor;
@@ -647,29 +761,36 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth)
     end
 end
 
-function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
+function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec)
     % buildLegacyModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
-            fftLength = 512;
-            guard = 32;
-            usableBins = fftLength - 2 * guard;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / usableBins / 1e3) * 1e3);
+            [fftLength, guard, subcarrierSpacing, cpLen] = ...
+                localOfdmGridForBandwidth(bandwidth, burstDurationSec);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
             modulatorConfig.ofdm.NumGuardBandCarriers = [guard; guard];
             modulatorConfig.ofdm.InsertDCNull = true;
-            modulatorConfig.ofdm.CyclicPrefixLength = 64;
+            modulatorConfig.ofdm.CyclicPrefixLength = cpLen;
             modulatorConfig.ofdm.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.ofdm.Windowing = false;
             modulatorConfig.mimo.Mode = localValidateOFDMMimoMode(modConfig);
         case 'OTFS'
-            delayLength = 512;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / max(1, delayLength - 8) / 1e3) * 1e3);
+            % Realized OBW = (DelayLength-8)*scs; the OTFS symbol duration is
+            % 1/scs. Raise the spacing so >= 2 symbols fit the burst (same
+            % symbol-vs-frame fit as OFDM) and scale the delay grid with the
+            % planned bandwidth so OBW tracks it.
+            if nargin < 3 || isempty(burstDurationSec) || ~(burstDurationSec > 0)
+                burstDurationSec = 2e-5;
+            end
+            % Cap as in localOfdmGridForBandwidth so the realized OBW stays ~=
+            % the planned bandwidth and the symbol fits the burst.
+            subcarrierSpacing = min(max(15e3, 2 / burstDurationSec), bandwidth / 12);
+            delayLength = max(16, round(bandwidth / subcarrierSpacing) + 8);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.otfs.DelayLength = delayLength;
@@ -677,13 +798,17 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             modulatorConfig.otfs.padType = "CP";
             modulatorConfig.otfs.padLen = 16;
         case 'SCFDMA'
-            fftLength = 512;
-            dataSubcarriers = 300;
-            subcarrierSpacing = max(15e3, ceil(bandwidth / dataSubcarriers / 1e3) * 1e3);
+            % Realized OBW = NumDataSubcarriers*scs. Scale the FFT + used
+            % subcarriers with the planned bandwidth at a fixed 15 kHz spacing
+            % (same grid as OFDM), instead of the max(15 kHz, .) floor on a fixed
+            % 300-subcarrier grid that pinned OBW to 300*15 kHz = 4.5 MHz.
+            [fftLength, guard, subcarrierSpacing, cpLen] = ...
+                localOfdmGridForBandwidth(bandwidth, burstDurationSec);
+            dataSubcarriers = fftLength - 2 * guard;
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.scfdma.FFTLength = fftLength;
-            modulatorConfig.scfdma.CyclicPrefixLength = 64;
+            modulatorConfig.scfdma.CyclicPrefixLength = cpLen;
             modulatorConfig.scfdma.Subcarrierspacing = subcarrierSpacing;
             modulatorConfig.scfdma.SubcarrierMappingInterval = 1;
             modulatorConfig.scfdma.NumDataSubcarriers = dataSubcarriers;
@@ -692,6 +817,13 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth)
             modulatorConfig.span = 10;
             modulatorConfig.SymbolMapping = "Gray";
             modulatorConfig.PhaseOffset = 0;
+        case 'FM'
+            % Narrowband-FM deviation scaled to the planned channel:
+            % Δf = bandwidth/3 = 2·symbolRate (Carson modulation index beta = 2),
+            % so the realized FM occupies its planned channel instead of the
+            % fixed 75 kHz broadcast deviation overrunning a narrow channel ~7x.
+            % See calculateRequiredBandwidth('FM').
+            modulatorConfig.FrequencyDeviation = max(1e3, bandwidth / 3);
         otherwise
             if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0
                 modulatorConfig.beta = modConfig.RolloffFactor;
@@ -765,12 +897,31 @@ function msgConfig = generateMessageConfig(~, modulationConfig, txDuration, msgP
             sprintf('AudioSelect|%s|%s', char(string(emitterId)), modulationFamily));
     end
 
-    % Calculate message length based on symbol rate, bits per symbol, and duration
+    % Calculate message length based on symbol rate and duration.
     symbolRate = modulationConfig.SymbolRate;
     bitsPerSymbol = modulationConfig.BitsPerSymbol;
-    
-    % Calculate required bits (with some margin for framing overhead)
-    calculatedLength = ceil(symbolRate * bitsPerSymbol * txDuration * 1.1); % 10% overhead margin
+
+    if msgConfig.IsDigital
+        % Digital: the source is bits; the modulator groups them into symbols
+        % and upsamples by SamplesPerSymbol, so the SPS factor cancels and the
+        % required bit-count is symbolRate*bitsPerSymbol*duration (+margin).
+        calculatedLength = ceil(symbolRate * bitsPerSymbol * txDuration * 1.1);
+    else
+        % Analog (FM/PM/AM ...): the source (audio) is modulated sample-by-sample
+        % at the modulator rate symbolRate*SamplesPerSymbol with NO upsampling,
+        % so the source must supply that many samples to cover the burst.
+        % Without the SamplesPerSymbol factor the produced signal is only
+        % ~1/SamplesPerSymbol of the segment and gateToDuration zero-pads the
+        % rest with silence (45-86% of every analog burst).
+        samplesPerSymbol = 1;
+        if isfield(modulationConfig, 'SamplesPerSymbol') && ...
+                ~isempty(modulationConfig.SamplesPerSymbol) && ...
+                isfinite(modulationConfig.SamplesPerSymbol) && ...
+                modulationConfig.SamplesPerSymbol > 0
+            samplesPerSymbol = double(modulationConfig.SamplesPerSymbol);
+        end
+        calculatedLength = ceil(symbolRate * samplesPerSymbol * txDuration * 1.1);
+    end
     
     % Apply bounds from scenario config
     lengthMin = msgParams.Length.Min;
@@ -809,6 +960,14 @@ function order = selectModulationOrder(modType, modParams)
                 orders = [2, 4, 8];
             case {'GMSK', 'MSK', 'OOK'}
                 orders = 2;
+            case {'APSK', 'DVBSAPSK'}
+                orders = [16, 32, 64, 128, 256];  % ring constellations need >= 16
+            case 'Mill88QAM'
+                orders = [16, 32, 64, 256];
+            case 'OTFS'
+                orders = [4, 16, 64];  % inner QAM/PSK order
+            case {'ASK', 'PAM', 'SCFDMA'}
+                orders = [4, 8, 16, 32, 64];
             case {'FM', 'PM', 'AM', 'SSBAM', 'DSBAM', 'DSBSCAM', 'VSBAM'}
                 orders = 1;  % Analog: Order not used, but set to 1
             otherwise
@@ -892,7 +1051,14 @@ function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
             slotMax = min(schedParams.SlotDuration.Max, obsDur * 0.3);
             pattern.SlotDuration = randomInRange(obj, slotMin, slotMax);
             pattern.NumSlots = randi([schedParams.SlotsPerFrame.Min, schedParams.SlotsPerFrame.Max]);
-            pattern.AssignedSlot = randi(pattern.NumSlots);
+            % Only slots whose start lies inside the observation window produce
+            % a real interval; assigning a later slot returns the empty [0,0]
+            % sentinel, which the fallback below would otherwise turn into a
+            % CONTINUOUS emission still labelled 'Scheduled' (signal contradicts
+            % annotation). Clamp the assigned slot to the startable range so the
+            % emitter is a truthful slotted one.
+            maxStartableSlot = max(1, ceil(obsDur / pattern.SlotDuration));
+            pattern.AssignedSlot = randi(min(pattern.NumSlots, maxStartableSlot));
             pattern.Intervals = generateScheduledIntervals(pattern, obsDur);
             
         case 'Random'
@@ -909,6 +1075,24 @@ function pattern = generateTemporalPattern(obj, temporalParams, txIndex)
             error('CSRD:Scenario:UnknownTemporalPattern', ...
                 'Unsupported TemporalBehavior pattern type "%s".', ...
                 char(string(selectedType)));
+    end
+
+    % Guarantee at least one active interval inside the observation window.
+    % generateBurst/Scheduled/Random return the [0, 0] no-activity sentinel
+    % for very short observations; without a fallback a planned transmitter
+    % would silently emit an all-idle (zero-source) scenario.
+    if isempty(pattern.Intervals) || ...
+            (size(pattern.Intervals, 1) == 1 && all(pattern.Intervals(1, :) == 0))
+        % A degenerate pattern collapsed to the no-activity sentinel. The
+        % fallback emits continuously across the window, so relabel the pattern
+        % as Continuous to keep the annotation's Type/DutyCycle truthful to the
+        % realized signal instead of advertising a slotted/bursty emitter that
+        % never existed.
+        pattern.Type = 'Continuous';
+        pattern.DutyCycle = 1.0;
+        pattern.StartTime = 0;
+        pattern.EndTime = temporalParams.ObservationDuration;
+        pattern.Intervals = [0, temporalParams.ObservationDuration];
     end
 end
 

@@ -41,6 +41,7 @@ for frameIdx = 1:numel(frames)
     for sourceIdx = 1:numel(frameSources)
         source = frameSources{sourceIdx};
         localValidateSource(source, frameIdx, sourceIdx);
+        source = localCoerceSourceGeometry(source);
         sources{end + 1} = source; %#ok<AGROW>
     end
 end
@@ -85,6 +86,44 @@ assert(exist(sourcePath, 'file') == 2, ...
     'CSRD:AnnotationV2:MissingFile', ...
     'Annotation file does not exist: %s', sourcePath);
 payload = jsondecode(fileread(sourcePath));
+end
+
+
+function source = localCoerceSourceGeometry(source)
+    % localCoerceSourceGeometry - Restore GeometrySnapshot numeric vectors.
+    % A geometry vector containing NaN/Inf serialises to JSON null and decodes
+    % back as a CELL ({[];[];[]}), not a double, which crashes downstream
+    % double()/norm(). Coerce the known-numeric GeometrySnapshot fields back to
+    % a double column (cell []  -> NaN); doubles pass through unchanged.
+    if isfield(source, 'Truth') && isstruct(source.Truth) && ...
+            isfield(source.Truth, 'Execution') && isstruct(source.Truth.Execution) && ...
+            isfield(source.Truth.Execution, 'GeometrySnapshot') && ...
+            isstruct(source.Truth.Execution.GeometrySnapshot)
+        geom = source.Truth.Execution.GeometrySnapshot;
+        numericFields = {'TxPositionM', 'TxVelocityMps', 'RxPositionM', 'RxVelocityMps'};
+        for k = 1:numel(numericFields)
+            if isfield(geom, numericFields{k})
+                geom.(numericFields{k}) = localCellToNumericVector(geom.(numericFields{k}));
+            end
+        end
+        source.Truth.Execution.GeometrySnapshot = geom;
+    end
+end
+
+
+function v = localCellToNumericVector(v)
+    % localCellToNumericVector - Cell of scalars/empties -> double column (empty -> NaN).
+    if ~iscell(v)
+        return;
+    end
+    out = nan(numel(v), 1);
+    for i = 1:numel(v)
+        e = v{i};
+        if isnumeric(e) && isscalar(e) && ~isempty(e)
+            out(i) = double(e);
+        end
+    end
+    v = out;
 end
 
 

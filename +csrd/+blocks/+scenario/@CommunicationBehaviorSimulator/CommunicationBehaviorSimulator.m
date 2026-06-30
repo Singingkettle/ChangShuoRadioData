@@ -218,7 +218,6 @@ classdef CommunicationBehaviorSimulator < matlab.System
                 end
                 rxRange = csrd.blocks.scenario.CommunicationBehaviorSimulator ...
                     .resolveObservableRange(rxc, fallbackObservableRange);
-                halfWin = (rxRange(2) - rxRange(1)) / 2;
 
                 % Phase 3 unified-rx case: identical CenterFrequency
                 % across every receiver, so the projection equals the
@@ -227,17 +226,11 @@ classdef CommunicationBehaviorSimulator < matlab.System
                 lowerEdge  = projOffset - halfBw;
                 upperEdge  = projOffset + halfBw;
 
-                absCenter = abs(projOffset);
-                if absCenter + halfBw <= halfWin + 1
-                    isVis  = true;
-                    reason = 'InBand';
-                elseif absCenter - halfBw < halfWin
-                    isVis  = false;
-                    reason = 'EdgeClipped';
-                else
-                    isVis  = false;
-                    reason = 'OutOfBand';
-                end
+                % Classify by the overlap of the emitter band with the receiver
+                % observable window directly (correct for any window, not only
+                % 0-centred ones). See classifyEmitterVisibility.
+                [isVis, reason] = csrd.blocks.scenario.CommunicationBehaviorSimulator ...
+                    .classifyEmitterVisibility(lowerEdge, upperEdge, rxRange);
 
                 rvs(end + 1) = struct( ...
                     'ReceiverId',              rxId, ...
@@ -322,6 +315,26 @@ classdef CommunicationBehaviorSimulator < matlab.System
                      'Only ''ReceiverCentric'' is available; ''Optimized'' / ''Random'' ', ...
                      'were thin wrappers and have been removed in Phase 2.'], ...
                     char(strategyName));
+            end
+        end
+
+        function [isVisible, reason] = classifyEmitterVisibility(lowerEdge, upperEdge, rxRange)
+            %CLASSIFYEMITTERVISIBILITY InBand/EdgeClipped/OutOfBand by band overlap.
+            % Classifies the emitter band [lowerEdge, upperEdge] against the
+            % receiver observable window [rxRange(1), rxRange(2)] by direct
+            % overlap, so it is correct for any window -- including one not
+            % centred on 0 (heterogeneous receivers) -- unlike the previous
+            % abs(offset) +/- halfBw vs half-width test. The +/-1 Hz tolerance
+            % matches the prior fully-inside test.
+            if lowerEdge >= rxRange(1) - 1 && upperEdge <= rxRange(2) + 1
+                isVisible = true;
+                reason = 'InBand';
+            elseif upperEdge > rxRange(1) && lowerEdge < rxRange(2)
+                isVisible = false;
+                reason = 'EdgeClipped';
+            else
+                isVisible = false;
+                reason = 'OutOfBand';
             end
         end
     end

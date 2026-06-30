@@ -86,16 +86,34 @@ Legacy v1 top-level fields are forbidden: `Realized`, `Planned`, `Temporal`,
 
 | Field | Unit | Meaning |
 |-------|------|---------|
-| `PlannedCenterFrequencyHz` | Hz | Blueprint center frequency |
+| `PlannedCenterFrequencyHz` | Hz | Planned source center as a **receiver-baseband offset** (same frame as `Execution.CenterFrequencyOffsetHz` and `ReceiverView.ProjectedCenterOffsetHz`), not an absolute RF carrier |
 | `PlannedBandwidthHz` | Hz | Blueprint bandwidth |
 | `PlannedSampleRate` | Hz | Planned sample rate |
 | `ModulationFamily` | text | Design category, used by downstream classifiers |
 | `ModulationOrder` | scalar | Modulation order when applicable |
+| `MessageSource` | text | Baseband source: `Audio` (analog) or `RandomBit` (digital) |
+| `IsDigital` | logical | Whether the modulation family is digital |
 | `PayloadLengthBits` | bits | Planned payload length |
 | `NumTransmitAntennas` | count | Planned transmit antenna count |
 
+All annotation frequencies are receiver-centered: the carrier `RealCarrierFrequency`
+deliberately never enters baseband/waveform generation (it drives only path loss,
+antenna pattern, and Doppler). `PlannedCenterFrequencyHz` is therefore a baseband
+offset relative to the receiver tuned center, in the same frame as the Execution
+and Measured center fields — despite the historical "CenterFrequency" name. A
+consumer that needs an absolute RF center must add the owning receiver's
+`RealCarrierFrequency`; reading this field as an absolute carrier is wrong by ~the
+tuned frequency.
+
 `Truth.Design.ModulationFamily` is the class label source for COCO conversion.
 It is not inferred from IQ.
+
+The message source is a deterministic function of the modulation family, not a
+free choice: analog families (FM/PM/AM variants) are driven by `Audio`, digital
+families (PSK/QAM/FSK/...) by `RandomBit`. The reader rejects any annotation
+whose `MessageSource`/`IsDigital` disagree with `ModulationFamily`
+(`CSRD:Annotation:MessageSourceModulationMismatch` /
+`CSRD:Annotation:IsDigitalModulationMismatch`).
 
 ## Truth.Execution
 
@@ -158,6 +176,9 @@ Receiver-view fields are per source per receiver:
 | `IsVisible` | logical | Whether the source is visible in the receiver window |
 | `VisibilityReason` | text | Reason such as `InBand` or `OutOfBand` |
 
-COCO v2 minimal export uses `ReceiverView.ProjectedCenterOffsetHz` for bbox
-center and `Truth.Measured.SourcePlane.OccupiedBandwidthHz` for bbox width.
-Invisible sources are skipped and reported in `csrd_export.skipped_sources`.
+COCO minimal export uses `Truth.Measured.SourcePlane.CenterFrequencyHz` for the
+bbox center (the measured, Doppler-inclusive center) and
+`Truth.Measured.SourcePlane.OccupiedBandwidthHz` for the bbox width -- both from
+the Measured plane so the box reflects the realized RX signal, not the planned
+`ReceiverView.ProjectedCenterOffsetHz`. Invisible sources are skipped and
+reported in `csrd_export.skipped_sources`.

@@ -239,8 +239,13 @@ function [bbox, bboxHz] = makeFrequencyBbox(source, observableRangeHz, ...
 rv = source.ReceiverView;
 sourcePlane = source.Truth.Measured.SourcePlane;
 
-centerHz = requireFiniteScalar(rv.ProjectedCenterOffsetHz, ...
-    'ReceiverView.ProjectedCenterOffsetHz');
+% Center the box on the MEASURED center frequency (same receiver-baseband
+% frame as the planned offset, but including the realized Doppler and carrier
+% error), consistent with the measured width below and the project's
+% measured-over-planned GT rule. ProjectedCenterOffsetHz is the planner's
+% pre-Doppler offset and would mis-center the box on the realized lobe.
+centerHz = requireFiniteScalar(sourcePlane.CenterFrequencyHz, ...
+    'Truth.Measured.SourcePlane.CenterFrequencyHz');
 bandwidthHz = requireFiniteScalar(sourcePlane.OccupiedBandwidthHz, ...
     'Truth.Measured.SourcePlane.OccupiedBandwidthHz');
 if bandwidthHz <= 0
@@ -317,7 +322,7 @@ function fieldSources = localFieldSources()
     % Outputs: see signature return values and contract fields.
 fieldSources = struct( ...
     'category', 'Truth.Design.ModulationFamily', ...
-    'bbox_center_hz', 'ReceiverView.ProjectedCenterOffsetHz', ...
+    'bbox_center_hz', 'Truth.Measured.SourcePlane.CenterFrequencyHz', ...
     'bbox_width_hz', ...
         'Truth.Measured.SourcePlane.OccupiedBandwidthHz', ...
     'time_occupancy', ...
@@ -405,9 +410,32 @@ fid = fopen(outputPath, 'w');
 assert(fid > 0, 'CSRD:Tools:CocoWriteFailed', ...
     'Could not open COCO output for writing: %s', outputPath);
 cleanup = onCleanup(@() fclose(fid));
-fprintf(fid, '%s', jsonencode(clean, 'PrettyPrint', true));
+% COCO requires images/annotations/categories to be JSON arrays. jsonencode
+% emits an array only for a non-scalar struct array (or a cell of structs); a
+% single-element collection would otherwise serialize as a bare JSON object and
+% break pycocotools (createIndex iterates these as lists). Encode from a
+% cell-wrapped copy so the on-disk JSON is always an array of objects, while the
+% returned struct keeps its original shape (callers/tests are unaffected).
+forJson = clean;
+forJson.images = localAsObjectArray(forJson.images);
+forJson.annotations = localAsObjectArray(forJson.annotations);
+forJson.categories = localAsObjectArray(forJson.categories);
+forJson.licenses = localAsObjectArray(forJson.licenses);
+fprintf(fid, '%s', jsonencode(forJson, 'PrettyPrint', true));
 delete(cleanup);
 coco = clean;
+end
+
+
+function out = localAsObjectArray(value)
+% localAsObjectArray - Force a struct array (including 0- or 1-element) into a
+% cell of scalar structs so jsonencode always emits a JSON array of objects,
+% never a bare object. Non-struct values pass through unchanged.
+if iscell(value) || ~isstruct(value)
+    out = value;
+else
+    out = num2cell(reshape(value, 1, []));
+end
 end
 
 

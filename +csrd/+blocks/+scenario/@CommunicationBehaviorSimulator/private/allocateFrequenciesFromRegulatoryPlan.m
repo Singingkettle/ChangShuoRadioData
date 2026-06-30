@@ -10,6 +10,12 @@ function [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan(obj, 
 
     globalLayout.FrequencyAllocations = {};
     isCellArray = iscell(txConfigs);
+    % The regulatory catalog places each emitter independently, so two can land
+    % co-channel. That is a realistic monitoring phenomenon (not an error to
+    % forbid as the receiver-centric path does), but colliding emitters must NOT
+    % be recorded as clean isolated placements -- detect actual band overlap and
+    % stamp globalLayout.OverlapOccurred honestly.
+    usedRanges = zeros(0, 2);
 
     for i = 1:length(txConfigs)
         if isCellArray
@@ -38,6 +44,20 @@ function [txConfigs, globalLayout] = allocateFrequenciesFromRegulatoryPlan(obj, 
                 txConfig.EntityID, lowerEdge, upperEdge, ...
                 observableRange(1), observableRange(2));
         end
+
+        proposedRange = [lowerEdge, upperEdge];
+        for j = 1:size(usedRanges, 1)
+            % Strict band-overlap (no MinSeparation margin): OverlapOccurred
+            % must record ACTUAL co-channel collisions, not near-but-separated
+            % placements. checkFrequencyOverlap adds the placement-deconfliction
+            % margin, which would over-report overlap here.
+            if proposedRange(1) < usedRanges(j, 2) && proposedRange(2) > usedRanges(j, 1)
+                globalLayout.OverlapOccurred = true;
+                globalLayout.OverlapReason = 'RegulatoryCatalogCoChannel';
+                break;
+            end
+        end
+        usedRanges = [usedRanges; proposedRange]; %#ok<AGROW>
 
         txConfig.Spectrum.LowerBound = lowerEdge;
         txConfig.Spectrum.UpperBound = upperEdge;

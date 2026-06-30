@@ -24,5 +24,73 @@ classdef ObwActualShortSignalContractTest < matlab.unittest.TestCase
             testCase.verifyEqual(bwActual, 0);
         end
 
+        function lateFrameTailBurstIsNotDiscarded(testCase)
+            % Regression: a short burst sitting entirely in the trailing
+            % partial segment that pwelch discards must still be measured as
+            % a positive occupied bandwidth (both estimators). Before the
+            % whole-signal-periodogram fallback, pwelch saw an all-zero
+            % windowed estimate and reported 0 Hz, which tripped the
+            % "OccupiedBandwidthHz must be positive for a live signal"
+            % assertion and dropped the entire frame/scenario.
+            fs = 2.4e6;
+            rng(32000767, 'twister');
+            N = 21284; burstLen = 386;
+            signal = complex(zeros(N, 1));
+            symbols = randi([0, 3], burstLen, 1);
+            signal(N - burstLen + 1:N) = exp(1j * 2 * pi * symbols / 4);
+
+            bwActual = csrd.pipeline.measurement.obwActual(signal, fs);
+            summary = csrd.pipeline.measurement.measureSignalSummary( ...
+                signal, fs, fs);
+
+            testCase.verifyGreaterThan(bwActual, 0);
+            testCase.verifyGreaterThan(summary.OccupiedBandwidthHz, 0);
+            % The two estimators share the fallback, so they must agree.
+            testCase.verifyEqual(bwActual, summary.OccupiedBandwidthHz, ...
+                'RelTol', 1e-9);
+        end
+
+        function lateFrameTailBurstReportsPositiveTimeOccupancy(testCase)
+            % Regression (envelope twin of the OBW tail-discard bug): the
+            % per-window envelope used floor() window counting and discarded
+            % the trailing partial window, so a burst entirely in the frame
+            % tail reported TimeOccupancy=0 -- a live signal labelled "never
+            % on", internally contradicting a positive OccupiedBandwidthHz.
+            fs = 2.4e6;
+            rng(32000767, 'twister');
+            N = 21284; burstLen = 164;   % < windowSamples (240) -> in discarded tail
+            signal = complex(zeros(N, 1));
+            symbols = randi([0, 3], burstLen, 1);
+            signal(N - burstLen + 1:N) = exp(1j * 2 * pi * symbols / 4);
+
+            summary = csrd.pipeline.measurement.measureSignalSummary( ...
+                signal, fs, fs);
+            env = csrd.pipeline.measurement.detectBurstEnvelope(signal, fs);
+
+            % OBW says the signal is present; TimeOccupancy must agree (> 0).
+            testCase.verifyGreaterThan(summary.OccupiedBandwidthHz, 0);
+            testCase.verifyGreaterThan(summary.TimeOccupancy, 0);
+            testCase.verifyGreaterThan(env.TimeOccupancy, 0);
+        end
+
+        function allZeroLongSignalStillReportsZero(testCase)
+            % The fallback must not manufacture bandwidth or occupancy out of
+            % a genuinely silent buffer: an all-zero long signal still reports
+            % 0 Hz and 0 occupancy (the caller classifies it NoSignal upstream).
+            fs = 2.4e6;
+            signal = complex(zeros(20000, 1));
+
+            bwActual = csrd.pipeline.measurement.obwActual(signal, fs);
+            summary = csrd.pipeline.measurement.measureSignalSummary( ...
+                signal, fs, fs);
+            env = csrd.pipeline.measurement.detectBurstEnvelope(signal, fs);
+
+            testCase.verifyEqual(bwActual, 0);
+            testCase.verifyEqual(summary.OccupiedBandwidthHz, 0);
+            testCase.verifyEqual(summary.TimeOccupancy, 0);
+            testCase.verifyEqual(env.TimeOccupancy, 0);
+            testCase.verifyEqual(env.NumBursts, 0);
+        end
+
     end
 end

@@ -105,9 +105,28 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             framePlaneCache = computeFramePlaneCache( ...
                 combinedSignal, rxInfo.SampleRate, observableBwHz);
 
+            % Realized receiver thermal-noise power (input-referred) for the
+            % measured received-SNR GT: per emitter, SNR = realized signal power
+            % / (realized channel noise + this thermal noise). Shared across the
+            % emitters at this receiver.
+            thermalNoiseW = NaN;
+            if isstruct(processedOutput) && ...
+                    isfield(processedOutput, 'RealizedThermalNoiseInputReferredW')
+                thermalNoiseW = processedOutput.RealizedThermalNoiseInputReferredW;
+            end
+            % ADC quantization-noise floor (input-referred), shared across the
+            % emitters at this receiver. Bounds the measured SNR by the
+            % converter's physical dynamic range (~6.02*AdcBits + 1.76 dB).
+            quantNoiseW = NaN;
+            if isstruct(processedOutput) && ...
+                    isfield(processedOutput, 'RealizedAdcQuantizationNoiseInputReferredW')
+                quantNoiseW = processedOutput.RealizedAdcQuantizationNoiseInputReferredW;
+            end
+
             FrameAnnotation{rxIdx}.SignalSources = [];
             for compIdx = 1:length(combinedSignal.Components)
                 comp = combinedSignal.Components{compIdx};
+                comp.MeasuredReceivedSNRdB = localMeasuredReceivedSnr(comp, thermalNoiseW, quantNoiseW);
                 sourceInfo = buildSourceAnnotation(comp, comp.Signal, ...
                     rxInfo.SampleRate, observableBwHz, framePlaneCache);
                 FrameAnnotation{rxIdx}.SignalSources = [FrameAnnotation{rxIdx}.SignalSources, sourceInfo];
@@ -345,19 +364,37 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane = struct();
     sourcePlane.OccupiedBandwidthHz  = NaN;
     sourcePlane.CenterFrequencyHz    = NaN;
-    sourcePlane.SNRdB                = getFieldOrDefault(comp, 'AppliedSNRdB', NaN);
+    % GT principle: the Measured SNR is MEASURED from the realized signal
+    % (signal power / total realized additive noise), set per emitter in the
+    % receiver loop as MeasuredReceivedSNRdB. Fall back to the analytical
+    % AppliedSNRdB only when the realized powers were unavailable. Initialised
+    % NaN (like the other measured scalars) so a NoSignal/silent buffer leaves
+    % it NaN -- the realized in-frame signal is absent, so a finite
+    % power-derived number would be a Measured-plane value for a buffer that
+    % isn't there. The live value is assigned in the hasSignal branch below.
+    sourcePlane.SNRdB                = NaN;
     sourcePlane.TimeOccupancy        = NaN;
     sourcePlane.FrequencyOccupancy   = NaN;
     sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
 
+    % Liveness is energy-based, not sample-count-based: an empty channel
+    % output (e.g. a link with no propagation paths) is zero-padded to the
+    % frame length by gateToDuration, producing a non-empty all-zero buffer
+    % with FrameSampleCount>0. Such a silent buffer must be classified
+    % NoSignal (occupied bandwidth legitimately measures 0), not a live
+    % signal -- otherwise the downstream requirePositiveMeasurement would
+    % reject the valid 0 and drop the whole frame.
     hasSignal = ~isempty(isolatedSignal) && size(isolatedSignal, 1) > 0 && ...
-        getFieldOrDefault(comp, 'FrameSampleCount', size(isolatedSignal, 1)) > 0;
+        getFieldOrDefault(comp, 'FrameSampleCount', size(isolatedSignal, 1)) > 0 && ...
+        any(abs(double(isolatedSignal(:))) > 0);
     if ~hasSignal
         sourcePlane.MeasurementStatus = 'NoSignal';
     else
         sourcePlane.MeasurementStatus = 'Measured';
         sourcePlane.SNRdB = requireFiniteMeasurement( ...
-            sourcePlane.SNRdB, 'Truth.Measured.SourcePlane.SNRdB');
+            getFieldOrDefault(comp, 'MeasuredReceivedSNRdB', ...
+                getFieldOrDefault(comp, 'AppliedSNRdB', NaN)), ...
+            'Truth.Measured.SourcePlane.SNRdB');
 
         % Phase 21: compute OBW, center frequency, envelope, and frequency
         % occupancy from one validated signal summary. Failure remains visible
@@ -375,8 +412,24 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         sourcePlane.CenterFrequencyHz = requireFiniteMeasurement( ...
             summary.CenterFrequencyHz, ...
             'Truth.Measured.SourcePlane.CenterFrequencyHz');
-        sourcePlane.TimeOccupancy = requireFiniteMeasurement( ...
+        % summary.TimeOccupancy is measured over the burst-only buffer, which is
+        % clipped to the emitter's active extent -- so a continuously-modulated
+        % burst reads ~1.0 regardless of how little of the frame it occupies.
+        % Scale it by the burst's fraction of the frame so SourcePlane.TimeOccupancy
+        % reports the emitter's activity over the whole observation window (the
+        % FramePlane semantics), not within its own clipped buffer.
+        bufferOccupancy = requireFiniteMeasurement( ...
             summary.TimeOccupancy, 'Truth.Measured.SourcePlane.TimeOccupancy');
+        frameLenSamples = getFieldOrDefault(comp, 'FrameLengthSamples', NaN);
+        frameSampleCount = getFieldOrDefault(comp, 'FrameSampleCount', NaN);
+        if isnumeric(frameLenSamples) && isscalar(frameLenSamples) && isfinite(frameLenSamples) && ...
+                frameLenSamples > 0 && isnumeric(frameSampleCount) && isscalar(frameSampleCount) && ...
+                isfinite(frameSampleCount)
+            frameFraction = min(1, max(0, double(frameSampleCount) / double(frameLenSamples)));
+            sourcePlane.TimeOccupancy = min(1, max(0, bufferOccupancy * frameFraction));
+        else
+            sourcePlane.TimeOccupancy = bufferOccupancy;
+        end
         sourcePlane.FrequencyOccupancy = requireFiniteMeasurement( ...
             summary.FrequencyOccupancy, ...
             'Truth.Measured.SourcePlane.FrequencyOccupancy');
@@ -421,14 +474,31 @@ function fp = computeFramePlaneCache(combinedSignal, sampleRate, observableBwHz)
     end
 
     sig = combinedSignal.Signal;
+    % Energy-based liveness (see buildMeasuredTruth): if every live-by-count
+    % component contributed only zero-padding (e.g. empty channel outputs),
+    % the combined buffer is silent and its occupied bandwidth legitimately
+    % measures 0. Classify it NoSignal rather than letting OBW=0 trip the
+    % requirePositiveMeasurement assertion and drop the frame.
+    if ~any(abs(double(sig(:))) > 0)
+        fp.MeasurementStatus = 'NoSignal';
+        return;
+    end
     fp.MeasurementStatus = 'Measured';
     % Phase 21: one summary call replaces three independent measurement
     % passes. Legacy visibility markers CSRD:Measurement:FrameCenterFrequencyFailed
     % and CSRD:Measurement:FrameEnvelopeFailed remain as comments for
     % production dead-code guards.
+    % The combined frame mixes emitters active over different sub-ranges, so its
+    % TimeOccupancy must be measured over SUB-FRAME windows. The envelope
+    % detector's default window is min(1e-4 s, frameDuration); every frame here
+    % is < 1e-4 s, so the default collapses to a single whole-frame window and
+    % TimeOccupancy degenerates to a constant 1.0. Pass an explicit ~1/32-frame
+    % window so a partially-occupied combined frame reports a real fraction.
+    frameDurationSec = size(sig, 1) / sampleRate;
     summary = guardedMeasurement(@() ...
         csrd.pipeline.measurement.measureSignalSummary( ...
-            sig, sampleRate, observableBwHz), ...
+            sig, sampleRate, observableBwHz, ...
+            'EnvelopeOptions', struct('WindowSec', frameDurationSec / 32)), ...
         'CSRD:Measurement:FrameOBWFailed');
     fp.OccupiedBandwidthHz = requirePositiveMeasurement( ...
         summary.OccupiedBandwidthHz, ...
@@ -578,6 +648,37 @@ function value = getFieldOrEmpty(s, fieldName, defaultValue)
     end
 end
 
+function snrDb = localMeasuredReceivedSnr(comp, thermalNoiseW, quantNoiseW)
+    % localMeasuredReceivedSnr - Measured per-emitter received SNR (dB): the
+    % realized per-emitter signal power over the total realized additive noise
+    % (channel noise + receiver thermal noise + ADC quantization noise). Returns
+    % NaN when the realized powers are unavailable so the caller falls back to
+    % the analytical label.
+    snrDb = NaN;
+    sigW = getFieldOrDefault(comp, 'ChannelSignalPowerW', NaN);
+    if ~isnumeric(sigW) || ~isscalar(sigW) || ~isfinite(sigW)
+        return;
+    end
+    chanNoiseW = getFieldOrDefault(comp, 'ChannelNoisePowerW', NaN);
+    totalNoiseW = 0; haveNoise = false;
+    if isnumeric(chanNoiseW) && isscalar(chanNoiseW) && isfinite(chanNoiseW)
+        totalNoiseW = totalNoiseW + double(chanNoiseW); haveNoise = true;
+    end
+    if isnumeric(thermalNoiseW) && isscalar(thermalNoiseW) && isfinite(thermalNoiseW)
+        totalNoiseW = totalNoiseW + double(thermalNoiseW); haveNoise = true;
+    end
+    if nargin >= 3 && isnumeric(quantNoiseW) && isscalar(quantNoiseW) && isfinite(quantNoiseW)
+        totalNoiseW = totalNoiseW + double(quantNoiseW); haveNoise = true;
+    end
+    if ~haveNoise || ~(totalNoiseW > 0)
+        return;
+    end
+    snrDb = csrd.pipeline.measurement.actualSnrFromComponents(double(sigW), totalNoiseW);
+    if ~isfinite(snrDb)
+        snrDb = NaN;   % keep the finite-measurement contract; fall back to label
+    end
+end
+
 function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
     % combineSignalComponents - Combine multiple signal components at receiver
     % Inputs: see signature arguments and local validation.
@@ -608,7 +709,7 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
     for compIdx = 1:length(signalComponents)
         comp = signalComponents{compIdx};
         if isfield(comp, 'Signal') && ~isempty(comp.Signal)
-            startOffset = localFrameStartOffset(comp, sampleRate);
+            startOffset = localFrameStartOffset(comp, sampleRate, frameShape.NumSamples);
             compSig = localCollapseAntennaSignal(comp.Signal);
             if startOffset >= frameShape.NumSamples
                 comp = localUpdateComponentSampleGrid( ...
@@ -748,9 +849,9 @@ function [signalOut, info] = localCoerceProcessedFrameLength(signalIn, targetSam
         'Action', action);
 end
 
-function startOffset = localFrameStartOffset(comp, sampleRate)
+function startOffset = localFrameStartOffset(comp, sampleRate, frameSamples)
     % localFrameStartOffset - Convert source start time into frame samples.
-    % Inputs: component struct and receiver sample rate.
+    % Inputs: component struct, receiver sample rate, frame length in samples.
     % Outputs: zero-based sample offset inside the current frame.
     startTime = 0;
     if isfield(comp, 'FrameRelativeStartTime') && ~isempty(comp.FrameRelativeStartTime)
@@ -758,7 +859,17 @@ function startOffset = localFrameStartOffset(comp, sampleRate)
     elseif isfield(comp, 'StartTime') && ~isempty(comp.StartTime)
         startTime = comp.StartTime;
     end
-    startOffset = max(0, round(double(startTime) * sampleRate));
+    rawOffset = double(startTime) * sampleRate;
+    startOffset = max(0, round(rawOffset));
+    % A burst whose start lies strictly inside the frame must not be rounded
+    % onto/past the frame end -- that would make combineSignalComponents drop
+    % the whole burst even though the planner placed it here with overlap.
+    % Clamp such a rounding overshoot to the last valid sample; only a start
+    % that truly reaches the frame end (floor >= frameSamples) stays out of
+    % range and is dropped.
+    if startOffset >= frameSamples && floor(rawOffset) < frameSamples
+        startOffset = frameSamples - 1;
+    end
 end
 
 function y = localCollapseAntennaSignal(signal)

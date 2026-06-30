@@ -90,6 +90,25 @@ classdef MeasurementPackageTest < matlab.unittest.TestCase
             testCase.verifyEqual(fc, -150e3, 'RelTol', 0.02);
         end
 
+        function spectrumCentroidNoisyEmitterTracksTrueCenter(testCase)
+            % Regression: broadband AWGN is symmetric about 0 Hz, so integrating
+            % the raw PSD pulls the measured center toward baseband. The
+            % peak-relative threshold must keep the measured CenterFrequencyHz GT
+            % near the true emitter center even at low SNR.
+            fs = testCase.SampleRate;
+            t = (0:1/fs:testCase.Duration - 1/fs)';
+            rng(909, 'twister');
+            sig = exp(1j * 2 * pi * 200e3 * t);
+            for snr = [20 6]
+                noisePower = 1 / 10 ^ (snr / 10);
+                rx = sig + sqrt(noisePower / 2) * ...
+                    (randn(numel(t), 1) + 1j * randn(numel(t), 1));
+                fc = csrd.pipeline.measurement.spectrumCentroid(rx, fs);
+                testCase.verifyEqual(fc, 200e3, 'AbsTol', 20e3, ...
+                    sprintf('Noisy centroid at SNR=%d dB drifted from 200 kHz', snr));
+            end
+        end
+
         function spectrumCentroidEmptyThrows(testCase)
             f = @() csrd.pipeline.measurement.spectrumCentroid([], 1e6);
             testCase.verifyError(f, 'CSRD:Measurement:EmptySignal');

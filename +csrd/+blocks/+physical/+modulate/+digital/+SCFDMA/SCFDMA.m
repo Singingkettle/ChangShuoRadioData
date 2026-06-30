@@ -286,7 +286,7 @@ classdef SCFDMA < csrd.blocks.physical.modulate.digital.OFDM.OFDM
                 % Configure SC-FDMA specific parameters
                 obj.ModulatorConfig.scfdma.FFTLength = randsample([128, 256, 512, 1024, 2048], 1);
                 obj.ModulatorConfig.scfdma.CyclicPrefixLength = randi([12, 32], 1);
-                obj.ModulatorConfig.scfdma.Subcarrierspacing = randsample([2, 4], 1) * 1e2; % 200 or 400 Hz
+                obj.ModulatorConfig.scfdma.Subcarrierspacing = 15e3; % standards SCS (was 200/400 Hz -> ~100x too narrow)
                 obj.ModulatorConfig.scfdma.SubcarrierMappingInterval = randi([1, 2], 1);
 
                 % Calculate maximum number of data subcarriers based on FFT size and mapping interval

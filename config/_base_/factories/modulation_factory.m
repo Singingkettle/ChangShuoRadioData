@@ -40,6 +40,10 @@ function config = modulation_factory()
     config.Factories.Modulation.digital.ASK.handle = 'csrd.blocks.physical.modulate.digital.ASK.ASK';
     config.Factories.Modulation.digital.ASK.Order = [4, 8, 16, 32, 64];
 
+    % PAM (Pulse Amplitude Modulation)
+    config.Factories.Modulation.digital.PAM.handle = 'csrd.blocks.physical.modulate.digital.PAM.PAM';
+    config.Factories.Modulation.digital.PAM.Order = [4, 8, 16, 32, 64];
+
     % CPM (Continuous Phase Modulation)
     config.Factories.Modulation.digital.CPFSK.handle = 'csrd.blocks.physical.modulate.digital.CPM.CPFSK';
     config.Factories.Modulation.digital.CPFSK.Order = [4, 8];

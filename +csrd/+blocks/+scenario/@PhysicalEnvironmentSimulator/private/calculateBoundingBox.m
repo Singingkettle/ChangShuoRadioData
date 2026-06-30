@@ -16,7 +16,7 @@ function [minLat, minLon, maxLat, maxLon] = calculateBoundingBox(obj, lat_deg, l
     %   maxLon - Maximum longitude
 
     lat_rad = deg2rad(lat_deg);
-    earth_radius_km = 6371.0;
+    earth_radius_km = getEarthRadiusMeters() / 1000;
 
     % Calculate latitude delta
     delta_lat_rad = (size_km / 2.0) / earth_radius_km;

@@ -245,6 +245,13 @@ classdef AWGNChannel < matlab.System
                 output.Signal = noisySignal;
                 output.AppliedSNRdB = obj.SNRdB;
             end
+            % Realized signal and additive-noise powers (Watts) for the measured
+            % received-SNR GT: SNR = signal / (channel noise + receiver thermal
+            % noise). The AWGN channel adds noise here; the receiver thermal
+            % stage adds the rest downstream and the two are combined when the
+            % per-emitter SNR is measured.
+            output.ChannelSignalPowerW = signalPower;
+            output.ChannelNoisePowerW = mean(abs(complexNoise(:)) .^ 2);
 
         end
 

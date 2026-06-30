@@ -15,6 +15,9 @@ the first place to learn the current codebase.
 
 ## How To Read / 阅读方式
 
+- `HANDOVER_2026-06-18_REVIEW_HANDOFF.md` is the current review handoff for
+  the next AI group or human reviewer. Start there when the task is bug
+  hunting, logic audit, or review planning after the PR #7/#8 merge state.
 - `HANDOVER_2026-04-26.md` and `HANDOVER_2026-05-03.md` are historical
   snapshots from previous refactoring passes.
 - `phases/` records phase-level decisions and verification notes.

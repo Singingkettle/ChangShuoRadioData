@@ -179,10 +179,28 @@ function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
         fAxis = fAxis(:);
     end
 
+    % pwelch (Welch's method) discards the trailing partial segment. A
+    % short burst that sits entirely in that discarded tail yields an
+    % all-zero windowed estimate even though the signal carries energy,
+    % which would mis-measure the occupied bandwidth as zero. Fall back to
+    % a whole-signal periodogram so every sample (including a late
+    % frame-tail burst) is counted. Mirrors measureSignalSummary so the two
+    % estimators stay equivalent.
+    if (isempty(spec) || sum(spec) <= 0) && sum(abs(double(signalCol)) .^ 2) > 0
+        spec = abs(fftshift(fft(double(signalCol)))) .^ 2;
+        fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
+    end
+
     if isempty(spec) || sum(spec) <= 0
         bwHz = 0;
         return;
     end
+
+    % Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
+    % narrowest-contiguous-span search below does not bridge the empty middle
+    % and inflate the OBW toward Fs. The span is invariant under the circular
+    % shift, so nothing is added back (fAxis is left unchanged).
+    spec = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
 
     peakVal = max(spec);
     if peakVal <= 0
@@ -190,7 +208,34 @@ function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
         return;
     end
 
-    threshold = peakVal * 10^(peakRelDb / 10);
+    % Primary estimate: peak-relative -3 dB clip then narrowest 99 %-energy band.
+    bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
+        peakVal * 10 ^ (peakRelDb / 10), pct);
+
+    % Collapse guard (mirrors measureSignalSummary so the two estimators stay
+    % equivalent). A flat occupied band a few dB below a single localized
+    % spectral spike -- short bursts (high spectral variance) or a frequency-
+    % selective channel peak -- makes the peak-relative threshold sit ABOVE the
+    % flat band and clip it away, collapsing the width to the spike's
+    % neighbourhood. Fall back to a noise-floor-relative estimate (robust
+    % low-percentile floor + 6 dB, which keeps the whole occupied band) only
+    % when the peak-relative result is implausibly narrow. The floor percentile
+    % must stay below the minimum noise fraction: an emitter may occupy up to
+    % MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving >=20% noise
+    % bins, so a 25th-percentile floor would land INSIDE a wideband occupied
+    % band and defeat the guard. The 10th percentile stays in the noise floor
+    % for occupancies up to 90% (mirrors measureSignalSummary).
+    floorThreshold = prctile(spec, 10) * 10 ^ (6 / 10);
+    bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
+    if bwFloor > 0 && bwHz < 0.3 * bwFloor
+        bwHz = bwFloor;
+    end
+end
+
+
+function bwHz = localSpanForThreshold(spec, fAxis, sampleRate, threshold, pct)
+    %LOCALSPANFORTHRESHOLD Narrowest contiguous band holding pct% of the energy
+    % left after zeroing bins below `threshold`.
     denoised = spec;
     denoised(denoised < threshold) = 0;
 

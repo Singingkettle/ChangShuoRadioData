@@ -227,7 +227,12 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
                 obj.ModulatorConfig.ofdm.NumGuardBandCarriers(2) = randi([5, 12], 1);
                 obj.ModulatorConfig.ofdm.InsertDCNull = randsample([true, false], 1);
                 obj.ModulatorConfig.ofdm.CyclicPrefixLength = randi([12, 32], 1);
-                obj.ModulatorConfig.ofdm.Subcarrierspacing = randsample([2, 4], 1) * 1e2;
+                % Standards subcarrier spacing (LTE/5G-NR numerology 0). The old
+                % default of 200/400 Hz pinned the realized OFDM occupied
+                % bandwidth to FFT*200..400 Hz (tens-to-hundreds of kHz, ~100x
+                % narrower than any real OFDM channel) whenever this fallback
+                % fired (an under-configured ModulatorConfig with no `base`).
+                obj.ModulatorConfig.ofdm.Subcarrierspacing = 15e3;
                 obj.usePilot = randsample([true, false], 1);
 
                 if obj.usePilot
@@ -247,7 +252,13 @@ classdef OFDM < csrd.blocks.physical.modulate.BaseModulator
                     if obj.NumTransmitAntennas > 1
                         % Keep the configured hardware antenna count stable; reduce the
                         % per-antenna pilot count when the random pilot request is too large.
-                        maxPilotsPerAntenna = floor(length(validRange) / obj.NumTransmitAntennas);
+                        % comm.OFDMModulator requires guard + DC-null + total pilots to be
+                        % STRICTLY less than FFTLength (>= 1 data subcarrier must remain).
+                        % validRange already excludes the guard bands and the DC bin, so
+                        % reserve one further carrier as data; otherwise a pilot count that
+                        % exactly fills validRange leaves zero data carriers when InsertDCNull
+                        % is true and the modulator throws comm:OFDM:NoDataCarriers.
+                        maxPilotsPerAntenna = floor((length(validRange) - 1) / obj.NumTransmitAntennas);
                         if maxPilotsPerAntenna < 1
                             error('CSRD:Modulation:OFDMInsufficientPilotCarriers', ...
                                 ['OFDM valid pilot carrier range cannot support %d ', ...

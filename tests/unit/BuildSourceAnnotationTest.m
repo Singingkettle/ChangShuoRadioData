@@ -230,6 +230,34 @@ classdef BuildSourceAnnotationTest < matlab.unittest.TestCase
                 'No SignalSource published a finite SourcePlane.TimeOccupancy.');
         end
 
+        function sourceTimeOccupancyDoesNotExceedFrameFraction(testCase)
+            % SourcePlane.TimeOccupancy is the emitter's activity over the whole
+            % FRAME, so it must never exceed the burst's fraction of the frame
+            % (FrameSampleCount/FrameLengthSamples). The pre-fix code measured
+            % occupancy on the burst-only buffer and reported ~1.0 for every
+            % emitter regardless of its sub-frame footprint -- this guards that.
+            sources = runSmokeAndCollect(testCase);
+            checked = false;
+            for k = 1:numel(sources)
+                m = sources{k}.Truth.Measured;
+                ex = sources{k}.Truth.Execution;
+                toc = m.SourcePlane.TimeOccupancy;
+                if ~(isnumeric(toc) && isscalar(toc) && isfinite(toc))
+                    continue;
+                end
+                if isnumeric(ex.FrameLengthSamples) && ex.FrameLengthSamples > 0
+                    frameFraction = double(ex.FrameSampleCount) / ...
+                        double(ex.FrameLengthSamples);
+                    testCase.verifyLessThanOrEqual(toc, frameFraction + 1e-9, ...
+                        sprintf(['SourcePlane.TimeOccupancy %.4f exceeds the ', ...
+                            'burst frame fraction %.4f.'], toc, frameFraction));
+                    checked = true;
+                end
+            end
+            testCase.verifyTrue(checked, ...
+                'No source exposed TimeOccupancy + frame-grid fields to check.');
+        end
+
         function executionTimesMatchSampleGrid(testCase)
             sources = runSmokeAndCollect(testCase);
             for k = 1:numel(sources)

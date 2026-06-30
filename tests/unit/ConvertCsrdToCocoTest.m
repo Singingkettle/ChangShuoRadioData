@@ -33,6 +33,31 @@ classdef ConvertCsrdToCocoTest < matlab.unittest.TestCase
                 coco.annotations.csrd.measured.SourcePlane.TimeOccupancy, 0.5);
         end
 
+        function bboxFollowsMeasuredCenterNotPlannedOffset(testCase)
+            % The frequency bbox must be centered on the MEASURED center
+            % frequency (which includes realized Doppler / carrier error),
+            % consistent with the measured width -- not the planner's
+            % pre-Doppler ReceiverView.ProjectedCenterOffsetHz.
+            payload = localValidPayload();
+            src = payload.Frames{1}{1}.SignalSources;
+            src.Truth.Measured.SourcePlane.CenterFrequencyHz = 1e5;
+            src.Truth.Measured.SourcePlane.OccupiedBandwidthHz = 2e5;
+            src.ReceiverView.ProjectedCenterOffsetHz = 0;
+            payload.Frames{1}{1}.SignalSources = src;
+
+            coco = convert_csrd_to_coco(payload, '', 'ImageWidth', 1000);
+
+            % Observable range [-5e6, 5e6] (width 1e7); measured center 1e5,
+            % OBW 2e5 -> band [0, 2e5] -> x = 500, width = 20. The planned
+            % offset 0 would have given x = 490, so x = 500 confirms the box
+            % follows the measured center.
+            testCase.verifyEqual(coco.annotations.bbox, [500, 0, 20, 1], ...
+                'AbsTol', 1e-9);
+            testCase.verifyEqual( ...
+                coco.annotations.csrd.source_fields.bbox_center_hz, ...
+                'Truth.Measured.SourcePlane.CenterFrequencyHz');
+        end
+
         function writesJsonFile(testCase)
             payload = localValidPayload();
             outDir = tempname;

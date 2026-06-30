@@ -36,6 +36,14 @@ classdef RegionSpectrumSelector
                     regulatory.RegionId, regulatory.ServiceTier, range(1), range(2));
             end
 
+            bands = filterBandsByIbwServiceability(bands, sampleRateHz, regulatory);
+            if isempty(bands)
+                error('CSRD:Spectrum:NoServiceableBands', ...
+                    ['No regulatory bands in region %s have a channel that fits the ', ...
+                    'receiver instantaneous bandwidth %.0f Hz; the SDR is too narrow ', ...
+                    'for this region''s services.'], regulatory.RegionId, sampleRateHz);
+            end
+
             anchor = selectMonitoringAnchor(bands, regulatory);
             monitoringCenterHz = selectMonitoringCenter(anchor, sampleRateHz, regulatory);
             receiverPlan = struct( ...
@@ -260,6 +268,32 @@ bands = bands(keep);
 end
 
 
+function bands = filterBandsByIbwServiceability(bands, sampleRateHz, regulatory)
+    % filterBandsByIbwServiceability - Keep bands with a channel that fits the IBW.
+    % A band whose narrowest channel exceeds the receiver instantaneous bandwidth
+    % cannot be served by this SDR. Dropping it stops a narrow-IBW SDR from
+    % selecting a monitoring band it cannot capture, which would otherwise fail
+    % emitter placement (CSRD:Spectrum:NoVisibleServiceBands) in mixed-service mode.
+keep = false(size(bands));
+for k = 1:numel(bands)
+    keep(k) = ~isempty(usableBandwidths(bands(k), sampleRateHz, regulatory));
+end
+
+if isfield(regulatory.MonitoringBand, 'FixedBandId') && ...
+        ~isempty(regulatory.MonitoringBand.FixedBandId)
+    fixedId = char(string(regulatory.MonitoringBand.FixedBandId));
+    fixedIdx = find(strcmpi({bands.BandId}, fixedId), 1, 'first');
+    if ~isempty(fixedIdx) && ~keep(fixedIdx)
+        error('CSRD:Spectrum:MonitoringBandNotServiceable', ...
+            ['Fixed monitoring BandId "%s" has no channel that fits the receiver ', ...
+            'instantaneous bandwidth %.0f Hz.'], fixedId, sampleRateHz);
+    end
+end
+
+bands = bands(keep);
+end
+
+
 function rank = tierRank(tier)
     % tierRank - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
@@ -343,6 +377,73 @@ elseif diff(anchor.FrequencyRangeHz) <= sampleRateHz
 else
     centerHz = centerMin + rand() * (centerMax - centerMin);
 end
+
+centerHz = ensurePlaceableMonitoringCenter(centerHz, centerMin, centerMax, ...
+    anchor, sampleRateHz, regulatory);
+end
+
+
+function centerHz = ensurePlaceableMonitoringCenter(centerHz, centerMin, ...
+        centerMax, anchor, sampleRateHz, regulatory)
+    % ensurePlaceableMonitoringCenter - Snap the center so an emitter fits.
+    % A narrow receiver window over a coarse channel raster can leave the
+    % random monitoring center with no raster-aligned channel inside it, which
+    % later fails emitter placement (CSRD:Spectrum:NoVisibleServiceBands). When
+    % that happens, snap the center to the nearest channel grid point (within
+    % the allowed center range) whose channel does fit the window.
+bws = usableBandwidths(anchor, sampleRateHz, regulatory);
+if isempty(bws)
+    return;  % nothing usable; selectEmitterPlan raises a precise error
+end
+if localCenterIsPlaceable(centerHz, anchor, sampleRateHz, bws)
+    return;  % common case: the chosen center already admits a channel
+end
+candidates = localChannelGrid(anchor, centerMin, centerMax);
+best = [];
+bestDist = inf;
+for c = candidates
+    if localCenterIsPlaceable(c, anchor, sampleRateHz, bws) && ...
+            abs(c - centerHz) < bestDist
+        best = c;
+        bestDist = abs(c - centerHz);
+    end
+end
+if ~isempty(best)
+    centerHz = best;
+end
+end
+
+
+function tf = localCenterIsPlaceable(centerHz, anchor, sampleRateHz, bws)
+    % localCenterIsPlaceable - True when some usable channel fits the window.
+rp = struct('MonitoringRangeHz', ...
+    [centerHz - sampleRateHz / 2, centerHz + sampleRateHz / 2], ...
+    'SampleRateHz', sampleRateHz);
+tf = false;
+for k = 1:numel(bws)
+    if canPlaceBandwidthInReceiverWindow(anchor, bws(k), rp)
+        tf = true;
+        return;
+    end
+end
+end
+
+
+function centers = localChannelGrid(anchor, lo, hi)
+    % localChannelGrid - Channel-center candidates within [lo, hi].
+if ~isempty(anchor.ExplicitChannelCentersHz)
+    centers = anchor.ExplicitChannelCentersHz(:)';
+    centers = centers(centers >= lo & centers <= hi);
+    return;
+end
+if anchor.ChannelRasterHz > 0
+    ref = anchor.FrequencyRangeHz(1);
+    kMin = ceil((lo - ref) / anchor.ChannelRasterHz);
+    kMax = floor((hi - ref) / anchor.ChannelRasterHz);
+    centers = ref + (kMin:kMax) * anchor.ChannelRasterHz;
+    return;
+end
+centers = [];  % continuous placement; no snapping needed
 end
 
 

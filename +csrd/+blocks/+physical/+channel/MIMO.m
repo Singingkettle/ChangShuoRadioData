@@ -129,6 +129,17 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
         %   by the K-factor parameter.
         FadingDistribution {mustBeMember(FadingDistribution, {'Rayleigh', 'Rician'})} = 'Rayleigh'
 
+        % Seed - RNG seed for a reproducible fading realisation
+        % Type: nonnegative integer, Default: 0
+        %
+        % Seeds the inner comm.MIMOChannel (RandomStream = 'mt19937ar with
+        % seed') so the fading realisation is deterministic and independent of
+        % the process-global RNG. ChannelFactory routes the burst-aware
+        % deriveChannelSeed value here, so the SAME (Tx, Rx, Burst) keeps the
+        % SAME fading across frames (H13) and reset() restores it deterministically
+        % instead of drawing fresh fading from the global stream.
+        Seed {mustBeNonnegative, mustBeInteger} = 0
+
         % PathDelays - Multipath delay profile in seconds
         % Type: non-negative scalar or row vector, Default: 0
         %
@@ -309,6 +320,8 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
                     'FadingDistribution', 'Rayleigh', ...
                     'FadingTechnique', obj.FadingTechnique, ...
                     'InitialTimeSource', obj.InitialTimeSource, ...
+                    'RandomStream', 'mt19937ar with seed', ...
+                    'Seed', obj.Seed, ...
                     'NumTransmitAntennas', obj.NumTransmitAntennas, ...
                     'NumReceiveAntennas', obj.NumReceiveAntennas);
             else
@@ -323,6 +336,8 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
                     'FadingDistribution', 'Rician', ...
                     'FadingTechnique', obj.FadingTechnique, ...
                     'InitialTimeSource', obj.InitialTimeSource, ...
+                    'RandomStream', 'mt19937ar with seed', ...
+                    'Seed', obj.Seed, ...
                     'NumTransmitAntennas', obj.NumTransmitAntennas, ...
                     'NumReceiveAntennas', obj.NumReceiveAntennas);
             end
@@ -388,15 +403,32 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
                     numTxAntennas, obj.NumTransmitAntennas);
             end
 
-            % Apply path loss attenuation
+            % Apply path loss attenuation. PathLoss is recomputed here from the
+            % CURRENT Distance: ChannelFactory updates Distance per frame, but
+            % PathLoss is otherwise derived only once in the constructor (from
+            % the default Distance = 1 m). Without this refresh every fading
+            % link would be attenuated by the 1 m path loss regardless of the
+            % real Tx-Rx separation, so the realised attenuation would not match
+            % the distance-based AppliedPathLoss/ComputedSNR recorded in the
+            % annotation (generated signal != annotation).
+            obj.PathLoss = obj.genPathLoss;
             % Convert dB to linear scale: 10^(dB/20) for amplitude scaling
             pathLossLinear = 10 ^ (obj.PathLoss / 20);
             attenuatedSignal = inputSignal.Signal / pathLossLinear;
 
-            % Update channel with current sample rate (release and reconfigure if needed)
-            if isLocked(obj.MultipathChannel) && ...
-                    obj.MultipathChannel.SampleRate ~= inputSignal.SampleRate
-                release(obj.MultipathChannel);
+            % Align the inner channel to the REAL signal sample rate. The cached
+            % channel block is released per frame, so by the time we get here the
+            % comm.MIMOChannel is usually fresh/unlocked -- the old
+            % isLocked()-gated update therefore never fired, leaving the inner
+            % channel at the BaseChannel default SampleRate (200 kHz) while the
+            % signal runs at e.g. 50 MHz. That ~250x time-base error grossly
+            % over-spreads the Jakes/Doppler fading and shrinks the multipath
+            % PathDelays to sub-sample. Set the rate whenever it differs,
+            % releasing first only if the object is already locked.
+            if obj.MultipathChannel.SampleRate ~= inputSignal.SampleRate
+                if isLocked(obj.MultipathChannel)
+                    release(obj.MultipathChannel);
+                end
                 obj.MultipathChannel.SampleRate = inputSignal.SampleRate;
             end
 
@@ -406,6 +438,17 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             % Prepare comprehensive output structure
             outputSignal = inputSignal;
             outputSignal.Signal = fadedSignal;
+            % Realized signal power and (zero) channel-noise power for the
+            % measured received-SNR GT. A fading channel adds no noise of its
+            % own; the per-emitter SNR is then set by the receiver thermal noise
+            % alone, measured downstream. Record the COLLAPSED monitor-stream
+            % power (the receiver saves sum(antennas); see
+            % localCollapseAntennaSignal): the per-column mean would under-state
+            % the saved per-emitter signal by ~NumReceiveAntennas and bias the
+            % measured SNR low against the absolute receiver thermal/ADC noise.
+            % For a single receive antenna sum(.,2) is a no-op (SISO unaffected).
+            outputSignal.ChannelSignalPowerW = mean(abs(sum(fadedSignal, 2)) .^ 2);
+            outputSignal.ChannelNoisePowerW = 0;
 
             % Add channel configuration information
             outputSignal.PathDelays = obj.PathDelays;

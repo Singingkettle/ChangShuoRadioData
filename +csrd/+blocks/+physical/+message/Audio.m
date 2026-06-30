@@ -121,7 +121,15 @@ classdef Audio < matlab.System
             y = zeros(1024, sample_times);
 
             for i = 1:sample_times
-                y(:, i) = obj.audioSrc();
+                block = obj.audioSrc();
+                % Audio assets may be stereo/multichannel; the message stream
+                % is a single baseband channel, so mix down to mono. Without
+                % this a stereo clip returns [1024 x 2] and the [1024 x 1]
+                % column assignment below would error.
+                if size(block, 2) > 1
+                    block = mean(block, 2);
+                end
+                y(:, i) = block;
             end
 
             out.data = y(1:MessageLength)';

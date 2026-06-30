@@ -188,8 +188,21 @@ classdef OQPSK < csrd.blocks.physical.modulate.digital.APSK.APSK
             % Generate OSTBC encoder for MIMO support
             obj.ostbc = obj.genOSTBC;
 
-            % Ensure SamplePerSymbol is even for proper OQPSK offset implementation
-            obj.SamplePerSymbol = max(2, obj.SamplePerSymbol - mod(obj.SamplePerSymbol, 2));
+            % Ensure SamplePerSymbol is even for proper OQPSK offset implementation.
+            % The declared SampleRate was set by the factory (before setup) as
+            % symbolRate*SamplePerSymbol using the raw (possibly odd) SPS. After
+            % coercing SPS to even, keep SampleRate consistent with the rate the
+            % waveform is actually upsampled to -- otherwise the TRF resamples
+            % the realized even-rate waveform at the stale odd rate and scales
+            % its frequency / bandwidth by oddSPS/evenSPS, corrupting the
+            % Execution SampleRate and the measured OccupiedBandwidthHz.
+            rawSamplePerSymbol = obj.SamplePerSymbol;
+            obj.SamplePerSymbol = max(2, rawSamplePerSymbol - mod(rawSamplePerSymbol, 2));
+            if rawSamplePerSymbol > 0 && obj.SamplePerSymbol ~= rawSamplePerSymbol && ...
+                    isfinite(obj.SampleRate) && obj.SampleRate > 0
+                symbolRate = obj.SampleRate / rawSamplePerSymbol;
+                obj.SampleRate = symbolRate * obj.SamplePerSymbol;
+            end
             obj.pureModulator = csrd.blocks.physical.modulate.digital.PSK.BaseOQPSK( ...
                 PhaseOffset = obj.ModulatorConfig.PhaseOffset, ...
                 SymbolMapping = obj.ModulatorConfig.SymbolMapping, ...

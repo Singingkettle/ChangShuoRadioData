@@ -135,6 +135,12 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         % flagged by `validateMeasurementCompleteness` / smoke tests).
         modulatedSignalSegment.Planned.PlannedBandwidthHz = ...
             currentSegmentScenario.Placement.TargetBandwidth;
+        % PlannedCenterFrequencyHz is a receiver-baseband offset (the
+        % ReceiverView projected center), NOT an absolute RF carrier: the
+        % carrier deliberately never enters baseband/Design (see
+        % docs/annotation-schema.md Truth.Design and the spectrum-blueprint
+        % refactor §C). This keeps it in the same frame as the Execution
+        % and Measured center fields so measured-vs-planned stays comparable.
         modulatedSignalSegment.Planned.PlannedCenterFrequencyHz = ...
             currentSegmentScenario.Placement.FrequencyOffset;
         modulatedSignalSegment.Planned.StartTimeSec = ...
@@ -186,7 +192,23 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
                 modulatedSignalSegment.Planned.ModulationSpatialMode = ...
                     char(string(modSrc.ModulatorConfig.mimo.Mode));
             else
-                modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+                % No explicit mimo.Mode (the non-OFDM families): the modulator
+                % applies OSTBC whenever it has more than one transmit antenna
+                % (BaseModulator.genOSTBC), so the planned spatial mode must
+                % reflect that instead of being left empty for a multi-antenna,
+                % OSTBC-encoded signal.
+                numTxAnt = 1;
+                if isfield(currentTxScenario, 'Hardware') && ...
+                        isstruct(currentTxScenario.Hardware) && ...
+                        isfield(currentTxScenario.Hardware, 'NumAntennas') && ...
+                        ~isempty(currentTxScenario.Hardware.NumAntennas)
+                    numTxAnt = double(currentTxScenario.Hardware.NumAntennas);
+                end
+                if numTxAnt > 1
+                    modulatedSignalSegment.Planned.ModulationSpatialMode = 'OSTBC';
+                else
+                    modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+                end
             end
         else
             modulatedSignalSegment.Planned.ModulationFamily = '';

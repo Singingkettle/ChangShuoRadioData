@@ -124,6 +124,24 @@ if ~isnumeric(sampleRateHz) || ~isscalar(sampleRateHz) || ...
         'CommunicationBehavior.Receiver.SampleRate must be positive.');
 end
 sampleRateHz = double(sampleRateHz);
+
+% Cap the planned frame-contract rate by the configured SDR's instantaneous
+% bandwidth, mirroring the receiver's own cap in
+% CommunicationBehaviorSimulator.setupImpl (applySdrProfile). The realized
+% receiver cannot sample faster than its SDR's IBW, so without this cap
+% Frame.SampleRateHz (e.g. 50 MHz) diverges from the realized receiver rate
+% (e.g. RTL-SDR 2.4 MHz) and the frame fails CSRD:Frame:InconsistentFrameSamples
+% for a narrow SDR -- and, per the measured-GT contract, the frame must use the
+% same rate the signal is actually realized/measured at. Wide SDRs (IBW >= the
+% requested rate) are unaffected.
+rx = scenarioConfig.CommunicationBehavior.Receiver;
+if isfield(rx, 'Sdr') && isstruct(rx.Sdr) && isfield(rx.Sdr, 'Model') && ...
+        ~isempty(rx.Sdr.Model)
+    profile = csrd.catalog.receiver.SdrReceiverCatalog.load(char(string(rx.Sdr.Model)));
+    if sampleRateHz > profile.MaxInstantaneousBandwidthHz
+        sampleRateHz = double(profile.MaxInstantaneousBandwidthHz);
+    end
+end
 end
 
 function scenarioId = localPositiveInteger(runtimeContext, fieldName, defaultValue)
