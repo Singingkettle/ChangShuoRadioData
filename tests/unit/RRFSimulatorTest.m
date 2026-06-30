@@ -147,6 +147,32 @@ classdef RRFSimulatorTest < matlab.unittest.TestCase
             release(simCoarse);
         end
 
+        function dcOffsetIsRelativeToReceivedLevel(testCase)
+            % Regression: DCOffset is a dBc level, so the realized DC spur must
+            % scale with the received RMS. The previous code added a fixed
+            % absolute amplitude 10^(DCOffset/20), so the realized DC-to-signal
+            % ratio drifted with the received power (which varies across the
+            % SNR sweep) and no longer matched the annotated dBc value. Drive
+            % the chain at two received levels and check the realized DC stays
+            % at the same dBc relative to the received level.
+            dcDb = -10;
+            rng(10);
+            base = complex(randn(8192, 1), randn(8192, 1));
+            base = base / sqrt(mean(abs(base) .^ 2)); % unit power
+            for scale = [1, 4]
+                sim = RRFSimulatorTest.makeSimulator(0);
+                sim.DCOffset = dcDb;
+                out = step(sim, scale * base);
+                dcAmplitude = abs(mean(out));
+                receivedRms = sqrt(mean(abs(out - mean(out)) .^ 2));
+                realizedDbc = 20 * log10(dcAmplitude / receivedRms);
+                testCase.verifyEqual(realizedDbc, dcDb, 'AbsTol', 1, ...
+                    sprintf(['Realized DC must stay at %g dBc relative to the ', ...
+                        'received level (received scale = %g).'], dcDb, scale));
+                release(sim);
+            end
+        end
+
     end
 
     methods (Static, Access = private)

@@ -166,21 +166,38 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             frequencyAxis = (-samplesPerFrame / 2:samplesPerFrame / 2 - 1)' * ...
                 (obj.SampleRate / samplesPerFrame);
 
-            % Generate vestigial filter response across frequency axis
-            obj.vestigialFilterResponse = arrayfun(@(freq)obj.vestigialFilter(freq, 30e3/2), frequencyAxis);
+            % Vestigial filter passband edge follows the ACTUAL message
+            % occupied bandwidth (and therefore the configured SampleRate),
+            % instead of a hard-coded 15 kHz audio assumption. At a high RF
+            % SampleRate, or for any message whose content extends beyond
+            % 15 kHz, the old fixed edge zeroed the vestigial shaping for the
+            % out-of-band portion, collapsing VSB into DSB. msgBwHz is the
+            % two-sided occupied bandwidth, so msgBwHz/2 is the upper content
+            % edge passed to the vestigial filter.
+            msgBwHz = csrd.support.modulation.occupiedBandwidthHz( ...
+                messageSignal, obj.SampleRate);
+            obj.vestigialFilterResponse = arrayfun( ...
+                @(freq)obj.vestigialFilter(freq, msgBwHz / 2), frequencyAxis);
 
             % Transform input signal to frequency domain
             messageSpectrum = fftshift(fft(messageSignal));
 
-            % Apply vestigial filtering based on sideband mode configuration
+            % Apply vestigial filtering based on sideband mode configuration.
+            % The SIGN of the quadrature term selects the retained sideband:
+            % (response - flipud(response)) yields the analytic (upper) signal
+            % m + j*Hilbert(m), matching SSBAM's convention and the positive
+            % band reported below. The previous code had the two signs swapped,
+            % so 'upper' actually realized the lower sideband (and vice versa),
+            % i.e. the modulation label / Design band disagreed with the real
+            % spectrum.
             if strcmp(obj.ModulatorConfig.mode, 'upper')
                 % Upper sideband mode: keep upper sideband, partially filter lower
-                imaginaryComponent = messageSpectrum .* (flipud(obj.vestigialFilterResponse) - obj.vestigialFilterResponse);
-                bandWidth = [-obj.ModulatorConfig.cutoff, csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate)];
+                imaginaryComponent = messageSpectrum .* (obj.vestigialFilterResponse - flipud(obj.vestigialFilterResponse));
+                bandWidth = [-obj.ModulatorConfig.cutoff, msgBwHz];
             else
                 % Lower sideband mode: keep lower sideband, partially filter upper
-                imaginaryComponent = messageSpectrum .* (obj.vestigialFilterResponse - flipud(obj.vestigialFilterResponse));
-                bandWidth = [-csrd.support.modulation.occupiedBandwidthHz(messageSignal, obj.SampleRate), obj.ModulatorConfig.cutoff];
+                imaginaryComponent = messageSpectrum .* (flipud(obj.vestigialFilterResponse) - obj.vestigialFilterResponse);
+                bandWidth = [-msgBwHz, obj.ModulatorConfig.cutoff];
             end
 
             % Convert filtered spectrum back to time domain
