@@ -338,12 +338,28 @@ classdef RRFSimulator < matlab.System
 
             xIq = obj.IQImbalance(xAwgn);
 
-            % Receiver DC offset (LO self-mixing / converter bias) leaks a small
-            % DC term into the baseband, matching the TX-side convention
-            % (DCOffset is a dBc level -> additive amplitude). Previously the RX
-            % DCOffset was recorded as a realized impairment in the annotation but
-            % never actually applied, so the annotated impairment was a phantom.
-            xIq = xIq + 10 ^ (obj.DCOffset / 20);
+            % Power gain of the IQ-imbalance stage (signal+noise), measured
+            % before the DC term is injected. Used to (a) refer the ADC
+            % quantization noise (which is sized at this post-IQ scale) back to
+            % the receiver-input scale, and (b) reference the DC offset to the
+            % received level.
+            postIqPower = mean(abs(double(xIq(:))) .^ 2);
+            awgnPower = mean(abs(double(xAwgn(:))) .^ 2);
+            if awgnPower > 0
+                iqPowerGain = postIqPower / awgnPower;
+            else
+                iqPowerGain = 1;
+            end
+
+            % Receiver DC offset (LO self-mixing / converter bias) leaks a DC
+            % term into the baseband. DCOffset is a dBc level, so the DC
+            % amplitude is referenced to the received RMS (sqrt of the post-IQ
+            % power) instead of being applied as a fixed absolute amplitude.
+            % With a fixed absolute amplitude the realized DC-to-signal ratio
+            % drifted with the received power (which varies across the SNR
+            % sweep and the ADC range) and no longer matched the annotated dBc
+            % value. A zero-power frame leaves the DC term at zero.
+            xIq = xIq + sqrt(postIqPower) * 10 ^ (obj.DCOffset / 20);
 
             % ADC quantization noise. A real N-bit converter imposes a
             % quantization noise floor that caps the realizable SNR at
@@ -369,10 +385,14 @@ classdef RRFSimulator < matlab.System
                     noiseStd = sqrt(quantNoisePower / 2);
                     xAdc = xIq + noiseStd * (randn(rs, size(xIq)) + 1i * randn(rs, size(xIq)));
                     % Refer the quantization noise to the receiver-input scale
-                    % (divide out the LNA power gain; IQ-imbalance power gain ~= 1)
                     % so it sums with the channel and thermal noise on the scale
-                    % the measured SNR GT uses.
-                    obj.RealizedAdcQuantizationNoiseInputReferredW = quantNoisePower / lnaPowerGain;
+                    % the measured SNR GT uses. The noise is sized at the
+                    % post-IQ scale, so divide out BOTH the LNA power gain and
+                    % the IQ-imbalance power gain (the latter was previously
+                    % approximated as 1, biasing the ADC-noise GT by the IQ
+                    % imbalance in the ADC-limited regime).
+                    obj.RealizedAdcQuantizationNoiseInputReferredW = ...
+                        quantNoisePower / (lnaPowerGain * iqPowerGain);
                 end
             end
 

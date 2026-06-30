@@ -88,6 +88,14 @@ classdef BaseChannel < matlab.System
             % validity domain of each model.
             distance_m = max(obj.Distance, 1);
 
+            % Recompute the wavelength from the CURRENT carrier frequency
+            % instead of the constructor-time obj.WaveLength. The channel
+            % factory assigns the real per-link CarrierFrequency AFTER the
+            % constructor runs, but obj.WaveLength was frozen at the 200 MHz
+            % default; fspl therefore used a stale frequency while the
+            % fogpl/gaspl/rainpl terms below already use the real
+            % obj.CarrierFrequency, making genPathLoss internally inconsistent.
+            obj.WaveLength = physconst('light') / obj.CarrierFrequency;
             freeSpacePL = fspl(distance_m, obj.WaveLength);
 
             T = 15; % Temperature in degree C

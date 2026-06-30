@@ -93,6 +93,34 @@ classdef BaseChannelDistanceTest < matlab.unittest.TestCase
                 'Path loss at 10 km must greatly exceed the 1 m value (attenuation tracks distance).');
         end
 
+        function freeSpacePathLossTracksCarrierSetAfterConstruction(testCase)
+            % Regression for the stale-wavelength bug: BaseChannel.WaveLength
+            % was computed once in the constructor from the default 200 MHz
+            % CarrierFrequency. The channel factory assigns the REAL carrier
+            % AFTER construction, so fspl used a 200 MHz wavelength while the
+            % fogpl/gaspl/rainpl terms used the real carrier (internally
+            % inconsistent path loss). genPathLoss must recompute the
+            % wavelength from the current CarrierFrequency.
+            distance_m = 1000;
+            ch = csrd.blocks.physical.channel.MIMO( ...
+                'FadingDistribution', 'Rayleigh', 'PathDelays', 0, ...
+                'AveragePathGains', 0, 'MaximumDopplerShift', 1, ...
+                'SampleRate', 1e6);
+            % CarrierFrequency stays at the 200 MHz default through
+            % construction, then the real carrier is assigned afterwards.
+            ch.Distance = distance_m;
+            ch.CarrierFrequency = 5.8e9;
+            in = struct('Signal', complex(ones(4096, 1)), ...
+                'SampleRate', 1e6, 'StartTime', 0);
+            ch.step(in);
+            expected = fspl(distance_m, physconst('light') / 5.8e9);
+            testCase.verifyLessThan(abs(ch.PathLoss - expected), 1, ...
+                'FSPL must track the carrier assigned after construction.');
+            stale = fspl(distance_m, physconst('light') / 200e6);
+            testCase.verifyGreaterThan(abs(ch.PathLoss - stale), 20, ...
+                'FSPL must not use the stale 200 MHz constructor wavelength.');
+        end
+
         function antennaModeIsSetCorrectly(testCase)
             ch = csrd.blocks.physical.channel.BaseChannel( ...
                 'NumTransmitAntennas', 2, 'NumReceiveAntennas', 4);
