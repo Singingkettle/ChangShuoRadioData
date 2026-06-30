@@ -114,11 +114,9 @@ data/
 .vscode
 .idea
 .DS_Store
+# Cursor editor config / AI rules: local-only, never synced to the repo.
 .cursor/
-# Track project-wide AI development rules; ignore everything else under .cursor/
-!.cursor/
-!.cursor/rules/
-!.cursor/rules/**
+.cursorignore
 
 # Local reference clone of the v1 repo (not part of this project's source)
 ref/
