@@ -100,8 +100,9 @@ function test_measured_truth_plausibility(varargin)
                     sp = localSourcePlane(src);
                     if isempty(sp); continue; end
                     sourcesChecked = sourcesChecked + 1;
+                    tag = sprintf('s%d/f%d/src%d', k, fi, si);
                     violations = [violations, ...
-                        localCheckPlausibility(sp, Fs, k, fi, si)]; %#ok<AGROW>
+                        csrd.test_support.measuredPlausibilityViolations(sp, Fs, tag)]; %#ok<AGROW>
                 end
             end
             scenariosRun = scenariosRun + 1;
@@ -149,44 +150,5 @@ function sp = localSourcePlane(src)
 end
 
 
-function v = localCheckPlausibility(sp, Fs, sid, fi, si)
-    v = {};
-    tag = sprintf('s%d/f%d/src%d', sid, fi, si);
-    tol = 1.02; % 2% slack for bin granularity / floating point
-
-    if localFiniteScalar(sp, 'OccupiedBandwidthHz')
-        ob = sp.OccupiedBandwidthHz;
-        if ob <= 0 || ob > Fs * tol
-            v{end + 1} = sprintf('%s OccupiedBandwidthHz=%.4g out of (0, Fs=%.4g]', tag, ob, Fs);
-        end
-    end
-    if localFiniteScalar(sp, 'CenterFrequencyHz')
-        ce = sp.CenterFrequencyHz;
-        if abs(ce) > (Fs / 2) * tol
-            v{end + 1} = sprintf('%s |CenterFrequencyHz|=%.4g > Fs/2=%.4g', tag, abs(ce), Fs / 2);
-        end
-    end
-    if localFiniteScalar(sp, 'TimeOccupancy')
-        to = sp.TimeOccupancy;
-        if to < -1e-3 || to > 1 + 1e-3
-            v{end + 1} = sprintf('%s TimeOccupancy=%.4g out of [0,1]', tag, to);
-        end
-    end
-    if localFiniteScalar(sp, 'FrequencyOccupancy')
-        fo = sp.FrequencyOccupancy;
-        if fo < -1e-3 || fo > 1 + 1e-3
-            v{end + 1} = sprintf('%s FrequencyOccupancy=%.4g out of [0,1]', tag, fo);
-        end
-    end
-    if localFiniteScalar(sp, 'SNRdB')
-        sn = sp.SNRdB;
-        if sn < -100 || sn > 200
-            v{end + 1} = sprintf('%s SNRdB=%.4g out of [-100,200]', tag, sn);
-        end
-    end
-end
-
-
-function tf = localFiniteScalar(s, f)
-    tf = isfield(s, f) && isnumeric(s.(f)) && isscalar(s.(f)) && isfinite(s.(f));
-end
+% Physical-bound checks live in csrd.test_support.measuredPlausibilityViolations
+% so this gate and the joint-dimension gate share one definition.
