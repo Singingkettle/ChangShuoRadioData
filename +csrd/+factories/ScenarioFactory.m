@@ -821,8 +821,22 @@ classdef ScenarioFactory < matlab.System
             plan.GeometryPolicy = struct( ...
                 'Evaluation', 'SegmentMidpoint', ...
                 'Source', 'ScenarioPlan');
-            plan.Entities = struct( ...
-                'Initial', localNormalizeInitialEntitiesAtZero(entities));
+            % Entities.Initial must capture the scenario's first-frame (t=0)
+            % state ONCE and then stay fixed. enrichScenarioPlan runs every
+            % frame on the mobility-advanced `entities` (stepImpl advances them
+            % via step(physicalEnvironmentSimulator, frameId) before this call),
+            % so rebuilding Initial each frame stamps a later frame's advanced
+            % positions with CreationTime=0 / Snapshots{1}.FrameId=1 -- a false
+            % "initial" snapshot. The live geometry path reads the frozen
+            % obj.ScenarioPlan (assigned once per scenario in @ChangShuo), not
+            % this currentScenarioPlan, so this is a latent inconsistency today;
+            % guarding it keeps the recorded Initial honest if a future consumer
+            % ever reads it. Carry the first-captured value forward.
+            if ~(isfield(plan, 'Entities') && isstruct(plan.Entities) && ...
+                    isfield(plan.Entities, 'Initial') && ~isempty(plan.Entities.Initial))
+                plan.Entities = struct( ...
+                    'Initial', localNormalizeInitialEntitiesAtZero(entities));
+            end
             plan.Receivers = rxConfigs;
             plan.Transmitters = txConfigs;
             plan.Communication = localScenarioPlanCommunication( ...
