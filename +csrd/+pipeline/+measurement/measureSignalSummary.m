@@ -256,6 +256,12 @@ if totalPower <= 0
     return;
 end
 fcHz = sum(fAxis .* psd) / totalPower + fcShiftHz;
+% The circular add-back (fcShiftHz) can push an edge-straddling centroid just
+% past +/-Fs/2; wrap it back into the physical captured band [-Fs/2, Fs/2) so
+% the measured CenterFrequencyHz never reports a frequency outside the receiver
+% passband (a downstream consumer placing it on the receiver frequency canvas
+% would otherwise land off-canvas).
+fcHz = mod(fcHz + sampleRate / 2, sampleRate) - sampleRate / 2;
 end
 
 function spanHz = localEnergySpan(psd, fAxis)

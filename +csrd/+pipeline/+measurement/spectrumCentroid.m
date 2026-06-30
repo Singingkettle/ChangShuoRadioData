@@ -103,6 +103,9 @@ function fcHz = spectrumCentroid(signal, sampleRate)
     end
 
     fcHz = sum(fAxis .* psd) / totalPower + fcShiftHz;
+    % Wrap back into the documented [-Fs/2, Fs/2) band: the circular add-back
+    % can push an edge-straddling centroid just past the Nyquist edge.
+    fcHz = mod(fcHz + sampleRate / 2, sampleRate) - sampleRate / 2;
 end
 
 function spanHz = localEnergySpan(psd, fAxis)
