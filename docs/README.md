@@ -3,8 +3,10 @@
 This directory is split into current operating documentation and historical
 audit snapshots.
 
-Use the root [`README.md`](../README.md), this index, the configuration guide,
-and the architecture guide as the current operating documentation. Files under
+**Generating a dataset for the first time? Start at
+[`GETTING_STARTED.md`](GETTING_STARTED.md).** Use the root
+[`README.md`](../README.md), this index, the configuration guide, and the
+architecture guide as the current operating documentation. Files under
 `docs/audits/` are historical evidence and may mention removed paths or older
 contracts.
 
@@ -12,10 +14,12 @@ contracts.
 
 | Document | Purpose |
 | --- | --- |
-| [`../README.md`](../README.md) | Project overview, current entry points, runtime model, validation commands. |
+| [`GETTING_STARTED.md`](GETTING_STARTED.md) | **Start here.** Requirements, OSM/Python prerequisites, how to generate data, output layout, troubleshooting. |
+| [`../README.md`](../README.md) | Project overview, current entry points, runtime model, repository layout. |
 | [`configuration.md`](configuration.md) | Raw config authorities, `RuntimePlan` policies, per-scenario `ScenarioPlan`, rejected legacy fields. |
 | [`architecture/source-layout.md`](architecture/source-layout.md) | Current source package responsibilities and production data flow. |
 | [`annotation-schema.md`](annotation-schema.md) | Annotation contract: `Truth.Design`, `Truth.Execution`, `Truth.Measured`, receiver view. |
+| [`examples/annotation-downstream.md`](examples/annotation-downstream.md) | Downstream consumer example: read the annotation, export COCO. |
 | [`README_Weather.md`](README_Weather.md) | Weather configuration path, units, defaults, and ScenarioPlan timing notes. |
 | [`audits/manual-full-code-review-guide.md`](audits/manual-full-code-review-guide.md) | Human review workflow for reading the full codebase without losing cross-module contracts. |
 
