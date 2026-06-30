@@ -1,3 +1,5 @@
+[English](configuration.md) | [中文](configuration.zh-CN.md)
+
 # CSRD Configuration And Runtime Plans
 
 This document describes the current configuration contract. It replaces older

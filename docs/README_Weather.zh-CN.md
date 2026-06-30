@@ -1,27 +1,24 @@
 [English](README_Weather.md) | [中文](README_Weather.zh-CN.md)
 
-# Weather Configuration Guide
+# 天气配置指南
 
-Weather is configured under the physical-environment factory:
+天气在物理环境工厂下进行配置：
 
 ```matlab
 config.Factories.Scenario.PhysicalEnvironment.Environment.Weather
 ```
 
-Weather is part of the scenario physical environment. It contributes
-environment metadata and future propagation-condition extensions, but time
-advancement must follow `ScenarioPlan.Frame.FrameDurationSec`; it must not
-reintroduce global legacy timing fields such as `TimeResolution`.
+天气是场景物理环境的一部分。它提供环境元数据以及未来的传播条件扩展，但时间推进必须遵循 `ScenarioPlan.Frame.FrameDurationSec`；它不得重新引入诸如 `TimeResolution` 之类的全局遗留计时字段。
 
-## Configuration Fields
+## 配置字段
 
-Enable weather:
+启用天气：
 
 ```matlab
 config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Enable = true;
 ```
 
-Initial conditions:
+初始条件：
 
 ```matlab
 weather = config.Factories.Scenario.PhysicalEnvironment.Environment.Weather;
@@ -32,9 +29,7 @@ weather.InitialConditions.WindSpeed = 0;         % m/s
 weather.InitialConditions.WindDirection = 0;     % degrees, 0-360
 ```
 
-Evolution parameters describe per-frame random variation. The frame duration is
-resolved by the scenario plan, so the weather update step should consume the
-scenario frame duration rather than a separate raw config time step.
+演化参数描述每帧的随机变化。帧时长由场景计划解析，因此天气更新步长应当采用场景帧时长，而不是单独的原始配置时间步长。
 
 ```matlab
 weather.Evolution.TemperatureVariation = 0.1;    % Celsius
@@ -44,7 +39,7 @@ weather.Evolution.WindSpeedVariation = 0.2;      % m/s
 weather.Evolution.WindDirectionVariation = 5;    % degrees
 ```
 
-Physical constraints:
+物理约束：
 
 ```matlab
 weather.Constraints.TemperatureRange = [-40, 60];    % Celsius
@@ -53,18 +48,16 @@ weather.Constraints.PressureRange = [900, 1100];     % hPa
 weather.Constraints.WindSpeedRange = [0, 50];        % m/s
 ```
 
-## Defaults
+## 默认值
 
-Current defaults are defined near the scenario factory configuration:
+当前默认值定义在场景工厂配置附近：
 
 - `config/_base_/factories/scenario_factory.m`
 - `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/getDefaultConfiguration.m`
 
-If a weather subfield is omitted, the physical-environment simulator uses its
-documented default for that subfield. Do not use weather defaults to hide a
-missing scenario timing contract; frame timing comes from `ScenarioPlan.Frame`.
+如果省略某个天气子字段，物理环境模拟器会对该子字段使用其文档中记录的默认值。不要利用天气默认值来掩盖缺失的场景计时契约；帧计时来自 `ScenarioPlan.Frame`。
 
-## Example
+## 示例
 
 ```matlab
 function config = my_weather_config()
@@ -91,14 +84,14 @@ function config = my_weather_config()
 end
 ```
 
-Run through the public entry point:
+通过公共入口点运行：
 
 ```matlab
 addpath('tools');
 simulation(1, 1, 'my_weather_config.m');
 ```
 
-## Related Code
+## 相关代码
 
 - `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/initializeEnvironment.m`
 - `+csrd/+blocks/+scenario/@PhysicalEnvironmentSimulator/private/updateWeatherConditions.m`

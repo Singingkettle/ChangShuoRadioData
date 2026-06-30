@@ -1,6 +1,6 @@
-# CSRD Documentation Index
-
 [English](README.md) | [中文](README.zh-CN.md)
+
+# CSRD Documentation Index
 
 **Generating a dataset for the first time? Start at
 [`GETTING_STARTED.md`](GETTING_STARTED.md).** Use the root
