@@ -1,14 +1,12 @@
 # CSRD Documentation Index
 
-This directory is split into current operating documentation and historical
-audit snapshots.
+[English](README.md) | [中文](README.zh-CN.md)
 
 **Generating a dataset for the first time? Start at
 [`GETTING_STARTED.md`](GETTING_STARTED.md).** Use the root
 [`README.md`](../README.md), this index, the configuration guide, and the
-architecture guide as the current operating documentation. Files under
-`docs/audits/` are historical evidence and may mention removed paths or older
-contracts.
+architecture guide as the current operating documentation. Each doc has a
+Chinese (`.zh-CN.md`) counterpart linked at its top.
 
 ## Current Docs
 
@@ -21,7 +19,6 @@ contracts.
 | [`annotation-schema.md`](annotation-schema.md) | Annotation contract: `Truth.Design`, `Truth.Execution`, `Truth.Measured`, receiver view. |
 | [`examples/annotation-downstream.md`](examples/annotation-downstream.md) | Downstream consumer example: read the annotation, export COCO. |
 | [`README_Weather.md`](README_Weather.md) | Weather configuration path, units, defaults, and ScenarioPlan timing notes. |
-| [`audits/manual-full-code-review-guide.md`](audits/manual-full-code-review-guide.md) | Human review workflow for reading the full codebase without losing cross-module contracts. |
 
 ## Configuration
 
@@ -70,17 +67,11 @@ simulation(1, 1, 'csrd2025/csrd2025.m')
 Generated validation output belongs under ignored `artifacts/` or `data/`.
 `data/map/` is the only data subtree treated as source asset.
 
-## Historical Audits
+## Historical material
 
-Historical material lives under [`audits/`](audits/). It records how the project
-reached the current state, but it may mention old paths, removed helpers, or
-past compatibility decisions.
-
-- [`audits/README.md`](audits/README.md) explains how to read the archive.
-- [`audits/HANDOVER_2026-04-26.md`](audits/HANDOVER_2026-04-26.md) and
-  [`audits/HANDOVER_2026-05-03.md`](audits/HANDOVER_2026-05-03.md) are handover
-  snapshots.
-- [`audits/phases/`](audits/phases/) contains phase-by-phase refactoring notes.
-
-Large generated audit manifests are no longer committed. Regenerate them under
-`artifacts/audits/reports/` when needed.
+The refactoring audits, phase notes, handovers, and overnight bug-hunt findings
+that record how the project reached its current state are preserved on the
+[`archive/history-2026-06-30`](https://github.com/Singingkettle/ChangShuoRadioData/tree/archive/history-2026-06-30)
+branch, not on `main`. They are evidence, not current operating instructions.
+Generated audit manifests are not committed; regenerate them under ignored
+`artifacts/`.

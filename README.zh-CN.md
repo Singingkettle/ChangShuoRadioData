@@ -166,11 +166,15 @@ runtests('tests/unit/MeasurementCompletenessHookTest.m')
 
 ## 文档
 
-- [`docs/README.md`](docs/README.md)：英文文档索引。
-- [`docs/configuration.md`](docs/configuration.md)：当前配置和运行计划合同。
-- [`docs/annotation-schema.md`](docs/annotation-schema.md)：annotation 消费合同。
-- [`docs/audits/manual-full-code-review-guide.md`](docs/audits/manual-full-code-review-guide.md)：人工代码 review 指南。
-- [`docs/audits/`](docs/audits/)：历史审计快照，只作为证据，不作为当前操作规范。
+- [`docs/GETTING_STARTED.zh-CN.md`](docs/GETTING_STARTED.zh-CN.md)：生成你的第一份数据集
+  （环境要求、OSM 数据、运行、输出、排错）。
+- [`docs/README.zh-CN.md`](docs/README.zh-CN.md)：文档索引。
+- [`docs/configuration.zh-CN.md`](docs/configuration.zh-CN.md)：当前配置和运行计划合同。
+- [`docs/annotation-schema.zh-CN.md`](docs/annotation-schema.zh-CN.md)：annotation 消费合同。
+
+历史重构审计、phase 笔记、overnight 排查记录保存在
+[`archive/history-2026-06-30`](https://github.com/Singingkettle/ChangShuoRadioData/tree/archive/history-2026-06-30)
+分支,不在 `main` 上。
 
 如果需要旧 JSAC 时代的行为，请查看历史稳定 revision：
 [a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)。
