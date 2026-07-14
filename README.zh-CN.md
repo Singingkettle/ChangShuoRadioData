@@ -178,7 +178,7 @@ runtests('tests/unit/MeasurementCompletenessHookTest.m')
 
 ## 引用
 
-如果你使用 ChangShuoRadioData,请引用本框架:
+如果你使用 ChangShuoRadioData,请同时引用本框架和 CSRD2025 数据集论文:
 
 ```bibtex
 @software{chang_shuo_2025_10667001,
@@ -192,15 +192,27 @@ runtests('tests/unit/MeasurementCompletenessHookTest.m')
 }
 ```
 
-### 相关论文
+```bibtex
+@ARTICLE{11289512,
+  author={Chang, Shuo and Sun, Rui and He, Jiashuo and Huang, Sai and Yu, Kan and Feng, Zhiyong},
+  journal={IEEE Journal on Selected Areas in Communications}, 
+  title={CSRD2025: A Large-Scale Synthetic Radio Dataset for Spectrum Sensing in Wireless Communications}, 
+  year={2026},
+  volume={44},
+  number={},
+  pages={2378-2392},
+  keywords={Radio frequency;Wireless communication;Sensors;Annotations;Data acquisition;Synthetic data;Interference;Data models;Wireless sensor networks;Emulation;Synthetic radio dataset;spectrum sensing;large AI models},
+  doi={10.1109/JSAC.2025.3641910}}
+```
 
-- **JSAC 时代版本 —— 已过时,不要以它为起点。** 本项目的早期版本对应 JSAC 时代的
-  工作,仅保留在历史 revision
-  [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)。
-  该版本**比当前框架旧很多——新用户请基于最新的 `main` 开发,不要使用 JSAC 时代的
-  代码。**
-- **IEEE TWC 论文 —— 仅对应 `twc/` 文件夹。** 下面这篇论文**只对应
-  [`twc/`](twc/) 子文件夹,与主框架相互独立**;仅当你使用该文件夹时才需要引用:
+> **这篇 JSAC 论文描述的是本框架较早的版本**,该版本保留在历史 revision
+> [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)。
+> 新用户请基于**最新的 `main`** 开发,而不是那个 revision。
+
+### 相关工作 —— 仅对应 `twc/` 文件夹
+
+下面这篇 IEEE TWC 论文**只对应 [`twc/`](twc/) 子文件夹,与主框架相互独立**;仅当你
+使用该文件夹时才需要引用:
 
 ```bibtex
 @ARTICLE{10667001,

@@ -181,7 +181,8 @@ branch, not on `main`.
 
 ## Citation
 
-If you use ChangShuoRadioData, please cite the framework:
+If you use ChangShuoRadioData, please cite both the framework and the CSRD2025
+dataset paper:
 
 ```bibtex
 @software{chang_shuo_2025_10667001,
@@ -195,17 +196,28 @@ If you use ChangShuoRadioData, please cite the framework:
 }
 ```
 
-### Related papers
+```bibtex
+@ARTICLE{11289512,
+  author={Chang, Shuo and Sun, Rui and He, Jiashuo and Huang, Sai and Yu, Kan and Feng, Zhiyong},
+  journal={IEEE Journal on Selected Areas in Communications}, 
+  title={CSRD2025: A Large-Scale Synthetic Radio Dataset for Spectrum Sensing in Wireless Communications}, 
+  year={2026},
+  volume={44},
+  number={},
+  pages={2378-2392},
+  keywords={Radio frequency;Wireless communication;Sensors;Annotations;Data acquisition;Synthetic data;Interference;Data models;Wireless sensor networks;Emulation;Synthetic radio dataset;spectrum sensing;large AI models},
+  doi={10.1109/JSAC.2025.3641910}}
+```
 
-- **JSAC-era version — outdated; do not start from it.** An earlier version of
-  this project accompanied the JSAC-era work and is preserved only at the
-  historical revision
-  [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).
-  That version is **much older than the current framework — new users should
-  build on the latest `main`, not the JSAC-era code.**
-- **IEEE TWC paper — `twc/` folder only.** The paper below corresponds **only to
-  the [`twc/`](twc/) subfolder and is independent of the main framework**; cite
-  it only if you use that folder:
+> **The JSAC paper describes an earlier version** of this framework, preserved at
+> the historical revision
+> [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).
+> New users should build on the **latest `main`**, not that revision.
+
+### Related work — `twc/` folder only
+
+The IEEE TWC paper below corresponds **only to the [`twc/`](twc/) subfolder and
+is independent of the main framework**; cite it only if you use that folder:
 
 ```bibtex
 @ARTICLE{10667001,
