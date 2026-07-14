@@ -1,71 +1,53 @@
-#! /bin/bash
+#!/bin/bash
+#
+# Parallel multi-worker CSRD data generation.
+#
+# Every worker shares ONE session directory via CSRD_SESSION_ID, so a parallel
+# run fills a single data/<Dataset>/session_<ID>/ tree instead of scattering
+# scenarios across one session_* folder per worker.
 
-# Store the script's directory path
+set -u
+
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-# Create log directory if it doesn't exist
 mkdir -p "$SCRIPTDIR/logs"
 
-# Get number of workers from user input
+# Number of workers (must be a positive integer).
 read -p "Enter number of workers: " numw
+if ! [[ "$numw" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: number of workers must be a positive integer (got '$numw')." >&2
+    exit 1
+fi
 
-# Log start time
-echo "Simulation started at $(date)" > "$SCRIPTDIR/logs/simulation.log"
+# One shared session id for every worker; exported so each MATLAB process
+# inherits it and writes into the same session directory.
+export CSRD_SESSION_ID="$(date +%Y%m%d_%H%M%S)"
+LOGFILE="$SCRIPTDIR/logs/simulation_${CSRD_SESSION_ID}.log"
 
-# Initialize arrays for PIDs and start times
+echo "Simulation started at $(date) | session ${CSRD_SESSION_ID} | ${numw} workers" | tee "$LOGFILE"
+
+# Launch all workers concurrently.
 declare -A pids
-declare -A start_times
-
-# Run all MATLAB processes simultaneously
-for ((i=1; i<=$numw; i++))
-do
-    # Record start time for this worker
-    start_times[$i]=$(date +%H:%M:%S)
-    echo "Starting worker $i of $numw" >> "$SCRIPTDIR/logs/simulation.log"
-    
-    # Start MATLAB process and capture its PID
-    {
-        scriptname=$(printf 'simulation(%d, %d)' "$i" "$numw")
-        echo "run script: $scriptname"
-        matlab -nodesktop -nosplash -r "cd('$SCRIPTDIR'); clc; clear; close all; $scriptname; exit;"
-    } &
-    
-    # Store the PID
+for ((i=1; i<=numw; i++)); do
+    matlab -nodesktop -nosplash -r "cd('$SCRIPTDIR'); clc; clear; close all; simulation($i, $numw); exit;" &
     pids[$i]=$!
-    echo "Launch A Matlab Worker with PID ${pids[$i]}"
-    echo "Worker $i started with PID ${pids[$i]} at ${start_times[$i]}" >> "$SCRIPTDIR/logs/simulation.log"
+    echo "Launched worker $i of $numw (PID ${pids[$i]})" | tee -a "$LOGFILE"
 done
 
-wait
-
-# Monitor all processes
-while true; do
-    running=0
-    for ((i=1; i<=$numw; i++))
-    do
-        if kill -0 ${pids[$i]} 2>/dev/null; then
-            running=1
-        else
-            # Process has ended, record completion time
-            if [ ! -z "${pids[$i]}" ]; then
-                end_time=$(date +%H:%M:%S)
-                echo "Worker $i (PID: ${pids[$i]}) completed at $end_time" >> "$SCRIPTDIR/logs/simulation.log"
-                echo "Duration for Worker $i:" >> "$SCRIPTDIR/logs/simulation.log"
-                echo "  Start: ${start_times[$i]}" >> "$SCRIPTDIR/logs/simulation.log"
-                echo "  End  : $end_time" >> "$SCRIPTDIR/logs/simulation.log"
-                echo "Matlab Worker with PID ${pids[$i]} Completed"
-                pids[$i]=""
-            fi
-        fi
-    done
-    
-    if [ $running -eq 0 ]; then
-        break
+# Wait for each worker and log completion. `wait <pid>` blocks on that worker
+# and reaps it, so there is no busy-poll and no defunct-process false "running".
+rc=0
+for ((i=1; i<=numw; i++)); do
+    if wait "${pids[$i]}"; then
+        echo "Worker $i (PID ${pids[$i]}) completed at $(date +%H:%M:%S)" | tee -a "$LOGFILE"
+    else
+        status=$?
+        rc=1
+        echo "Worker $i (PID ${pids[$i]}) FAILED (exit $status) at $(date +%H:%M:%S)" | tee -a "$LOGFILE"
     fi
-    
-    sleep 10
 done
 
-# Log completion time
-echo "Simulation completed at $(date)" >> "$SCRIPTDIR/logs/simulation.log"
-echo "All workers completed. Check logs/simulation.log for details."
+echo "Simulation completed at $(date) | session ${CSRD_SESSION_ID}" | tee -a "$LOGFILE"
+if [ "$rc" -ne 0 ]; then
+    echo "One or more workers failed. See $LOGFILE." >&2
+fi
+exit $rc
