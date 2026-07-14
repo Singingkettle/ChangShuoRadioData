@@ -91,9 +91,24 @@ classdef GlobalLogManager < handle
                     'runs', 'global_logs');
             end
 
-            % Create timestamped session directory
-            currentTime = datetime('now', 'Format', 'yyyyMMdd_HHmmss');
-            sessionDirectory = fullfile(outputDirectory, sprintf('session_%s', currentTime));
+            % Per-process timestamp. Kept unique per process because it also
+            % names the logger instance below (concurrent workers must not share
+            % a logger name / log file).
+            currentTime = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+
+            % Session directory name. Parallel launchers
+            % (tools/multi_simulation.*) export CSRD_SESSION_ID so every worker
+            % process writes into ONE shared session directory, instead of each
+            % process stamping its own second-resolution timestamp -- which
+            % scattered a single parallel run across N separate session_*
+            % folders. Falls back to the per-process timestamp when unset
+            % (single-process runs are unchanged). The value is sanitised to a
+            % path-safe token so it can only name a session folder.
+            sessionId = regexprep(getenv('CSRD_SESSION_ID'), '[^\w\-]', '');
+            if isempty(sessionId)
+                sessionId = currentTime;
+            end
+            sessionDirectory = fullfile(outputDirectory, sprintf('session_%s', sessionId));
             manager.logDirectory = fullfile(sessionDirectory, 'logs');
 
             % Create directory if it doesn't exist
