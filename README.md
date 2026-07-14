@@ -179,5 +179,55 @@ preserved on the
 [`archive/history-2026-06-30`](https://github.com/Singingkettle/ChangShuoRadioData/tree/archive/history-2026-06-30)
 branch, not on `main`.
 
-If you need the older JSAC-era behavior, use the historical stable revision:
-[a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).
+## Citation
+
+If you use ChangShuoRadioData, please cite both the framework and the CSRD2025
+dataset paper:
+
+```bibtex
+@software{chang_shuo_2025_10667001,
+  author       = {Chang, Shuo},
+  title        = {ChangShuoRadioData: A Comprehensive MATLAB-based Radio Communication Simulation Framework},
+  month        = mar,
+  year         = 2025,
+  publisher    = {ChangShuoLab},
+  version      = {v1.0.0},
+  url          = {https://github.com/Singingkettle/ChangShuoRadioData}
+}
+```
+
+```bibtex
+@ARTICLE{11289512,
+  author={Chang, Shuo and Sun, Rui and He, Jiashuo and Huang, Sai and Yu, Kan and Feng, Zhiyong},
+  journal={IEEE Journal on Selected Areas in Communications}, 
+  title={CSRD2025: A Large-Scale Synthetic Radio Dataset for Spectrum Sensing in Wireless Communications}, 
+  year={2026},
+  volume={44},
+  number={},
+  pages={2378-2392},
+  keywords={Radio frequency;Wireless communication;Sensors;Annotations;Data acquisition;Synthetic data;Interference;Data models;Wireless sensor networks;Emulation;Synthetic radio dataset;spectrum sensing;large AI models},
+  doi={10.1109/JSAC.2025.3641910}}
+```
+
+> **The JSAC paper describes an earlier version** of this framework, preserved at
+> the historical revision
+> [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).
+> New users should build on the **latest `main`**, not that revision.
+
+### Related work — `twc/` folder only
+
+The IEEE TWC paper below corresponds **only to the [`twc/`](twc/) subfolder and
+is independent of the main framework**; cite it only if you use that folder:
+
+```bibtex
+@ARTICLE{10667001,
+  author={Xing, Huijun and Zhang, Xuhui and Chang, Shuo and Ren, Jinke and Zhang, Zixun and Xu, Jie and Cui, Shuguang},
+  journal={IEEE Transactions on Wireless Communications}, 
+  title={Joint Signal Detection and Automatic Modulation Classification via Deep Learning}, 
+  year={2024},
+  volume={23},
+  number={11},
+  pages={17129-17142},
+  keywords={Feature extraction;Signal detection;Frequency modulation;Time-frequency analysis;Signal to noise ratio;Industries;Deep learning;Automatic modulation classification;dataset design;hierarchical classification head},
+  doi={10.1109/TWC.2024.3450972}}
+```
