@@ -176,5 +176,41 @@ runtests('tests/unit/MeasurementCompletenessHookTest.m')
 [`archive/history-2026-06-30`](https://github.com/Singingkettle/ChangShuoRadioData/tree/archive/history-2026-06-30)
 分支,不在 `main` 上。
 
-如果需要旧 JSAC 时代的行为，请查看历史稳定 revision：
-[a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)。
+## 引用
+
+如果你使用 ChangShuoRadioData,请引用本框架:
+
+```bibtex
+@software{chang_shuo_2025_10667001,
+  author       = {Chang, Shuo},
+  title        = {ChangShuoRadioData: A Comprehensive MATLAB-based Radio Communication Simulation Framework},
+  month        = mar,
+  year         = 2025,
+  publisher    = {ChangShuoLab},
+  version      = {v1.0.0},
+  url          = {https://github.com/Singingkettle/ChangShuoRadioData}
+}
+```
+
+### 相关论文
+
+- **JSAC 时代版本 —— 已过时,不要以它为起点。** 本项目的早期版本对应 JSAC 时代的
+  工作,仅保留在历史 revision
+  [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5)。
+  该版本**比当前框架旧很多——新用户请基于最新的 `main` 开发,不要使用 JSAC 时代的
+  代码。**
+- **IEEE TWC 论文 —— 仅对应 `twc/` 文件夹。** 下面这篇论文**只对应
+  [`twc/`](twc/) 子文件夹,与主框架相互独立**;仅当你使用该文件夹时才需要引用:
+
+```bibtex
+@ARTICLE{10667001,
+  author={Xing, Huijun and Zhang, Xuhui and Chang, Shuo and Ren, Jinke and Zhang, Zixun and Xu, Jie and Cui, Shuguang},
+  journal={IEEE Transactions on Wireless Communications}, 
+  title={Joint Signal Detection and Automatic Modulation Classification via Deep Learning}, 
+  year={2024},
+  volume={23},
+  number={11},
+  pages={17129-17142},
+  keywords={Feature extraction;Signal detection;Frequency modulation;Time-frequency analysis;Signal to noise ratio;Industries;Deep learning;Automatic modulation classification;dataset design;hierarchical classification head},
+  doi={10.1109/TWC.2024.3450972}}
+```

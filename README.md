@@ -179,5 +179,43 @@ preserved on the
 [`archive/history-2026-06-30`](https://github.com/Singingkettle/ChangShuoRadioData/tree/archive/history-2026-06-30)
 branch, not on `main`.
 
-If you need the older JSAC-era behavior, use the historical stable revision:
-[a6d09a4b264894b76f852ce33bfd82adc7b270b5](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).
+## Citation
+
+If you use ChangShuoRadioData, please cite the framework:
+
+```bibtex
+@software{chang_shuo_2025_10667001,
+  author       = {Chang, Shuo},
+  title        = {ChangShuoRadioData: A Comprehensive MATLAB-based Radio Communication Simulation Framework},
+  month        = mar,
+  year         = 2025,
+  publisher    = {ChangShuoLab},
+  version      = {v1.0.0},
+  url          = {https://github.com/Singingkettle/ChangShuoRadioData}
+}
+```
+
+### Related papers
+
+- **JSAC-era version — outdated; do not start from it.** An earlier version of
+  this project accompanied the JSAC-era work and is preserved only at the
+  historical revision
+  [`a6d09a4b`](https://github.com/Singingkettle/ChangShuoRadioData/tree/a6d09a4b264894b76f852ce33bfd82adc7b270b5).
+  That version is **much older than the current framework — new users should
+  build on the latest `main`, not the JSAC-era code.**
+- **IEEE TWC paper — `twc/` folder only.** The paper below corresponds **only to
+  the [`twc/`](twc/) subfolder and is independent of the main framework**; cite
+  it only if you use that folder:
+
+```bibtex
+@ARTICLE{10667001,
+  author={Xing, Huijun and Zhang, Xuhui and Chang, Shuo and Ren, Jinke and Zhang, Zixun and Xu, Jie and Cui, Shuguang},
+  journal={IEEE Transactions on Wireless Communications}, 
+  title={Joint Signal Detection and Automatic Modulation Classification via Deep Learning}, 
+  year={2024},
+  volume={23},
+  number={11},
+  pages={17129-17142},
+  keywords={Feature extraction;Signal detection;Frequency modulation;Time-frequency analysis;Signal to noise ratio;Industries;Deep learning;Automatic modulation classification;dataset design;hierarchical classification head},
+  doi={10.1109/TWC.2024.3450972}}
+```
