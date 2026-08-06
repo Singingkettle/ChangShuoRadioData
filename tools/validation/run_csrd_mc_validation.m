@@ -1,12 +1,12 @@
-function baselinePath = run_phase5_mc_validation(varargin)
-%RUN_PHASE5_MC_VALIDATION Phase 5 MC baseline entry point.
+function baselinePath = run_csrd_mc_validation(varargin)
+%RUN_CSRD_MC_VALIDATION Phase 5 MC baseline entry point.
 % Inputs: see signature arguments and local validation.
 % Outputs: see signature return values and contract fields.
 %
-%   run_phase5_mc_validation() runs the canonical 1000-scenario Phase 5
+%   run_csrd_mc_validation() runs the canonical 1000-scenario Phase 5
 %   sweep and writes docs/baselines/2026-04-final-v04.json.
 %
-%   run_phase5_mc_validation(N, 'Mode', 'smoke') runs a small validation
+%   run_csrd_mc_validation(N, 'Mode', 'smoke') runs a small validation
 %   of the Phase 5 wrapper without overwriting the canonical final file.
 
 p = inputParser;
