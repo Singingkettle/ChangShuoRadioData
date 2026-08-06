@@ -26,8 +26,8 @@ projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(projectRoot);
 addpath(fullfile(projectRoot, 'tests'));
 addpath(fullfile(projectRoot, 'tools', 'ci'));
-addpath(fullfile(projectRoot, 'tools', 'phase5'));
-addpath(fullfile(projectRoot, 'tools', 'phase6'));
+addpath(fullfile(projectRoot, 'tools', 'validation'));
+addpath(fullfile(projectRoot, 'tools', 'diagnostics'));
 addpath(fullfile(projectRoot, 'tools', 'release'));
 
 if p.Results.Verbose

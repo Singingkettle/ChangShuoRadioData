@@ -14,7 +14,7 @@ addpath(projectRoot);
 addpath(fullfile(projectRoot, 'tests'));
 addpath(fullfile(projectRoot, 'tests', 'regression'));
 addpath(fullfile(projectRoot, 'tools', 'ci'));
-addpath(fullfile(projectRoot, 'tools', 'phase5'));
+addpath(fullfile(projectRoot, 'tools', 'validation'));
 addpath(fullfile(projectRoot, 'tools', 'coverage'));
 
 fprintf('=== CSRD CI smoke ===\n');

@@ -9,7 +9,7 @@ here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 addpath(projectRoot);
 addpath(fullfile(projectRoot, 'tools', 'release'));
-addpath(fullfile(projectRoot, 'tools', 'phase6'));
+addpath(fullfile(projectRoot, 'tools', 'diagnostics'));
 addpath(fullfile(projectRoot, 'tools', 'ci'));
 
 results = run_csrd_release_ci_readiness( ...
