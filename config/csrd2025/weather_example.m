@@ -20,18 +20,13 @@ function config = weather_example()
     % Runner configuration
     config.Runner.NumScenarios = 2;
     config.Runner.RandomSeed = 'shuffle';
-    config.Runner.SimulationMode = 'Scenario-Driven';
-    config.Runner.ValidationLevel = 'Moderate';
 
     % Data Storage Configuration
     config.Runner.Data.OutputDirectory = 'WeatherExample';
-    config.Runner.Data.SaveFormat = 'mat';
     config.Runner.Data.CompressData = true;
-    config.Runner.Data.MetadataIncluded = true;
 
     % Engine Configuration
     config.Runner.Engine.Handle = 'csrd.core.ChangShuo';
-    config.Runner.Engine.ResetBetweenScenarios = true;
 
     % Logging Configuration
     config.Logging.Name = 'WeatherExample';
@@ -67,6 +62,5 @@ function config = weather_example()
     config.Metadata.CreatedDate = datetime('now');
     config.Metadata.Description = 'Weather Configuration Example for CSRD Framework';
     config.Metadata.Author = 'ChangShuo';
-    config.Metadata.WeatherScenario = 'Tropical Hot and Humid';
     config.Metadata.LastModified = datetime('now');
 end

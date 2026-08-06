@@ -22,18 +22,10 @@ function config = csrd2025_osm_large_map_validation()
 
     config.Runner.NumScenarios = 1;
     config.Runner.RandomSeed = 20260507;
-    config.Runner.SimulationMode = 'Phase26-SpecificOsmMapValidation';
-    config.Runner.ValidationLevel = 'Strict';
     config.Runner.Toolbox.Level = 'minimal';
 
     config.Runner.Data.OutputDirectory = 'CSRD2025_osm_large_map_validation';
-    config.Runner.Data.SaveFormat = 'mat';
     config.Runner.Data.CompressData = false;
-    config.Runner.Data.MetadataIncluded = true;
-    config.Runner.Data.BackupEnabled = false;
-    config.Runner.Data.RetentionPolicy = 'Keep';
-    config.Runner.Data.VersionControl = false;
-    config.Runner.Data.ScenarioGrouping = true;
     config.Runner.Data.PrettyPrintAnnotations = false;
 
     config.Runner.Performance.EnableStageTiming = true;

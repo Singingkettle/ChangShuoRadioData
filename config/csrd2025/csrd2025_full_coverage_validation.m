@@ -16,18 +16,10 @@ function config = csrd2025_full_coverage_validation()
 
     config.Runner.NumScenarios = 1;
     config.Runner.RandomSeed = 20260430;
-    config.Runner.SimulationMode = 'Phase13-FullCoverageValidation';
-    config.Runner.ValidationLevel = 'Strict';
     config.Runner.Toolbox.Level = 'minimal';
 
     config.Runner.Data.OutputDirectory = 'CSRD2025_full_coverage_validation';
-    config.Runner.Data.SaveFormat = 'mat';
     config.Runner.Data.CompressData = false;
-    config.Runner.Data.MetadataIncluded = true;
-    config.Runner.Data.BackupEnabled = false;
-    config.Runner.Data.RetentionPolicy = 'Keep';
-    config.Runner.Data.VersionControl = true;
-    config.Runner.Data.ScenarioGrouping = true;
 
     config.Logging.Name = 'CSRD-Phase13-FullCoverage';
     config.Logging.Policy = 'Standard';
