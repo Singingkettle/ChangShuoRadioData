@@ -44,27 +44,6 @@ function config = receive_factory()
 
     config.Factories.Receive.Simulation.handle = ...
         'csrd.blocks.physical.rxRadioFront.RRFSimulator';
-    config.Factories.Receive.Simulation.Description = ...
-        'Simulation-based receiver with configurable RF impairments';
-
-    % --- Hardware Parameters (Detail-level, not scenario-level) ---
-    config.Factories.Receive.Simulation.Parameters.NoiseFigure.Min = 3;      % dB
-    config.Factories.Receive.Simulation.Parameters.NoiseFigure.Max = 10;     % dB
-    config.Factories.Receive.Simulation.Parameters.Sensitivity.Min = -110;   % dBm
-    config.Factories.Receive.Simulation.Parameters.Sensitivity.Max = -80;    % dBm
-    config.Factories.Receive.Simulation.Parameters.AntennaGain.Min = 0;      % dBi
-    config.Factories.Receive.Simulation.Parameters.AntennaGain.Max = 20;     % dBi
-
-    % --- Antenna types ---
-    config.Factories.Receive.Simulation.Antenna.Types = {'Omni', 'Parabolic', 'Array'};
-    config.Factories.Receive.Simulation.Antenna.Omni.Gain = [0, 6];
-    config.Factories.Receive.Simulation.Antenna.Omni.Height = [5, 30];
-    config.Factories.Receive.Simulation.Antenna.Parabolic.Diameter = [0.3, 5.0];
-    config.Factories.Receive.Simulation.Antenna.Parabolic.Efficiency = [0.45, 0.7];
-    config.Factories.Receive.Simulation.Antenna.Parabolic.Gain = [20, 40];
-    config.Factories.Receive.Simulation.Antenna.Array.NumElements = [2, 8];
-    config.Factories.Receive.Simulation.Antenna.Array.ElementSpacing = [0.4, 0.6];
-    config.Factories.Receive.Simulation.Antenna.Array.Geometry = {'ULA', 'URA'};
 
     % --- DCOffset (dB) ---
     config.Factories.Receive.Simulation.DCOffset = [-60, -40];
@@ -157,8 +136,4 @@ function config = receive_factory()
           0, 27.64,  5.59;
           5, 28.49, 12.03 ];
     config.Factories.Receive.Simulation.Nonlinearity.LookupTable = lt;
-
-    config.Factories.Receive.LogDetails = true;
-    config.Factories.Receive.Description = ...
-        'Receiver factory (class handles + hardware details)';
 end

@@ -9,8 +9,7 @@ tests/
 ├── run_all_tests.m         # Maintained regression test entry point
 ├── README.md               # This file
 ├── regression/             # End-to-end and targeted regression tests
-├── integration/            # Legacy matlab.unittest integration tests
-└── unit/                   # Legacy matlab.unittest unit tests
+└── unit/                   # matlab.unittest unit tests
 ```
 
 ## Regression Tests
@@ -59,5 +58,5 @@ matlab -batch "addpath(fullfile(pwd,'tests')); results = run_all_tests(); disp(r
 
 - Do not place new test scripts in the repository root.
 - Prefer `tests/regression/` for executable scenario and bug-regression scripts.
-- Use `tests/unit/` and `tests/integration/` for `matlab.unittest` class-based tests.
+- Use `tests/unit/` for `matlab.unittest` class-based tests.
 - Keep test fixtures local to the test that owns them unless reuse is necessary.

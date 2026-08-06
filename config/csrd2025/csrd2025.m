@@ -20,50 +20,19 @@ function config = csrd2025()
     % Runner configuration - matches initialize_csrd_configuration.m structure
     config.Runner.NumScenarios = 4; % Total number of scenarios to execute
     config.Runner.RandomSeed = 'shuffle'; % Random seed for reproducibility
-    config.Runner.SimulationMode = 'Scenario-Driven'; % Execution mode
-    config.Runner.ValidationLevel = 'Moderate'; % Validation strictness
 
     % Data Storage and Management Configuration
     config.Runner.Data.OutputDirectory = 'CSRD2025';
-    config.Runner.Data.SaveFormat = 'mat'; % File format
     config.Runner.Data.CompressData = true; % Enable data compression
-    config.Runner.Data.MetadataIncluded = true; % Include comprehensive metadata
-    config.Runner.Data.BackupEnabled = false; % Enable automatic backup
-    config.Runner.Data.MaxFileSize = '100MB'; % Maximum individual file size
-    config.Runner.Data.RetentionPolicy = 'Keep'; % Data retention policy
-    config.Runner.Data.VersionControl = true; % Enable version control
-    config.Runner.Data.ScenarioGrouping = true; % Group data by scenario
     config.Runner.Data.PrettyPrintAnnotations = false; % Compact JSON for production speed
-
-    % Parallel Processing Configuration
-    config.Runner.Parallel.UseParallel = false; % Enable parallel processing
-    config.Runner.Parallel.ScenarioDistribution = 'Auto'; % Distribution strategy
-    config.Runner.Parallel.MaxWorkers = 4; % Maximum number of workers
-    config.Runner.Parallel.LoadBalancing = 'Auto'; % Load balancing strategy
-    config.Runner.Parallel.MemoryManagement = 'Conservative'; % Memory strategy
-    config.Runner.Parallel.GPUAcceleration = false; % Enable GPU acceleration
-    config.Runner.Parallel.ClusterSupport = false; % Enable cluster processing
 
     % Engine Configuration
     config.Runner.Engine.Handle = 'csrd.core.ChangShuo';
-    config.Runner.Engine.ResetBetweenScenarios = true; % Reset engine state
-    config.Runner.Engine.CacheOptimization = true; % Enable caching
-    config.Runner.Engine.ErrorRecovery = 'Graceful'; % Error recovery strategy
-    config.Runner.Engine.PerformanceMonitoring = true; % Enable monitoring
-    config.Runner.Engine.InstancePerScenario = true; % Create new instance per scenario
 
     % Phase 21 performance tracing. Production default stays off; profiling
     % tools turn this on and write ignored artifacts/performance/phase21/.
     config.Runner.Performance.EnableStageTiming = false;
     config.Runner.Performance.ArtifactDirectory = fullfile('artifacts', 'performance', 'phase21');
-
-    % Quality Assurance Configuration
-    config.Runner.QualityAssurance.EnableValidation = true; % Enable validation
-    config.Runner.QualityAssurance.ToleranceLevel = 1e-6; % Numerical tolerance
-    config.Runner.QualityAssurance.StatisticalChecks = true; % Enable statistical validation
-    config.Runner.QualityAssurance.ReferenceComparison = false; % Enable reference comparison
-    config.Runner.QualityAssurance.AutoCorrection = false; % Enable auto correction
-    config.Runner.QualityAssurance.ScenarioValidation = true; % Enable scenario validation
 
     % Global logging policy.
     config.Logging.Name = 'CSRD';

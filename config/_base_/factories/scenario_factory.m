@@ -29,7 +29,6 @@ function config = scenario_factory()
     %% ═══════════════════════════════════════════════════════════════════════
     %%                           METADATA
     %% ═══════════════════════════════════════════════════════════════════════
-    config.Factories.Scenario.Description = 'Scenario blueprint configuration';
     config.Factories.Scenario.Version = '2025.3.0';
     config.Factories.Scenario.Architecture = 'Blueprint-Factory';
     
@@ -77,7 +76,6 @@ function config = scenario_factory()
     % --- Statistical Scene Configuration ---
     % Virtual scene with statistical channel modeling
     config.Factories.Scenario.PhysicalEnvironment.Map.Statistical.Boundaries = [-2000, 2000, -2000, 2000]; % [xmin, xmax, ymin, ymax] meters
-    config.Factories.Scenario.PhysicalEnvironment.Map.Statistical.Resolution = 100;  % meters per grid cell
     config.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel = 'Statistical';  % Uses statistical fading models
     
     % --- OSM Scene Configuration ---
@@ -97,23 +95,14 @@ function config = scenario_factory()
     % --- Entity Counts (Scenario-level) ---
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Max = 8;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Height.Min = 10;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Height.Max = 100;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.InitialDistribution = 'Random';
-    
+
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.Model = 'ConstantVelocity';
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.MaxSpeed.Min = 0;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.MaxSpeed.Max = 30;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.AccelerationRange = [-2, 2];
-    
+
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Min = 1;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 4;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Height.Min = 5;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Height.Max = 50;
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.InitialDistribution = 'Random';
-    
+
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Mobility.Model = 'Stationary';
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Mobility.MaxSpeed.Min = 0;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Mobility.MaxSpeed.Max = 0;
     
     % --- Environment ---
@@ -128,9 +117,7 @@ function config = scenario_factory()
     config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.HumidityRange = [0, 100];
     config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.PressureRange = [900, 1100];
     config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Constraints.WindSpeedRange = [0, 50];
-    
-    config.Factories.Scenario.PhysicalEnvironment.Environment.Obstacles.Enable = true;
-    
+
     %% ═══════════════════════════════════════════════════════════════════════
     %%                    COMMUNICATION BEHAVIOR
     %% ═══════════════════════════════════════════════════════════════════════
@@ -168,12 +155,10 @@ function config = scenario_factory()
     % transmitter's service, RF channel, bandwidth, and modulation family are
     % selected from that region's spectrum catalog.
     config.Factories.Scenario.CommunicationBehavior.Regulatory.Enable = true;
-    config.Factories.Scenario.CommunicationBehavior.Regulatory.Region.Policy = 'Fixed';
     config.Factories.Scenario.CommunicationBehavior.Regulatory.Region.Fixed = 'CN';
     config.Factories.Scenario.CommunicationBehavior.Regulatory.ServiceTier = 'Tier1';
     config.Factories.Scenario.CommunicationBehavior.Regulatory.ExcludedServiceClasses = ...
         {'Radar', 'Radiolocation', 'Radionavigation'};
-    config.Factories.Scenario.CommunicationBehavior.Regulatory.MonitoringBand.Selection = 'WeightedByRegion';
     config.Factories.Scenario.CommunicationBehavior.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
     % Narrowband real-world services such as AM/land-mobile keep their
     % realistic occupied bandwidth, but the synthetic waveform sample rate
@@ -201,15 +186,11 @@ function config = scenario_factory()
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {...
         'Continuous', 'Burst', 'Scheduled', 'Random'};
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = [0.4, 0.3, 0.2, 0.1];
-    
-    config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Continuous.DutyCycle = 1.0;
-    
+
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.OnDuration.Min = 0.01;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.OnDuration.Max = 0.1;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.OffDuration.Min = 0.01;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.OffDuration.Max = 0.2;
-    config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.DutyCycle.Min = 0.1;
-    config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.DutyCycle.Max = 0.8;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.InitialDelay.Min = 0;
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.Burst.InitialDelay.Max = 0.5;
     
@@ -255,12 +236,9 @@ function config = scenario_factory()
     % (csrd.support.modulation.messageSourceForModulation):
     %   analog modulation (FM/PM/AM variants) -> Audio
     %   digital modulation (PSK/QAM/FSK/...)   -> RandomBit
-    % This list only documents the registered sources; it is no longer used
-    % to sample a source. MessageFactory looks up DETAILS from
-    % message_factory.m, and message length is CALCULATED from bandwidth and
-    % duration, not configured.
-    config.Factories.Scenario.CommunicationBehavior.Message.Types = {'RandomBit', 'Audio'};
-    
+    % Message length is CALCULATED from bandwidth and duration (bounds
+    % default in code; override via CommunicationBehavior.Message.Length).
+
     % ===================== TRANSMISSION PATTERN =====================
     config.Factories.Scenario.CommunicationBehavior.TransmissionPattern.DefaultType = 'Continuous';
     

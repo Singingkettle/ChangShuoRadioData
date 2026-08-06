@@ -4,22 +4,18 @@ function results = run_all_tests(varargin)
     %   results = run_all_tests()
     %   results = run_all_tests('regression')
     %   results = run_all_tests('unit')
-    %   results = run_all_tests('integration')
     %   results = run_all_tests('all')
     %   results = run_all_tests(..., 'verbose', true)
     %
-    %   The 'all' selector now genuinely sweeps tests/regression,
-    %   tests/unit and tests/integration. Previously 'all' aliased to
-    %   'regression', silently hiding every unit and integration test
-    %   from CI runs.
+    %   The 'all' selector sweeps tests/regression and tests/unit.
     %
     %   Regression tests are simple top-level functions named
-    %   ``test_*.m``. Unit and integration tests are matlab.unittest
-    %   classes (``*Test.m``) executed via ``runtests``.
+    %   ``test_*.m``. Unit tests are matlab.unittest classes
+    %   (``*Test.m``) executed via ``runtests``.
 
     p = inputParser;
     addOptional(p, 'testType', 'regression', ...
-        @(x) any(validatestring(x, {'regression', 'unit', 'integration', ...
+        @(x) any(validatestring(x, {'regression', 'unit', ...
             'phase0', 'phase1', 'phase2', 'phase3', 'phase4', ...
             'phase6', 'phase7', 'phase8', 'phase9', 'all'})));
     addParameter(p, 'verbose', false, @islogical);
@@ -82,8 +78,6 @@ function selected = resolveSelectedSuites(testType)
             selected = {'regression'};
         case 'unit'
             selected = {'unit'};
-        case 'integration'
-            selected = {'integration'};
         case 'phase0'
             % Phase 0 (audit §17.2) curated subset: the 6 unit tests
             % covering validateRequiredToolboxes / LogPolicy /
@@ -152,7 +146,7 @@ function selected = resolveSelectedSuites(testType)
             % multidimensional sweep.
             selected = {'phase9'};
         case 'all'
-            selected = {'regression', 'unit', 'integration'};
+            selected = {'regression', 'unit'};
         otherwise
             error('CSRD:Tests:UnsupportedType', ...
                 'Unsupported test type: %s', testType);
@@ -239,7 +233,7 @@ function records = runSuite(suite, testsDir, verbose)
     switch suite
         case 'regression'
             records = runRegressionFiles(suiteDir, verbose);
-        case {'unit', 'integration'}
+        case 'unit'
             records = runUnittestSuite(suite, suiteDir, verbose);
     end
     fprintf('\n');

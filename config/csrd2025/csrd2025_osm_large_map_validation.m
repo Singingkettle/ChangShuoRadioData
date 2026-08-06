@@ -22,18 +22,10 @@ function config = csrd2025_osm_large_map_validation()
 
     config.Runner.NumScenarios = 1;
     config.Runner.RandomSeed = 20260507;
-    config.Runner.SimulationMode = 'Phase26-SpecificOsmMapValidation';
-    config.Runner.ValidationLevel = 'Strict';
     config.Runner.Toolbox.Level = 'minimal';
 
     config.Runner.Data.OutputDirectory = 'CSRD2025_osm_large_map_validation';
-    config.Runner.Data.SaveFormat = 'mat';
     config.Runner.Data.CompressData = false;
-    config.Runner.Data.MetadataIncluded = true;
-    config.Runner.Data.BackupEnabled = false;
-    config.Runner.Data.RetentionPolicy = 'Keep';
-    config.Runner.Data.VersionControl = false;
-    config.Runner.Data.ScenarioGrouping = true;
     config.Runner.Data.PrettyPrintAnnotations = false;
 
     config.Runner.Performance.EnableStageTiming = true;
@@ -58,15 +50,12 @@ function config = csrd2025_osm_large_map_validation()
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Min = 1;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Count.Max = 1;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.Model = 'Stationary';
-    config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.MaxSpeed.Min = 0;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Transmitters.Mobility.MaxSpeed.Max = 0;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Min = 1;
     config.Factories.Scenario.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
     config.Factories.Scenario.CommunicationBehavior.Receiver.NumAntennas = 1;
     config.Factories.Scenario.CommunicationBehavior.Transmitter.NumAntennas.Min = 1;
     config.Factories.Scenario.CommunicationBehavior.Transmitter.NumAntennas.Max = 1;
-    config.Factories.Scenario.CommunicationBehavior.Regulatory.MonitoringBand.Selection = 'Fixed';
-    config.Factories.Scenario.CommunicationBehavior.Regulatory.MonitoringBand.Fixed = 'CN_ISM_24';
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
     config.Factories.Scenario.CommunicationBehavior.TemporalBehavior.PatternDistribution = 1;
 

@@ -4,7 +4,7 @@ function test_phase6_performance_diagnostics()
 here = fileparts(mfilename('fullpath'));
 projectRoot = fileparts(fileparts(here));
 addpath(projectRoot);
-addpath(fullfile(projectRoot, 'tools', 'phase6'));
+addpath(fullfile(projectRoot, 'tools', 'diagnostics'));
 
 outDir = tempname;
 cleanup = onCleanup(@() localRemoveDir(outDir));

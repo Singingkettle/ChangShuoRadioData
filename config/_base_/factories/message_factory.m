@@ -16,15 +16,10 @@ function config = message_factory()
     %   │   └── Audio              % Analog modulation - audio file source
     %   └── Description
 
-    %% ========== COMMON PARAMETERS ==========
-    % NOTE: MessageLength is CALCULATED based on symbol rate and transmission duration!
-    %   MessageLength ≈ SymbolRate × BitsPerSymbol × TransmissionDuration
-    % These are constraints/limits for the calculation result
-    
-    config.Factories.Message.Parameters.Length.Min = 64;       % Minimum bits (lower bound)
-    config.Factories.Message.Parameters.Length.Max = 65536;    % Maximum bits (upper bound, memory limit)
-
     %% ========== MESSAGE SOURCE TYPES ==========
+    % NOTE: MessageLength is CALCULATED based on symbol rate and transmission
+    % duration (bounds default in code; override via
+    % Factories.Scenario.CommunicationBehavior.Message.Length).
 
     % RandomBit configuration (for digital modulation)
     % Note: RandomBit class properties: BitProbability, Seed, OutputOrientation, EnableStatistics
@@ -35,8 +30,4 @@ function config = message_factory()
     % Note: AudioFile defaults to the built-in audio file if not specified
     config.Factories.Message.MessageTypes.Audio.handle = 'csrd.blocks.physical.message.Audio';
     % Don't pass AudioFile - let Audio class use its default
-
-    %% ========== METADATA ==========
-    config.Factories.Message.LogDetails = true;
-    config.Factories.Message.Description = 'Message source factory (class handles + type-specific details)';
 end

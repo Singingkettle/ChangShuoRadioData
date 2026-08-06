@@ -125,8 +125,6 @@ classdef Logger < handle & matlab.mixin.SetGetExactNames & ...
 
     methods
         varargout = write(obj, varargin)
-        clearLog(obj)
-        openLogFile(obj)
     end
 
     methods (Access = protected)

@@ -30,10 +30,8 @@ function config = channel_factory()
 
     % Ray Tracing Channel (for 3D environment simulation)
     config.Factories.Channel.ChannelModels.RayTracing.handle = 'csrd.blocks.physical.channel.RayTracing';
-    config.Factories.Channel.ChannelModels.RayTracing.Config.Environment = 'Urban';
     config.Factories.Channel.ChannelModels.RayTracing.Config.MaxReflections = 3;
     config.Factories.Channel.ChannelModels.RayTracing.Config.FrequencyCarrier = 2.4e9; % Hz
-    config.Factories.Channel.ChannelModels.RayTracing.Config.NumRaysPerSource = 1000;
     config.Factories.Channel.ChannelModels.RayTracing.Config.UseGPU = 'auto';
     config.Factories.Channel.ChannelModels.RayTracing.Config.GpuMinSamples = 8192;
     % Geometry cache tolerance (meters) for RayTracing site/ray keys.

@@ -16,18 +16,10 @@ function config = csrd2025_osm_raytracing_validation()
 
     config.Runner.NumScenarios = 1;
     config.Runner.RandomSeed = 20260502;
-    config.Runner.SimulationMode = 'Phase16-OsmRayTracingValidation';
-    config.Runner.ValidationLevel = 'Strict';
     config.Runner.Toolbox.Level = 'minimal';
 
     config.Runner.Data.OutputDirectory = 'CSRD2025_osm_raytracing_validation';
-    config.Runner.Data.SaveFormat = 'mat';
     config.Runner.Data.CompressData = false;
-    config.Runner.Data.MetadataIncluded = true;
-    config.Runner.Data.BackupEnabled = false;
-    config.Runner.Data.RetentionPolicy = 'Keep';
-    config.Runner.Data.VersionControl = false;
-    config.Runner.Data.ScenarioGrouping = true;
 
     config.Logging.Name = 'CSRD-Phase16-OSM-RayTracing';
     config.Logging.Policy = 'Standard';

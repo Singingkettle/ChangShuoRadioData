@@ -19,12 +19,8 @@ function config = transmit_factory()
     %   etc.) live in scenario_factory.m / CommunicationBehavior, not
     %   here.
 
-    config.Factories.Transmit.Types = {'Simulation'};
-
     config.Factories.Transmit.Simulation.handle = ...
         'csrd.blocks.physical.txRadioFront.TRFSimulator';
-    config.Factories.Transmit.Simulation.Description = ...
-        'Simulation-based transmitter with configurable RF impairments';
 
     % --- DCOffset (dB) ---
     config.Factories.Transmit.Simulation.DCOffset = [-60, -40];
@@ -115,8 +111,4 @@ function config = transmit_factory()
           0, 27.64,  5.59;
           5, 28.49, 12.03 ];
     config.Factories.Transmit.Simulation.Nonlinearity.LookupTable = lt;
-
-    config.Factories.Transmit.LogDetails = true;
-    config.Factories.Transmit.Description = ...
-        'Transmitter factory configuration (RF impairment models)';
 end
