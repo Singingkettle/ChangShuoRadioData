@@ -68,9 +68,9 @@ rerun in this release-readiness path.
 
 ## Downstream Documentation
 
-- `docs/annotation-v2-schema.md`
-- `docs/examples/annotation-v2-downstream.md`
-- `examples/read_annotation_v2_downstream.m`
+- `docs/annotation-schema.md`
+- `docs/examples/annotation-downstream.md`
+- `examples/read_annotation_downstream.m`
 
 ## Remaining Backlog
 
