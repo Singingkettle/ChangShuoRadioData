@@ -1,9 +1,9 @@
-function results = run_phase6_performance_diagnostics(varargin)
-%RUN_PHASE6_PERFORMANCE_DIAGNOSTICS Read-only Phase 6 performance report.
+function results = run_csrd_performance_diagnostics(varargin)
+%RUN_CSRD_PERFORMANCE_DIAGNOSTICS Read-only Phase 6 performance report.
 % Inputs: see signature arguments and local validation.
 % Outputs: see signature return values and contract fields.
 %
-%   RESULTS = run_phase6_performance_diagnostics() reads the frozen
+%   RESULTS = run_csrd_performance_diagnostics() reads the frozen
 %   final-v04 baseline and the Phase 4 reference baseline, checks that
 %   correctness gates remain intact, and reports performance watch items.
 %
