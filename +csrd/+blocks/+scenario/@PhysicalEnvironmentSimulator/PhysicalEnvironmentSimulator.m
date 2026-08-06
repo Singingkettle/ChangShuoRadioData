@@ -231,9 +231,6 @@ classdef PhysicalEnvironmentSimulator < matlab.System
         config = getDefaultConfiguration(obj)
 
         % Map-related utility methods
-        features = loadOSMFeatures(obj)
-        grid = createGridMap(obj)
-        features = loadCustomFeatures(obj)
         weather = updateWeatherConditions(obj, currentWeather, deltaTime)
         obstacles = updateDynamicObstacles(obj, currentObstacles, deltaTime)
 
