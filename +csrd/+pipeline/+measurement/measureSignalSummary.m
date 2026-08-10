@@ -15,43 +15,27 @@ addParameter(p, 'Percentage', 99, ...
 addParameter(p, 'PeakRelativeDb', -3, ...
     @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x < 0);
 addParameter(p, 'EnvelopeOptions', struct(), @(x) isempty(x) || isstruct(x));
-% A combined multi-emitter frame legitimately occupies the whole capture band,
-% so the single-emitter saturation test must not be applied to it.
-addParameter(p, 'SingleEmitter', true, @(x) islogical(x) && isscalar(x));
 parse(p, varargin{:});
 
 signalCol = localValidateAndCollapse(signal, sampleRate);
 sampleRate = double(sampleRate);
 
 summary = struct();
-% The Measured plane runs on post-channel, AWGN-loaded waveforms, so it uses the
-% three-tier resolution: the fine peak-relative estimate where it holds, a
-% noise-floor-subtracted estimate where the fine one has bridged the noise
-% floor, and an explicit 'Unresolved' verdict where neither can separate the
-% band. The Execution plane (obwActual) measures clean pre-channel waveforms and
-% deliberately stays on the pure peak-relative path.
-[obwHz, obwStatus, obwInfo] = csrd.pipeline.measurement.resolveOccupiedBandwidth( ...
+summary.OccupiedBandwidthHz = csrd.pipeline.measurement.peakRelativeObwCore( ...
     signalCol, sampleRate, double(p.Results.Percentage), ...
-    double(p.Results.PeakRelativeDb), p.Results.SingleEmitter);
-summary.OccupiedBandwidthHz = obwHz;
+    double(p.Results.PeakRelativeDb));
 summary.CenterFrequencyHz = localSpectrumCentroid(signalCol, sampleRate);
 envInfo = localDetectEnvelope(signalCol, sampleRate, p.Results.EnvelopeOptions);
 summary.TimeOccupancy = envInfo.TimeOccupancy;
 summary.Envelope = envInfo;
-if isfinite(observableBwHz) && isfinite(summary.OccupiedBandwidthHz)
+if isfinite(observableBwHz)
     summary.FrequencyOccupancy = csrd.pipeline.measurement.frequencyOccupancy( ...
         summary.OccupiedBandwidthHz, double(observableBwHz));
 else
-    % FrequencyOccupancy is a pure function of OccupiedBandwidthHz, so leaving it
-    % populated when the bandwidth is unresolved would publish the same claim in
-    % a different unit.
     summary.FrequencyOccupancy = NaN;
 end
-summary.MeasurementStatus = obwStatus;
+summary.MeasurementStatus = 'Measured';
 summary.MeasurementSemantics = '';
-summary.ObwEstimator = obwInfo.Estimator;
-summary.UnresolvedOccupiedBandwidthHz = obwInfo.UnresolvedBwHz;
-summary.SpectralPeakToNoiseFloorDb = obwInfo.PeakRelative.PeakToNoiseFloorDb;
 end
 
 function signalCol = localValidateAndCollapse(signal, sampleRate)
