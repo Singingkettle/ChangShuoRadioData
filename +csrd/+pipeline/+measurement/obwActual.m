@@ -134,8 +134,8 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
         case 'matlab-obw'
             bwHz = obw(double(signalCol), double(sampleRate), [], double(percentage));
         case 'peak-relative'
-            bwHz = computePeakRelativeObw(signalCol, double(sampleRate), ...
-                double(percentage), peakRelDb);
+            bwHz = csrd.pipeline.measurement.peakRelativeObwCore( ...
+                signalCol, double(sampleRate), double(percentage), peakRelDb);
         otherwise
             error('CSRD:Measurement:InvalidMethod', ...
                 'obwActual: unsupported Method "%s" (expected peak-relative | matlab-obw).', method);
@@ -143,152 +143,8 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 end
 
 
-% =====================================================================
-function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
-    %COMPUTEPEAKRELATIVEOBW Peak-relative-thresholded 99 %-energy OBW.
-    % Inputs: see signature arguments and local validation.
-    % Outputs: see signature return values and contract fields.
-    %
-    %   1. Compute a smoothed two-sided PSD with pwelch (Hamming window,
-    %      8 segments with 50 % overlap; deterministic).
-    %   2. peak = max(spec); threshold = peak * 10^(peakRelDb/10).
-    %      All bins below threshold are clipped to zero before the
-    %      energy-mass search. This decouples the OBW estimate from the
-    %      per-source noise level (clean modulator output vs noisy
-    %      receiver waveform converge for SNR >= 6 dB at -3 dBc).
-    %   3. Walk a sliding-window search to find the narrowest contiguous
-    %      band whose retained-bin energy >= percentage * total mass.
-
-    N = length(signalCol);
-    if N < 8
-        % Too short for pwelch's default 8-segment split; fall back to a
-        % single-segment FFT magnitude. Keeps short-signal unit tests
-        % equivalent to the previous implementation.
-        spec = abs(fftshift(fft(double(signalCol)))).^2;
-        fAxis = ((0:N-1)' - floor(N/2)) * (sampleRate / N);
-    else
-        winLen = max(64, 2 ^ floor(log2(N / 8)));
-        if winLen >= N
-            winLen = max(8, floor(N / 2));
-        end
-        overlap = floor(winLen / 2);
-        nfft = max(256, 2 ^ nextpow2(winLen));
-        [pxx, fAxis] = pwelch(double(signalCol), hamming(winLen), ...
-            overlap, nfft, sampleRate, 'centered');
-        spec = pxx(:);
-        fAxis = fAxis(:);
-    end
-
-    % pwelch (Welch's method) discards the trailing partial segment. A
-    % short burst that sits entirely in that discarded tail yields an
-    % all-zero windowed estimate even though the signal carries energy,
-    % which would mis-measure the occupied bandwidth as zero. Fall back to
-    % a whole-signal periodogram so every sample (including a late
-    % frame-tail burst) is counted. Mirrors measureSignalSummary so the two
-    % estimators stay equivalent.
-    if (isempty(spec) || sum(spec) <= 0) && sum(abs(double(signalCol)) .^ 2) > 0
-        spec = abs(fftshift(fft(double(signalCol)))) .^ 2;
-        fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
-    end
-
-    if isempty(spec) || sum(spec) <= 0
-        bwHz = 0;
-        return;
-    end
-
-    % Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
-    % narrowest-contiguous-span search below does not bridge the empty middle
-    % and inflate the OBW toward Fs. The span is invariant under the circular
-    % shift, so nothing is added back (fAxis is left unchanged).
-    spec = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
-
-    peakVal = max(spec);
-    if peakVal <= 0
-        bwHz = 0;
-        return;
-    end
-
-    % Primary estimate: peak-relative -3 dB clip then narrowest 99 %-energy band.
-    bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
-        peakVal * 10 ^ (peakRelDb / 10), pct);
-
-    % Collapse guard (mirrors measureSignalSummary so the two estimators stay
-    % equivalent). A flat occupied band a few dB below a single localized
-    % spectral spike -- short bursts (high spectral variance) or a frequency-
-    % selective channel peak -- makes the peak-relative threshold sit ABOVE the
-    % flat band and clip it away, collapsing the width to the spike's
-    % neighbourhood. Fall back to a noise-floor-relative estimate (robust
-    % low-percentile floor + 6 dB, which keeps the whole occupied band) only
-    % when the peak-relative result is implausibly narrow. The floor percentile
-    % must stay below the minimum noise fraction: an emitter may occupy up to
-    % MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving >=20% noise
-    % bins, so a 25th-percentile floor would land INSIDE a wideband occupied
-    % band and defeat the guard. The 10th percentile stays in the noise floor
-    % for occupancies up to 90% (mirrors measureSignalSummary).
-    floorThreshold = prctile(spec, 10) * 10 ^ (6 / 10);
-    bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
-    if bwFloor > 0 && bwHz < 0.3 * bwFloor
-        bwHz = bwFloor;
-    end
-end
-
-
-function bwHz = localSpanForThreshold(spec, fAxis, sampleRate, threshold, pct)
-    %LOCALSPANFORTHRESHOLD Narrowest contiguous band holding pct% of the energy
-    % left after zeroing bins below `threshold`.
-    denoised = spec;
-    denoised(denoised < threshold) = 0;
-
-    totalEnergy = sum(denoised);
-    if totalEnergy <= 0
-        % All bins fell below threshold (signal indistinguishable from
-        % the receiver-band noise floor). Report 0 Hz so the caller can
-        % surface an explicit MeasurementCompleteness failure rather
-        % than silently propagating Nyquist as a measurement.
-        bwHz = 0;
-        return;
-    end
-
-    targetMass = totalEnergy * (pct / 100);
-    nBins = numel(denoised);
-
-    % Find the narrowest contiguous bin range whose cumulative energy
-    % >= targetMass. Two-pointer scan: both edges advance monotonically
-    % so the inner search is O(N).
-    cumEnergy = cumsum(denoised);
-    bestSpan = nBins;
-    lBest = 1;
-    rBest = nBins;
-    rIdx = 1;
-    for lIdx = 1:nBins
-        if rIdx < lIdx
-            rIdx = lIdx;
-        end
-        while rIdx < nBins
-            spanEnergy = cumEnergy(rIdx) - cumEnergy(lIdx) + denoised(lIdx);
-            if spanEnergy >= targetMass
-                break;
-            end
-            rIdx = rIdx + 1;
-        end
-        spanEnergy = cumEnergy(rIdx) - cumEnergy(lIdx) + denoised(lIdx);
-        if spanEnergy >= targetMass
-            span = rIdx - lIdx + 1;
-            if span < bestSpan
-                bestSpan = span;
-                lBest = lIdx;
-                rBest = rIdx;
-            end
-        end
-    end
-
-    if nBins == 1
-        % A single nonzero sample is an impulse on the sample grid. Its
-        % discrete spectrum occupies the full observable Nyquist span, and
-        % this must match measureSignalSummary's short-signal semantics.
-        bwHz = sampleRate;
-    else
-        binWidth = median(diff(fAxis));
-        bwHz = double(max(0, (fAxis(rBest) - fAxis(lBest)) + abs(binWidth)));
-    end
-end
+% The peak-relative kernel and the span search now live in
+% csrd.pipeline.measurement.peakRelativeObwCore /
+% csrd.pipeline.measurement.narrowestEnergySpan so this estimator and
+% measureSignalSummary share one implementation instead of two copies that
+% had to be kept in sync by hand.

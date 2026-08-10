@@ -225,12 +225,17 @@ function hotspots = inspectStaticHotspots(projectRoot)
     % Outputs: see signature return values and contract fields.
 obwPath = fullfile(projectRoot, '+csrd', '+pipeline', '+measurement', ...
     'obwActual.m');
+% The peak-relative kernel (and therefore the pwelch dependency) lives in the
+% shared core that obwActual and measureSignalSummary both delegate to.
+obwCorePath = fullfile(projectRoot, '+csrd', '+pipeline', '+measurement', ...
+    'peakRelativeObwCore.m');
 rxPath = fullfile(projectRoot, '+csrd', '+core', '@ChangShuo', ...
     'private', 'processReceiverProcessing.m');
 rrfPath = fullfile(projectRoot, '+csrd', '+blocks', '+physical', ...
     '+rxRadioFront', 'RRFSimulator.m');
 
 obwCode = stripMatlabComments(fileread(obwPath));
+obwCoreCode = stripMatlabComments(fileread(obwCorePath));
 rxCode = stripMatlabComments(fileread(rxPath));
 rrfCode = stripMatlabComments(fileread(rrfPath));
 
@@ -238,8 +243,8 @@ framePlaneCalls = regexp(rxCode, 'computeFramePlaneCache\s*\(', 'match');
 hotspots = struct();
 hotspots.Success = true;
 hotspots.Items = [
-    makeHotspot('obwActualUsesPwelch', contains(obwCode, 'pwelch('), ...
-        obwPath, 'Measurement OBW currently depends on pwelch.')
+    makeHotspot('obwActualUsesPwelch', contains(obwCoreCode, 'pwelch('), ...
+        obwCorePath, 'Measurement OBW currently depends on pwelch.')
     makeHotspot('obwActualPeakRelativeDefault', ...
         contains(obwCode, '''PeakRelativeDb'', -3'), obwPath, ...
         'Peak-relative -3 dBc default is frozen by Phase 4/5 evidence.')

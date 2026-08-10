@@ -21,7 +21,7 @@ signalCol = localValidateAndCollapse(signal, sampleRate);
 sampleRate = double(sampleRate);
 
 summary = struct();
-summary.OccupiedBandwidthHz = localPeakRelativeObw( ...
+summary.OccupiedBandwidthHz = csrd.pipeline.measurement.peakRelativeObwCore( ...
     signalCol, sampleRate, double(p.Results.Percentage), ...
     double(p.Results.PeakRelativeDb));
 summary.CenterFrequencyHz = localSpectrumCentroid(signalCol, sampleRate);
@@ -62,138 +62,6 @@ else
 end
 end
 
-function bwHz = localPeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
-    % localPeakRelativeObw - CSRD MATLAB declaration.
-    % Inputs: see function signature and validation.
-    % Outputs: see return values and contract fields.
-N = length(signalCol);
-if N < 8
-    spec = abs(fftshift(fft(double(signalCol)))).^2;
-    fAxis = ((0:N-1)' - floor(N/2)) * (sampleRate / N);
-else
-    winLen = max(64, 2 ^ floor(log2(N / 8)));
-    if winLen >= N
-        winLen = max(8, floor(N / 2));
-    end
-    overlap = floor(winLen / 2);
-    nfft = max(256, 2 ^ nextpow2(winLen));
-    [pxx, fAxis] = pwelch(double(signalCol), hamming(winLen), ...
-        overlap, nfft, sampleRate, 'centered');
-    spec = pxx(:);
-    fAxis = fAxis(:);
-end
-
-% pwelch (Welch's method) discards the trailing partial segment of the
-% signal. A short burst that sits entirely in that discarded tail yields an
-% all-zero windowed estimate even though the signal carries energy, which
-% would mis-measure the occupied bandwidth as zero. Fall back to a
-% whole-signal periodogram so every sample (including a late frame-tail
-% burst) is counted.
-if (isempty(spec) || sum(spec) <= 0) && sum(abs(double(signalCol)) .^ 2) > 0
-    spec = abs(fftshift(fft(double(signalCol)))) .^ 2;
-    fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
-end
-
-if isempty(spec) || sum(spec) <= 0
-    bwHz = 0;
-    return;
-end
-
-% Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
-% narrowest-contiguous-span search does not bridge the empty middle and
-% inflate the OBW toward Fs. The span is invariant under the circular shift
-% (mirrors obwActual so the two estimators stay equivalent).
-spec = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
-
-peakVal = max(spec);
-if peakVal <= 0
-    bwHz = 0;
-    return;
-end
-
-% Primary estimate: narrowest band holding `pct` of the energy that survives a
-% peak-relative -3 dB clip. Tracks the signal and rejects the noise floor for
-% the common flat-spectrum case.
-bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
-    peakVal * 10 ^ (peakRelDb / 10), pct);
-
-% Collapse guard. When a signal has a flat occupied band a few dB below a
-% single localized spectral spike -- short bursts (low time-bandwidth product,
-% high spectral variance) or a frequency-selective channel peak -- the
-% peak-relative threshold sits ABOVE the flat band and clips it away,
-% collapsing the measured width to the spike's neighbourhood (e.g. a realized
-% ~17 MHz QAM measured at ~1.5 MHz). Detect that against a noise-floor-relative
-% estimate (threshold a fixed +6 dB above a robust low-percentile floor, which
-% keeps the whole occupied band) and fall back to it only when the
-% peak-relative result is implausibly narrow, so the common case is unchanged.
-% The floor percentile must stay BELOW the minimum noise fraction: an emitter
-% may occupy up to MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving
-% >=20% noise bins, so a 25th-percentile floor would land INSIDE a wideband
-% occupied band and defeat the guard (the floor estimate then collapses to the
-% spike just like the peak-relative one). The 10th percentile stays in the
-% noise floor for occupancies up to 90%.
-floorThreshold = prctile(spec, 10) * 10 ^ (6 / 10);
-bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
-if bwFloor > 0 && bwHz < 0.3 * bwFloor
-    bwHz = bwFloor;
-end
-end
-
-function bwHz = localSpanForThreshold(spec, fAxis, sampleRate, threshold, pct)
-    % localSpanForThreshold - narrowest contiguous band holding pct% of the
-    % energy left after zeroing bins below `threshold`.
-denoised = spec;
-denoised(denoised < threshold) = 0;
-
-totalEnergy = sum(denoised);
-if totalEnergy <= 0
-    bwHz = 0;
-    return;
-end
-
-targetMass = totalEnergy * (pct / 100);
-nBins = numel(denoised);
-cumEnergy = cumsum(denoised);
-bestSpan = nBins;
-lBest = 1;
-rBest = nBins;
-rIdx = 1;
-for lIdx = 1:nBins
-    if rIdx < lIdx
-        rIdx = lIdx;
-    end
-    while rIdx < nBins && localRangeMass(cumEnergy, lIdx, rIdx) < targetMass
-        rIdx = rIdx + 1;
-    end
-    if localRangeMass(cumEnergy, lIdx, rIdx) >= targetMass
-        span = rIdx - lIdx + 1;
-        if span < bestSpan
-            bestSpan = span;
-            lBest = lIdx;
-            rBest = rIdx;
-        end
-    end
-end
-
-if nBins == 1
-    bwHz = sampleRate;
-else
-    binWidth = median(diff(fAxis));
-    bwHz = max(0, (fAxis(rBest) - fAxis(lBest)) + abs(binWidth));
-end
-end
-
-function mass = localRangeMass(cumEnergy, lIdx, rIdx)
-    % localRangeMass - CSRD MATLAB declaration.
-    % Inputs: see function signature and validation.
-    % Outputs: see return values and contract fields.
-if lIdx <= 1
-    mass = cumEnergy(rIdx);
-else
-    mass = cumEnergy(rIdx) - cumEnergy(lIdx - 1);
-end
-end
-
 function fcHz = localSpectrumCentroid(signalCol, sampleRate)
     % localSpectrumCentroid - CSRD MATLAB declaration.
     % Inputs: see function signature and validation.
@@ -228,7 +96,7 @@ if peakVal <= 0
     fcHz = 0;
     return;
 end
-% Collapse guard (mirrors localPeakRelativeObw). When a localized spectral
+% Collapse guard (mirrors peakRelativeObwCore). When a localized spectral
 % spike sits a few dB above an otherwise-flat occupied band, the peak-relative
 % clip keeps only the spike and biases the centroid toward it. If the
 % peak-relative retained band is far narrower than a noise-floor-relative band
@@ -238,7 +106,7 @@ end
 peakThreshold = peakVal * 10 ^ (-3 / 10);
 % 10th-percentile floor (not 25th): an emitter may occupy up to 80% of the
 % band, so a 25th-percentile floor would land inside a wideband occupied band
-% and defeat the guard (mirrors localPeakRelativeObw / obwActual).
+% and defeat the guard (mirrors peakRelativeObwCore).
 floorThreshold = prctile(psd, 10) * 10 ^ (6 / 10);
 peakClipped = psd;
 peakClipped(peakClipped < peakThreshold) = 0;
