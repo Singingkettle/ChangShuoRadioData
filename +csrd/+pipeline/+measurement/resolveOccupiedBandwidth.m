@@ -24,10 +24,13 @@ function [bwHz, status, info] = resolveOccupiedBandwidth(signalCol, sampleRate, 
 %   1. Take the peak-relative estimate.
 %   2. If the robust estimator certifies itself AND reports a materially
 %      narrower band (< 0.70x), the fine estimate had bridged the noise floor;
-%      publish the robust value.
-%   3. If the robust estimator cannot certify itself AND the fine estimate has
-%      saturated (>= 0.85 of the sample rate, above the 0.8 emitter cap the
-%      generator enforces), then neither estimator resolved the band; report
+%      publish the robust value. A collapsed robust answer never reaches this
+%      test: lowSnrObw withholds its own certification when the span it found is
+%      only a couple of its analysis bins wide.
+%   3. If the robust estimator RAN and could not certify itself, the fine
+%      estimate has saturated (>= 0.85 of the sample rate, above the 0.8 emitter
+%      cap the generator enforces), and the fine estimate did not come from its
+%      own collapse guard, then neither estimator resolved the band; report
 %      'Unresolved' and let the caller null the affected scalars.
 %   Otherwise the two agree, or the robust one is dead while the fine one looks
 %   physically sane; publish the fine estimate.
@@ -69,7 +72,14 @@ function [bwHz, status, info] = resolveOccupiedBandwidth(signalCol, sampleRate, 
 
 % A robust value below this fraction of the fine value is a disagreement, not
 % resolution noise. Calibration: agreement cases sit at 0.83..1.18x; genuine
-% inflation drives the fraction to 0.11..0.37x.
+% inflation recoveries drive the fraction to 0.04..0.37x (the low end being a
+% very narrow emitter whose fine estimate bridged the whole capture band).
+%
+% There is deliberately NO lower bound here. Rejecting a collapsed robust value
+% is lowSnrObw's own job, via its minimum-resolved-bins self-assessment: a ratio
+% floor at this level cannot separate "narrow emitter recovered from a bridged
+% fine estimate" (0.04x, legitimate) from "robust estimator collapsed" (0.01x),
+% because both are small for the same arithmetic reason.
 DISAGREEMENT_FRACTION = 0.70;
 % Emitters are capped at Regulatory.MaxBandwidthFractionOfSampleRate = 0.8, so a
 % single-emitter reading at or above this fraction is the estimator having
@@ -112,7 +122,18 @@ if lowSnrInfo.Trustworthy && bwRobust > 0 && ...
     return;
 end
 
-if isSingleEmitter && ~lowSnrInfo.Trustworthy && ...
+% Tier 3 needs positive evidence AGAINST the fine estimate, not merely the
+% absence of a robust one. Two cases must keep their wide fine value:
+%   - the robust estimator declined to run (input too short to average), so it
+%     has said nothing. A one-sample impulse legitimately occupies the whole
+%     observable band, and that is a documented contract.
+%   - the fine estimator's own collapse guard produced the wide value. That is a
+%     deliberate floor-relative fallback for a flat occupied band under a
+%     localized spike, not a noise-bridging artifact, and tier 3 must not
+%     overrule it.
+robustWasEvaluated = ~strcmp(lowSnrInfo.ThresholdSource, 'not-evaluated');
+if isSingleEmitter && robustWasEvaluated && ~lowSnrInfo.Trustworthy && ...
+        ~peakInfo.CollapseGuardFired && ...
         bwPeak >= SATURATION_FRACTION * sampleRate
     info.UnresolvedBwHz = bwPeak;
     bwHz = NaN;

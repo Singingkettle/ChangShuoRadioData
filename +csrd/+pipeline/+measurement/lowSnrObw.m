@@ -56,21 +56,48 @@ function [bwHz, info] = lowSnrObw(signalCol, sampleRate, pct, peakRelDb)
 %                                 detection margin against the estimate's own
 %                                 statistical fluctuation
 %            .SurvivingFraction - fraction of bins above the threshold
-%            .ThresholdSource   - 'signal-limited' | 'noise-limited'
+%            .ThresholdSource   - 'signal-limited' | 'noise-limited' |
+%                                 'not-evaluated' (input too short to average)
 %            .NoiseFloorPsd     - the robust floor estimate that was subtracted
 %            .NumSegments       - K, the number of averaged Welch segments
 %
-%          Trustworthy = signal-limited OR (MarginDb >= 8 AND
-%          SurvivingFraction >= 0.02). The two constants come from the
-%          calibration above: 8 dB and 0.02 are the tightest pair that keeps the
-%          most accurate cases (360 of 388) while certifying none of the 122
-%          collapsed ones.
+%          Trustworthy = NumSegments >= 8
+%                        AND bwHz >= 4 analysis bins
+%                        AND (signal-limited
+%                             OR (MarginDb >= 8 AND SurvivingFraction >= 0.02)).
+%          The 8 dB / 0.02 pair comes from the calibration above: the tightest
+%          combination that keeps the most accurate cases (360 of 388) while
+%          certifying none of the 122 collapsed ones. The segment and bin floors
+%          were added afterwards, from real pipeline evidence that the
+%          calibration could not produce - see their comments below.
 %
 % See also: csrd.pipeline.measurement.peakRelativeObwCore
 %           csrd.pipeline.measurement.resolveOccupiedBandwidth
 
 MARGIN_DB_MIN = 8;
 SURVIVING_FRACTION_MIN = 0.02;
+% NUM_SEGMENTS_MIN guards the one assumption the calibration could not check:
+% it used full-frame continuous waveforms, where the segment count is ~255. A
+% per-source buffer clipped to a short burst can leave only a handful of
+% segments, and then the 4*N0/sqrt(K) term is so large that the answer collapses
+% to one or two bins -- while `signal-limited` still certifies it, because a
+% strong burst does put the residual peak above that huge threshold. Below this
+% many segments the trimmed noise floor and the 1/sqrt(K) term are both too
+% coarse to support a verdict. 8 segments matches the averaging the fine
+% estimator itself relies on; the calibrated cases all had ~255, so this floor
+% does not touch them.
+NUM_SEGMENTS_MIN = 8;
+% MIN_RESOLVED_BINS is the self-assessment that actually catches the collapse: an
+% occupied band narrower than a few of this estimator's OWN analysis bins has not
+% been resolved by it, whatever the threshold bookkeeping says. Measured on real
+% pipeline sources, collapsed answers were 0.5-2 bins wide (97.7 / 195.3 /
+% 390.6 kHz on a 195.3 kHz grid) while genuine low-SNR recoveries were 9-32 bins
+% (1.76-6.2 MHz). 4 bins sits between them with margin either way.
+%
+% This must be an ABSOLUTE bin count, not a fraction of the fine estimate: a very
+% narrow emitter legitimately recovers to ~0.04x of a fine value that has bridged
+% the whole capture band, so a ratio floor cannot tell that apart from a collapse.
+MIN_RESOLVED_BINS = 4;
 NOISE_TRIM_FACTOR = 3;
 NOISE_TRIM_ITERATIONS = 3;
 STATISTICAL_FLOOR_SIGMA = 4;
@@ -87,8 +114,12 @@ info = struct( ...
 N = length(signalCol);
 if N < 2 * WINDOW_LENGTH
     % Too short to buy meaningful averaging; the fine estimator is the better
-    % answer here and the caller keeps it.
+    % answer here and the caller keeps it. Report 'not-evaluated' rather than a
+    % failed verdict: the caller must be able to tell "this estimator declined to
+    % run" from "it ran and could not resolve the band", because only the latter
+    % is evidence against the fine estimate.
     bwHz = 0;
+    info.ThresholdSource = 'not-evaluated';
     return;
 end
 
@@ -136,10 +167,13 @@ threshold = max(signalThreshold, statisticalFloor);
 
 info.MarginDb = 10 * log10(peakResidual / max(noiseFloor / sqrt(numSegments), realmin));
 info.SurvivingFraction = sum(residual >= threshold) / numel(residual);
-info.Trustworthy = strcmp(info.ThresholdSource, 'signal-limited') || ...
-    (info.MarginDb >= MARGIN_DB_MIN && ...
-     info.SurvivingFraction >= SURVIVING_FRACTION_MIN);
-
 bwHz = csrd.pipeline.measurement.narrowestEnergySpan(residual, fAxis, ...
     sampleRate, threshold, pct);
+
+binWidthHz = sampleRate / nfft;
+info.Trustworthy = numSegments >= NUM_SEGMENTS_MIN && ...
+    bwHz >= MIN_RESOLVED_BINS * binWidthHz && ...
+    (strcmp(info.ThresholdSource, 'signal-limited') || ...
+     (info.MarginDb >= MARGIN_DB_MIN && ...
+      info.SurvivingFraction >= SURVIVING_FRACTION_MIN));
 end
