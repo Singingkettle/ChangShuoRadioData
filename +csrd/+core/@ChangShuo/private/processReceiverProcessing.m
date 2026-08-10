@@ -50,7 +50,15 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             else
                 rxScenarioConfig = obj.ScenarioConfig.Receivers(rxIdx);
             end
-            processedOutput = step(obj.Factories.Receive, combinedSignal, ...
+            % The receiver RF chain consumes the NOISY combined buffer (channel
+            % noise realized), while combinedSignal.Signal stays clean for the
+            % measured planes below. Everything the receiver adds on top
+            % (thermal noise, rx DC offset, rx IQ imbalance, ADC quantisation)
+            % is therefore downstream of every measurement, as is the channel
+            % noise -- which is the ordering the measured labels depend on.
+            receiverInput = combinedSignal;
+            receiverInput.Signal = combinedSignal.NoisySignal;
+            processedOutput = step(obj.Factories.Receive, receiverInput, ...
                 FrameId, rxInfo, rxScenarioConfig);
             if isfield(processedOutput, 'Signal')
                 [processedOutput.Signal, rxFrameGating] = ...
@@ -698,6 +706,13 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
 
     combinedSignal = struct();
     combinedSignal.Signal = complex(zeros(frameShape.NumSamples, 1));
+    % Two accumulators. `Signal` stays NOISE-FREE and is what both measured
+    % planes are computed from -- the dataset's labels are only valid measured on
+    % a clean waveform, because a noise floor inside the estimator's
+    % peak-relative clip inflates the published occupied bandwidth up to 6x at
+    % low SNR. `NoisySignal` carries the deferred channel noise and is what the
+    % receiver RF chain consumes and what gets saved as the frame the model sees.
+    combinedSignal.NoisySignal = complex(zeros(frameShape.NumSamples, 1));
     combinedSignal.Components = {};
     combinedSignal.FrameShape = frameShape;
 
@@ -728,6 +743,9 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
             if usableLen > 0
                 combinedSignal.Signal(idxStart:idxEnd) = ...
                     combinedSignal.Signal(idxStart:idxEnd) + compSig;
+                combinedSignal.NoisySignal(idxStart:idxEnd) = ...
+                    combinedSignal.NoisySignal(idxStart:idxEnd) + ...
+                    localRealizePendingChannelNoise(comp, compSig);
             end
             comp = localUpdateComponentSampleGrid( ...
                 comp, compSig, startOffset, frameShape.NumSamples, sampleRate);
@@ -736,6 +754,43 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
             combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
         end
     end
+end
+
+function noisySig = localRealizePendingChannelNoise(comp, compSig)
+    % localRealizePendingChannelNoise - add the channel noise this component owes.
+    % Inputs: comp - component struct, optionally carrying PendingChannelNoise
+    %           (PowerW at the antenna-collapsed scale, plus a burst-deterministic
+    %           Seed) planned by ChannelFactory.planChannelNoise;
+    %         compSig - the antenna-collapsed, frame-clipped CLEAN buffer.
+    % Outputs: noisySig - compSig plus the realized noise, or compSig unchanged
+    %           when the link owes no channel noise.
+    %
+    % This is the single channel-noise injection point in the pipeline. It runs
+    % after the measured planes are taken from the clean buffers, which is the
+    % whole point of the ordering: measuring after noise injection lets the noise
+    % floor cross the peak-relative clip and inflates the occupied-bandwidth
+    % label. Drawing one collapsed realization at the summed-scale power is
+    % statistically identical to summing per-antenna realizations, which is how
+    % the noise was realized before the reorder.
+    noisySig = compSig;
+    if ~isstruct(comp) || ~isfield(comp, 'PendingChannelNoise') || ...
+            ~isstruct(comp.PendingChannelNoise)
+        return;
+    end
+    pending = comp.PendingChannelNoise;
+    if ~isfield(pending, 'PowerW') || ~isnumeric(pending.PowerW) || ...
+            ~isscalar(pending.PowerW) || ~isfinite(pending.PowerW) || ...
+            pending.PowerW <= 0
+        return;
+    end
+    if ~isfield(pending, 'Seed') || ~isnumeric(pending.Seed) || ...
+            ~isscalar(pending.Seed) || ~isfinite(pending.Seed)
+        return;
+    end
+    rs = RandStream('mt19937ar', 'Seed', double(pending.Seed));
+    noiseStd = sqrt(double(pending.PowerW) / 2);
+    noisySig = compSig + noiseStd * ...
+        (randn(rs, size(compSig)) + 1i * randn(rs, size(compSig)));
 end
 
 function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)

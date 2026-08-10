@@ -219,6 +219,14 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                         component.ChannelSignalPowerW = NaN;
                         component.ChannelNoisePowerW = NaN;
                     end
+                    % Carry the OWED channel noise forward without realizing it.
+                    % The measured planes must be taken on a noise-free waveform,
+                    % so the single deferred injector adds this in
+                    % combineSignalComponents after both measurements. Absent
+                    % descriptor == this link owes no channel noise.
+                    if isfield(channelOutput, 'PendingChannelNoise')
+                        component.PendingChannelNoise = channelOutput.PendingChannelNoise;
+                    end
                     component = csrd.pipeline.signal.gateToDuration( ...
                         component, localComponentDurationSec(segmentSignal), ...
                         'ChannelOutput');

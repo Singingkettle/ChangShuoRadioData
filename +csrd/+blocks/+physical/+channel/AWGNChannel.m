@@ -222,36 +222,38 @@ classdef AWGNChannel < matlab.System
 
             signalPower = mean(abs(signalData(:)) .^ 2);
 
-            if signalPower == 0
-                noiseVariance = 1;
-            else
-                snrLinear = 10 ^ (obj.SNRdB / 10);
-                noiseVariance = signalPower / snrLinear;
-            end
-
-            noiseStdDev = sqrt(noiseVariance / 2);
-            realNoise = noiseStdDev * randn(obj.pRandomStream, size(signalData));
-            imagNoise = noiseStdDev * randn(obj.pRandomStream, size(signalData));
-            complexNoise = complex(realNoise, imagNoise);
-
-            noisySignal = signalData + complexNoise;
-
+            % NOISE IS NOT ADDED HERE.
+            %
+            % The dataset's ground truth lives on the measured plane, and the
+            % measurement must run on a noise-free waveform: measuring occupied
+            % bandwidth after noise injection lets the noise floor cross the
+            % estimator's peak-relative clip, which inflates the published label
+            % by up to 6x at low SNR and teaches a downstream spectrum-sensing
+            % model "low SNR => wide signal".
+            %
+            % So this block declares its target SNR and passes the waveform
+            % through unchanged. The single deferred injector realizes the noise
+            % after both measured planes have been taken (see
+            % ChannelFactory.planChannelNoise and combineSignalComponents in
+            % processReceiverProcessing). That also unifies the two historical
+            % injection sites -- this one and the post-propagation top-up in
+            % ChannelFactory -- which previously needed an `alreadyNoised` guard
+            % to arbitrate and kept two different power-bookkeeping scales.
             if isStructInput
                 output = inputSignal;
-                output.Signal = noisySignal;
-                output.AppliedSNRdB = obj.SNRdB;
             else
                 output = struct();
-                output.Signal = noisySignal;
-                output.AppliedSNRdB = obj.SNRdB;
+                output.Signal = signalData;
             end
-            % Realized signal and additive-noise powers (Watts) for the measured
-            % received-SNR GT: SNR = signal / (channel noise + receiver thermal
-            % noise). The AWGN channel adds noise here; the receiver thermal
-            % stage adds the rest downstream and the two are combined when the
-            % per-emitter SNR is measured.
+            output.AppliedSNRdB = obj.SNRdB;
+            % The target this block would have realized. The deferred injector
+            % sizes the noise from it, so an AWGN "channel" is now exactly what
+            % it always physically was: no propagation effect plus a target SNR.
+            output.ChannelDeclaredSnrDb = obj.SNRdB;
+            % Clean signal power for the measured received-SNR GT. Channel noise
+            % is filled in by the deferred injector.
             output.ChannelSignalPowerW = signalPower;
-            output.ChannelNoisePowerW = mean(abs(complexNoise(:)) .^ 2);
+            output.ChannelNoisePowerW = 0;
 
         end
 
