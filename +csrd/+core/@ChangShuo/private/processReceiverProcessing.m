@@ -450,9 +450,18 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         else
             sourcePlane.TimeOccupancy = bufferOccupancy;
         end
-        sourcePlane.FrequencyOccupancy = requireFiniteMeasurement( ...
-            summary.FrequencyOccupancy, ...
-            'Truth.Measured.SourcePlane.FrequencyOccupancy');
+        if strcmpi(sourcePlane.MeasurementStatus, 'Unresolved')
+            % FrequencyOccupancy is occupied bandwidth divided by the observable
+            % band, so it is unresolvable exactly when the bandwidth is. It must
+            % skip the finite-value contract for the same reason
+            % OccupiedBandwidthHz does above -- otherwise this hard-errors, the
+            % whole frame fails, and the scenario produces no annotation at all.
+            sourcePlane.FrequencyOccupancy = NaN;
+        else
+            sourcePlane.FrequencyOccupancy = requireFiniteMeasurement( ...
+                summary.FrequencyOccupancy, ...
+                'Truth.Measured.SourcePlane.FrequencyOccupancy');
+        end
     end
 
     measured.SourcePlane = sourcePlane;
