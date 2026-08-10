@@ -191,7 +191,26 @@ function [nSources, violations] = localCheckAnnotation(annotation, cohortName)
             tag = sprintf('%s/f%d/src%d', cohortName, fi, si);
             violations = [violations, ...
                 csrd.test_support.measuredPlausibilityViolations( ...
-                    src.Truth.Measured.SourcePlane, Fs, tag)]; %#ok<AGROW>
+                    src.Truth.Measured.SourcePlane, Fs, tag, ...
+                    localPlausibilityContext(src, src.Truth.Measured.SourcePlane))]; %#ok<AGROW>
         end
+    end
+end
+
+
+function ctx = localPlausibilityContext(src, sourcePlane)
+    % localPlausibilityContext - cross-plane inputs for the plausibility bounds.
+    %   Supplies Truth.Execution.ModulatedBandwidthHz (the same estimator run on
+    %   the clean pre-channel waveform) so the measured value can be checked
+    %   against the emitter's own bandwidth, plus the measurement status so an
+    %   explicitly unresolvable source is exempt from that comparison.
+    ctx = struct('ExecutionBwHz', NaN, 'MeasurementStatus', '');
+    if isstruct(src) && isfield(src, 'Truth') && isstruct(src.Truth) ...
+            && isfield(src.Truth, 'Execution') && isstruct(src.Truth.Execution) ...
+            && isfield(src.Truth.Execution, 'ModulatedBandwidthHz')
+        ctx.ExecutionBwHz = src.Truth.Execution.ModulatedBandwidthHz;
+    end
+    if isstruct(sourcePlane) && isfield(sourcePlane, 'MeasurementStatus')
+        ctx.MeasurementStatus = sourcePlane.MeasurementStatus;
     end
 end

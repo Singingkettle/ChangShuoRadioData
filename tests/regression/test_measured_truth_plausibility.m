@@ -102,7 +102,8 @@ function test_measured_truth_plausibility(varargin)
                     sourcesChecked = sourcesChecked + 1;
                     tag = sprintf('s%d/f%d/src%d', k, fi, si);
                     violations = [violations, ...
-                        csrd.test_support.measuredPlausibilityViolations(sp, Fs, tag)]; %#ok<AGROW>
+                        csrd.test_support.measuredPlausibilityViolations( ...
+                            sp, Fs, tag, localPlausibilityContext(src, sp))]; %#ok<AGROW>
                 end
             end
             scenariosRun = scenariosRun + 1;
@@ -152,3 +153,21 @@ end
 
 % Physical-bound checks live in csrd.test_support.measuredPlausibilityViolations
 % so this gate and the joint-dimension gate share one definition.
+
+
+function ctx = localPlausibilityContext(src, sourcePlane)
+    % localPlausibilityContext - cross-plane inputs for the plausibility bounds.
+    %   Supplies Truth.Execution.ModulatedBandwidthHz (the same estimator run on
+    %   the clean pre-channel waveform) so the measured value can be checked
+    %   against the emitter's own bandwidth, plus the measurement status so an
+    %   explicitly unresolvable source is exempt from that comparison.
+    ctx = struct('ExecutionBwHz', NaN, 'MeasurementStatus', '');
+    if isstruct(src) && isfield(src, 'Truth') && isstruct(src.Truth) ...
+            && isfield(src.Truth, 'Execution') && isstruct(src.Truth.Execution) ...
+            && isfield(src.Truth.Execution, 'ModulatedBandwidthHz')
+        ctx.ExecutionBwHz = src.Truth.Execution.ModulatedBandwidthHz;
+    end
+    if isstruct(sourcePlane) && isfield(sourcePlane, 'MeasurementStatus')
+        ctx.MeasurementStatus = sourcePlane.MeasurementStatus;
+    end
+end
