@@ -199,15 +199,31 @@ function validateMeasurementCompleteness(annotation)
 
             % Phase 4 (audit §3.7.D test (b)/(c)): at-least-one-finite
             % rule for OccupiedBandwidthHz across the two planes.
+            %
+            % The rule only applies when both planes still CLAIM to be
+            % measurements. A plane whose MeasurementStatus is 'Unresolved' or
+            % 'NoSignal' is asserting the opposite -- that its scalars are not
+            % labels -- so a NaN there is the contract being honoured, not a
+            % measurement subsystem failure.
+            %
+            % This distinction is load-bearing. CSRD:Annotation:* identifiers are
+            % whitelisted by isScenarioSkipException, so raising here does not
+            % merely fail a source: it drops the WHOLE SCENARIO silently. Left
+            % unrelaxed, marking low-SNR sources unresolvable would quietly
+            % delete them from the dataset -- a worse and far less visible bias
+            % than the inflated bandwidths the status was introduced to replace.
             sourceOk = isFiniteNonNegativeScalar(sourcePlane.OccupiedBandwidthHz);
             frameOk  = isFiniteNonNegativeScalar(framePlane.OccupiedBandwidthHz);
-            if ~sourceOk && ~frameOk
+            sourceClaims = localClaimsMeasurement(sourcePlane);
+            frameClaims  = localClaimsMeasurement(framePlane);
+            if ~sourceOk && ~frameOk && sourceClaims && frameClaims
                 error('CSRD:Annotation:MeasurementIncomplete', ...
                     ['validateMeasurementCompleteness: SignalSources(%d) ', ...
                      'at %s has BOTH planes with non-finite ', ...
-                     'OccupiedBandwidthHz; the measurement subsystem ', ...
-                     'must produce a finite, non-negative value on at ', ...
-                     'least one plane (audit §3.7.D).'], sIdx, carrier.Path);
+                     'OccupiedBandwidthHz while both still report ', ...
+                     'MeasurementStatus=''Measured''; the measurement ', ...
+                     'subsystem must produce a finite, non-negative value on ', ...
+                     'at least one plane (audit §3.7.D).'], sIdx, carrier.Path);
             end
         end
     end
@@ -301,5 +317,20 @@ function out = normaliseSignalSources(value)
         out = {};
     else
         out = {value};
+    end
+end
+
+function tf = localClaimsMeasurement(plane)
+    % localClaimsMeasurement - does this plane assert its scalars are labels?
+    % Inputs: plane - a Truth.Measured plane struct.
+    % Outputs: tf - true unless MeasurementStatus explicitly disclaims the
+    %   measurement ('NoSignal' or 'Unresolved'). A missing status is treated as
+    %   a claim, so the historical strict behaviour is preserved for any producer
+    %   that does not set it.
+    tf = true;
+    if isstruct(plane) && isfield(plane, 'MeasurementStatus') && ...
+            ~isempty(plane.MeasurementStatus)
+        status = lower(char(string(plane.MeasurementStatus)));
+        tf = ~ismember(status, {'nosignal', 'unresolved'});
     end
 end
