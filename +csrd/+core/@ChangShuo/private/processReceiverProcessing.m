@@ -362,6 +362,47 @@ function execution = buildExecutionTruth(comp)
     validateExecutionSampleGrid(execution, comp);
 end
 
+function summary = localMeasurePerAntenna(signal, sampleRate, observableBwHz, priorWindowHz)
+    % localMeasurePerAntenna - measure one emitter per antenna, then aggregate.
+    % Inputs: signal - [samples x antennas] isolated emitter buffer (noise-free);
+    %         sampleRate, observableBwHz - receiver facts;
+    %         priorWindowHz - blueprint prior search window or [].
+    % Outputs: summary - measureSignalSummary-shaped struct whose bandwidth is the
+    %         MAX across antennas, matching the Execution plane's obwAntennaMax
+    %         rule so the two planes are directly comparable.
+    %
+    % Antennas are measured separately on purpose: they carry independently faded
+    % copies of the same emission, so a sum would report the interference pattern
+    % between them rather than the emitter's occupied bandwidth. The remaining
+    % scalars come from the widest antenna, so every published number describes
+    % one physical stream instead of a mixture.
+    if size(signal, 2) <= 1
+        summary = csrd.pipeline.measurement.measureSignalSummary( ...
+            signal, sampleRate, observableBwHz, 'PriorWindowHz', priorWindowHz);
+        return;
+    end
+    best = [];
+    bestBw = -Inf;
+    for col = 1:size(signal, 2)
+        s = csrd.pipeline.measurement.measureSignalSummary( ...
+            signal(:, col), sampleRate, observableBwHz, ...
+            'PriorWindowHz', priorWindowHz);
+        if isfinite(s.OccupiedBandwidthHz) && s.OccupiedBandwidthHz > bestBw
+            bestBw = s.OccupiedBandwidthHz;
+            best = s;
+        end
+    end
+    if isempty(best)
+        % No antenna produced a usable bandwidth; fall back to the first stream so
+        % the caller's existing failure handling still sees a well-formed struct.
+        summary = csrd.pipeline.measurement.measureSignalSummary( ...
+            signal(:, 1), sampleRate, observableBwHz, ...
+            'PriorWindowHz', priorWindowHz);
+        return;
+    end
+    summary = best;
+end
+
 function value = localStructNumber(s, fieldName)
     % localStructNumber - finite numeric scalar from a struct field, else NaN.
     % Inputs: s - struct (or anything); fieldName - char field name.
@@ -483,10 +524,20 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         % exactly as a spectrum-analyser operator sets centre and span from the
         % drawings before reading the occupied bandwidth off the instrument.
         priorWindowHz = localBlueprintPriorWindow(comp, sampleRate);
+        % Measure this emitter on its OWN antenna streams, never on a sum. For
+        % MIMO the per-antenna copies are independently faded, so summing them
+        % first fabricates notches and reports a spectrum no transmitter emitted.
+        % Aggregating with max across antennas is what Truth.Execution already
+        % does (csrd.pipeline.measurement.obwAntennaMax), which is what makes the
+        % two planes directly comparable.
+        measurementSignal = isolatedSignal;
+        if isfield(comp, 'SignalPerAntenna') && ~isempty(comp.SignalPerAntenna) && ...
+                size(comp.SignalPerAntenna, 1) == size(isolatedSignal, 1)
+            measurementSignal = comp.SignalPerAntenna;
+        end
         summary = guardedMeasurement(@() ...
-            csrd.pipeline.measurement.measureSignalSummary( ...
-                isolatedSignal, sampleRate, observableBwHz, ...
-                'PriorWindowHz', priorWindowHz), ...
+            localMeasurePerAntenna(measurementSignal, sampleRate, ...
+                observableBwHz, priorWindowHz), ...
             'CSRD:Measurement:SourceOBWFailed');
         sourcePlane.OccupiedBandwidthHz = requirePositiveMeasurement( ...
             summary.OccupiedBandwidthHz, ...
@@ -799,6 +850,13 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
         comp = signalComponents{compIdx};
         if isfield(comp, 'Signal') && ~isempty(comp.Signal)
             startOffset = localFrameStartOffset(comp, sampleRate, frameShape.NumSamples);
+            % Keep the PRE-COLLAPSE per-antenna buffer for measurement. The GT is
+            % measured per transmitter and, for MIMO, per antenna: antennas see
+            % independently faded copies, and summing them first creates deep
+            % notches that change the spectrum into something no emitter actually
+            % transmitted. The summed stream is still what the receiver records,
+            % so it stays the signal that is combined and saved.
+            compSigPerAntenna = comp.Signal;
             compSig = localCollapseAntennaSignal(comp.Signal);
             if startOffset >= frameShape.NumSamples
                 comp = localUpdateComponentSampleGrid( ...
@@ -812,6 +870,9 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
                 usableLen = 0;
             end
             compSig = compSig(1:usableLen, :);
+            if ~isempty(compSigPerAntenna)
+                compSigPerAntenna = compSigPerAntenna(1:min(usableLen, size(compSigPerAntenna, 1)), :);
+            end
             idxStart = startOffset + 1;
             idxEnd = startOffset + usableLen;
             if usableLen > 0
@@ -823,6 +884,7 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
             end
             comp = localUpdateComponentSampleGrid( ...
                 comp, compSig, startOffset, frameShape.NumSamples, sampleRate);
+            comp.SignalPerAntenna = compSigPerAntenna;
             combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
         else
             combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
