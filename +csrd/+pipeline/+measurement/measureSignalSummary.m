@@ -42,13 +42,17 @@ else
 end
 summary.MeasurementStatus = 'Measured';
 summary.MeasurementSemantics = '';
-% Plan-relative diagnostics. A measurement that filled its own prior window is
-% suspect for a different reason than a noisy one: it means the window, not the
-% signal, set the answer. Published so that condition is auditable instead of
-% invisible.
+% Plan-relative diagnostics. The prior never bounds the reported bandwidth (the
+% window grows until the measurement stops growing), so these describe how far
+% the REALIZATION departed from the blueprint -- a plan-quality signal, not a
+% measurement fault. PriorWindowGrowths > 0 means the realized emitter ran past
+% the band the plan placed it in, or the plan was misplaced; Converged == false
+% means even the growth cap did not settle it and the value is the full-band
+% measurement.
 summary.PriorWindowApplied = obwInfo.PriorWindowApplied;
 summary.PriorWindowFillRatio = obwInfo.PriorWindowFillRatio;
-summary.TouchesPriorEdge = obwInfo.TouchesPriorEdge;
+summary.PriorWindowGrowths = obwInfo.PriorWindowGrowths;
+summary.PriorWindowConverged = obwInfo.PriorWindowConverged;
 end
 
 function signalCol = localValidateAndCollapse(signal, sampleRate)

@@ -73,8 +73,14 @@ function [bwHz, info] = peakRelativeObwCore(signalCol, sampleRate, pct, peakRelD
 %                                  the plan-relative signal that the measurement
 %                                  was clipped by its own window rather than by
 %                                  the signal
-%            .TouchesPriorEdge   - true when the retained band reaches a window
-%                                  edge bin
+%            .PriorWindowGrowths - how many times the window had to be doubled
+%                                  before the measurement stopped growing.
+%                                  Non-zero means the realization ran past the
+%                                  blueprint (or the blueprint was misplaced),
+%                                  which is a plan-quality signal, not a
+%                                  measurement fault
+%            .PriorWindowConverged - true when growth converged rather than
+%                                  hitting the attempt cap
 %
 % See also: csrd.pipeline.measurement.obwActual
 %           csrd.pipeline.measurement.measureSignalSummary
@@ -93,7 +99,8 @@ info = struct( ...
     'PriorWindowApplied', false, ...
     'PriorWindowHz', [], ...
     'PriorWindowFillRatio', NaN, ...
-    'TouchesPriorEdge', false);
+    'PriorWindowGrowths', 0, ...
+    'PriorWindowConverged', false);
 
 N = length(signalCol);
 if N < 8
@@ -137,86 +144,178 @@ end
 % so nothing is added back (fAxis is left unchanged).
 [spec, fcShiftHz] = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
 
-% Restrict the search to the prior window BEFORE the peak is taken, so neither
-% the clip level nor the span search can be influenced by energy outside the band
-% the blueprint says this emitter occupies.
+% Plan-as-prior, with the PLAN NEVER BOUNDING THE ANSWER.
 %
-% The window arrives in TRUE receiver-baseband frequency, but the recentre above
-% circularly shifted `spec` while leaving `fAxis` untouched. A SPAN is invariant
-% under that shift (which is why nothing is added back for bwHz), but an ABSOLUTE
-% window is not: true frequency = shifted-axis frequency + fcShiftHz, so the
-% window must be moved onto the shifted axis before selecting bins. Getting this
-% wrong would silently mask the wrong part of the spectrum for exactly the
-% edge-straddling emitters the recentre exists to handle.
-inWindow = true(size(spec));
+% The ground truth must reflect what was actually realized, not what was planned:
+% execution legitimately deviates from the blueprint, and a label clipped to a
+% plan-derived window would be reporting the plan. So the window is used only to
+% LOCATE the emitter -- it keeps the span search from bridging to energy that is
+% not this emitter's -- and it is GROWN whenever the measured band reaches its
+% edge, because touching the edge is the signature of the window, not the signal,
+% having set the answer. Growth continues until the answer is interior or the
+% window covers the whole capture, at which point the result is exactly the
+% historical full-band measurement.
+specFull = spec;
+searchWindowHz = [];
 if ~isempty(priorWindowHz) && numel(priorWindowHz) == 2 && ...
         all(isfinite(priorWindowHz)) && priorWindowHz(2) > priorWindowHz(1)
-    shiftedWindow = [priorWindowHz(1), priorWindowHz(2)] - fcShiftHz;
-    candidate = fAxis >= shiftedWindow(1) & fAxis <= shiftedWindow(2);
-    if any(candidate) && any(spec(candidate) > 0)
-        inWindow = candidate;
-        spec(~inWindow) = 0;
-        info.PriorWindowApplied = true;
-        info.PriorWindowHz = [priorWindowHz(1), priorWindowHz(2)];
+    % The recentre above circularly shifted `spec` while leaving fAxis untouched.
+    % A SPAN is invariant under that shift (which is why nothing is added back for
+    % bwHz) but an ABSOLUTE window is not, so map the window onto the shifted
+    % axis. Getting this wrong would mask the wrong bins for exactly the
+    % edge-straddling emitters the recentre exists to handle.
+    searchWindowHz = [priorWindowHz(1), priorWindowHz(2)] - fcShiftHz;
+end
+
+% Grow the window until the ANSWER STOPS GROWING. That, not an edge test, is the
+% operational definition of "the data set the extent": if doubling the window
+% still widens the measurement, the window was the binding constraint, so it must
+% not be the one reported. Convergence means the emitter's own spectrum ended
+% before the window did.
+%
+% This also repairs a misplaced prior. A window that happens to sit on sidelobe
+% leakage away from the emitter would otherwise return a fabricated narrow label;
+% under growth the answer keeps increasing until the real lobe is inside, and the
+% converged value is the honest full-band one.
+MAX_WINDOW_GROWTHS = 10;
+GROWTH_TOLERANCE = 0.02;   % <2% change counts as converged
+
+bwHz = 0;
+converged = false;
+for growth = 0:MAX_WINDOW_GROWTHS
+    [candidateBw, candidateInfo, windowWidthHz] = localMeasureInWindow( ...
+        specFull, fAxis, sampleRate, pct, peakRelDb, searchWindowHz, fcShiftHz);
+    if candidateBw <= 0 && growth == 0
+        bwHz = 0;
+        info = localMergeWindowInfo(info, candidateInfo, growth);
+        return;
     end
-    % A window that excludes every bin, or contains no energy at all, is not
-    % applied: that would turn a plan/measurement mismatch into a silent zero
-    % instead of a visible one. The full-band answer is reported and the
-    % diagnostics record that no window took effect.
+    grew = candidateBw > bwHz * (1 + GROWTH_TOLERANCE);
+    bwHz = max(bwHz, candidateBw);
+    info = localMergeWindowInfo(info, candidateInfo, growth);
+    if ~grew
+        converged = true;
+        break;
+    end
+    if isempty(searchWindowHz) || windowWidthHz >= sampleRate
+        % Already the whole capture; there is nothing left to grow into and the
+        % answer is the historical full-band measurement.
+        converged = true;
+        break;
+    end
+    centreHz = 0.5 * (searchWindowHz(1) + searchWindowHz(2));
+    halfHz = min(windowWidthHz, sampleRate / 2);
+    searchWindowHz = [centreHz - halfHz, centreHz + halfHz];
 end
-
-peakVal = max(spec);
-if peakVal <= 0
-    bwHz = 0;
-    return;
-end
-
-% Primary estimate: peak-relative clip then narrowest pct%-energy band.
-bwHz = csrd.pipeline.measurement.narrowestEnergySpan(spec, fAxis, ...
-    sampleRate, peakVal * 10 ^ (peakRelDb / 10), pct);
-info.BwPeakHz = bwHz;
-
-% Collapse guard. When a signal has a flat occupied band a few dB below a
-% single localized spectral spike -- short bursts (low time-bandwidth
-% product, high spectral variance) or a frequency-selective channel peak --
-% the peak-relative threshold sits ABOVE the flat band and clips it away,
-% collapsing the measured width to the spike's neighbourhood (e.g. a
-% realized ~17 MHz QAM measured at ~1.5 MHz). Detect that against a
-% noise-floor-relative estimate (a fixed +6 dB above a robust low-percentile
-% floor, which keeps the whole occupied band) and fall back to it only when
-% the peak-relative result is implausibly narrow, so the common case is
-% unchanged. The floor percentile must stay BELOW the minimum noise
-% fraction: an emitter may occupy up to MaxBandwidthFractionOfSampleRate
-% (=0.8) of the band, leaving >=20% noise bins, so a 25th-percentile floor
-% would land INSIDE a wideband occupied band and defeat the guard (the floor
-% estimate then collapses to the spike just like the peak-relative one). The
-% 10th percentile stays in the noise floor for occupancies up to 90%.
-% The floor percentile must be taken over the WINDOWED bins only; including the
-% zeroed out-of-window bins would drag the 10th percentile to zero and make the
-% collapse guard's floor-relative span meaningless.
-floorVal = prctile(spec(inWindow), 10);
-floorThreshold = floorVal * 10 ^ (6 / 10);
-bwFloor = csrd.pipeline.measurement.narrowestEnergySpan(spec, fAxis, ...
-    sampleRate, floorThreshold, pct);
-info.BwFloorHz = bwFloor;
-if floorVal > 0
-    info.PeakToNoiseFloorDb = 10 * log10(peakVal / floorVal);
-end
-if bwFloor > 0 && bwHz < 0.3 * bwFloor
-    bwHz = bwFloor;
-    info.CollapseGuardFired = true;
-end
+info.PriorWindowConverged = converged;
 
 info.OccupiedFraction = bwHz / sampleRate;
-if info.PriorWindowApplied
-    windowWidthHz = info.PriorWindowHz(2) - info.PriorWindowHz(1);
-    if windowWidthHz > 0
+end
+
+function [bwHz, info, windowWidthHz] = localMeasureInWindow(specFull, fAxis, ...
+        sampleRate, pct, peakRelDb, windowHz, fcShiftHz)
+    % localMeasureInWindow - one peak-relative measurement inside `windowHz`.
+    % Inputs: specFull - unmasked (already Nyquist-recentred) spectrum;
+    %         fAxis - the shifted frequency axis; sampleRate, pct, peakRelDb -
+    %         estimator settings; windowHz - [lo hi] on the shifted axis or [];
+    %         fcShiftHz - the recentre shift, used to report the window in true
+    %         frequency.
+    % Outputs: bwHz - the estimate; info - per-attempt diagnostics;
+    %          windowWidthHz - width of the window that took effect (Inf when
+    %          none, so the caller stops growing).
+    info = struct('BwPeakHz', 0, 'BwFloorHz', 0, 'PeakToNoiseFloorDb', NaN, ...
+        'CollapseGuardFired', false, 'PriorWindowApplied', false, ...
+        'PriorWindowHz', [], 'PriorWindowFillRatio', NaN);
+    [spec, inWindow, applied, appliedWindowHz] = ...
+        localApplyWindow(specFull, fAxis, windowHz);
+    info.PriorWindowApplied = applied;
+    if applied
+        info.PriorWindowHz = appliedWindowHz + fcShiftHz;
+        windowWidthHz = appliedWindowHz(2) - appliedWindowHz(1);
+    else
+        windowWidthHz = Inf;
+    end
+
+    peakVal = max(spec);
+    if peakVal <= 0
+        bwHz = 0;
+        return;
+    end
+
+    bwHz = csrd.pipeline.measurement.narrowestEnergySpan(spec, fAxis, ...
+        sampleRate, peakVal * 10 ^ (peakRelDb / 10), pct);
+    info.BwPeakHz = bwHz;
+
+    % Collapse guard. A flat occupied band a few dB below a single localized
+    % spike (short bursts, or a frequency-selective channel peak) puts the
+    % peak-relative threshold ABOVE the flat band and clips it away, collapsing
+    % the width to the spike's neighbourhood (e.g. a realized ~17 MHz QAM
+    % measured at ~1.5 MHz). Fall back to a noise-floor-relative span only when
+    % the peak-relative result is implausibly narrow, so the common case is
+    % unchanged. The floor percentile is taken over IN-WINDOW bins only -- the
+    % zeroed out-of-window bins would drag the 10th percentile to zero and make
+    % the floor-relative span meaningless. It must also stay BELOW the minimum
+    % noise fraction: an emitter may occupy up to
+    % MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving >=20% noise
+    % bins, so a 25th-percentile floor would land INSIDE a wideband occupied band
+    % and defeat the guard.
+    floorVal = prctile(spec(inWindow), 10);
+    bwFloor = csrd.pipeline.measurement.narrowestEnergySpan(spec, fAxis, ...
+        sampleRate, floorVal * 10 ^ (6 / 10), pct);
+    info.BwFloorHz = bwFloor;
+    if floorVal > 0
+        info.PeakToNoiseFloorDb = 10 * log10(peakVal / floorVal);
+    end
+    if bwFloor > 0 && bwHz < 0.3 * bwFloor
+        bwHz = bwFloor;
+        info.CollapseGuardFired = true;
+    end
+    if applied && windowWidthHz > 0
         info.PriorWindowFillRatio = bwHz / windowWidthHz;
-        % Bin granularity: treat "within one bin of the window width" as having
-        % reached the edge, since the span search reports edge-to-edge plus one
-        % bin width.
-        binWidthHz = abs(median(diff(fAxis)));
-        info.TouchesPriorEdge = bwHz >= (windowWidthHz - binWidthHz);
     end
 end
+
+function info = localMergeWindowInfo(info, attempt, growth)
+    % localMergeWindowInfo - copy one attempt's diagnostics onto the output info.
+    % Inputs: info - accumulating diagnostics; attempt - localMeasureInWindow
+    %         diagnostics; growth - how many doublings had been applied.
+    % Outputs: info - updated diagnostics.
+    info.BwPeakHz = attempt.BwPeakHz;
+    info.BwFloorHz = attempt.BwFloorHz;
+    info.PeakToNoiseFloorDb = attempt.PeakToNoiseFloorDb;
+    info.CollapseGuardFired = attempt.CollapseGuardFired;
+    info.PriorWindowApplied = attempt.PriorWindowApplied;
+    info.PriorWindowHz = attempt.PriorWindowHz;
+    info.PriorWindowFillRatio = attempt.PriorWindowFillRatio;
+    info.PriorWindowGrowths = growth;
+end
+
+function [spec, inWindow, applied, appliedWindowHz] = localApplyWindow(specFull, fAxis, windowHz)
+    % localApplyWindow - zero the bins outside `windowHz` (shifted-axis Hz).
+    % Inputs: specFull - unmasked spectrum; fAxis - shifted frequency axis;
+    %         windowHz - [lo hi] on that same shifted axis, or [] for no window.
+    % Outputs: spec - masked spectrum; inWindow - logical mask;
+    %          applied - whether a window actually took effect;
+    %          appliedWindowHz - the window in effect ([] when none).
+    %
+    % A window that excludes every bin, or that contains no energy at all, is NOT
+    % applied: forcing a measurement inside a window the signal is not in would
+    % turn a plan-versus-realization mismatch into a fabricated narrow label. The
+    % honest answer there is the full-band measurement plus a diagnostic recording
+    % that no window took effect.
+    spec = specFull;
+    inWindow = true(size(specFull));
+    applied = false;
+    appliedWindowHz = [];
+    if isempty(windowHz)
+        return;
+    end
+    candidate = fAxis >= windowHz(1) & fAxis <= windowHz(2);
+    if ~any(candidate) || ~any(specFull(candidate) > 0)
+        return;
+    end
+    inWindow = candidate;
+    spec(~inWindow) = 0;
+    applied = true;
+    appliedWindowHz = [windowHz(1), windowHz(2)];
 end
