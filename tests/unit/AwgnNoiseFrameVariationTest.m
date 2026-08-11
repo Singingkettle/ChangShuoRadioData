@@ -8,6 +8,12 @@ classdef AwgnNoiseFrameVariationTest < matlab.unittest.TestCase
     % burst-stable, H13), which previously made the additive noise byte-identical
     % across every frame of a scenario -- a per-scenario noise mask a model could
     % memorize. ChannelFactory now frame-salts the additive-noise seed.
+    %
+    % Since the measurement moved ahead of noise injection, ChannelFactory SIZES
+    % the noise rather than adding it, so these assertions run on the
+    % PendingChannelNoise descriptor and on the realization that
+    % csrd.pipeline.signal.realizeChannelNoise produces from it -- which is the
+    % noise that actually reaches the saved frame.
 
     methods (Test)
 
@@ -22,7 +28,19 @@ classdef AwgnNoiseFrameVariationTest < matlab.unittest.TestCase
                 'Noise seed must be stable for the same frame');
         end
 
-        function injectedNoiseVariesAcrossFramesAtStablePower(testCase)
+        function plannedNoiseVariesAcrossFramesAtStablePower(testCase)
+            % The property under test is unchanged -- the noise REALIZATION must
+            % differ frame to frame while its POWER tracks one target -- but the
+            % factory now SIZES the noise instead of adding it, so it has to be
+            % checked on the descriptor and on the realization the descriptor
+            % produces, not on the factory's output waveform.
+            %
+            % Checking the waveform here would now be VACUOUS in the worst way: the
+            % factory returns the clean signal unchanged, so `isequal(o1.Signal,
+            % o2.Signal)` is trivially true and a test written against it fails for
+            % the right reason today but could be "fixed" by relaxing it into
+            % something that proves nothing. Going through the real injector keeps
+            % the assertion about the noise that actually reaches the dataset.
             factory = localFactory();
             cleanup = onCleanup(@() localRelease(factory)); %#ok<NASGU>
             [input, txInfo, rxInfo, linkInfo] = localStepArgs();
@@ -31,15 +49,70 @@ classdef AwgnNoiseFrameVariationTest < matlab.unittest.TestCase
             o1b = step(factory, input, 1, txInfo, rxInfo, linkInfo);   % same frame
             o2 = step(factory, input, 2, txInfo, rxInfo, linkInfo);    % next frame
 
-            testCase.verifyFalse(isequal(o1.Signal, o2.Signal), ...
-                'Additive noise must differ between frames (i.i.d.)');
-            testCase.verifyEqual(o1.Signal, o1b.Signal, ...
-                'Same frame must reproduce the same noise realisation');
-            % same target SNR -> comparable realized power across frames
-            p1 = mean(abs(o1.Signal) .^ 2);
-            p2 = mean(abs(o2.Signal) .^ 2);
-            testCase.verifyEqual(p2, p1, 'RelTol', 0.1, ...
-                'Noise power must track the same target across frames');
+            % The waveform must now be NOISE-FREE, and this is the exact inversion
+            % of the assertion this test used to make. The fading seed deliberately
+            % excludes FrameId (H13, so fading stays burst-stable), so the only
+            % thing that ever differed between two frames of one burst was the
+            % additive noise. Before the reorder that made o1.Signal ~= o2.Signal;
+            % now they must be EQUAL, which is a direct proof that no noise is left
+            % in the buffer the measured planes read.
+            %
+            % Note "clean" means noise-free, not unmodified: the factory still
+            % applies propagation and fading, so comparing against input.Signal
+            % would be wrong.
+            testCase.verifyEqual(o1.Signal, o2.Signal, sprintf( ...
+                ['Two frames of one burst must carry the IDENTICAL waveform, since ', ...
+                 'fading is burst-stable and noise is no longer added here. A ', ...
+                 'difference means noise reached the buffer the measured planes ', ...
+                 'read (frames compared: 1 and 2, %d samples).'], ...
+                size(o1.Signal, 1)));
+            % ChannelNoisePowerW is deliberately NON-zero here: it is the power the
+            % saved frame will carry once the injector runs, and it is what
+            % localMeasuredReceivedSnr divides by to produce
+            % Truth.Measured.SourcePlane.SNRdB. So the invariant is not "zero", it is
+            % that the ACCOUNTING and the PLAN agree exactly. If they ever drifted
+            % apart, every SNRdB label would describe a different amount of noise
+            % than the waveform actually carries, and nothing else in the suite would
+            % notice -- the label and the buffer are produced by different code paths.
+            testCase.verifyEqual(double(o1.ChannelNoisePowerW), ...
+                double(o1.PendingChannelNoise.PowerW), 'RelTol', 1e-12, ...
+                ['ChannelNoisePowerW (which sets the published SNRdB) must equal ', ...
+                 'PendingChannelNoise.PowerW (which the injector realizes). A gap ', ...
+                 'here means the SNR label and the waveform disagree.']);
+
+            for o = {o1, o1b, o2}
+                testCase.verifyTrue(isfield(o{1}, 'PendingChannelNoise') && ...
+                    isstruct(o{1}.PendingChannelNoise), ...
+                    'Every noised link must carry a PendingChannelNoise descriptor.');
+            end
+
+            testCase.verifyNotEqual(o1.PendingChannelNoise.Seed, ...
+                o2.PendingChannelNoise.Seed, ...
+                'Noise seed must differ across frames (additive noise is i.i.d.).');
+            testCase.verifyEqual(o1.PendingChannelNoise.Seed, ...
+                o1b.PendingChannelNoise.Seed, ...
+                'Same frame must plan the same noise realisation.');
+            testCase.verifyEqual(o2.PendingChannelNoise.PowerW, ...
+                o1.PendingChannelNoise.PowerW, 'RelTol', 0.1, ...
+                'Noise power must track the same target SNR across frames.');
+
+            % And the descriptors must produce what they promise once realized.
+            n1 = csrd.pipeline.signal.realizeChannelNoise( ...
+                o1.PendingChannelNoise, o1.Signal) - o1.Signal;
+            n1b = csrd.pipeline.signal.realizeChannelNoise( ...
+                o1b.PendingChannelNoise, o1b.Signal) - o1b.Signal;
+            n2 = csrd.pipeline.signal.realizeChannelNoise( ...
+                o2.PendingChannelNoise, o2.Signal) - o2.Signal;
+
+            testCase.verifyEqual(n1, n1b, ...
+                'The same frame must realize a byte-identical noise sequence.');
+            testCase.verifyFalse(isequal(n1, n2), ...
+                ['Successive frames must realize DIFFERENT noise. A frame-invariant ', ...
+                 'realization is a per-scenario noise fingerprint a model can ', ...
+                 'memorise instead of learning the signal.']);
+            testCase.verifyEqual(mean(abs(n2) .^ 2), mean(abs(n1) .^ 2), ...
+                'RelTol', 0.15, ...
+                'Realized noise power must track the same target across frames.');
         end
 
     end

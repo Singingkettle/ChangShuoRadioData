@@ -829,7 +829,8 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
                     combinedSignal.Signal(idxStart:idxEnd) + compSig;
                 combinedSignal.NoisySignal(idxStart:idxEnd) = ...
                     combinedSignal.NoisySignal(idxStart:idxEnd) + ...
-                    localRealizePendingChannelNoise(comp, compSig);
+                    csrd.pipeline.signal.realizeChannelNoise( ...
+                        localPendingChannelNoise(comp), compSig);
             end
             comp = localUpdateComponentSampleGrid( ...
                 comp, compSig, startOffset, frameShape.NumSamples, sampleRate);
@@ -841,41 +842,23 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
     end
 end
 
-function noisySig = localRealizePendingChannelNoise(comp, compSig)
-    % localRealizePendingChannelNoise - add the channel noise this component owes.
-    % Inputs: comp - component struct, optionally carrying PendingChannelNoise
-    %           (PowerW at the antenna-collapsed scale, plus a burst-deterministic
-    %           Seed) planned by ChannelFactory.planChannelNoise;
-    %         compSig - the antenna-collapsed, frame-clipped CLEAN buffer.
-    % Outputs: noisySig - compSig plus the realized noise, or compSig unchanged
-    %           when the link owes no channel noise.
+function pending = localPendingChannelNoise(comp)
+    % localPendingChannelNoise - the PendingChannelNoise descriptor, or [].
+    % Inputs: comp - component struct as carried through the receiver loop.
+    % Outputs: pending - the descriptor struct planned by
+    %           ChannelFactory.planChannelNoise, or [] when the link owes none.
     %
-    % This is the single channel-noise injection point in the pipeline. It runs
-    % after the measured planes are taken from the clean buffers, which is the
-    % whole point of the ordering: measuring after noise injection lets the noise
-    % floor cross the peak-relative clip and inflates the occupied-bandwidth
-    % label. Drawing one collapsed realization at the summed-scale power is
-    % statistically identical to summing per-antenna realizations, which is how
-    % the noise was realized before the reorder.
-    noisySig = compSig;
-    if ~isstruct(comp) || ~isfield(comp, 'PendingChannelNoise') || ...
-            ~isstruct(comp.PendingChannelNoise)
-        return;
+    % The realization itself lives in csrd.pipeline.signal.realizeChannelNoise
+    % rather than here. It is the single point where noise enters the dataset and
+    % therefore sets the realized SNR of every saved frame, so it belongs
+    % somewhere a test can call it directly; as a local function in a private
+    % method file it was unreachable, and the most safety-critical step in the
+    % pipeline had no direct coverage.
+    pending = [];
+    if isstruct(comp) && isfield(comp, 'PendingChannelNoise') && ...
+            isstruct(comp.PendingChannelNoise)
+        pending = comp.PendingChannelNoise;
     end
-    pending = comp.PendingChannelNoise;
-    if ~isfield(pending, 'PowerW') || ~isnumeric(pending.PowerW) || ...
-            ~isscalar(pending.PowerW) || ~isfinite(pending.PowerW) || ...
-            pending.PowerW <= 0
-        return;
-    end
-    if ~isfield(pending, 'Seed') || ~isnumeric(pending.Seed) || ...
-            ~isscalar(pending.Seed) || ~isfinite(pending.Seed)
-        return;
-    end
-    rs = RandStream('mt19937ar', 'Seed', double(pending.Seed));
-    noiseStd = sqrt(double(pending.PowerW) / 2);
-    noisySig = compSig + noiseStd * ...
-        (randn(rs, size(compSig)) + 1i * randn(rs, size(compSig)));
 end
 
 function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
