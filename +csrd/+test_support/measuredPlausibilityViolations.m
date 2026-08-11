@@ -16,10 +16,9 @@ function violations = measuredPlausibilityViolations(sourcePlane, sampleRate, ta
 %       0  <= FrequencyOccupancy   <= 1               (a fraction)
 %       -100 <= SNRdB              <= 200             (no infinite/absurd SNR)
 %
-%   With `context` supplied, two cross-plane bounds are added:
+%   With `context` supplied, one cross-plane bound is added:
 %
-%       OccupiedBandwidthHz <= 2.5 * context.ExecutionBwHz   (inflation)
-%       OccupiedBandwidthHz >= 0.25 * context.ExecutionBwHz  (collapse)
+%       OccupiedBandwidthHz <= PROPAGATION_INFLATION_LIMIT * context.ExecutionBwHz
 %
 %   NOTE on the 0.85*Fs absolute bound. The generator caps an emitter at
 %   Regulatory.MaxBandwidthFractionOfSampleRate = 0.8 of the receiver sample
@@ -30,13 +29,31 @@ function violations = measuredPlausibilityViolations(sourcePlane, sampleRate, ta
 %   passed cleanly. 0.85 = the 0.8 cap plus ~6 % slack for FFT-bin
 %   granularity, Doppler and rolloff on a maximally wide emitter.
 %
-%   NOTE on the cross-plane ratios. Truth.Execution.ModulatedBandwidthHz is
-%   the same estimator run on the clean pre-channel waveform, so the two
-%   agree to ~1 % at usable SNR (release baseline P95 = 0.0222). The worst
-%   physically explainable low-SNR ratio is ~1.7x; catastrophic bridging runs
-%   3.2x-6.6x. 2.5 sits between them. The 0.25 lower bound sits just below
-%   the estimator's internal collapse guard trip point (0.3) so a legitimate
-%   guard fallback can never self-trip.
+%   NOTE on the cross-plane bound, and on what it can and cannot prove. Both
+%   planes now run ONE kernel (occupiedBandwidthCore) on clean, per-emitter,
+%   per-antenna buffers; they differ only in WHICH buffer. So this ratio polices
+%   exactly one stage -- propagation -- and it structurally CANNOT detect a wrong
+%   bandwidth DEFINITION, because a wrong definition moves both planes together.
+%   That blind spot is not hypothetical: it is how a -3 dB-down width shipped for
+%   several releases under the name "occupied bandwidth" while this gate stayed
+%   green. Definitional correctness is proved elsewhere, against an EXTERNAL
+%   analytic prediction (a root-raised-cosine single carrier measures
+%   OBW = 1.100 * Rs at beta = 0.25, and can never exceed (1+beta) * Rs because the
+%   pulse is strictly bandlimited) -- never against the other plane.
+%
+%   The limit is derived from measurement, not chosen: over 1413 sources spanning
+%   AWGN / Rayleigh / Rician the ratio is 1.0000 at the median, with a maximum of
+%   1.0002 for AWGN (pure bin-grid quantisation) and 1.0175 for Rayleigh. Rician
+%   reaches 13.67, and that tail is understood: short bursts clipped at a frame
+%   boundary, where a hard-gated burst of duration T genuinely occupies ~10/T at
+%   the 99 % power level. That is a TRUE statement about an unphysically gated
+%   signal, so it must not be masked by widening this bound. Such sources are
+%   caught by the resolution test instead, which names the real problem.
+%
+%   The former 0.25x lower bound is GONE. It was calibrated against a
+%   peak-relative estimator's internal collapse-guard trip point, and that
+%   estimator no longer exists; a power integral has no guard to self-trip. A
+%   collapse now shows up as a resolution-cell count near 1, checked directly.
 %
 %   Only finite scalar fields are checked; missing or NaN fields are left to the
 %   separate coverage gate. A source explicitly marked unresolvable or silent
@@ -64,6 +81,21 @@ end
 violations = {};
 tol = 1.02; % small slack for FFT-bin granularity / floating point
 
+% Propagation is the ONLY stage between Truth.Execution and Truth.Measured, so the
+% ratio between them is a fading/Doppler bound. Measured over 1413 sources: AWGN
+% max 1.0002, Rayleigh max 1.0175, Rician p95 1.304. 1.6 leaves headroom for a
+% deeper multipath profile than the registered statistical models produce while
+% still rejecting the order-of-magnitude excursions.
+PROPAGATION_INFLATION_LIMIT = 1.6;
+
+% Minimum analysis cells for the reported width to be a bandwidth statement at
+% all. ITU-R SM.443 wants a measurement RBW at ~1-3 % of the occupied bandwidth
+% (>= ~33 cells). 8 sits deliberately far below that: this bound is for values
+% that are not bandwidths, not for values measured coarsely. The gap between 8 and
+% 33 is a quality signal for the consumer, published as BandwidthResolutionCells,
+% not a failure here.
+MIN_RESOLUTION_CELLS = 8;
+
 % Emitters are capped at MaxBandwidthFractionOfSampleRate (0.8) of Fs; anything
 % materially above that is the estimator bridging the capture band, not a wide
 % emitter.
@@ -82,18 +114,41 @@ if localFiniteScalar(sourcePlane, 'OccupiedBandwidthHz')
             tag, ob, maxOccupiedFraction, sampleRate * maxOccupiedFraction);
     end
 
-    if claimsMeasurement && localFiniteScalar(context, 'ExecutionBwHz') && ...
-            context.ExecutionBwHz > 0
+    % A reading spanning only a handful of analysis cells is a resolution floor,
+    % not a bandwidth -- and it is also the mechanism behind the widest
+    % propagation-ratio outliers. Test it FIRST so such a source is reported for
+    % what it is instead of being blamed on propagation.
+    resolvedBandwidth = true;
+    if localFiniteScalar(sourcePlane, 'BandwidthResolutionCells')
+        cells = sourcePlane.BandwidthResolutionCells;
+        if cells < MIN_RESOLUTION_CELLS
+            resolvedBandwidth = false;
+            violations{end + 1} = sprintf( ...
+                ['%s OccupiedBandwidthHz=%.4g spans only %.2f analysis cells ', ...
+                 '(RBW=%.4g Hz): a resolution floor, not a measured bandwidth'], ...
+                tag, ob, cells, localFieldOrNaN(sourcePlane, 'BandwidthResolutionHz'));
+        end
+    end
+
+    if claimsMeasurement && resolvedBandwidth && ...
+            localFiniteScalar(context, 'ExecutionBwHz') && context.ExecutionBwHz > 0
         execBw = context.ExecutionBwHz;
         ratio = ob / execBw;
-        if ratio > 2.5
+        if ratio > PROPAGATION_INFLATION_LIMIT
+            % Report the burst length with the ratio. Propagation is the only
+            % PIPELINE stage between the planes, but it is not the only cause: a
+            % burst clipped at a frame boundary is hard-gated, and a hard-gated
+            % burst of duration T genuinely occupies ~10/T at the 99 % power level.
+            % Naming the sample count here stops a gating artefact from being
+            % misread as a fading defect.
             violations{end + 1} = sprintf( ...
-                '%s OccupiedBandwidthHz=%.4g is %.2fx its own ExecutionBw=%.4g (>2.5x)', ...
-                tag, ob, ratio, execBw);
-        elseif ratio < 0.25
-            violations{end + 1} = sprintf( ...
-                '%s OccupiedBandwidthHz=%.4g is %.2fx its own ExecutionBw=%.4g (<0.25x)', ...
-                tag, ob, ratio, execBw);
+                ['%s OccupiedBandwidthHz=%.4g is %.3fx its own ExecutionBw=%.4g ', ...
+                 '(>%.2fx) on %g active samples at RBW=%.4g Hz; propagation is ', ...
+                 'the only pipeline stage between the two planes, so either ', ...
+                 'fading reshaped the spectrum or the burst was hard-gated short'], ...
+                tag, ob, ratio, execBw, PROPAGATION_INFLATION_LIMIT, ...
+                localFieldOrNaN(sourcePlane, 'ActiveSampleCount'), ...
+                localFieldOrNaN(sourcePlane, 'BandwidthResolutionHz'));
         end
     end
 end
@@ -125,6 +180,14 @@ if localFiniteScalar(sourcePlane, 'SNRdB')
     if sn < -100 || sn > 200
         violations{end + 1} = sprintf('%s SNRdB=%.4g out of [-100,200]', tag, sn);
     end
+end
+end
+
+
+function v = localFieldOrNaN(s, f)
+v = NaN;
+if localFiniteScalar(s, f)
+    v = double(s.(f));
 end
 end
 

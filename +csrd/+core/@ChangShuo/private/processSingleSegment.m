@@ -184,6 +184,20 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             else
                 modulatedSignalSegment.Planned.ModulationOrder = 0;
             end
+            % The two pulse-shaping parameters the planner chose. They are
+            % published because the occupied bandwidth of a shaped single
+            % carrier is predicted by THEM, not by the allocation: for a
+            % root-raised-cosine pulse the ITU 99 % OBW is a fixed multiple of
+            % the symbol rate that rises with the roll-off. Without these two
+            % numbers in the annotation, a measured bandwidth can only be
+            % checked against itself (the allocation is a ceiling the planner
+            % also snaps -- see snapNarrowSymbolRateToReceiverGrid, which breaks
+            % PlannedBandwidth = (1+beta)*Rs for narrow channels), which is how a
+            % systematic bandwidth-definition error survived undetected.
+            modulatedSignalSegment.Planned.PlannedSymbolRateHz = ...
+                localPlannedNumber(modSrc, 'SymbolRate');
+            modulatedSignalSegment.Planned.PlannedRolloffFactor = ...
+                localPlannedNumber(modSrc, 'RolloffFactor');
             if isfield(modSrc, 'ModulatorConfig') && isstruct(modSrc.ModulatorConfig) && ...
                     isfield(modSrc.ModulatorConfig, 'mimo') && ...
                     isstruct(modSrc.ModulatorConfig.mimo) && ...
@@ -214,6 +228,8 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
             modulatedSignalSegment.Planned.ModulationFamily = '';
             modulatedSignalSegment.Planned.ModulationOrder = 0;
             modulatedSignalSegment.Planned.ModulationSpatialMode = '';
+            modulatedSignalSegment.Planned.PlannedSymbolRateHz = NaN;
+            modulatedSignalSegment.Planned.PlannedRolloffFactor = NaN;
         end
         if isfield(currentTxScenario, 'Message') && isstruct(currentTxScenario.Message) && ...
                 isfield(currentTxScenario.Message, 'Length') && ...
@@ -259,5 +275,20 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
                  'currentTxScenario.Hardware.NumAntennas is required.'], ...
                 FrameId, string(currentTxId), segIdx);
         end
+    end
+end
+
+
+function value = localPlannedNumber(s, fieldName)
+    % localPlannedNumber - positive finite planner scalar, else NaN.
+    %   NaN means "the planner did not choose this parameter for this family"
+    %   (an unshaped or analog emitter has no symbol rate or roll-off), which is
+    %   a distinct statement from zero and must not be published as one.
+    % Inputs: s - struct; fieldName - char field name.
+    % Outputs: value - double scalar, NaN when absent or not usable.
+    value = NaN;
+    if isstruct(s) && isfield(s, fieldName) && isnumeric(s.(fieldName)) && ...
+            isscalar(s.(fieldName)) && isfinite(s.(fieldName)) && s.(fieldName) >= 0
+        value = double(s.(fieldName));
     end
 end

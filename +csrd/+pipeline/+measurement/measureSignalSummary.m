@@ -67,6 +67,26 @@ summary.MeasurementSemantics = '';
 % convention a label follows.
 summary.BandwidthDefinition = obwInfo.BandwidthDefinition;
 summary.BandwidthEstimator = obwInfo.BandwidthEstimator;
+% Measurement conditions, published so the label carries its own uncertainty. The
+% same 15 MHz reading means one thing on a 32768-sample buffer and something else
+% on a 64-sample burst: a hard-gated burst of duration T genuinely occupies ~10/T
+% at the 99 % power level, so a wide reading on a short burst is a true statement
+% about a signal that should not have been built that way -- not a measurement
+% error. Without these fields a consumer cannot tell those two cases apart, and a
+% spectrum-sensing model trained on the mixture learns the artefact as signal.
+%
+% BandwidthResolutionCells is the actionable one: it is how many analysis cells the
+% reported width spans. ITU-R SM.443 puts a usable measurement RBW at ~1-3 % of the
+% occupied bandwidth, i.e. >= ~33 cells; below that the number is a resolution
+% floor rather than a bandwidth.
+summary.BandwidthResolutionHz = obwInfo.ResolutionBandwidthHz;
+summary.ActiveSampleCount = obwInfo.ActiveSampleCount;
+if isfinite(obwInfo.ResolutionBandwidthHz) && obwInfo.ResolutionBandwidthHz > 0
+    summary.BandwidthResolutionCells = ...
+        summary.OccupiedBandwidthHz / obwInfo.ResolutionBandwidthHz;
+else
+    summary.BandwidthResolutionCells = NaN;
+end
 end
 
 function signalCol = localValidateAndCollapse(signal, sampleRate)

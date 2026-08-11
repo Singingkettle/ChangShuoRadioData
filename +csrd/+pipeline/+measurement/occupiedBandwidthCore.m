@@ -76,11 +76,19 @@ info = struct( ...
     'UpperEdgeHz', NaN, ...
     'TotalPowerW', 0, ...
     'SpectrumSource', 'pwelch', ...
+    'ResolutionBandwidthHz', NaN, ...
+    'ActiveSampleCount', 0, ...
     'BandwidthDefinition', ...
         sprintf('ITU-R SM.328 occupied bandwidth (%.4g%% power)', pct), ...
     'BandwidthEstimator', 'csrd.pipeline.measurement.occupiedBandwidthCore');
 
 N = length(signalCol);
+% The count of samples that actually carry energy, which is what sets this
+% measurement's resolution. A burst gated into a long frame has N samples of span
+% but only a few of content, and a hard-gated burst of duration T genuinely
+% spreads to ~10/T at the 99 % level -- so this number is not bookkeeping, it is
+% the reason two identical bandwidth readings can mean entirely different things.
+info.ActiveSampleCount = sum(abs(double(signalCol)) > 0);
 if N < 8
     % Too short for pwelch's default 8-segment split; a single-segment
     % periodogram keeps short-signal semantics well defined.
@@ -131,6 +139,7 @@ if nBins == 1
     info.TotalPowerW = sum(spec);
     info.LowerEdgeHz = fAxis(1);
     info.UpperEdgeHz = fAxis(1);
+    info.ResolutionBandwidthHz = sampleRate;
     return;
 end
 
@@ -147,6 +156,24 @@ upperTarget = (1 - excludedFraction) * totalPower;
 
 cumPower = cumsum(spec);
 binWidthHz = abs(median(diff(fAxis)));
+% The resolution this answer was actually produced at. Two limits apply and the
+% COARSER one wins:
+%   - the analysis grid, binWidthHz;
+%   - Fs / ActiveSampleCount, the resolution the burst length can support.
+% The second matters because a burst gated into a long frame gets a fine analysis
+% grid it has not earned: zero padding interpolates a spectrum, it never adds
+% information. Reporting only binWidthHz would claim a 64-sample burst was
+% measured at the same resolution as a 32768-sample one.
+%
+% ITU-R SM.443 puts a usable measurement RBW at roughly 1-3 % of the occupied
+% bandwidth, so publishing the RBW beside the width lets a consumer apply that test
+% instead of trusting every reading equally. VIM 2.3: a measured value without its
+% conditions is not a sufficient specification of the quantity.
+burstResolutionHz = Inf;
+if info.ActiveSampleCount > 0
+    burstResolutionHz = sampleRate / double(info.ActiveSampleCount);
+end
+info.ResolutionBandwidthHz = max(binWidthHz, min(burstResolutionHz, sampleRate));
 
 lowerEdgeHz = localInterpolatedCrossing(cumPower, fAxis, lowerTarget, binWidthHz);
 upperEdgeHz = localInterpolatedCrossing(cumPower, fAxis, upperTarget, binWidthHz);

@@ -278,6 +278,16 @@ function design = buildDesignTruth(comp)
     design.ModulationFamily  = getFieldOrEmpty(plannedSrc, 'ModulationFamily', '');
     design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
     design.ModulationSpatialMode = getFieldOrEmpty(plannedSrc, 'ModulationSpatialMode', '');
+    % Pulse-shaping parameters, published so the measured occupied bandwidth has
+    % an EXTERNAL reference. For a root-raised-cosine single carrier the ITU 99 %
+    % OBW is a fixed multiple of the symbol rate rising with the roll-off, so
+    % (Rs, beta) predicts the measurement from published theory alone. Checking
+    % the measurement against PlannedBandwidthHz instead cannot do that: the
+    % allocation is a ceiling the planner may snap onto the receiver grid, and
+    % checking it against Truth.Execution is self-referential, since both planes
+    % now run one kernel and would agree even on a wrong definition.
+    design.PlannedSymbolRateHz = getFieldOrDefault(plannedSrc, 'PlannedSymbolRateHz', NaN);
+    design.PlannedRolloffFactor = getFieldOrDefault(plannedSrc, 'PlannedRolloffFactor', NaN);
     design.MessageSource     = getFieldOrEmpty(plannedSrc, 'MessageSource', '');
     design.IsDigital         = getFieldOrDefault(plannedSrc, 'IsDigital', true);
     design.PayloadLengthBits = getFieldOrDefault(plannedSrc, 'PayloadLengthBits', NaN);
@@ -422,6 +432,13 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane.TimeOccupancy        = NaN;
     sourcePlane.FrequencyOccupancy   = NaN;
     sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
+    % Measurement conditions for OccupiedBandwidthHz. See measureSignalSummary:
+    % BandwidthResolutionCells says how many analysis cells the reported width
+    % spans, which is the one number that separates a bandwidth from a resolution
+    % floor. ITU-R SM.443 puts a usable RBW at ~1-3 % of the width (>= ~33 cells).
+    sourcePlane.BandwidthResolutionHz    = NaN;
+    sourcePlane.BandwidthResolutionCells = NaN;
+    sourcePlane.ActiveSampleCount        = NaN;
 
     % Liveness is energy-based, not sample-count-based: an empty channel
     % output (e.g. a link with no propagation paths) is zero-padded to the
@@ -488,6 +505,16 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         sourcePlane.FrequencyOccupancy = requireFiniteMeasurement( ...
             summary.FrequencyOccupancy, ...
             'Truth.Measured.SourcePlane.FrequencyOccupancy');
+        % Conditions travel with the value. These are not asserted finite: they
+        % describe the measurement rather than being labels themselves, so a
+        % degenerate buffer that legitimately has no resolution to report must be
+        % able to say NaN instead of failing the frame.
+        sourcePlane.BandwidthResolutionHz = ...
+            getFieldOrDefault(summary, 'BandwidthResolutionHz', NaN);
+        sourcePlane.BandwidthResolutionCells = ...
+            getFieldOrDefault(summary, 'BandwidthResolutionCells', NaN);
+        sourcePlane.ActiveSampleCount = ...
+            getFieldOrDefault(summary, 'ActiveSampleCount', NaN);
     end
 
     measured.SourcePlane = sourcePlane;
