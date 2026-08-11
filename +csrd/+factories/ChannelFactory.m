@@ -247,13 +247,21 @@ classdef ChannelFactory < matlab.System
                     frameId, txIdStr, rxIdStr, class(currentChannelBlock), ME_step.message);
                 obj.logger.error('Stack: %s', getReport(ME_step, 'extended', 'hyperlinks', 'off'));
 
-                % Scenario-level identifiers are still classified through
-                % the shared predicate, but Phase 5 removes the generic
-                % sentinel-output path as well: a failed channel block must
-                % not write a half-corrupted frame or partial annotation.
-                if csrd.pipeline.scenario.isScenarioSkipException(ME_step)
-                    rethrow(ME_step);
-                end
+                % Rethrow everything, unconditionally. This factory does NOT
+                % classify: a failed channel block must never write a
+                % half-corrupted frame or a partial annotation, whether the cause
+                % is scenario-level or not, so there is no decision to make here.
+                % Classification into "skip this scenario" versus "fail" happens
+                % once, in SimulationRunner.runScenario, which is the only layer
+                % that can act on the distinction.
+                %
+                % This used to read `if isScenarioSkipException(ME) rethrow; end;
+                % rethrow;` -- both branches identical, with the logging above the
+                % branch, so the predicate call could not change any behaviour. It
+                % was a decoration that read as a safety mechanism, and it made the
+                % static gate that checks for the predicate's NAME pass here while
+                % proving nothing. The gate now asserts the real requirement for
+                % this file instead: that no catch block swallows.
                 rethrow(ME_step);
             end
         end
