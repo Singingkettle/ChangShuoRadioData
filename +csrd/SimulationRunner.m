@@ -1013,7 +1013,7 @@ classdef SimulationRunner < matlab.System
             %       }
             %   with the following mandatory Header.Runtime keys (Phase 2):
             %       LogPolicy / ToolboxLevel / ScenarioId / WorkerId /
-            %       SavedAt / SanitizeManifest /
+            %       SavedAt / SanitizeManifest / MeasurementContract /
             %       BlueprintHash / BlueprintResamples / ValidatorVersion
             %
             %   The last three keys are the Phase 2 (audit C4) blueprint
@@ -1058,6 +1058,17 @@ classdef SimulationRunner < matlab.System
             annotation.Header.Runtime.SavedAt          = char(datetime('now', ...
                 'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z''', 'TimeZone', 'UTC'));
             annotation.Header.Runtime.SanitizeManifest = sanitizeManifest;
+
+            % What the measured labels in this file MEAN: the quantity, the
+            % estimator, the point in the pipeline the buffers were taken, and a
+            % version that makes pre-fix data distinguishable. Before this existed a
+            % consumer had no way to tell an annotation whose OccupiedBandwidthHz
+            % held an ITU 99 %-power band from one whose identically named field held
+            % a peak-relative main-lobe width measured on a noisy antenna sum -- a
+            % different quantity under the same name. An ABSENT MeasurementContract
+            % is what identifies that older era.
+            annotation.Header.Runtime.MeasurementContract = ...
+                csrd.pipeline.measurement.measurementContract();
 
             % Phase 2 (audit §3.4 / C4) blueprint provenance.
             annotation.Header.Runtime = ...

@@ -47,6 +47,29 @@ reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
 | `NumReceivers` | 唯一接收机 ID 的数量 |
 | `ReceiverIDs` | 接收机 ID 列表 |
 
+### `Header.Runtime.MeasurementContract`
+
+本文件中测量标注**代表什么量**,在一处说清,使消费方永远不必从字段名去推断。设置
+`RequireRuntimeHeader` 时必需;reader 会拒绝没有它的标注,也会拒绝自己未实现的版本。
+
+| 字段 | 含义 |
+|-------|---------|
+| `ContractVersion` | 整数。当发布的量、测量点或估计器发生使新旧数据不可比的变化时递增。当前为 2。 |
+| `BandwidthDefinition` | 量的定义,例如 `ITU-R SM.328 occupied bandwidth (99% power)` |
+| `BandwidthEstimator` | 计算它的函数 |
+| `BandwidthMeasurePoint` | 测量缓冲的取样位置:`post_channel_pre_noise_per_emitter_per_antenna` |
+| `NoiseFreeMeasurement` | 测量缓冲是否无噪。reader **拒绝** `false`:功率积分定义的占用带宽在含噪缓冲上是未定义的。 |
+| `PerEmitterPerAntenna` | 是否逐发射机、逐天线分离。reader **拒绝** `false`:对独立衰落的天线副本求和,报出的是副本之间的干涉图样,不是任何发射机真正发出的带宽。 |
+
+`MeasurementContract` **缺失**本身也是有意义的:它标识出在"测量前移到注噪之前"这一改动
+之前写出的标注——那时 `OccupiedBandwidthHz` 装的是在含噪、天线求和缓冲上测得的
+peak-relative 主瓣宽度。那与同名字段现在的量不是一回事,所以这类文件会被拒绝,而不是
+被静默混入当前数据。版本 1 追溯地指那个时代,并且没有任何文件带这个标记,因为当时它
+还不存在。
+
+不要为"让测量更接近同一个既定定义"的修复递增 `ContractVersion` —— 那是
+`BandwidthDefinition` 该表达的事情。
+
 ## 帧字段
 
 每一帧必须包含:

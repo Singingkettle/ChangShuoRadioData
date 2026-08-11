@@ -53,6 +53,32 @@ reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
 | `NumReceivers` | Unique receiver IDs |
 | `ReceiverIDs` | Receiver ID list |
 
+### `Header.Runtime.MeasurementContract`
+
+What the measured labels in this file MEAN, stated once so a consumer never has to
+infer it from a field name. Required whenever `RequireRuntimeHeader` is set; the
+reader refuses an annotation without it, and refuses a version it was not written
+against.
+
+| Field | Meaning |
+|-------|---------|
+| `ContractVersion` | Integer, bumped when the published quantity, the measurement point, or the estimator changes in a way that makes new data incomparable with old. Currently 2. |
+| `BandwidthDefinition` | The quantity, e.g. `ITU-R SM.328 occupied bandwidth (99% power)` |
+| `BandwidthEstimator` | The function that computed it |
+| `BandwidthMeasurePoint` | Where the measured buffer was taken: `post_channel_pre_noise_per_emitter_per_antenna` |
+| `NoiseFreeMeasurement` | Whether the measured buffers carry no noise. The reader REFUSES `false`: a power-integral occupied bandwidth is undefined on a noisy buffer. |
+| `PerEmitterPerAntenna` | Whether emitters and antennas were separated. The reader REFUSES `false`: summing independently faded antenna copies reports the interference pattern between the copies, not a bandwidth any transmitter emitted. |
+
+An **absent** `MeasurementContract` is itself meaningful: it identifies an annotation
+written before the measurement moved ahead of noise injection, whose
+`OccupiedBandwidthHz` held a peak-relative main-lobe width measured on a noisy
+antenna sum. That is a different quantity under the same field name, so such files
+are refused rather than silently mixed with current data. Version 1 is retroactively
+that era and no file carries the marker, because the marker did not exist then.
+
+Do not bump `ContractVersion` for a fix that brings the measurement CLOSER to the
+same stated definition -- that is what `BandwidthDefinition` is for.
+
 ## Frame Fields
 
 Each frame must contain:
