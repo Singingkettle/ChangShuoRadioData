@@ -415,6 +415,18 @@ runner = csrd.SimulationRunner( ...
     'FactoryConfigs', cfg.Factories, ...
     'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
+
+% Clear this scenario's annotation target BEFORE stepping. Each scenario already
+% gets its own session-scoped outDir, so this is belt and braces on that -- but a
+% baseline is the one artefact where a silently duplicated scenario is invisible
+% after the fact, because the aggregate looks entirely plausible. Note the ordering:
+% clearing after the step would delete the annotation this function then reads.
+warnStatePre = warning('off', 'MATLAB:structOnObject');
+annotationPathPre = fullfile(struct(runner).actualOutputDirectory, 'annotations', ...
+    'scenario_000001_annotation.json');
+warning(warnStatePre);
+csrd.test_support.freshAnnotationReader('clear', annotationPathPre);
+
 step(runner, 1, 1);
 
 % Suppress the noisy `MATLAB:structOnObject` warning that fires every

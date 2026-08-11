@@ -174,13 +174,20 @@ function [diffs, snrs] = localCohortDiffs(masterCfg, runRoot, numScenarios, snrD
             runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner, ...
                 'FactoryConfigs', cfg.Factories, 'RuntimePlan', cfg.RuntimePlan);
             setup(runner);
-            step(runner, 1, 1);
+
+            % Clear before stepping. This gate compares two SNR cohorts, so a
+            % scenario that silently reused another scenario's annotation would
+            % contaminate one cohort with the other's data -- the one failure mode
+            % that could make an SNR-invariance claim look true when it is not.
             ws = warning('off', 'MATLAB:structOnObject');
             s = struct(runner);
             warning(ws);
-
             annotationPath = fullfile(s.actualOutputDirectory, 'annotations', ...
                 'scenario_000001_annotation.json');
+            csrd.test_support.freshAnnotationReader('clear', annotationPath);
+
+            step(runner, 1, 1);
+
             if exist(annotationPath, 'file') ~= 2
                 fprintf(2, '  %s scenario %d: no annotation written\n', tag, k);
                 continue;

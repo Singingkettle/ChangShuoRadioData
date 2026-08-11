@@ -78,18 +78,29 @@ function test_measured_truth_plausibility(varargin)
             runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner, ...
                 'FactoryConfigs', cfg.Factories, 'RuntimePlan', cfg.RuntimePlan);
             setup(runner);
-            step(runner, 1, 1);
 
+            % Resolve the output path BEFORE stepping and clear the target, so a
+            % scenario that generates nothing cannot be scored on the previous
+            % scenario's annotation. The runner writes into a session directory
+            % shared across the scenarios of one process, and frame-level failures
+            % do not raise the scenario-level skip counter -- so a stale read looks
+            % exactly like a successful one. This silently produced a wrong
+            % published number once already (see
+            % csrd.test_support.freshAnnotationReader).
             warnState = warning('off', 'MATLAB:structOnObject');
             s = struct(runner);
             warning(warnState);
             annotationPath = fullfile(s.actualOutputDirectory, 'annotations', ...
                 'scenario_000001_annotation.json');
-            if exist(annotationPath, 'file') ~= 2
-                continue;
-            end
+            csrd.test_support.freshAnnotationReader('clear', annotationPath);
 
-            annotation = jsondecode(fileread(annotationPath));
+            step(runner, 1, 1);
+
+            [annotation, annotationMeta] = csrd.test_support.freshAnnotationReader( ...
+                'read', annotationPath, sprintf('scenario %d', k));
+            fprintf('  s%-3d %-9s %8d bytes  %s\n', k, ...
+                cfg.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel, ...
+                annotationMeta.Bytes, annotationMeta.DatenumStr);
             frames = annotation.Frames;
             for fi = 1:numel(frames)
                 fr = frames(fi);

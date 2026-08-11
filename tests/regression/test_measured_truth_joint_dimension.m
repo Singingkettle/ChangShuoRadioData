@@ -158,12 +158,21 @@ function annotationPath = localRunOneScenario(cfg)
     runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner, ...
         'FactoryConfigs', cfg.Factories, 'RuntimePlan', cfg.RuntimePlan);
     setup(runner);
-    step(runner, 1, 1);
+
+    % Resolve the path and clear it BEFORE stepping. The runner writes into a
+    % session directory shared across a process's scenarios, and a frame-level
+    % failure does not raise the scenario-level skip counter -- so a cohort that
+    % generated nothing would otherwise be scored on the previous cohort's
+    % annotation and look like a pass. See
+    % csrd.test_support.freshAnnotationReader for the incident this prevents.
     warnState = warning('off', 'MATLAB:structOnObject');
     s = struct(runner);
     warning(warnState);
     annotationPath = fullfile(s.actualOutputDirectory, 'annotations', ...
         'scenario_000001_annotation.json');
+    csrd.test_support.freshAnnotationReader('clear', annotationPath);
+
+    step(runner, 1, 1);
 end
 
 
