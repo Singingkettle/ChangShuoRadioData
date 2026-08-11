@@ -294,3 +294,16 @@ bbox center (the measured, Doppler-inclusive center) and
 the Measured plane so the box reflects the realized RX signal, not the planned
 `ReceiverView.ProjectedCenterOffsetHz`. Invisible sources are skipped and
 reported in `csrd_export.skipped_sources`.
+
+A source is also skipped when its measured plane EXPLICITLY reports a non-`Measured`
+`MeasurementStatus` — a silent buffer, for instance an emitter whose burst does not
+overlap this frame. `NaN` is the honest bandwidth there, and one such source must not
+abort a whole dataset export. Each skip carries a `skip_reason`, the counts are
+aggregated in `csrd_export.skip_reason_counts`, and the breakdown is printed, so a
+systemic measurement failure shows up as a reported reason rather than as a quietly
+undersized dataset.
+
+A plane that claims `Measured` — or says nothing — while carrying a `NaN` bandwidth
+is a contradiction, not an absence, and stays FATAL
+(`CSRD:Tools:CocoMissingFiniteScalar`). Absence must not buy leniency, or a pipeline
+bug becomes a smaller dataset instead of an error.

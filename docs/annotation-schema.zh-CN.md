@@ -250,3 +250,13 @@ bbox 中心(测得的、含多普勒的中心),并使用
 来自 Measured 平面,因此该框反映的是已实现的 RX 信号,而非计划的
 `ReceiverView.ProjectedCenterOffsetHz`。不可见的来源会被跳过,并
 在 `csrd_export.skipped_sources` 中报告。
+
+当某个来源的测量平面**明确**报告非 `Measured` 的 `MeasurementStatus` 时(例如静默缓冲:
+某发射机的突发与本帧不重叠),该来源同样会被跳过。此时 `NaN` 是诚实的带宽值,而一个这样的
+来源不应中止整个数据集导出。每条跳过都带 `skip_reason`,计数汇总在
+`csrd_export.skip_reason_counts` 中,并会打印明细——这样系统性的测量故障会表现为一个被
+报告的原因,而不是一个安静地变小的数据集。
+
+而一个声称 `Measured`(或什么都不说)却携带 `NaN` 带宽的平面是**自相矛盾**、不是缺失,
+仍然**致命**(`CSRD:Tools:CocoMissingFiniteScalar`)。缺失不该换来宽容,否则管线缺陷会
+变成一个更小的数据集而不是一个错误。
