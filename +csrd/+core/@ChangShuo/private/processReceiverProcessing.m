@@ -362,6 +362,73 @@ function execution = buildExecutionTruth(comp)
     validateExecutionSampleGrid(execution, comp);
 end
 
+function value = localStructNumber(s, fieldName)
+    % localStructNumber - finite numeric scalar from a struct field, else NaN.
+    % Inputs: s - struct (or anything); fieldName - char field name.
+    % Outputs: value - double scalar, NaN when absent or not a finite scalar.
+    value = NaN;
+    if isstruct(s) && isfield(s, fieldName) && isnumeric(s.(fieldName)) && ...
+            isscalar(s.(fieldName)) && isfinite(s.(fieldName))
+        value = double(s.(fieldName));
+    end
+end
+
+function windowHz = localBlueprintPriorWindow(comp, sampleRate)
+    % localBlueprintPriorWindow - the plan-derived search window for one emitter.
+    % Inputs: comp - component struct carrying ReceiverView (the per-(Tx,Rx)
+    %           projected placement) and DopplerShiftHz;
+    %         sampleRate - receiver sample rate (Hz).
+    % Outputs: windowHz - [lowerHz upperHz] in receiver-baseband frequency, or []
+    %           when the blueprint is unavailable, in which case the estimator
+    %           falls back to the historical full-band search.
+    %
+    % The plan is used as PRIOR INFORMATION, not as the answer: it bounds where
+    % the estimator looks so a single emitter's measured band cannot run across
+    % the whole capture, whatever the cause (noise floor, fading notches, or the
+    % antenna-collapse asymmetry between the Execution and Measured planes).
+    %
+    % Doppler correction is mandatory. ReceiverView.ProjectedCenterOffsetHz is
+    % the planner's PRE-Doppler placement (convert_csrd_to_coco.m says so
+    % explicitly when it insists the COCO bbox use the measured centre), while
+    % the waveform being measured has already been Doppler-shifted in
+    % processChannelPropagation. Without the correction the window would drift off
+    % the realized lobe for fast emitters.
+    %
+    % GUARD_FACTOR widens the planned width. It must absorb PA spectral regrowth
+    % and fading-induced spreading, and it can afford to be generous because the
+    % planned band is itself already WIDER than the measured convention: the plan
+    % is a (1+beta)*Rs 99 %-energy figure while the measurement is a -3 dBc main
+    % lobe, ~27 % narrower for single-carrier. A factor of 2 still blocks the
+    % 6x-81x excursions that motivated this change.
+    GUARD_FACTOR = 2.0;
+    windowHz = [];
+    if ~isstruct(comp) || ~isfield(comp, 'ReceiverView') || ...
+            ~isstruct(comp.ReceiverView)
+        return;
+    end
+    rv = comp.ReceiverView;
+    lower = localStructNumber(rv, 'ProjectedLowerEdgeHz');
+    upper = localStructNumber(rv, 'ProjectedUpperEdgeHz');
+    if ~(isfinite(lower) && isfinite(upper) && upper > lower)
+        return;
+    end
+    centerHz = 0.5 * (lower + upper);
+    plannedWidthHz = upper - lower;
+
+    dopplerHz = localStructNumber(comp, 'DopplerShiftHz');
+    if isfinite(dopplerHz)
+        centerHz = centerHz + dopplerHz;
+    end
+
+    halfWidthHz = 0.5 * GUARD_FACTOR * plannedWidthHz;
+    windowHz = [centerHz - halfWidthHz, centerHz + halfWidthHz];
+    % Never propose a window wider than the captured band; a plan that big
+    % carries no information and the full-band search is the honest answer.
+    if (windowHz(2) - windowHz(1)) >= sampleRate
+        windowHz = [];
+    end
+end
+
 function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         observableBwHz, comp, framePlaneCache)
     %BUILDMEASUREDTRUTH SourcePlane (isolated) + FramePlane (cached).
@@ -410,9 +477,16 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         % CSRD:Measurement:SourceCenterFrequencyFailed and
         % CSRD:Measurement:SourceEnvelopeFailed stay here so static gates keep
         % proving live measurement failures are not silently written as NaN.
+        % Blueprint prior: point the estimator at the band the plan placed this
+        % emitter in, instead of searching the whole capture. The VALUE still
+        % comes entirely from the data -- the prior only decides where to look,
+        % exactly as a spectrum-analyser operator sets centre and span from the
+        % drawings before reading the occupied bandwidth off the instrument.
+        priorWindowHz = localBlueprintPriorWindow(comp, sampleRate);
         summary = guardedMeasurement(@() ...
             csrd.pipeline.measurement.measureSignalSummary( ...
-                isolatedSignal, sampleRate, observableBwHz), ...
+                isolatedSignal, sampleRate, observableBwHz, ...
+                'PriorWindowHz', priorWindowHz), ...
             'CSRD:Measurement:SourceOBWFailed');
         sourcePlane.OccupiedBandwidthHz = requirePositiveMeasurement( ...
             summary.OccupiedBandwidthHz, ...

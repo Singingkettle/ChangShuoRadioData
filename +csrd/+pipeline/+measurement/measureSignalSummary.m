@@ -15,15 +15,21 @@ addParameter(p, 'Percentage', 99, ...
 addParameter(p, 'PeakRelativeDb', -3, ...
     @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x < 0);
 addParameter(p, 'EnvelopeOptions', struct(), @(x) isempty(x) || isstruct(x));
+% Blueprint prior: [lowerHz upperHz] search window in receiver-baseband
+% frequency. Empty means the historical full-band search. The value still comes
+% from the data; the window only bounds where the estimator looks.
+addParameter(p, 'PriorWindowHz', [], ...
+    @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
 parse(p, varargin{:});
 
 signalCol = localValidateAndCollapse(signal, sampleRate);
 sampleRate = double(sampleRate);
 
 summary = struct();
-summary.OccupiedBandwidthHz = csrd.pipeline.measurement.peakRelativeObwCore( ...
-    signalCol, sampleRate, double(p.Results.Percentage), ...
-    double(p.Results.PeakRelativeDb));
+[summary.OccupiedBandwidthHz, obwInfo] = ...
+    csrd.pipeline.measurement.peakRelativeObwCore( ...
+        signalCol, sampleRate, double(p.Results.Percentage), ...
+        double(p.Results.PeakRelativeDb), p.Results.PriorWindowHz);
 summary.CenterFrequencyHz = localSpectrumCentroid(signalCol, sampleRate);
 envInfo = localDetectEnvelope(signalCol, sampleRate, p.Results.EnvelopeOptions);
 summary.TimeOccupancy = envInfo.TimeOccupancy;
@@ -36,6 +42,13 @@ else
 end
 summary.MeasurementStatus = 'Measured';
 summary.MeasurementSemantics = '';
+% Plan-relative diagnostics. A measurement that filled its own prior window is
+% suspect for a different reason than a noisy one: it means the window, not the
+% signal, set the answer. Published so that condition is auditable instead of
+% invisible.
+summary.PriorWindowApplied = obwInfo.PriorWindowApplied;
+summary.PriorWindowFillRatio = obwInfo.PriorWindowFillRatio;
+summary.TouchesPriorEdge = obwInfo.TouchesPriorEdge;
 end
 
 function signalCol = localValidateAndCollapse(signal, sampleRate)
