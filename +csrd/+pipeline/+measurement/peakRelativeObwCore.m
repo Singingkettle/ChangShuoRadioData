@@ -25,7 +25,10 @@ function [bwHz, info] = peakRelativeObwCore(signalCol, sampleRate, pct, peakRelD
 %      surviving energy.
 %   4. Collapse guard: when the peak-relative result is implausibly narrow
 %      relative to a noise-floor-relative estimate (10th-percentile floor
-%      + 6 dB), fall back to the floor-relative span.
+%      + 6 dB) AND that wider band holds materially more energy (i.e. real
+%      occupied spectrum was clipped away), fall back to the floor-relative
+%      span. The energy test is what stops the guard firing on emitters that
+%      are narrow simply because they are narrow.
 %
 % Inputs:
 %   signalCol  - complex column vector (antenna collapsing is the caller's
@@ -214,6 +217,10 @@ end
 
 function [bwHz, info, windowWidthHz] = localMeasureInWindow(specFull, fAxis, ...
         sampleRate, pct, peakRelDb, windowHz, fcShiftHz)
+    % A peak-relative band holding less than this fraction of the floor-relative
+    % band's energy means real occupied spectrum was clipped away, which is the
+    % only situation the collapse guard exists for.
+    COLLAPSE_ENERGY_FRACTION = 0.5;
     % localMeasureInWindow - one peak-relative measurement inside `windowHz`.
     % Inputs: specFull - unmasked (already Nyquist-recentred) spectrum;
     %         fAxis - the shifted frequency axis; sampleRate, pct, peakRelDb -
@@ -260,13 +267,32 @@ function [bwHz, info, windowWidthHz] = localMeasureInWindow(specFull, fAxis, ...
     % bins, so a 25th-percentile floor would land INSIDE a wideband occupied band
     % and defeat the guard.
     floorVal = prctile(spec(inWindow), 10);
+    floorThreshold = floorVal * 10 ^ (6 / 10);
+    peakThreshold = peakVal * 10 ^ (peakRelDb / 10);
     bwFloor = csrd.pipeline.measurement.narrowestEnergySpan(spec, fAxis, ...
-        sampleRate, floorVal * 10 ^ (6 / 10), pct);
+        sampleRate, floorThreshold, pct);
     info.BwFloorHz = bwFloor;
     if floorVal > 0
         info.PeakToNoiseFloorDb = 10 * log10(peakVal / floorVal);
     end
-    if bwFloor > 0 && bwHz < 0.3 * bwFloor
+    % The guard needs an ENERGY test, not just a width test. "The floor-relative
+    % band is much wider" is true for ANY narrow emitter in a leaky spectrum, so
+    % width alone made the guard fire on signals that were narrow simply because
+    % they ARE narrow. Observed consequence: a 0.586 MHz emitter on a
+    % 1024-sample frame (nfft 256, so the signal is ~3 bins wide) was published
+    % at 48.2 MHz -- the guard replaced the correct answer with the full-band
+    % floor-relative span, 81x too wide.
+    %
+    % The guard's actual premise is that a flat occupied band was CLIPPED AWAY by
+    % a threshold sitting above it. If that happened, the floor-relative band
+    % holds materially more energy than the peak-relative one. If instead the
+    % peak-relative band already holds nearly all the in-window energy, nothing
+    % was clipped and there is nothing to rescue.
+    peakEnergy = sum(spec(spec >= peakThreshold));
+    floorEnergy = sum(spec(spec >= floorThreshold));
+    energyWasClipped = floorEnergy > 0 && ...
+        peakEnergy < COLLAPSE_ENERGY_FRACTION * floorEnergy;
+    if bwFloor > 0 && bwHz < 0.3 * bwFloor && energyWasClipped
         bwHz = bwFloor;
         info.CollapseGuardFired = true;
     end
