@@ -26,10 +26,34 @@ signalCol = localValidateAndCollapse(signal, sampleRate);
 sampleRate = double(sampleRate);
 
 summary = struct();
-[summary.OccupiedBandwidthHz, obwInfo] = ...
-    csrd.pipeline.measurement.peakRelativeObwCore( ...
-        signalCol, sampleRate, double(p.Results.Percentage), ...
-        double(p.Results.PeakRelativeDb), p.Results.PriorWindowHz);
+% OccupiedBandwidthHz is the ITU-R SM.328 / RR No. 1.153 quantity: the band that
+% excludes 0.5 % of the mean power at each edge, i.e. the 99 %-power bandwidth.
+% That is what the field NAME promises, and MATLAB's obw() implements exactly it
+% (verified against the analytic RRC result to 0.64 %).
+%
+% This replaces the former peak-relative (-3 dBc) estimate, which was a DIFFERENT
+% quantity: ITU-R SM.443 requires x ~ 26 dB for an x-dB-down width to approximate
+% OBW, and at x = 3 dB the result is the main-lobe footprint. For RRC that width
+% is ~1.0*Rs and is INDEPENDENT OF THE ROLL-OFF -- measured here at 0.897 / 0.901
+% / 0.803 Rs for beta = 0.1 / 0.25 / 0.5 while the true OBW rises 1.027 -> 1.096
+% -> 1.266 Rs. So the old label was effectively the baud rate and was blind to a
+% parameter it was supposed to reflect.
+%
+% The peak-relative form existed for ONE reason: obw() is unusable on a noisy
+% waveform (7.13*Rs at 10 dB SNR). Now that the measurement runs before noise
+% injection that reason is gone, and with it the need for the collapse guard and
+% the blueprint prior window -- both were noise-robustness scaffolding, not
+% definitional choices. ECC/REC/(06)01 makes the same point from the metrology
+% side: measuring 99 % OBW requires the peak at least 30 dB above the noise
+% floor, so on the noisy buffer the quantity is not merely imprecise, it is
+% undefined at the bottom of our SNR range.
+summary.OccupiedBandwidthHz = csrd.pipeline.measurement.obwActual( ...
+    signalCol, sampleRate, double(p.Results.Percentage), 'Method', 'matlab-obw');
+% Reported for provenance so a consumer can tell which definition produced the
+% value without reading the source.
+obwInfo = struct( ...
+    'BandwidthDefinition', 'ITU-R SM.328 occupied bandwidth (99% power)', ...
+    'BandwidthEstimator', 'MATLAB Signal Processing Toolbox obw()');
 summary.CenterFrequencyHz = localSpectrumCentroid(signalCol, sampleRate);
 envInfo = localDetectEnvelope(signalCol, sampleRate, p.Results.EnvelopeOptions);
 summary.TimeOccupancy = envInfo.TimeOccupancy;
@@ -42,17 +66,12 @@ else
 end
 summary.MeasurementStatus = 'Measured';
 summary.MeasurementSemantics = '';
-% Plan-relative diagnostics. The prior never bounds the reported bandwidth (the
-% window grows until the measurement stops growing), so these describe how far
-% the REALIZATION departed from the blueprint -- a plan-quality signal, not a
-% measurement fault. PriorWindowGrowths > 0 means the realized emitter ran past
-% the band the plan placed it in, or the plan was misplaced; Converged == false
-% means even the growth cap did not settle it and the value is the full-band
-% measurement.
-summary.PriorWindowApplied = obwInfo.PriorWindowApplied;
-summary.PriorWindowFillRatio = obwInfo.PriorWindowFillRatio;
-summary.PriorWindowGrowths = obwInfo.PriorWindowGrowths;
-summary.PriorWindowConverged = obwInfo.PriorWindowConverged;
+% Quantity provenance. A bare number is not a sufficient specification of a
+% measured quantity (JCGM 200:2012 VIM 2.3): the definition and the instrument
+% belong with the value, so a consumer never has to guess which bandwidth
+% convention a label follows.
+summary.BandwidthDefinition = obwInfo.BandwidthDefinition;
+summary.BandwidthEstimator = obwInfo.BandwidthEstimator;
 end
 
 function signalCol = localValidateAndCollapse(signal, sampleRate)

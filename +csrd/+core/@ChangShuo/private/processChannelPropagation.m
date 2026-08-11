@@ -735,8 +735,15 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
     end
 
     try
+        % Same ITU-R SM.328 / RR No. 1.153 occupied-bandwidth definition as the
+        % Measured plane (99 % power, 0.5 % excluded each edge), so the two planes
+        % are comparable by DEFINITION rather than merely by sharing an estimator.
+        % Sharing the old peak-relative default is what made the C8
+        % exec-vs-measured gate self-referential: it verified that one estimator
+        % repeats itself, never that either value was the quantity its field name
+        % claims.
         bwHz = csrd.pipeline.measurement.obwAntennaMax( ...
-            sig, double(segmentSignal.SampleRate));
+            sig, double(segmentSignal.SampleRate), 99, 'Method', 'matlab-obw');
     catch
         bwHz = NaN;
     end
