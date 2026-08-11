@@ -742,8 +742,14 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
         % exec-vs-measured gate self-referential: it verified that one estimator
         % repeats itself, never that either value was the quantity its field name
         % claims.
+        % No explicit Method: take obwActual's default so BOTH planes run the
+        % identical implementation (occupiedBandwidthCore, ITU-R SM.328 with this
+        % package's spectrum preparation). Pinning this side to bare obw() while
+        % the Measured side used the prepared kernel reintroduced exactly the
+        % asymmetry this change exists to remove -- the two planes must differ
+        % only in WHICH BUFFER they measure, never in how.
         bwHz = csrd.pipeline.measurement.obwAntennaMax( ...
-            sig, double(segmentSignal.SampleRate), 99, 'Method', 'matlab-obw');
+            sig, double(segmentSignal.SampleRate));
     catch
         bwHz = NaN;
     end

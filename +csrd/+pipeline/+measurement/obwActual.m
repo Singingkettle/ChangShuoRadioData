@@ -8,48 +8,53 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 % `Truth.Execution.ModulatedBandwidthHz` (see audit §17.6 / §6 C8).
 %
 % USAGE
-%   bwHz = obwActual(signal, sampleRate)               % 99 %, peak-relative
-%   bwHz = obwActual(signal, sampleRate, percentage)   % custom %
-%   bwHz = obwActual(..., 'Method', 'peak-relative')   % default
-%   bwHz = obwActual(..., 'Method', 'matlab-obw')      % raw MATLAB obw
-%   bwHz = obwActual(..., 'PeakRelativeDb', -3)        % default -3 dB
+%   bwHz = obwActual(signal, sampleRate)               % ITU 99 % OBW (default)
+%   bwHz = obwActual(signal, sampleRate, percentage)   % custom power %
+%   bwHz = obwActual(..., 'Method', 'itu-99')          % default
+%   bwHz = obwActual(..., 'Method', 'matlab-obw')      % same definition, obw()
+%   bwHz = obwActual(..., 'Method', 'peak-relative')   % LEGACY x-dB-down width
 %
-% METHODOLOGY
+% DEFINITION
+%   The default reports the ITU-R SM.328 / Radio Regulations No. 1.153 occupied
+%   bandwidth: the band that excludes `(100-percentage)/2` % of the mean power at
+%   each edge, i.e. 99 % of the power in band for the default percentage.
 %
-%   The default ('peak-relative') estimator was selected after the Phase
-%   4 baseline_v0 sweep (561 sources, AWGN cohort) showed that the
-%   previous noise-floor-percentile estimator could NOT make the C8
-%   ExecutionVsMeasuredBwAbsRelDiffP95 < 3 % gate physically realisable
-%   for SNR in [6, 20] dB. The reason is fundamental:
+% HISTORY -- WHY THE DEFAULT CHANGED
+%   This function previously defaulted to a peak-relative (-3 dBc) clip followed
+%   by the narrowest band holding 99 % of the SURVIVING energy, and documented
+%   that as "the standard engineering definition of occupied bandwidth ... X dB
+%   Down mode". The instrument mode is real, but it measures the x-dB-down
+%   bandwidth, which ITU-R SM.328 lists as a SEPARATE quantity; ITU-R SM.443
+%   requires x ~ 26 dB before an x-dB-down width approximates OBW. At x = 3 dB
+%   the result is the main-lobe footprint, and for a root-raised-cosine signal
+%   that footprint is ~1.0*Rs INDEPENDENT OF ROLL-OFF (measured: 0.897 / 0.901 /
+%   0.803 Rs at beta = 0.1 / 0.25 / 0.5, while the true OBW rises 1.027 -> 1.096
+%   -> 1.266 Rs). So the old default published something close to the baud rate
+%   under the name "occupied bandwidth", blind to a parameter it should track.
 %
-%     - The Execution measurement runs on the **clean** modulator output
-%       (zero AWGN), so any bin-amplitude-percentile floor estimate is
-%       dominated by FFT processing leakage and lands many tens of dB
-%       below the signal peak. The threshold therefore drops to ~-30 dBc
-%       and the 99 %-energy mass naturally extends out into the RRC /
-%       OFDM rolloff sidelobes.
-%     - The SourcePlane measurement runs on the **noisy** receiver-rate
-%       waveform. At SNR=6 dB the noise PSD sits ~6 dB below the
-%       in-band peak, so any floor*margin threshold either drowns the
-%       noise (margin too small) or chops off the legitimate rolloff
-%       (margin too large). At realistic operating SNRs the algorithm
-%       reports either Nyquist-edge bandwidths or main-lobe-only
-%       bandwidths; neither matches the clean-side number.
+%   The peak-relative form was adopted for one reason, stated in the original
+%   note below: a power-integral definition is unusable on a NOISY waveform,
+%   because noise contributes power across the whole band. That constraint was
+%   removed when the measurement moved BEFORE noise injection -- both planes now
+%   measure clean, per-emitter, per-antenna buffers, where the power integral is
+%   well posed. ECC/REC/(06)01 agrees from the metrology side: 99 % OBW
+%   measurement requires the peak at least 30 dB above the noise floor.
 %
-%   Peak-relative thresholding sidesteps both failure modes: the
-%   threshold floats with the signal peak, not with the per-source noise
-%   floor, so clean and noisy measurements of the same modulator output
-%   converge as long as the in-band SNR keeps the signal main lobe well
-%   above the chosen ratio. With the default -3 dBc threshold (= peak/2):
+%   'peak-relative' is retained, opt-in only, so the historical behaviour stays
+%   reproducible for before/after comparison. It must never be used as a
+%   published label.
 %
-%     - Clean RRC and noisy RRC at SNR=6..20 dB report identical
-%       bandwidths.
-%     - Clean OFDM and noisy OFDM agree to <0.1 % for the same SNR
-%       range.
-%     - The reported bandwidth is the -3 dB main-lobe footprint, which
-%       is the standard engineering definition of "occupied bandwidth"
-%       on R&S FSV / Keysight 89600 spectrum analysers when the OBW
-%       cursor is configured for "X dB Down" mode (default 3 dB).
+% ORIGINAL NOTE (kept because it records why the noisy-waveform constraint
+% existed, which is what justifies the current ordering):
+%
+%   The 'peak-relative' estimator was selected after the Phase 4 baseline_v0
+%   sweep (561 sources, AWGN cohort) showed that a noise-floor-percentile
+%   estimator could NOT make the C8 ExecutionVsMeasuredBwAbsRelDiffP95 < 3 %
+%   gate physically realisable for SNR in [6, 20] dB, because the Execution
+%   measurement ran on the clean modulator output while the SourcePlane
+%   measurement ran on the noisy receiver-rate waveform. Note that the gate it
+%   was tuned against was itself self-referential: both planes called the same
+%   kernel, so the gate verified repeatability rather than correctness.
 %
 % Inputs:
 %   signal      : complex column vector (or [N x M] for multi-antenna).
@@ -59,7 +64,7 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 %   percentage  : optional scalar in (0, 100], default 99 (%)
 %
 % Optional Name-Value:
-%   'Method'         - 'peak-relative' (default) or 'matlab-obw'
+%   'Method'         - 'itu-99' (default) | 'matlab-obw' | 'peak-relative'
 %   'PeakRelativeDb' - peak-relative threshold in dB, default -3.
 %                      Must be strictly negative. Values:
 %                        -3  : default; main-lobe -3 dB BW. SNR-invariant
@@ -91,7 +96,7 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
     p.FunctionName = 'obwActual';
     p.CaseSensitive = false;
     p.KeepUnmatched = false;
-    addParameter(p, 'Method', 'peak-relative', ...
+    addParameter(p, 'Method', 'itu-99', ...
         @(x) ischar(x) || (isstring(x) && isscalar(x)));
     addParameter(p, 'PeakRelativeDb', -3, ...
         @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x < 0);
@@ -131,14 +136,29 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
     end
 
     switch method
+        case 'itu-99'
+            % Default. The ITU-R SM.328 / RR No. 1.153 quantity, computed on this
+            % package's prepared spectrum so the Nyquist recentre, the
+            % discarded-tail fallback and the degenerate-input contracts all hold.
+            bwHz = csrd.pipeline.measurement.occupiedBandwidthCore( ...
+                signalCol, double(sampleRate), double(percentage));
         case 'matlab-obw'
+            % Independent implementation of the same definition, kept as a
+            % cross-check on the one above. It lacks the spectrum preparation, so
+            % it is not suitable as the production path for edge-placed emitters
+            % or frame-tail bursts.
             bwHz = obw(double(signalCol), double(sampleRate), [], double(percentage));
         case 'peak-relative'
+            % LEGACY, opt-in only. An x-dB-down main-lobe width, NOT an occupied
+            % bandwidth: ITU-R SM.443 needs x ~ 26 dB to approximate OBW and this
+            % uses x = 3 dB, which for RRC is ~1.0*Rs independent of roll-off.
+            % Retained so the peak-relative behaviour stays reproducible for
+            % before/after comparisons; never use it as a published label.
             bwHz = csrd.pipeline.measurement.peakRelativeObwCore( ...
                 signalCol, double(sampleRate), double(percentage), peakRelDb);
         otherwise
             error('CSRD:Measurement:InvalidMethod', ...
-                'obwActual: unsupported Method "%s" (expected peak-relative | matlab-obw).', method);
+                'obwActual: unsupported Method "%s" (expected itu-99 | matlab-obw | peak-relative).', method);
     end
 end
 

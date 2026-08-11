@@ -12,12 +12,18 @@ p.FunctionName = 'measureSignalSummary';
 p.CaseSensitive = false;
 addParameter(p, 'Percentage', 99, ...
     @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0 && x <= 100);
+% Accepted for backward compatibility with callers that still pass it. It has no
+% effect: the published bandwidth is the ITU power-integral quantity, not an
+% x-dB-down width.
 addParameter(p, 'PeakRelativeDb', -3, ...
     @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x < 0);
 addParameter(p, 'EnvelopeOptions', struct(), @(x) isempty(x) || isstruct(x));
-% Blueprint prior: [lowerHz upperHz] search window in receiver-baseband
-% frequency. Empty means the historical full-band search. The value still comes
-% from the data; the window only bounds where the estimator looks.
+% Accepted for backward compatibility. It has no effect: a power-integral
+% definition has no search window to bound. The blueprint prior existed to stop a
+% peak-relative threshold search from bridging a risen noise floor, and the
+% measurement no longer runs on a noisy buffer. The plan remains the right
+% CROSS-CHECK on the result (see measuredPlausibilityViolations), just not an
+% input to it.
 addParameter(p, 'PriorWindowHz', [], ...
     @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
 parse(p, varargin{:});
@@ -47,13 +53,9 @@ summary = struct();
 % side: measuring 99 % OBW requires the peak at least 30 dB above the noise
 % floor, so on the noisy buffer the quantity is not merely imprecise, it is
 % undefined at the bottom of our SNR range.
-summary.OccupiedBandwidthHz = csrd.pipeline.measurement.obwActual( ...
-    signalCol, sampleRate, double(p.Results.Percentage), 'Method', 'matlab-obw');
-% Reported for provenance so a consumer can tell which definition produced the
-% value without reading the source.
-obwInfo = struct( ...
-    'BandwidthDefinition', 'ITU-R SM.328 occupied bandwidth (99% power)', ...
-    'BandwidthEstimator', 'MATLAB Signal Processing Toolbox obw()');
+[summary.OccupiedBandwidthHz, obwInfo] = ...
+    csrd.pipeline.measurement.occupiedBandwidthCore( ...
+        signalCol, sampleRate, double(p.Results.Percentage));
 summary.CenterFrequencyHz = localSpectrumCentroid(signalCol, sampleRate);
 envInfo = localDetectEnvelope(signalCol, sampleRate, p.Results.EnvelopeOptions);
 summary.TimeOccupancy = envInfo.TimeOccupancy;
