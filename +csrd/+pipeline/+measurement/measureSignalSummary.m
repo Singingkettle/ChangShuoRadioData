@@ -12,20 +12,13 @@ p.FunctionName = 'measureSignalSummary';
 p.CaseSensitive = false;
 addParameter(p, 'Percentage', 99, ...
     @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0 && x <= 100);
-% Accepted for backward compatibility with callers that still pass it. It has no
-% effect: the published bandwidth is the ITU power-integral quantity, not an
-% x-dB-down width.
-addParameter(p, 'PeakRelativeDb', -3, ...
-    @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x < 0);
 addParameter(p, 'EnvelopeOptions', struct(), @(x) isempty(x) || isstruct(x));
-% Accepted for backward compatibility. It has no effect: a power-integral
-% definition has no search window to bound. The blueprint prior existed to stop a
-% peak-relative threshold search from bridging a risen noise floor, and the
-% measurement no longer runs on a noisy buffer. The plan remains the right
-% CROSS-CHECK on the result (see measuredPlausibilityViolations), just not an
-% input to it.
-addParameter(p, 'PriorWindowHz', [], ...
-    @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
+% NOTE: there is deliberately no threshold or search-window parameter. A power
+% integral has no threshold to tune and no window to bound, so there is nothing
+% here a caller could set that would change WHICH QUANTITY is reported. The plan
+% is still the right cross-check on the result (measuredPlausibilityViolations),
+% just not an input to it -- which keeps the measured plane independent of the
+% planner, as a blind-detection reference must be.
 parse(p, varargin{:});
 
 signalCol = localValidateAndCollapse(signal, sampleRate);
@@ -122,8 +115,8 @@ if N >= 8
     % across the short-signal boundary.
     psd = movmean(psd, max(3, 2 * round(N / 512) + 1));
 end
-% Float the integration threshold with the signal peak (matching the
-% peak-relative OBW estimator) before forming the energy-weighted mean.
+% Float the integration threshold with the signal peak before forming the
+% energy-weighted mean.
 % Broadband AWGN is symmetric about 0 Hz, so integrating the raw PSD pulls the
 % measured center toward baseband by signalPower/(signalPower+inBandNoise) --
 % biasing the measured CenterFrequencyHz GT by MHz at realistic SNRs, worst for
@@ -134,7 +127,12 @@ if peakVal <= 0
     fcHz = 0;
     return;
 end
-% Collapse guard (mirrors peakRelativeObwCore). When a localized spectral
+% Collapse guard for the CENTROID only. This is a different quantity from the
+% occupied bandwidth above and keeps its own peak-relative logic: a centroid is an
+% energy-weighted mean, so unlike a power-integral width it is genuinely pulled
+% toward a dominant spike and needs the fallback. Reviewed and left unchanged when
+% the bandwidth switched to the ITU power integral -- changing two quantities at
+% once would make either one unattributable. When a localized spectral
 % spike sits a few dB above an otherwise-flat occupied band, the peak-relative
 % clip keeps only the spike and biases the centroid toward it. If the
 % peak-relative retained band is far narrower than a noise-floor-relative band
@@ -144,7 +142,7 @@ end
 peakThreshold = peakVal * 10 ^ (-3 / 10);
 % 10th-percentile floor (not 25th): an emitter may occupy up to 80% of the
 % band, so a 25th-percentile floor would land inside a wideband occupied band
-% and defeat the guard (mirrors peakRelativeObwCore).
+% and defeat the guard.
 floorThreshold = prctile(psd, 10) * 10 ^ (6 / 10);
 peakClipped = psd;
 peakClipped(peakClipped < peakThreshold) = 0;

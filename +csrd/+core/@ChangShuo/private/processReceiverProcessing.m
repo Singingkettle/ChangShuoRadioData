@@ -362,11 +362,10 @@ function execution = buildExecutionTruth(comp)
     validateExecutionSampleGrid(execution, comp);
 end
 
-function summary = localMeasurePerAntenna(signal, sampleRate, observableBwHz, priorWindowHz)
+function summary = localMeasurePerAntenna(signal, sampleRate, observableBwHz)
     % localMeasurePerAntenna - measure one emitter per antenna, then aggregate.
     % Inputs: signal - [samples x antennas] isolated emitter buffer (noise-free);
-    %         sampleRate, observableBwHz - receiver facts;
-    %         priorWindowHz - blueprint prior search window or [].
+    %         sampleRate, observableBwHz - receiver facts.
     % Outputs: summary - measureSignalSummary-shaped struct whose bandwidth is the
     %         MAX across antennas, matching the Execution plane's obwAntennaMax
     %         rule so the two planes are directly comparable.
@@ -378,15 +377,14 @@ function summary = localMeasurePerAntenna(signal, sampleRate, observableBwHz, pr
     % one physical stream instead of a mixture.
     if size(signal, 2) <= 1
         summary = csrd.pipeline.measurement.measureSignalSummary( ...
-            signal, sampleRate, observableBwHz, 'PriorWindowHz', priorWindowHz);
+            signal, sampleRate, observableBwHz);
         return;
     end
     best = [];
     bestBw = -Inf;
     for col = 1:size(signal, 2)
         s = csrd.pipeline.measurement.measureSignalSummary( ...
-            signal(:, col), sampleRate, observableBwHz, ...
-            'PriorWindowHz', priorWindowHz);
+            signal(:, col), sampleRate, observableBwHz);
         if isfinite(s.OccupiedBandwidthHz) && s.OccupiedBandwidthHz > bestBw
             bestBw = s.OccupiedBandwidthHz;
             best = s;
@@ -396,78 +394,10 @@ function summary = localMeasurePerAntenna(signal, sampleRate, observableBwHz, pr
         % No antenna produced a usable bandwidth; fall back to the first stream so
         % the caller's existing failure handling still sees a well-formed struct.
         summary = csrd.pipeline.measurement.measureSignalSummary( ...
-            signal(:, 1), sampleRate, observableBwHz, ...
-            'PriorWindowHz', priorWindowHz);
+            signal(:, 1), sampleRate, observableBwHz);
         return;
     end
     summary = best;
-end
-
-function value = localStructNumber(s, fieldName)
-    % localStructNumber - finite numeric scalar from a struct field, else NaN.
-    % Inputs: s - struct (or anything); fieldName - char field name.
-    % Outputs: value - double scalar, NaN when absent or not a finite scalar.
-    value = NaN;
-    if isstruct(s) && isfield(s, fieldName) && isnumeric(s.(fieldName)) && ...
-            isscalar(s.(fieldName)) && isfinite(s.(fieldName))
-        value = double(s.(fieldName));
-    end
-end
-
-function windowHz = localBlueprintPriorWindow(comp, sampleRate)
-    % localBlueprintPriorWindow - the plan-derived search window for one emitter.
-    % Inputs: comp - component struct carrying ReceiverView (the per-(Tx,Rx)
-    %           projected placement) and DopplerShiftHz;
-    %         sampleRate - receiver sample rate (Hz).
-    % Outputs: windowHz - [lowerHz upperHz] in receiver-baseband frequency, or []
-    %           when the blueprint is unavailable, in which case the estimator
-    %           falls back to the historical full-band search.
-    %
-    % The plan is used as PRIOR INFORMATION, not as the answer: it bounds where
-    % the estimator looks so a single emitter's measured band cannot run across
-    % the whole capture, whatever the cause (noise floor, fading notches, or the
-    % antenna-collapse asymmetry between the Execution and Measured planes).
-    %
-    % Doppler correction is mandatory. ReceiverView.ProjectedCenterOffsetHz is
-    % the planner's PRE-Doppler placement (convert_csrd_to_coco.m says so
-    % explicitly when it insists the COCO bbox use the measured centre), while
-    % the waveform being measured has already been Doppler-shifted in
-    % processChannelPropagation. Without the correction the window would drift off
-    % the realized lobe for fast emitters.
-    %
-    % GUARD_FACTOR widens the planned width. It must absorb PA spectral regrowth
-    % and fading-induced spreading, and it can afford to be generous because the
-    % planned band is itself already WIDER than the measured convention: the plan
-    % is a (1+beta)*Rs 99 %-energy figure while the measurement is a -3 dBc main
-    % lobe, ~27 % narrower for single-carrier. A factor of 2 still blocks the
-    % 6x-81x excursions that motivated this change.
-    GUARD_FACTOR = 2.0;
-    windowHz = [];
-    if ~isstruct(comp) || ~isfield(comp, 'ReceiverView') || ...
-            ~isstruct(comp.ReceiverView)
-        return;
-    end
-    rv = comp.ReceiverView;
-    lower = localStructNumber(rv, 'ProjectedLowerEdgeHz');
-    upper = localStructNumber(rv, 'ProjectedUpperEdgeHz');
-    if ~(isfinite(lower) && isfinite(upper) && upper > lower)
-        return;
-    end
-    centerHz = 0.5 * (lower + upper);
-    plannedWidthHz = upper - lower;
-
-    dopplerHz = localStructNumber(comp, 'DopplerShiftHz');
-    if isfinite(dopplerHz)
-        centerHz = centerHz + dopplerHz;
-    end
-
-    halfWidthHz = 0.5 * GUARD_FACTOR * plannedWidthHz;
-    windowHz = [centerHz - halfWidthHz, centerHz + halfWidthHz];
-    % Never propose a window wider than the captured band; a plan that big
-    % carries no information and the full-band search is the honest answer.
-    if (windowHz(2) - windowHz(1)) >= sampleRate
-        windowHz = [];
-    end
 end
 
 function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
@@ -518,18 +448,10 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         % CSRD:Measurement:SourceCenterFrequencyFailed and
         % CSRD:Measurement:SourceEnvelopeFailed stay here so static gates keep
         % proving live measurement failures are not silently written as NaN.
-        % Blueprint prior: point the estimator at the band the plan placed this
-        % emitter in, instead of searching the whole capture. The VALUE still
-        % comes entirely from the data -- the prior only decides where to look,
-        % exactly as a spectrum-analyser operator sets centre and span from the
-        % drawings before reading the occupied bandwidth off the instrument.
-        priorWindowHz = localBlueprintPriorWindow(comp, sampleRate);
-        % Measure this emitter on its OWN antenna streams, never on a sum. For
-        % MIMO the per-antenna copies are independently faded, so summing them
-        % first fabricates notches and reports a spectrum no transmitter emitted.
-        % Aggregating with max across antennas is what Truth.Execution already
-        % does (csrd.pipeline.measurement.obwAntennaMax), which is what makes the
-        % two planes directly comparable.
+        % Measure this emitter on its OWN antenna streams, never on a sum. The
+        % per-antenna copies are independently faded, so summing them first
+        % reports the interference pattern between the copies rather than the
+        % emitter's occupied bandwidth -- a spectrum no transmitter emitted.
         measurementSignal = isolatedSignal;
         if isfield(comp, 'SignalPerAntenna') && ~isempty(comp.SignalPerAntenna) && ...
                 size(comp.SignalPerAntenna, 1) == size(isolatedSignal, 1)
@@ -537,7 +459,7 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         end
         summary = guardedMeasurement(@() ...
             localMeasurePerAntenna(measurementSignal, sampleRate, ...
-                observableBwHz, priorWindowHz), ...
+                observableBwHz), ...
             'CSRD:Measurement:SourceOBWFailed');
         sourcePlane.OccupiedBandwidthHz = requirePositiveMeasurement( ...
             summary.OccupiedBandwidthHz, ...
