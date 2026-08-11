@@ -119,7 +119,9 @@ frame = struct( ...
     'SignalSources', source, ...
     'RxImpairments', struct());
 payload = struct();
-payload.Header.Runtime = struct('ScenarioId', 1, 'WorkerId', 1);
+% Shared builder -- see csrd.test_support.validRuntimeHeader.
+payload.Header = csrd.test_support.validRuntimeHeader( ...
+    'ScenarioId', 1, 'WorkerId', 1);
 payload.Frames = frame;
 end
 
