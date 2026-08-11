@@ -53,6 +53,11 @@ function test_measured_truth_plausibility(varargin)
     sourcesChecked = 0;
     scenariosRun = 0;
     violations = {};
+    % Low-precision notes are reported, never failed on. See
+    % measuredPlausibilityViolations: a short narrow burst genuinely cannot have a
+    % finely defined bandwidth, so counting those as defects would assert a
+    % dataset-design choice as a correctness property.
+    qualityNotes = {};
 
     for k = 1:numScenarios
         try
@@ -101,9 +106,11 @@ function test_measured_truth_plausibility(varargin)
                     if isempty(sp); continue; end
                     sourcesChecked = sourcesChecked + 1;
                     tag = sprintf('s%d/f%d/src%d', k, fi, si);
-                    violations = [violations, ...
+                    [srcViolations, srcNotes] = ...
                         csrd.test_support.measuredPlausibilityViolations( ...
-                            sp, Fs, tag, localPlausibilityContext(src, sp))]; %#ok<AGROW>
+                            sp, Fs, tag, localPlausibilityContext(src, sp));
+                    violations = [violations, srcViolations]; %#ok<AGROW>
+                    qualityNotes = [qualityNotes, srcNotes]; %#ok<AGROW>
                 end
             end
             scenariosRun = scenariosRun + 1;
@@ -121,6 +128,14 @@ function test_measured_truth_plausibility(varargin)
     fprintf('  Scenarios run     : %d\n', scenariosRun);
     fprintf('  Sources checked   : %d\n', sourcesChecked);
     fprintf('  Bound violations  : %d\n', numel(violations));
+    fprintf('  Low-precision     : %d (%.1f%%, reported not failed)\n', ...
+        numel(qualityNotes), 100 * numel(qualityNotes) / max(1, sourcesChecked));
+    for v = 1:min(5, numel(qualityNotes))
+        fprintf('    ~~ %s\n', qualityNotes{v});
+    end
+    if numel(qualityNotes) > 5
+        fprintf('    ~~ ... and %d more\n', numel(qualityNotes) - 5);
+    end
 
     if ~isempty(violations)
         for v = 1:numel(violations)

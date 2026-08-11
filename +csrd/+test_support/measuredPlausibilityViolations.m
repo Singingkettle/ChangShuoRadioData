@@ -1,8 +1,25 @@
-function violations = measuredPlausibilityViolations(sourcePlane, sampleRate, tag, context)
+function [violations, qualityNotes] = measuredPlausibilityViolations( ...
+        sourcePlane, sampleRate, tag, context)
 %MEASUREDPLAUSIBILITYVIOLATIONS Hard physical-bound checks on a measured SourcePlane.
 %
 %   violations = measuredPlausibilityViolations(sourcePlane, sampleRate, tag)
 %   violations = measuredPlausibilityViolations(sourcePlane, sampleRate, tag, context)
+%   [violations, qualityNotes] = measuredPlausibilityViolations(...)
+%
+%   Two OUTPUTS, deliberately separated, because they answer different questions:
+%
+%     violations   - something is physically impossible. A bug, always.
+%     qualityNotes - the value is true but LOW PRECISION. Not a bug.
+%
+%   The distinction is not cosmetic. A 286 kHz emitter carried in a 512-sample
+%   burst at Fs = 50 MHz cannot be measured more finely than Fs/512 = 98 kHz, so
+%   its bandwidth is reported across ~3 analysis cells. That reading is honest and
+%   the pipeline is behaving correctly; the label is simply coarse. Failing on it
+%   would amount to asserting that the generator must never emit a short narrow
+%   burst, which is a dataset-design choice, not a correctness property. Making it
+%   a note keeps the fact visible -- and the per-source number is published as
+%   Truth.Measured.SourcePlane.BandwidthResolutionCells so a consumer can filter
+%   on it -- without turning a design choice into a red gate.
 %
 %   Returns a cell array of human-readable violation strings; empty means every
 %   bound holds. Unlike a finiteness/shape check, these are PHYSICAL bounds a
@@ -16,7 +33,7 @@ function violations = measuredPlausibilityViolations(sourcePlane, sampleRate, ta
 %       0  <= FrequencyOccupancy   <= 1               (a fraction)
 %       -100 <= SNRdB              <= 200             (no infinite/absurd SNR)
 %
-%   With `context` supplied, one cross-plane bound is added:
+%   Bounds. With `context` supplied, one cross-plane bound is added:
 %
 %       OccupiedBandwidthHz <= PROPAGATION_INFLATION_LIMIT * context.ExecutionBwHz
 %
@@ -69,7 +86,10 @@ function violations = measuredPlausibilityViolations(sourcePlane, sampleRate, ta
 %                     .MeasurementStatus - status string, when known
 %
 %   Outputs:
-%     violations - cell array of violation description strings (empty = clean).
+%     violations   - cell array of violation description strings (empty = clean).
+%     qualityNotes - cell array of low-precision notes. NEVER a failure: these
+%                    describe correct measurements of signals whose burst length
+%                    limits how finely a bandwidth can be defined at all.
 
 if nargin < 3 || isempty(tag)
     tag = 'source';
@@ -79,6 +99,7 @@ if nargin < 4 || isempty(context)
 end
 
 violations = {};
+qualityNotes = {};
 tol = 1.02; % small slack for FFT-bin granularity / floating point
 
 % Propagation is the ONLY stage between Truth.Execution and Truth.Measured, so the
@@ -88,12 +109,11 @@ tol = 1.02; % small slack for FFT-bin granularity / floating point
 % still rejecting the order-of-magnitude excursions.
 PROPAGATION_INFLATION_LIMIT = 1.6;
 
-% Minimum analysis cells for the reported width to be a bandwidth statement at
-% all. ITU-R SM.443 wants a measurement RBW at ~1-3 % of the occupied bandwidth
-% (>= ~33 cells). 8 sits deliberately far below that: this bound is for values
-% that are not bandwidths, not for values measured coarsely. The gap between 8 and
-% 33 is a quality signal for the consumer, published as BandwidthResolutionCells,
-% not a failure here.
+% Below this many analysis cells the reported width is quantised by the burst
+% length rather than by the emitter. ITU-R SM.443 wants a measurement RBW at
+% ~1-3 % of the occupied bandwidth (>= ~33 cells), so 8 is already generous; it is
+% set low on purpose because crossing it produces a NOTE, not a failure, and the
+% note should mark the genuinely coarse cases rather than most of the dataset.
 MIN_RESOLUTION_CELLS = 8;
 
 % Emitters are capped at MaxBandwidthFractionOfSampleRate (0.8) of Fs; anything
@@ -114,19 +134,22 @@ if localFiniteScalar(sourcePlane, 'OccupiedBandwidthHz')
             tag, ob, maxOccupiedFraction, sampleRate * maxOccupiedFraction);
     end
 
-    % A reading spanning only a handful of analysis cells is a resolution floor,
-    % not a bandwidth -- and it is also the mechanism behind the widest
-    % propagation-ratio outliers. Test it FIRST so such a source is reported for
-    % what it is instead of being blamed on propagation.
+    % A reading spanning few analysis cells is quantised by its own burst length
+    % rather than by the emitter, and it is also the mechanism behind the widest
+    % propagation-ratio outliers. Record it FIRST, as a NOTE, and suppress the
+    % propagation comparison for such a source: comparing a coarsely quantised
+    % width against a finely measured one would blame propagation for arithmetic.
     resolvedBandwidth = true;
     if localFiniteScalar(sourcePlane, 'BandwidthResolutionCells')
         cells = sourcePlane.BandwidthResolutionCells;
         if cells < MIN_RESOLUTION_CELLS
             resolvedBandwidth = false;
-            violations{end + 1} = sprintf( ...
-                ['%s OccupiedBandwidthHz=%.4g spans only %.2f analysis cells ', ...
-                 '(RBW=%.4g Hz): a resolution floor, not a measured bandwidth'], ...
-                tag, ob, cells, localFieldOrNaN(sourcePlane, 'BandwidthResolutionHz'));
+            qualityNotes{end + 1} = sprintf( ...
+                ['%s OccupiedBandwidthHz=%.4g spans %.2f analysis cells ', ...
+                 '(RBW=%.4g Hz, %g active samples): quantised by burst length, ', ...
+                 'not by the emitter'], ...
+                tag, ob, cells, localFieldOrNaN(sourcePlane, 'BandwidthResolutionHz'), ...
+                localFieldOrNaN(sourcePlane, 'ActiveSampleCount'));
         end
     end
 
@@ -135,12 +158,17 @@ if localFiniteScalar(sourcePlane, 'OccupiedBandwidthHz')
         execBw = context.ExecutionBwHz;
         ratio = ob / execBw;
         if ratio > PROPAGATION_INFLATION_LIMIT
-            % Report the burst length with the ratio. Propagation is the only
-            % PIPELINE stage between the planes, but it is not the only cause: a
-            % burst clipped at a frame boundary is hard-gated, and a hard-gated
-            % burst of duration T genuinely occupies ~10/T at the 99 % power level.
-            % Naming the sample count here stops a gating artefact from being
-            % misread as a fading defect.
+            % Report the burst length and RBW with the ratio, because propagation
+            % is the only PIPELINE stage between the planes but not the only
+            % possible cause: the two planes also measure buffers of different
+            % length, and a hard-gated burst of duration T occupies ~10/T at the
+            % 99 % power level, so a short clip inflates the measured side on its
+            % own. Printing both numbers lets the reader tell which case they have
+            % instead of assuming fading. The current dataset has one such cluster
+            % -- an FM emitter at 12.0x-13.7x, Rician only, decaying monotonically
+            % across ten consecutive frames on 1024 active samples -- and 1024
+            % samples is NOT short enough for gating to explain 13x (measured:
+            % 1.27x at that length), so its mechanism is still open.
             violations{end + 1} = sprintf( ...
                 ['%s OccupiedBandwidthHz=%.4g is %.3fx its own ExecutionBw=%.4g ', ...
                  '(>%.2fx) on %g active samples at RBW=%.4g Hz; propagation is ', ...
