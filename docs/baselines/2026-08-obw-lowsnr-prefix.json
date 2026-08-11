@@ -1,0 +1,66 @@
+{
+  "SchemaVersion": "baseline-v0",
+  "GeneratedAt": "2026-08-10T02:14:42Z",
+  "GeneratedBy": "tests/regression/test_baseline_sweep_200.m@671878f",
+  "MatlabVersion": "25.1.0.2943329 (R2025a)",
+  "OS": "win64",
+  "Mode": "smoke",
+  "SweepWallclockSec": 429.9860373,
+  "RunRecovery": {
+    "Resume": false,
+    "NumRecoveredScenarios": 0,
+    "AggregationWallclockSec": 429.9860373,
+    "ScenarioWallclockSecSum": 424.0043535
+  },
+  "Recipe": {
+    "RecipeFile": "tests/regression/baseline_recipe_v0.m",
+    "RecipeSha": "65176050d08518889eb06328d5cdffcadac3fae5b7b47d2dd41eee2b41880a64",
+    "NumScenarios": 250,
+    "RngSeed": 2.0260424E+7,
+    "Counts": {
+      "x2p4GHz_AWGN_OFDM_A": 48,
+      "x2p4GHz_AWGN_OFDM_B": 24,
+      "AMBroadcast_AWGN": 12,
+      "FMBroadcast_AWGN": 12,
+      "HighSpeed_Aero_Doppler": 12,
+      "Sub3GHz_AWGN_PSKQAM": 47,
+      "Sub3GHz_RayleighMIMO_OFDM": 47,
+      "Sub3GHz_RicianMIMO_Mixed": 48
+    }
+  },
+  "ToolboxLevel": "minimal",
+  "LogPolicy": "Standard",
+  "Metrics": {
+    "BlueprintAcceptanceRate": 1,
+    "ChannelFactoryFailureRate": 0,
+    "WallclockSecPerScenarioP50": 1.555768,
+    "WallclockSecPerScenarioP95": 3.0793684,
+    "LogLinesPerScenarioP50": 308,
+    "LogLinesPerScenarioP95": 452,
+    "AnnotationFileBytesP50": 32867.5,
+    "AnnotationFileBytesP95": 87974,
+    "ExecutionVsMeasuredBwAbsRelDiffP95": 0.29629629629629628,
+    "ExecutionVsMeasuredBwAbsRelDiffLowSnrP50": 0.027118644067796609,
+    "ExecutionVsMeasuredBwAbsRelDiffLowSnrP95": 1.9793545155288339,
+    "ExecutionVsMeasuredBwAbsRelDiffLowSnrMax": 5.7243816254416959,
+    "EmptySignalSegmentRatio": 0,
+    "BlueprintResamplesP50": 0,
+    "BlueprintResamplesP95": 0,
+    "BlueprintResamplesMax": 0,
+    "BlueprintProvenanceCoverage": 1,
+    "Diagnostics": {
+      "NumScenarioSkipped": 0,
+      "NumScenarioSkippedByReason": {},
+      "NumScenarioRayTracingNoBuildingDataHit": 0,
+      "JsonNanCount": 0,
+      "JsonInfinityCount": 0,
+      "SanitizeManifestSummary": {
+        "TotalEntries": 668
+      },
+      "NumLowSnrExcludedFromBwMetric": 897,
+      "NumBwSamplesUsedLowSnr": 897,
+      "LowSnrFloorDb": 6,
+      "NumBwSamplesUsed": 1170
+    }
+  }
+}
