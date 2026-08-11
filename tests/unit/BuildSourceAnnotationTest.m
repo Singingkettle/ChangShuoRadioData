@@ -188,9 +188,9 @@ classdef BuildSourceAnnotationTest < matlab.unittest.TestCase
                             k, expected));
                 end
                 testCase.verifyEqual(m.SourcePlane.MeasurementSemantics, ...
-                    'receiver_view_isolated');
+                    'receiver_view_isolated_pre_noise');
                 testCase.verifyEqual(m.FramePlane.MeasurementSemantics, ...
-                    'post_rx_combined_pre_rfchain');
+                    'post_rx_combined_pre_noise');
             end
         end
 

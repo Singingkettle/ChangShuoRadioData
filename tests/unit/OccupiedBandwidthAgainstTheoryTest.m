@@ -130,6 +130,32 @@ classdef OccupiedBandwidthAgainstTheoryTest < matlab.unittest.TestCase
             end
         end
 
+        function flatSpectrumMeasuresNinetyNinePercentOfNyquist(testCase)
+            % The other end of the definition, and an exact analytic anchor: a flat
+            % power spectral density spread over the whole Nyquist span has 99 % of
+            % its power in 0.99 * Fs, by inspection of the integral. White noise is
+            % the realisable case.
+            %
+            % This is also the asymptote every flat-topped family approaches -- a
+            % root-raised-cosine with beta -> 0, a large-N OFDM signal, a
+            % high-time-bandwidth chirp -- so it pins the ceiling of the whole
+            % quantity, not just a noise property. And it is the direction an
+            % estimator fails in when it mistakes a noise floor for signal, which
+            % is the failure that produced the historical inflation: the number
+            % must approach 0.99 * Fs, and an estimator that reported a plausible
+            % NARROW band for pure noise would be finding structure that is not
+            % there.
+            Fs = 50e6;
+            n = 32768;
+            rs = RandStream('mt19937ar', 'Seed', 424242);
+            x = (randn(rs, n, 1) + 1i * randn(rs, n, 1)) / sqrt(2);
+            bwHz = csrd.pipeline.measurement.obwActual(x, Fs);
+            testCase.verifyEqual(bwHz / Fs, 0.99, 'AbsTol', 0.01, sprintf( ...
+                ['White noise measured %.4f * Fs; a flat spectrum contains 99 %% ', ...
+                 'of its power in exactly 0.99 * Fs. A materially narrower answer ', ...
+                 'means the estimator is finding structure in noise.'], bwHz / Fs));
+        end
+
         function resolutionCellsRiseWithTheActiveBurstLength(testCase)
             % The conditions published beside the value must actually track the
             % measurement's quality. A burst gated into a long frame is the case

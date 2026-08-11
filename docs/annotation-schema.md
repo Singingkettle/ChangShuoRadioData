@@ -187,8 +187,21 @@ Required semantics:
 
 | Field | Required value |
 |-------|----------------|
-| `SourcePlane.MeasurementSemantics` | `receiver_view_isolated` |
-| `FramePlane.MeasurementSemantics` | `post_rx_combined_pre_rfchain` |
+| `SourcePlane.MeasurementSemantics` | `receiver_view_isolated_pre_noise` |
+| `FramePlane.MeasurementSemantics` | `post_rx_combined_pre_noise` |
+
+Both strings carry `_pre_noise` because the noise-free property is what makes
+these labels usable, and the previous names (`receiver_view_isolated` /
+`post_rx_combined_pre_rfchain`) did not mention it at all. `_pre_noise` implies
+pre-RF-chain: the deferred noise injector runs before the receiver RF chain, so a
+buffer measured before noise is necessarily before thermal noise and the ADC too.
+
+The reader rejects any other value (`CSRD:AnnotationV2:UnexpectedSemantics`), so
+the rename is self-versioning: an annotation written before the measurement moved
+ahead of noise injection is refused rather than silently mixed with new data. That
+is deliberate. Those older files carry occupied bandwidths measured on noisy
+buffers with a peak-relative estimator, which are a different quantity under the
+same field name — exactly the mixture that must never reach a training set.
 
 ### What `OccupiedBandwidthHz` is, and under what conditions
 

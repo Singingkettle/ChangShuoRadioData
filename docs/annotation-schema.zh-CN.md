@@ -83,8 +83,10 @@ reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
 | 字段 | 单位 | 含义 |
 |-------|------|---------|
 | `PlannedCenterFrequencyHz` | Hz | 计划的来源中心,作为**接收机基带偏移**(与 `Execution.CenterFrequencyOffsetHz` 和 `ReceiverView.ProjectedCenterOffsetHz` 处于同一坐标系),而非绝对 RF 载波 |
-| `PlannedBandwidthHz` | Hz | 蓝图带宽 |
+| `PlannedBandwidthHz` | Hz | 蓝图带宽:规划器分配的**额度**,即一个上限,不是对测得宽度的预测 |
 | `PlannedSampleRate` | Hz | 计划采样率 |
+| `PlannedSymbolRateHz` | Hz | 规划器选定的符号率;无此概念的族取 `NaN` |
+| `PlannedRolloffFactor` | 标量 | 规划器选定的脉冲成形滚降;不适用处取 `NaN` |
 | `ModulationFamily` | 文本 | 设计类别,供下游分类器使用 |
 | `ModulationOrder` | 标量 | 适用时的调制阶数 |
 | `MessageSource` | 文本 | 基带源:`Audio`(模拟)或 `RandomBit`(数字) |
@@ -155,8 +157,56 @@ reader = csrd.pipeline.annotation.readAnnotation(annotationPath, ...
 
 | 字段 | 必需取值 |
 |-------|----------------|
-| `SourcePlane.MeasurementSemantics` | `receiver_view_isolated` |
-| `FramePlane.MeasurementSemantics` | `post_rx_combined_pre_rfchain` |
+| `SourcePlane.MeasurementSemantics` | `receiver_view_isolated_pre_noise` |
+| `FramePlane.MeasurementSemantics` | `post_rx_combined_pre_noise` |
+
+两个字符串都带 `_pre_noise`,因为标注可用的前提正是"无噪"这一性质,而旧名
+(`receiver_view_isolated` / `post_rx_combined_pre_rfchain`)对此一字未提。
+`_pre_noise` 蕴含 pre-RF-chain:延迟注噪器在接收 RF 链之前运行,所以在注噪之前
+测得的缓冲必然也在热噪声与 ADC 之前。
+
+reader 硬拒其它取值(`CSRD:AnnotationV2:UnexpectedSemantics`),因此改名自带
+版本判别:在"测量前移到注噪之前"这一改动之前写出的标注会被直接拒绝,而不是被
+静默混入新数据。这是刻意的——那些旧文件里的占用带宽是在含噪缓冲上用
+peak-relative 估计器测出的,与同名字段现在的量不是一回事,而这种混合恰恰是绝
+不能进入训练集的。
+
+### `OccupiedBandwidthHz` 是什么量,在什么条件下测得
+
+`OccupiedBandwidthHz` 是 **ITU-R SM.328 / 无线电规则 No. 1.153 的占用带宽**:
+两侧各排除总平均功率 0.5% 后的频带。它**不是** x dB 下降宽度;ITU-R SM.443 要求
+x 约 26 dB 时后者才近似前者。量的定义与产出它的估计器随值一起发布,使消费方
+永远不必猜标注遵循哪种口径:
+
+| 字段 | 含义 |
+|-------|---------|
+| `BandwidthDefinition` | 量的定义,例如 `ITU-R SM.328 occupied bandwidth (99% power)` |
+| `BandwidthEstimator` | 产出该值的函数 |
+
+两个平面都测量**干净、逐发射机、逐天线、注噪之前**的缓冲。逐发射机逐天线很重要:
+同一发射机的各天线副本经历独立衰落,先求和会报出副本之间的干涉图样,而不是任何
+发射机真正发出的带宽。注噪之前也很重要:功率积分定义在含噪缓冲上不只是不精确,
+而是**未定义**——噪声在整个频带贡献功率,而 ECC/REC/(06)01 要求峰值至少高出噪声
+底 30 dB 才能测 99% 占用带宽。`SNRdB` 仍然描述**被保存下来**的那一帧所携带的噪声
+水平;它和带宽描述同一次投递的不同侧面,不是同一个缓冲的两个属性。
+
+### 测量条件(`SourcePlane`)
+
+一个孤立的数值不足以规定一个测得量(JCGM 200:2012 VIM 2.3)。同一个 15 MHz 读数
+在 32768 样本缓冲上和在 64 样本突发上含义完全不同,因为持续时间为 T 的硬门控突发
+在 99% 功率口径下确实占据约 10/T ——这是关于"一个本不该那样被构造出来的信号"的
+真陈述,不是测量错误。下列字段让消费方能区分这两种情况:
+
+| 字段 | 单位 | 含义 |
+|-------|------|---------|
+| `BandwidthResolutionHz` | Hz | 该答案实际的分辨率:取"分析栅格"与 `SampleRate / ActiveSampleCount` 中**更粗**的一个,因为零填充只是对频谱插值,从不增加信息 |
+| `BandwidthResolutionCells` | 个 | `OccupiedBandwidthHz / BandwidthResolutionHz`。ITU-R SM.443 认为可用的测量 RBW 应为宽度的 1–3%,即 33 格以上;低于约 8 时,该值是被突发长度而非发射机量化的 |
+| `ActiveSampleCount` | 个 | 携带能量的样本数,它决定分辨率下限 |
+
+这些字段描述测量本身而非标注值,所以与测得的标量不同,对退化缓冲可以合法取 `NaN`。
+`BandwidthResolutionCells` 偏低是**精度陈述,不是缺陷**:50 MHz 采样下 512 样本突发
+里的 286 kHz 发射机本来就不可能测得比 98 kHz 更细。代表性扫描中约 43% 的源低于
+8 格,需要精细宽度的消费方应按该字段筛选。
 
 ## ReceiverView
 

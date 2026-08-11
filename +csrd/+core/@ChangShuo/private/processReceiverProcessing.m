@@ -431,7 +431,7 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane.SNRdB                = NaN;
     sourcePlane.TimeOccupancy        = NaN;
     sourcePlane.FrequencyOccupancy   = NaN;
-    sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
+    sourcePlane.MeasurementSemantics = 'receiver_view_isolated_pre_noise';
     % Measurement conditions for OccupiedBandwidthHz. See measureSignalSummary:
     % BandwidthResolutionCells says how many analysis cells the reported width
     % spans, which is the one number that separates a bandwidth from a resolution
@@ -605,7 +605,7 @@ function fp = makeEmptyFramePlane()
         'TimeOccupancy',        NaN, ...
         'FrequencyOccupancy',   NaN, ...
         'MeasurementStatus',    'NoSignal', ...
-        'MeasurementSemantics', 'post_rx_combined_pre_rfchain');
+        'MeasurementSemantics', 'post_rx_combined_pre_noise');
 end
 
 function bwHz = computeObservableBandwidthHz(rxInfo)
