@@ -439,6 +439,12 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane.BandwidthResolutionHz    = NaN;
     sourcePlane.BandwidthResolutionCells = NaN;
     sourcePlane.ActiveSampleCount        = NaN;
+    % Shape, not just width. SpectralConcentrationRatio = 99 % span / 50 % span
+    % distinguishes a lobe-dominated reading from a floor-dominated one; a
+    % frequency-selective null on the emitter's lobe raises it to tens while the
+    % ITU 99 % number is still correct for the notched waveform.
+    sourcePlane.HalfPowerSpanHz          = NaN;
+    sourcePlane.SpectralConcentrationRatio = NaN;
 
     % Liveness is energy-based, not sample-count-based: an empty channel
     % output (e.g. a link with no propagation paths) is zero-padded to the
@@ -515,6 +521,10 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
             getFieldOrDefault(summary, 'BandwidthResolutionCells', NaN);
         sourcePlane.ActiveSampleCount = ...
             getFieldOrDefault(summary, 'ActiveSampleCount', NaN);
+        sourcePlane.HalfPowerSpanHz = ...
+            getFieldOrDefault(summary, 'HalfPowerSpanHz', NaN);
+        sourcePlane.SpectralConcentrationRatio = ...
+            getFieldOrDefault(summary, 'SpectralConcentrationRatio', NaN);
     end
 
     measured.SourcePlane = sourcePlane;

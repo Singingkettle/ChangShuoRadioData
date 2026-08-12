@@ -81,6 +81,19 @@ summary.BandwidthEstimator = obwInfo.BandwidthEstimator;
 % floor rather than a bandwidth.
 summary.BandwidthResolutionHz = obwInfo.ResolutionBandwidthHz;
 summary.ActiveSampleCount = obwInfo.ActiveSampleCount;
+% Spectral concentration: how many half-power spans fit inside the 99 % span. It
+% answers a question BandwidthResolutionCells structurally cannot -- that one
+% divides the reported width by the analysis resolution, so an INFLATED reading
+% earns a HIGH cell count and looks well resolved. This ratio instead compares two
+% widths of the same distribution, so a reading dominated by a broadband floor
+% rather than by the emitter's lobe stands out however wide it is.
+summary.HalfPowerSpanHz = obwInfo.HalfPowerSpanHz;
+if isfinite(obwInfo.HalfPowerSpanHz) && obwInfo.HalfPowerSpanHz > 0
+    summary.SpectralConcentrationRatio = ...
+        summary.OccupiedBandwidthHz / obwInfo.HalfPowerSpanHz;
+else
+    summary.SpectralConcentrationRatio = NaN;
+end
 if isfinite(obwInfo.ResolutionBandwidthHz) && obwInfo.ResolutionBandwidthHz > 0
     summary.BandwidthResolutionCells = ...
         summary.OccupiedBandwidthHz / obwInfo.ResolutionBandwidthHz;

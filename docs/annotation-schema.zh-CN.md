@@ -225,6 +225,19 @@ x 约 26 dB 时后者才近似前者。量的定义与产出它的估计器随�
 | `BandwidthResolutionHz` | Hz | 该答案实际的分辨率:取"分析栅格"与 `SampleRate / ActiveSampleCount` 中**更粗**的一个,因为零填充只是对频谱插值,从不增加信息 |
 | `BandwidthResolutionCells` | 个 | `OccupiedBandwidthHz / BandwidthResolutionHz`。ITU-R SM.443 认为可用的测量 RBW 应为宽度的 1–3%,即 33 格以上;低于约 8 时,该值是被突发长度而非发射机量化的 |
 | `ActiveSampleCount` | 个 | 携带能量的样本数,它决定分辨率下限 |
+| `HalfPowerSpanHz` | Hz | 由同一次累积行走得到的、容纳中间 50% 功率的跨度 |
+| `SpectralConcentrationRatio` | 比值 | `OccupiedBandwidthHz / HalfPowerSpanHz`。任何行为良好的分布都约为 2——干净根升余弦 2.18、白噪声 1.99(平坦谱给出 0.99·Fs / 0.5·Fs)。只有"窄主瓣压在宽底噪上"时才会增大;超过约 8 时,报出的宽度描述的是底噪而不是发射机 |
+
+`SpectralConcentrationRatio` 之所以必需,是因为 `BandwidthResolutionCells` **结构上**
+无法发现这种情况:那个字段是"报出的宽度 ÷ 分析分辨率",所以一个**被膨胀**的读数反而得到
+**很高**的格数、看起来分辨良好。浓度比拿的是**同一个分布的两个宽度**,因此它测的是形状而
+不是大小。
+
+它捕捉的情况是真实的,而且报出的带宽是**正确**的:延迟 1 µs 的两抽头信道频响每 1 MHz 一个
+零点、最小值 10.7 dB,所以一个零点落在约 1 MHz 的发射机上会把主瓣压低约 10 dB,而几乎不
+触碰硬门控与 PA 再生长留下的宽带底。那个被切槽波形的 ITU 99% 带宽确实是几十 MHz。本数据集
+就含有这样一簇——一个 FM 发射机报出 15 MHz,而一半功率在 625 kHz 之内、浓度 24——它以
+77 格通过了分辨率检查。需要"标注描述发射机自身带宽"的消费方应按此字段筛选。
 
 这些字段描述测量本身而非标注值,所以与测得的标量不同,对退化缓冲可以合法取 `NaN`。
 `BandwidthResolutionCells` 偏低是**精度陈述,不是缺陷**:50 MHz 采样下 512 样本突发

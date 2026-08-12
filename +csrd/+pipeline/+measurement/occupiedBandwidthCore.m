@@ -78,6 +78,7 @@ info = struct( ...
     'SpectrumSource', 'pwelch', ...
     'ResolutionBandwidthHz', NaN, ...
     'ActiveSampleCount', 0, ...
+    'HalfPowerSpanHz', NaN, ...
     'BandwidthDefinition', ...
         csrd.pipeline.measurement.bandwidthDefinitionString(pct), ...
     'BandwidthEstimator', 'csrd.pipeline.measurement.occupiedBandwidthCore');
@@ -177,6 +178,23 @@ info.ResolutionBandwidthHz = max(binWidthHz, min(burstResolutionHz, sampleRate))
 
 lowerEdgeHz = localInterpolatedCrossing(cumPower, fAxis, lowerTarget, binWidthHz);
 upperEdgeHz = localInterpolatedCrossing(cumPower, fAxis, upperTarget, binWidthHz);
+
+% The SHAPE of the distribution, not just its 99 % width: the span holding the
+% middle 50 % of the power, from the same cumulative walk. Comparing the two spans
+% says whether the reported bandwidth describes a LOBE or a FLOOR, and that
+% distinction cannot be recovered from the 99 % number alone.
+%
+% Why it is needed. A frequency-selective channel can notch the main lobe -- a
+% two-tap profile with a 1 us delay has nulls every 1 MHz and a 10.7 dB minimum, so
+% a null landing on a ~1 MHz emitter suppresses its lobe by ~10 dB while barely
+% touching the wideband floor left by hard gating and PA regrowth. The 99 % edges
+% then walk out to the band extremes and the ITU quantity is correctly reported as
+% tens of MHz, while half the power still sits in a few hundred kHz. Measured in
+% this dataset: 50 % within 350 kHz against a 99 % span of 15 MHz, a ratio of ~43,
+% where a healthy lobe-dominated signal sits near 2-4.
+info.HalfPowerSpanHz = max(0, ...
+    localInterpolatedCrossing(cumPower, fAxis, 0.75 * totalPower, binWidthHz) - ...
+    localInterpolatedCrossing(cumPower, fAxis, 0.25 * totalPower, binWidthHz));
 
 info.LowerEdgeHz = lowerEdgeHz;
 info.UpperEdgeHz = upperEdgeHz;

@@ -267,6 +267,23 @@ measurement error. These fields let a consumer tell the two apart:
 | `BandwidthResolutionHz` | Hz | Resolution the answer was produced at: the COARSER of the analysis grid and `SampleRate / ActiveSampleCount`, because zero padding interpolates a spectrum and never adds information |
 | `BandwidthResolutionCells` | count | `OccupiedBandwidthHz / BandwidthResolutionHz`. ITU-R SM.443 puts a usable measurement RBW at 1–3 % of the width, i.e. 33 cells or more; below about 8 the value is quantised by the burst length rather than by the emitter |
 | `ActiveSampleCount` | count | Samples carrying energy, which is what sets the resolution floor |
+| `HalfPowerSpanHz` | Hz | Span holding the middle 50 % of the power, from the same cumulative walk |
+| `SpectralConcentrationRatio` | ratio | `OccupiedBandwidthHz / HalfPowerSpanHz`. About 2 for any well-behaved distribution — 2.18 for a clean root-raised-cosine, 1.99 for white noise, since a flat spectrum gives 0.99·Fs / 0.5·Fs. It grows only when a narrow lobe sits on a broadband floor; above ~8 the reported width describes the floor, not the emitter |
+
+`SpectralConcentrationRatio` exists because `BandwidthResolutionCells` structurally
+cannot detect this case: that field divides the reported width by the analysis
+resolution, so an INFLATED reading earns a HIGH cell count and looks well resolved.
+The concentration ratio compares two widths of the SAME distribution, so it measures
+shape rather than size.
+
+The case it catches is real and the reported bandwidth is CORRECT. A two-tap channel
+profile with a 1 µs delay has nulls every 1 MHz and a 10.7 dB minimum, so a null
+landing on a ~1 MHz emitter suppresses its lobe by about 10 dB while barely touching
+the wideband floor left by hard gating and PA regrowth. The ITU 99 % band of that
+notched waveform really is tens of MHz. This dataset contains such a cluster — an FM
+emitter reported at 15 MHz with half its power inside 625 kHz, concentration 24 —
+which passed the resolution test at 77 cells. A consumer wanting labels that describe
+an emitter's own bandwidth should filter on this field.
 
 These describe the measurement rather than being labels themselves, so unlike the
 measured scalars they may legitimately be `NaN` for a degenerate buffer. A low

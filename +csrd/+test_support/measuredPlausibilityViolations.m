@@ -9,7 +9,10 @@ function [violations, qualityNotes] = measuredPlausibilityViolations( ...
 %   Two OUTPUTS, deliberately separated, because they answer different questions:
 %
 %     violations   - something is physically impossible. A bug, always.
-%     qualityNotes - the value is true but LOW PRECISION. Not a bug.
+%     qualityNotes - the value is TRUE but not usable as the emitter's bandwidth:
+%                    either quantised by the burst length, or describing a
+%                    broadband floor after a frequency-selective null suppressed
+%                    the lobe. Not a bug.
 %
 %   The distinction is not cosmetic. A 286 kHz emitter carried in a 512-sample
 %   burst at Fs = 50 MHz cannot be measured more finely than Fs/512 = 98 kHz, so
@@ -116,6 +119,14 @@ PROPAGATION_INFLATION_LIMIT = 1.6;
 % note should mark the genuinely coarse cases rather than most of the dataset.
 MIN_RESOLUTION_CELLS = 8;
 
+% Above this, the reported width describes a broadband FLOOR rather than the
+% emitter's lobe. The ratio is 99 %-span / 50 %-span, so it is ~2 for any
+% well-behaved distribution -- measured 2.18 for a clean root-raised-cosine and
+% 1.99 for white noise, since a flat spectrum gives 0.99*Fs / 0.5*Fs. It only grows
+% when a narrow lobe sits on a wide floor. 8 is comfortably above every healthy
+% case and far below the pathological one (~43, see below).
+MAX_SPECTRAL_CONCENTRATION = 8;
+
 % Emitters are capped at MaxBandwidthFractionOfSampleRate (0.8) of Fs; anything
 % materially above that is the estimator bridging the capture band, not a wide
 % emitter.
@@ -150,6 +161,34 @@ if localFiniteScalar(sourcePlane, 'OccupiedBandwidthHz')
                  'not by the emitter'], ...
                 tag, ob, cells, localFieldOrNaN(sourcePlane, 'BandwidthResolutionHz'), ...
                 localFieldOrNaN(sourcePlane, 'ActiveSampleCount'));
+        end
+    end
+
+    % A width that describes a FLOOR rather than a lobe. This catches a case
+    % BandwidthResolutionCells structurally cannot: that test divides the reported
+    % width by the analysis resolution, so an INFLATED reading earns a HIGH cell
+    % count and passes as well resolved. The dataset's worst
+    % Measured-vs-Execution cluster is exactly that shape -- an FM emitter reported
+    % at 15 MHz with half its power inside 350 kHz, a ratio near 43, which sailed
+    % through the resolution test at 77 cells.
+    %
+    % Its mechanism is understood and the reported number is CORRECT: a two-tap
+    % channel profile with a 1 us delay has nulls every 1 MHz and a 10.7 dB minimum,
+    % so a null landing on a ~1 MHz emitter suppresses the lobe by ~10 dB while
+    % barely touching the wideband floor from hard gating and PA regrowth. The ITU
+    % 99 % band of THAT waveform really is tens of MHz. So this is a NOTE, not a
+    % violation: the measurement is right and the label is unusable as "the
+    % emitter's bandwidth", which is a fact a consumer must be able to see rather
+    % than a defect to be fixed in the estimator.
+    if localFiniteScalar(sourcePlane, 'SpectralConcentrationRatio')
+        concentration = sourcePlane.SpectralConcentrationRatio;
+        if concentration > MAX_SPECTRAL_CONCENTRATION
+            resolvedBandwidth = false;
+            qualityNotes{end + 1} = sprintf( ...
+                ['%s OccupiedBandwidthHz=%.4g holds half its power within %.4g Hz ', ...
+                 '(concentration %.1fx, healthy ~2): the width describes a ', ...
+                 'broadband floor, not the emitter''s lobe'], ...
+                tag, ob, localFieldOrNaN(sourcePlane, 'HalfPowerSpanHz'), concentration);
         end
     end
 

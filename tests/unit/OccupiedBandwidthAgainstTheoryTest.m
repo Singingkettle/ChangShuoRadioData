@@ -156,6 +156,52 @@ classdef OccupiedBandwidthAgainstTheoryTest < matlab.unittest.TestCase
                  'means the estimator is finding structure in noise.'], bwHz / Fs));
         end
 
+        function concentrationRatioSeparatesALobeFromAFloor(testCase)
+            % The discriminator that BandwidthResolutionCells structurally cannot
+            % provide. That one divides the reported width by the analysis
+            % resolution, so an INFLATED reading earns a HIGH cell count and passes
+            % as well resolved -- the dataset's worst Measured-vs-Execution cluster
+            % sailed through it at 77 cells while holding half its power in 350 kHz.
+            %
+            % SpectralConcentrationRatio = 99 %-span / 50 %-span compares two widths
+            % of the SAME distribution, so it measures shape. It is ~2 for anything
+            % well behaved, including a flat spectrum (0.99*Fs / 0.5*Fs = 1.98), and
+            % grows only when a narrow lobe sits on a broadband floor.
+            [x, Fs] = testCase.makeRrcQam(0.25);
+            lobe = csrd.pipeline.measurement.measureSignalSummary(x, Fs, Fs);
+            testCase.verifyLessThan(lobe.SpectralConcentrationRatio, 4, sprintf( ...
+                ['A clean root-raised-cosine is lobe-dominated; concentration ', ...
+                 '%.3f should sit near 2.'], lobe.SpectralConcentrationRatio));
+
+            rs = RandStream('mt19937ar', 'Seed', 424242);
+            n = (randn(rs, 32768, 1) + 1i * randn(rs, 32768, 1)) / sqrt(2);
+            flat = csrd.pipeline.measurement.measureSignalSummary(n, 50e6, 50e6);
+            testCase.verifyLessThan(flat.SpectralConcentrationRatio, 4, sprintf( ...
+                ['A flat spectrum must ALSO read near 2 (0.99*Fs / 0.5*Fs = 1.98); ', ...
+                 'got %.3f. A metric that flagged wideband signals as pathological ', ...
+                 'would just be a width test in disguise.'], ...
+                flat.SpectralConcentrationRatio));
+
+            % A narrow lobe on a wide floor: the shape a frequency-selective null
+            % produces when it suppresses the lobe by ~10 dB and leaves the floor.
+            % Its ITU 99 % bandwidth is CORRECTLY wide, which is exactly why width
+            % alone cannot detect it.
+            FsWide = 50e6;
+            nWide = numel(x);
+            tWide = (0:nWide - 1)' / FsWide;
+            narrow = exp(1i * 2 * pi * 3e5 * tWide);
+            rs2 = RandStream('mt19937ar', 'Seed', 99);
+            floorNoise = (randn(rs2, nWide, 1) + 1i * randn(rs2, nWide, 1)) / sqrt(2);
+            mixed = narrow + 0.1 * floorNoise;   % floor at -20 dBc, band-filling
+            notched = csrd.pipeline.measurement.measureSignalSummary(mixed, FsWide, FsWide);
+            testCase.verifyGreaterThan(notched.SpectralConcentrationRatio, 8, sprintf( ...
+                ['A narrow lobe on a -20 dBc band-filling floor must be flagged: ', ...
+                 'OBW %.4g Hz with half the power inside %.4g Hz is concentration ', ...
+                 '%.2f, and the gate threshold is 8.'], ...
+                notched.OccupiedBandwidthHz, notched.HalfPowerSpanHz, ...
+                notched.SpectralConcentrationRatio));
+        end
+
         function resolutionCellsRiseWithTheActiveBurstLength(testCase)
             % The conditions published beside the value must actually track the
             % measurement's quality. A burst gated into a long frame is the case
