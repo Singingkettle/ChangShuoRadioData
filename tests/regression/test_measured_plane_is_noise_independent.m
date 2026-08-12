@@ -188,6 +188,15 @@ function [diffs, snrs] = localCohortDiffs(masterCfg, runRoot, numScenarios, snrD
 
             step(runner, 1, 1);
 
+            % A failed scenario must not silently shrink a cohort. This gate
+            % compares two SNR cohorts, so losing scenarios from one of them
+            % changes exactly the statistic under test.
+            runSummary = runner.LastRunSummary;
+            assert(runSummary.Failed == 0, ...
+                ['Noise-independence gate: %s scenario %d FAILED generation, which ', ...
+                 'would shrink one cohort and bias the comparison. Cause: %s'], ...
+                tag, k, runSummary.FirstFailureMessage);
+
             if exist(annotationPath, 'file') ~= 2
                 fprintf(2, '  %s scenario %d: no annotation written\n', tag, k);
                 continue;

@@ -96,6 +96,18 @@ function test_measured_truth_plausibility(varargin)
 
             step(runner, 1, 1);
 
+            % A scenario that failed generation must be a LOUD failure, not a
+            % quietly smaller sample. step() returns normally either way and the
+            % counts used to live only in a log line, so a gate looping over
+            % scenarios lost data with no signal at all -- which is how an
+            % intractable-resample-ratio failure (1 scenario in 24, ratio
+            % 1902671/1179923) stayed hidden behind a stale annotation read.
+            runSummary = runner.LastRunSummary;
+            assert(runSummary.Failed == 0, ...
+                ['Plausibility gate: scenario %d FAILED generation, so this gate ', ...
+                 'would otherwise score fewer sources than it asked for and call ', ...
+                 'that a result. Cause: %s'], k, runSummary.FirstFailureMessage);
+
             [annotation, annotationMeta] = csrd.test_support.freshAnnotationReader( ...
                 'read', annotationPath, sprintf('scenario %d', k));
             fprintf('  s%-3d %-9s %8d bytes  %s\n', k, ...

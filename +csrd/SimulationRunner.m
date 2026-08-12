@@ -75,6 +75,28 @@ classdef SimulationRunner < matlab.System
         RuntimePlan struct
     end
 
+    properties (SetAccess = private, GetAccess = public)
+        % LastRunSummary: outcome of the most recent step(), readable by callers.
+        %
+        %   .Successful / .Failed / .Skipped - scenario counts
+        %   .FirstFailureMessage             - '' when none failed
+        %
+        %   These counts previously lived only in locals, went to the log and the
+        %   performance trace, and were then discarded -- so step() returned
+        %   normally whether a scenario had produced an annotation or not, and a
+        %   caller had no programmatic way to tell. Every gate that loops over
+        %   scenarios then lost data silently: a generation failure looked
+        %   identical to a successful run with fewer sources. That is how an
+        %   intractable-resample-ratio failure (TRFSimulator.resampleToTarget
+        %   refusing a 1902671/1179923 ratio) stayed hidden behind a stale
+        %   annotation read for as long as it did.
+        %
+        %   A caller that asks for N scenarios and gets fewer must be able to say
+        %   so, so this is a public fact rather than a log line.
+        LastRunSummary = struct('Successful', 0, 'Failed', 0, 'Skipped', 0, ...
+            'FirstFailureMessage', '')
+    end
+
     properties (Access = private)
         % logger: Logger instance for tracking simulation progress and debugging
         logger
@@ -327,6 +349,11 @@ classdef SimulationRunner < matlab.System
 
                 catch scenarioError
                     failedScenarios = failedScenarios + 1;
+                    if isempty(obj.LastRunSummary.FirstFailureMessage)
+                        obj.LastRunSummary.FirstFailureMessage = sprintf( ...
+                            'scenario %d: %s (%s)', scenarioId, ...
+                            scenarioError.message, scenarioError.identifier);
+                    end
                     scenarioTime = toc(scenarioStartTime);
 
                     % Display progress even for failed scenarios
@@ -351,6 +378,10 @@ classdef SimulationRunner < matlab.System
                 failedScenarios, skippedScenarios, simulationStartTime, true);
             csrd.runtime.map.osmSiteViewerCache('retain', false);
             csrd.runtime.map.osmSiteViewerCache('clear');
+
+            obj.LastRunSummary.Successful = successfulScenarios;
+            obj.LastRunSummary.Failed = failedScenarios;
+            obj.LastRunSummary.Skipped = skippedScenarios;
 
             obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, ...
                 skippedScenarios, simulationStartTime);
