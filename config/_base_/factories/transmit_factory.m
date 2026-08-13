@@ -36,6 +36,23 @@ function config = transmit_factory()
     % --- Reference impedance (shared across all Methods) ---
     config.Factories.Transmit.Simulation.Nonlinearity.ReferenceImpedance = 50; % Ω
 
+    % --- Input back-off (shared across all Methods) ---
+    % Drawn per transmitter and enforced in TRFSimulator before the PA: if the
+    % drive's mean power sits closer than InputBackoffDb to the PA's own
+    % measured 1 dB compression point, it is ATTENUATED down to P1dB - IBO;
+    % a drive already further from compression is left untouched (never
+    % boosted -- the boost variant measurably pulled clean draws into
+    % compression, see the Step 3.5 comment in TRFSimulator). This is the one
+    % guard that fixes the over-driven Methods identically -- e.g. the lookup
+    % table, whose unit-power drive sat 17 dB PAST compression -- while the
+    % curve-shape parameters above stay canonical. The drawn value is exported
+    % with RFImpairments.NonlinearityConfig as the labeled minimum back-off.
+    % Real systems run 6-10 dB backed off for linear modulations; the 4 dB end
+    % of the range keeps draws with visible shoulders in the dataset on
+    % purpose. Absolute output power is unaffected: TRF Step 7 renormalizes to
+    % TxPowerDb.
+    config.Factories.Transmit.Simulation.Nonlinearity.InputBackoffDb = [4, 12];
+
     % --- Available Methods ---
     config.Factories.Transmit.Simulation.Nonlinearity.Methods = { ...
         'Cubic polynomial', 'Hyperbolic tangent', 'Saleh model', ...

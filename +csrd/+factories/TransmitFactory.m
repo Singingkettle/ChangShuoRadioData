@@ -327,6 +327,21 @@ classdef TransmitFactory < matlab.System
             end
 
             nonlinConfig.ReferenceImpedance = referenceImpedance;
+
+            % Drawn minimum input back-off (dB below the PA's measured 1 dB
+            % compression point; the TRF attenuates the drive down to it only
+            % when the drive sits closer than this, never boosts). Optional in
+            % the config so hand-built test fixtures without the field keep
+            % their exact drive level; when present it becomes part of the
+            % exported RFImpairments.NonlinearityConfig, i.e. a labeled
+            % property of the transmitter.
+            if isfield(nonlinField, 'InputBackoffDb') && ...
+                    ~isempty(nonlinField.InputBackoffDb)
+                iboRange = nonlinField.InputBackoffDb;
+                nonlinConfig.InputBackoffDb = obj.randomInRange( ...
+                    iboRange(1), iboRange(end));
+            end
+
             obj.logger.debug('Configured nonlinearity method "%s"', selectedMethod);
         end
 
