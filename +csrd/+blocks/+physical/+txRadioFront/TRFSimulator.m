@@ -987,47 +987,22 @@ classdef TRFSimulator < matlab.System
             % Inputs: obj - a TRFSimulator whose MemoryLessNonlinearityConfig is set.
             % Outputs: refDbm - input power (dBm at ReferenceImpedance) where the
             %          configured PA's gain has compressed 1 dB below its PEAK
-            %          value over the sweep; NaN when it never compresses within
-            %          the probe range (a linear PA needs no back-off).
+            %          value; NaN when it never compresses within the probe range
+            %          (a linear PA needs no back-off).
             %
-            % Measured NUMERICALLY on a probe instance rather than derived from
-            % per-Method closed forms, for two reasons. First, one procedure
-            % covers all six comm.MemorylessNonlinearity Methods identically --
-            % IIP3-to-P1dB conversions exist only for the polynomial models, the
-            % Saleh/Ghorbani/Rapp/Lookup reference points would each need their
-            % own formula, and a wrong formula here silently mis-positions the
-            % operating point (the exact defect class this mechanism exists to
-            % remove). Second, the probe measures the PA THE PIPELINE ACTUALLY
-            % BUILT, InputScaling and all, so a future Method or parameter change
-            % cannot desynchronise a formula from the implementation.
-            %
-            % Compression is referenced to the PEAK gain, searched only past the
-            % peak. Referencing the smallest-amplitude gain instead is wrong for
-            % the Ghorbani model: its AM/AM (x4 < 0) is gain-EXPANSIVE at small
-            % drive, so a small-signal reference misreads the expansion slope as
-            % compression and reports ~-47 dBm -- and the back-off step then
-            % crushes a healthy drive by 40-60 dB into that expansion region.
-            % For the monotonically compressing Methods the peak sits at the
-            % start of the sweep and both definitions agree.
+            % The sweep itself lives in csrd.blocks.physical.paInputCompressionDbm
+            % -- ONE kernel shared with RRFSimulator's LNA back-off, so the two
+            % front ends can never disagree on what "compression" means. See
+            % that function for the measurement rationale (numeric, not
+            % closed-form; peak-referenced, not small-signal-referenced).
             %
             % The probe is a fresh instance from the same config: the production
             % System object is locked to the frame size, and
             % comm.MemorylessNonlinearity is stateless, so a separate sweep
             % instance is both necessary and sufficient.
-            probe = obj.genMemoryLessNonlinearity();
-            cleanup = onCleanup(@() release(probe));
-            amps = logspace(-3, 1.5, 160).';   % ~ -47 .. +43 dBm at 50 ohm
-            y = probe(complex(amps, zeros(size(amps))));
-            gainDb = 20 * log10(max(abs(y), realmin) ./ amps);
-            [peakGainDb, peakIdx] = max(gainDb);
-            idx = find(gainDb(peakIdx:end) <= peakGainDb - 1, 1);
-            if isempty(idx)
-                refDbm = NaN;
-                return;
-            end
-            idx = idx + peakIdx - 1;
-            impedance = obj.MemoryLessNonlinearityConfig.ReferenceImpedance;
-            refDbm = 20 * log10(amps(idx)) + 30 - 10 * log10(impedance);
+            refDbm = csrd.blocks.physical.paInputCompressionDbm( ...
+                obj.genMemoryLessNonlinearity(), ...
+                obj.MemoryLessNonlinearityConfig.ReferenceImpedance);
         end
 
         function obj = TRFSimulator(varargin)

@@ -56,6 +56,12 @@ classdef RRFSimulator < matlab.System
         ThermalNoiseSampleRateHz double = NaN
         ThermalNoiseTemperatureK double = NaN
         SampleShifterOffsetPpm double = NaN
+
+        % PaInputRefDbm: cached input-referred 1 dB compression point of the
+        % configured LNA (dBm), measured by paInputReferenceDbm at setup. NaN
+        % when no InputBackoffDb is configured or the LNA never compresses
+        % within the probe range (a linear LNA needs no back-off).
+        PaInputRefDbm double = NaN
     end
 
     methods (Access = private)
@@ -279,6 +285,26 @@ classdef RRFSimulator < matlab.System
             setProperties(obj, nargin, varargin{:});
         end
 
+        function refDbm = paInputReferenceDbm(obj)
+            % paInputReferenceDbm - the LNA's input-referred 1 dB compression point.
+            % Inputs: obj - an RRFSimulator whose MemoryLessNonlinearityConfig is set.
+            % Outputs: refDbm - input power (dBm at ReferenceImpedance) where the
+            %          configured LNA's gain has compressed 1 dB below its PEAK
+            %          value; NaN when it never compresses within the probe range
+            %          (a linear LNA needs no back-off).
+            %
+            % Delegates to csrd.blocks.physical.paInputCompressionDbm -- the ONE
+            % compression kernel shared with TRFSimulator's PA back-off, so the
+            % two front ends can never disagree on what "compression" means.
+            % The probe is a fresh instance from the same config: the production
+            % System object is locked to the frame size, and
+            % comm.MemorylessNonlinearity is stateless, so a separate sweep
+            % instance is both necessary and sufficient.
+            refDbm = csrd.blocks.physical.paInputCompressionDbm( ...
+                obj.genLowerPowerAmplifier(), ...
+                obj.MemoryLessNonlinearityConfig.ReferenceImpedance);
+        end
+
     end
 
     methods (Access = protected)
@@ -291,6 +317,18 @@ classdef RRFSimulator < matlab.System
             obj.IQImbalance = obj.genIqImbalance;
             obj.ensureThermalNoiseObject();
             obj.ensureSampleShifterObject();
+
+            % Cache the LNA's input-referred 1 dB compression point once per
+            % setup, but only when a back-off is configured -- the probe sweep
+            % costs one extra LNA construction.
+            obj.PaInputRefDbm = NaN;
+            cfgNl = obj.MemoryLessNonlinearityConfig;
+            if isstruct(cfgNl) && isfield(cfgNl, 'InputBackoffDb') && ...
+                    isnumeric(cfgNl.InputBackoffDb) && ...
+                    isscalar(cfgNl.InputBackoffDb) && ...
+                    isfinite(cfgNl.InputBackoffDb) && cfgNl.InputBackoffDb > 0
+                obj.PaInputRefDbm = obj.paInputReferenceDbm();
+            end
         end
 
         function outputSignal = stepImpl(obj, inputSignal)
@@ -315,6 +353,39 @@ classdef RRFSimulator < matlab.System
             %   inputSignal: Pre-combined numeric signal array [samples x antennas]
             % Returns:
             %   outputSignal: Signal array after the impairment chain.
+
+            % Enforce the LNA input back-off before the nonlinearity. If the
+            % combined frame's MEAN power sits closer than the drawn
+            % InputBackoffDb to the LNA's own measured 1 dB compression point
+            % (cached at setup), attenuate it down to exactly P1dB - IBO.
+            % ATTENUATE-ONLY, never boost -- same contract as TRFSimulator
+            % Step 3.5, same shared compression kernel. This guard is not a
+            % corner case here: combined channel-output frames measure
+            % +33..+35 dBm (50-ohm convention) at the LNA input, 3..40 dB PAST
+            % every configured Method's compression point, so without it every
+            % saved frame's waveform is LNA-clipped. The attenuation rescales
+            % the frame ahead of the (absolute-power, comparatively tiny)
+            % thermal-noise stage; the received-SNR GT below re-measures the
+            % realized noise on the attenuated scale, so the labels stay
+            % honest, and the measured Truth planes sit upstream of this
+            % block entirely.
+            cfgNl = obj.MemoryLessNonlinearityConfig;
+            if isstruct(cfgNl) && isfield(cfgNl, 'InputBackoffDb') && ...
+                    isnumeric(cfgNl.InputBackoffDb) && ...
+                    isscalar(cfgNl.InputBackoffDb) && ...
+                    isfinite(cfgNl.InputBackoffDb) && ...
+                    cfgNl.InputBackoffDb > 0 && isfinite(obj.PaInputRefDbm)
+                drivePowerW = mean(abs(double(inputSignal(:))) .^ 2) / ...
+                    cfgNl.ReferenceImpedance;
+                if drivePowerW > eps
+                    driveDbm = 10 * log10(drivePowerW * 1000);
+                    targetDbm = obj.PaInputRefDbm - double(cfgNl.InputBackoffDb);
+                    if driveDbm > targetDbm
+                        inputSignal = inputSignal * ...
+                            10 ^ ((targetDbm - driveDbm) / 20);
+                    end
+                end
+            end
 
             x = obj.LowerPowerAmplifier(inputSignal);
 

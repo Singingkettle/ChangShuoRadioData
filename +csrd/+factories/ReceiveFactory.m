@@ -359,6 +359,20 @@ classdef ReceiveFactory < matlab.System
             end
 
             nonlinConfig.ReferenceImpedance = referenceImpedance;
+
+            % Drawn minimum input back-off (dB below the LNA's measured 1 dB
+            % compression point; RRFSimulator attenuates the combined frame
+            % down to it only when the drive sits closer than this, never
+            % boosts). Optional in the config so hand-built test fixtures
+            % without the field keep their exact drive level; when present it
+            % is part of the receiver's nonlinearity configuration.
+            if isfield(nonlinField, 'InputBackoffDb') && ...
+                    ~isempty(nonlinField.InputBackoffDb)
+                iboRange = nonlinField.InputBackoffDb;
+                nonlinConfig.InputBackoffDb = obj.randomInRange( ...
+                    iboRange(1), iboRange(end));
+            end
+
             obj.logger.debug('Configured nonlinearity method "%s"', selectedMethod);
         end
 
@@ -383,6 +397,15 @@ classdef ReceiveFactory < matlab.System
                 src.AMPMConversion(1), src.AMPMConversion(2));
             cfg.PowerLowerLimit = obj.resolvePowerLimit(src.PowerLowerLimit, -40);
             cfg.PowerUpperLimit = obj.resolvePowerLimit(src.PowerUpperLimit,  Inf);
+            % comm.MemorylessNonlinearity errors on Upper <= Lower at step time,
+            % deep inside a scenario. The config keeps the two ranges disjoint,
+            % but a future range edit could overlap them -- fail HERE, at draw
+            % time, with the drawn values named.
+            assert(cfg.PowerUpperLimit > cfg.PowerLowerLimit, ...
+                'CSRD:ReceiveFactory:InvertedPowerWindow', ...
+                ['Drawn PowerUpperLimit (%.3g dBm) must exceed PowerLowerLimit ', ...
+                 '(%.3g dBm); fix the Nonlinearity config ranges so they cannot ', ...
+                 'overlap.'], cfg.PowerUpperLimit, cfg.PowerLowerLimit);
         end
 
         function cfg = buildHyperbolicTangentConfig(obj, src)
@@ -396,6 +419,12 @@ classdef ReceiveFactory < matlab.System
             cfg.AMPMConversion  = obj.randomInRange(src.AMPMConversion(1), src.AMPMConversion(2));
             cfg.PowerLowerLimit = obj.resolvePowerLimit(src.PowerLowerLimit, -40);
             cfg.PowerUpperLimit = obj.resolvePowerLimit(src.PowerUpperLimit,  Inf);
+            % Same draw-time window check as the cubic builder (see there).
+            assert(cfg.PowerUpperLimit > cfg.PowerLowerLimit, ...
+                'CSRD:ReceiveFactory:InvertedPowerWindow', ...
+                ['Drawn PowerUpperLimit (%.3g dBm) must exceed PowerLowerLimit ', ...
+                 '(%.3g dBm); fix the Nonlinearity config ranges so they cannot ', ...
+                 'overlap.'], cfg.PowerUpperLimit, cfg.PowerLowerLimit);
         end
 
         function cfg = buildSalehModelConfig(obj, src)
