@@ -8,10 +8,22 @@ Weather is configured under the physical-environment factory:
 config.Factories.Scenario.PhysicalEnvironment.Environment.Weather
 ```
 
-Weather is part of the scenario physical environment. It contributes
-environment metadata and future propagation-condition extensions, but time
-advancement must follow `ScenarioPlan.Frame.FrameDurationSec`; it must not
-reintroduce global legacy timing fields such as `TimeResolution`.
+## What weather does — and does not do — today
+
+Weather is ENVIRONMENT METADATA ONLY. The simulator initializes a weather
+state (temperature/humidity/pressure/wind) and evolves it per frame with the
+random variations below, and that state is recorded in the physical
+environment's frame history. It does NOT reach the propagation chain: no
+channel model reads the weather state, so it never changes path loss, fading,
+or any sample of the generated IQ. (Atmospheric-condition hooks exist in the
+codebase as an extension point but are not wired into production channels;
+and since csrd2025 realizes a CONTROLLED target SNR rather than a
+link-budget-driven one, even a wired atmospheric loss would not move the
+realized SNR.) Treat weather as scene dressing for future extensions, not as
+a physical effect in today's dataset.
+
+Time advancement follows `ScenarioPlan.Frame.FrameDurationSec`; weather must
+not reintroduce global legacy timing fields such as `TimeResolution`.
 
 ## Configuration Fields
 
@@ -20,6 +32,10 @@ Enable weather:
 ```matlab
 config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Enable = true;
 ```
+
+`Enable = false` behaves exactly like an absent `Weather` block: the static
+default weather state is used, nothing evolves, and no random draws are
+consumed (guarded by `WeatherEnableTest`, bit-identical frames).
 
 Initial conditions:
 

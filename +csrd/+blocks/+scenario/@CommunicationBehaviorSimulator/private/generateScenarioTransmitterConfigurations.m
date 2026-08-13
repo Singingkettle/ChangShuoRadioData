@@ -546,6 +546,8 @@ end
 
 function minInterval = calculateMinTransmissionInterval(transmissionPattern)
     % calculateMinTransmissionInterval - Shortest single on-interval (burst).
+    % Inputs: transmissionPattern - struct with .Intervals [start end] rows (s).
+    % Outputs: minInterval - shortest positive on-interval duration (s), 0 when none.
     % The transmit gating cuts the modulated signal per burst, so a multicarrier
     % symbol must fit ONE burst; this returns the tightest such constraint.
     intervals = transmissionPattern.Intervals;

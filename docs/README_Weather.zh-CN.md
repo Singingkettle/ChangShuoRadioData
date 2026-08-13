@@ -8,7 +8,17 @@
 config.Factories.Scenario.PhysicalEnvironment.Environment.Weather
 ```
 
-天气是场景物理环境的一部分。它提供环境元数据以及未来的传播条件扩展，但时间推进必须遵循 `ScenarioPlan.Frame.FrameDurationSec`；它不得重新引入诸如 `TimeResolution` 之类的全局遗留计时字段。
+## 今天的天气做什么——以及不做什么
+
+天气**仅是环境元数据**。仿真器初始化一个天气状态（温度/湿度/气压/风），
+按帧用下面的随机变化量演化它，并把该状态记录进物理环境的帧历史。它**不会**
+进入传播链路：没有任何信道模型读取天气状态，因此它从不改变路径损耗、衰落
+或任何一个生成的 IQ 样本。（代码库中存在大气条件钩子作为扩展点，但未接入
+生产信道；且 csrd2025 实现的是**受控目标 SNR**而非链路预算驱动的 SNR，即使
+接了大气损耗也不会移动实现的 SNR。）请把天气当作面向未来扩展的场景装饰，
+而不是当前数据集中的物理效应。
+
+时间推进必须遵循 `ScenarioPlan.Frame.FrameDurationSec`；天气不得重新引入诸如 `TimeResolution` 之类的全局遗留计时字段。
 
 ## 配置字段
 
@@ -17,6 +27,9 @@ config.Factories.Scenario.PhysicalEnvironment.Environment.Weather
 ```matlab
 config.Factories.Scenario.PhysicalEnvironment.Environment.Weather.Enable = true;
 ```
+
+`Enable = false` 的行为与完全没有 `Weather` 块**逐位一致**：使用静态默认
+天气状态、不演化、不消耗随机数（由 `WeatherEnableTest` 守卫）。
 
 初始条件：
 

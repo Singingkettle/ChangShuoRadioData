@@ -252,6 +252,7 @@ end
 
 
 function v = localFieldOrNaN(s, f)
+    % localFieldOrNaN - the field as a double when finite scalar, else NaN.
 v = NaN;
 if localFiniteScalar(s, f)
     v = double(s.(f));
@@ -260,6 +261,7 @@ end
 
 
 function tf = localFiniteScalar(s, f)
+    % localFiniteScalar - whether the struct carries a finite numeric scalar field.
 tf = isstruct(s) && isfield(s, f) && isnumeric(s.(f)) ...
     && isscalar(s.(f)) && isfinite(s.(f));
 end

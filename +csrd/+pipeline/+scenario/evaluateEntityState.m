@@ -1,5 +1,10 @@
 function state = evaluateEntityState(scenarioPlan, entityId, timeSec)
 %EVALUATEENTITYSTATE Evaluate deterministic entity geometry at a scenario time.
+% Inputs: scenarioPlan - frozen plan with Entities.Initial (t=0 records);
+%         entityId - entity ID text; timeSec - evaluation time (s, >= 0).
+% Outputs: state - struct with EntityID, Position[M]/Velocity[Mps] (meters,
+%          map-clamped), GeoPositionDeg when derivable, MobilityModel and
+%          the evaluation time/policy.
 
 if nargin < 1 || ~isstruct(scenarioPlan)
     error('CSRD:ScenarioPlan:MissingScenarioPlan', ...
@@ -53,6 +58,7 @@ state.MobilityModel = mobilityModel;
 end
 
 function entity = localFindInitialEntity(scenarioPlan, entityId)
+    % localFindInitialEntity - the t=0 entity record with this ID, or error.
 if ~isfield(scenarioPlan, 'Entities') || ~isstruct(scenarioPlan.Entities) || ...
         ~isfield(scenarioPlan.Entities, 'Initial') || ...
         isempty(scenarioPlan.Entities.Initial)
@@ -73,6 +79,7 @@ entity = entities(match);
 end
 
 function timeSec = localEntityBaseTime(entity)
+    % localEntityBaseTime - the time the initial record was captured at (s).
 timeSec = NaN;
 if isfield(entity, 'CreationTime') && isnumeric(entity.CreationTime) && ...
         isscalar(entity.CreationTime)
@@ -89,6 +96,7 @@ end
 end
 
 function v = localRequireVector(entity, fieldName)
+    % localRequireVector - the entity field as a finite 1x3 row, or error.
 if ~isfield(entity, fieldName) || isempty(entity.(fieldName)) || ...
         ~isnumeric(entity.(fieldName)) || numel(entity.(fieldName)) ~= 3 || ...
         any(~isfinite(entity.(fieldName)(:)))
@@ -100,6 +108,7 @@ v = double(entity.(fieldName)(:)).';
 end
 
 function mobilityModel = localEntityMobilityModel(entity)
+    % localEntityMobilityModel - the mobility model name (default ConstantVelocity).
 mobilityModel = 'ConstantVelocity';
 if isfield(entity, 'MobilityModel') && ~isempty(entity.MobilityModel)
     mobilityModel = char(string(entity.MobilityModel));
@@ -107,6 +116,7 @@ end
 end
 
 function [positionM, geoPositionDeg] = localApplyMapGeometry(positionM, entity, scenarioPlan)
+    % localApplyMapGeometry - clamp the position to the map bounds and derive geo coords.
 boundaries = localScenarioBoundaries(scenarioPlan);
 geoPositionDeg = [];
 if isempty(boundaries)
@@ -135,6 +145,7 @@ positionM(3) = max(5, positionM(3));
 end
 
 function boundaries = localScenarioBoundaries(scenarioPlan)
+    % localScenarioBoundaries - the plan map boundaries (geo struct, numeric, or []).
 boundaries = [];
 if isfield(scenarioPlan, 'Map') && isstruct(scenarioPlan.Map)
     if isfield(scenarioPlan.Map, 'Boundaries')
@@ -148,6 +159,7 @@ end
 end
 
 function meterBounds = localGeoBoundsToMeters(bounds)
+    % localGeoBoundsToMeters - geo corner box -> [xmin xmax ymin ymax] meters.
 corners = [
     bounds.MinLatitude, bounds.MinLongitude
     bounds.MinLatitude, bounds.MaxLongitude
@@ -161,6 +173,7 @@ meterBounds = [min(xy(:, 1)), max(xy(:, 1)), min(xy(:, 2)), max(xy(:, 2))];
 end
 
 function xyMeters = localGeoToMeters(latDeg, lonDeg, bounds)
+    % localGeoToMeters - equirectangular lat/lon-to-meters about the map center.
 earthRadiusM = 6371000;
 centerLat = double(bounds.CenterLatitude);
 centerLon = double(bounds.CenterLongitude);
@@ -170,6 +183,7 @@ xyMeters = [x, y];
 end
 
 function geo = localMetersToGeo(positionM, bounds)
+    % localMetersToGeo - meters about the map center -> [lat lon alt].
 earthRadiusM = 6371000;
 centerLat = double(bounds.CenterLatitude);
 centerLon = double(bounds.CenterLongitude);

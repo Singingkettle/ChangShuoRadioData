@@ -1,5 +1,8 @@
 function [entities, environment] = planInitialState(obj)
 %PLANINITIALSTATE Build and cache the scenario t=0 physical state.
+% Inputs: obj - PhysicalEnvironmentSimulator (frameHistory may already hold t=0).
+% Outputs: entities - initial entity array; environment - initial environment
+%          state (weather, obstacles, map), both cached as frame 1.
 
 frameId = 1;
 if isKey(obj.frameHistory, frameId)

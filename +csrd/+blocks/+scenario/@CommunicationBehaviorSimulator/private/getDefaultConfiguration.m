@@ -24,7 +24,6 @@ function config = getDefaultConfiguration(obj)
     config.Regulatory.Region.Fixed = 'CN';
     config.Regulatory.ServiceTier = 'Tier1';
     config.Regulatory.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
-    config.Regulatory.MonitoringBand.Selection = 'WeightedByRegion';
     config.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
     config.Regulatory.MinimumModulatorSampleRateHz = 250e3;
 

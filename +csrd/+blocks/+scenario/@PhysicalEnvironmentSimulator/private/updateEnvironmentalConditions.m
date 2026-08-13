@@ -10,8 +10,13 @@ function environment = updateEnvironmentalConditions(obj, frameId, timeResolutio
     environment.FrameId = frameId;
     environment.Time = (frameId - 1) * timeResolution;
 
-    % Update weather conditions (simple model)
-    if isfield(obj.Config, 'Environment') && isfield(obj.Config.Environment, 'Weather')
+    % Update weather conditions (simple model). Enable=false must behave
+    % exactly like an absent Weather block: the flag was documented and set
+    % by four unit tests, but nothing read it -- the presence of the struct
+    % alone kept the evolution running.
+    if isfield(obj.Config, 'Environment') && ...
+            isfield(obj.Config.Environment, 'Weather') && ...
+            localWeatherEnabled(obj.Config.Environment.Weather)
         environment.Weather = updateWeatherConditions(obj, environment.Weather, timeResolution);
     end
 
@@ -21,4 +26,15 @@ function environment = updateEnvironmentalConditions(obj, frameId, timeResolutio
     end
 
     obj.currentEnvironment = environment;
+end
+
+function enabled = localWeatherEnabled(weatherConfig)
+    % localWeatherEnabled - honor Weather.Enable, defaulting to true.
+    % Inputs: weatherConfig - the Environment.Weather config struct.
+    % Outputs: enabled - false only when Enable is explicitly false.
+    enabled = true;
+    if isstruct(weatherConfig) && isfield(weatherConfig, 'Enable') && ...
+            ~isempty(weatherConfig.Enable)
+        enabled = logical(weatherConfig.Enable);
+    end
 end

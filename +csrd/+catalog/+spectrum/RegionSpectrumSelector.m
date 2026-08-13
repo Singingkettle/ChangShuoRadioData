@@ -117,6 +117,24 @@ end
 
 regulatory.MonitoringBand = struct();
 if isfield(raw, 'MonitoringBand') && isstruct(raw.MonitoringBand)
+    % Reject unknown keys LOUDLY. The sibling Region block accepts a
+    % 'Fixed' alias, which is exactly the typo generator: three unit tests
+    % wrote MonitoringBand.Selection='Fixed' / MonitoringBand.Fixed=
+    % 'CN_ISM_24' for months, the selector silently ignored both keys, and
+    % the tests believed they were pinned to CN_ISM_24 while actually
+    % running on a random band every time. A config key that nothing
+    % consumes must fail here, at the one place the struct is adopted.
+    knownKeys = {'FixedBandId', 'RestrictEmittersToFixedBand', ...
+        'AllowIntersectingServices', 'CenterFrequencyHz'};
+    givenKeys = fieldnames(raw.MonitoringBand);
+    unknown = setdiff(givenKeys, knownKeys);
+    if ~isempty(unknown)
+        error('CSRD:Spectrum:UnknownMonitoringBandKey', ...
+            ['MonitoringBand config carries unknown key(s) {%s}; the ', ...
+             'selector consumes only {%s}. An unconsumed key means the ', ...
+             'band you think you configured is not the band that runs.'], ...
+            strjoin(unknown, ', '), strjoin(knownKeys, ', '));
+    end
     regulatory.MonitoringBand = raw.MonitoringBand;
 end
 
@@ -270,6 +288,9 @@ end
 
 function bands = filterBandsByIbwServiceability(bands, sampleRateHz, regulatory)
     % filterBandsByIbwServiceability - Keep bands with a channel that fits the IBW.
+    % Inputs: bands - regulatory band structs; sampleRateHz - receiver IBW (Hz);
+    %         regulatory - resolved regulatory config (MonitoringBand etc.).
+    % Outputs: bands - the serviceable subset (errors if the fixed band drops).
     % A band whose narrowest channel exceeds the receiver instantaneous bandwidth
     % cannot be served by this SDR. Dropping it stops a narrow-IBW SDR from
     % selecting a monitoring band it cannot capture, which would otherwise fail
@@ -386,6 +407,11 @@ end
 function centerHz = ensurePlaceableMonitoringCenter(centerHz, centerMin, ...
         centerMax, anchor, sampleRateHz, regulatory)
     % ensurePlaceableMonitoringCenter - Snap the center so an emitter fits.
+    % Inputs: centerHz - drawn monitoring center (Hz); centerMin/centerMax -
+    %         allowed center range (Hz); anchor - selected band struct;
+    %         sampleRateHz - receiver IBW (Hz); regulatory - resolved config.
+    % Outputs: centerHz - unchanged when placeable, else snapped to the
+    %          nearest placeable channel-grid point in range.
     % A narrow receiver window over a coarse channel raster can leave the
     % random monitoring center with no raster-aligned channel inside it, which
     % later fails emitter placement (CSRD:Spectrum:NoVisibleServiceBands). When

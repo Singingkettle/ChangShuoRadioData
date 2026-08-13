@@ -110,6 +110,10 @@ end
 function profile = profileOf(model, manufacturer, tuningRangeHz, maxIbwHz, ...
         adcBits, noiseFigureDb, numChannels, refs)
     % profileOf - Assemble one SDR capability profile struct.
+    % Inputs: model/manufacturer - names; tuningRangeHz - [min max] Hz;
+    %         maxIbwHz - instantaneous bandwidth (Hz); adcBits/noiseFigureDb/
+    %         numChannels - device scalars; refs - source citation cellstr.
+    % Outputs: profile - populated SDR capability profile struct.
     profile = emptyProfile();
     profile.Model = model;
     profile.Manufacturer = manufacturer;
@@ -124,6 +128,8 @@ end
 
 function profile = emptyProfile()
     % emptyProfile - Empty SDR profile template.
+    % Inputs: none.
+    % Outputs: profile - all-fields-empty/NaN SDR profile struct template.
     profile = struct( ...
         'Model', '', ...
         'Manufacturer', '', ...

@@ -1,5 +1,8 @@
 function initializeMapFromConfig(obj)
     %INITIALIZEMAPFROMCONFIG Initialize the explicitly configured map model.
+    % Inputs: obj - PhysicalEnvironmentSimulator whose Config names the map
+    %         type (Map.Type or Environment.MapType); no-op when already done.
+    % Outputs: none (sets obj.mapData/obj.mapInitialized in place).
 
     if obj.mapInitialized
         return;
@@ -23,6 +26,7 @@ function initializeMapFromConfig(obj)
 end
 
 function mapType = localResolveMapType(config)
+    % localResolveMapType - the map type from Environment.MapType or Map.Type, or error.
 if ~isstruct(config)
     error('CSRD:Scenario:MissingMapType', ...
         'PhysicalEnvironmentSimulator.Config must be a struct with Map.Type or Environment.MapType.');

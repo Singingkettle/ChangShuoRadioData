@@ -85,10 +85,16 @@ classdef GlobalLogManager < handle
             logConfig = localResolveLogConfig(logConfig);
             manager.logConfig = logConfig;
 
-            % Setup log directory
+            % Setup log directory. The default is anchored to the PROJECT
+            % ROOT (derived from this class file's location), never to pwd:
+            % a pwd-relative default scattered log trees into whatever
+            % directory the caller happened to be in. And it lands under
+            % artifacts/runtime/, not artifacts/tests/ -- production runs
+            % that never passed an explicit directory were filing their
+            % logs into the test-artifact area.
             if nargin < 2 || isempty(outputDirectory)
-                outputDirectory = fullfile(pwd, 'artifacts', 'tests', ...
-                    'runs', 'global_logs');
+                outputDirectory = fullfile(localProjectRoot(), ...
+                    'artifacts', 'runtime', 'logs');
             end
 
             % Per-process timestamp. Kept unique per process because it also
@@ -263,6 +269,17 @@ classdef GlobalLogManager < handle
 
     end
 
+end
+
+function root = localProjectRoot()
+    % localProjectRoot - the repository root, derived from this file's path.
+    % Inputs: none.
+    % Outputs: root - absolute path of the directory containing +csrd.
+    %
+    % This class lives at <root>/+csrd/+runtime/+logger/GlobalLogManager.m,
+    % so the root is three directories up -- a location fact that cannot
+    % drift with the caller's working directory the way pwd does.
+    root = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
 end
 
 function resolved = localResolveLogConfig(logConfig)

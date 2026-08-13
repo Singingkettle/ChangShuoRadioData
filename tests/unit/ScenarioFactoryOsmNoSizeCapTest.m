@@ -115,8 +115,7 @@ scenarioCfg.PhysicalEnvironment.Entities.Receivers.Count.Max = 1;
 scenarioCfg.CommunicationBehavior.Receiver.NumAntennas = 1;
 scenarioCfg.CommunicationBehavior.Transmitter.NumAntennas.Min = 1;
 scenarioCfg.CommunicationBehavior.Transmitter.NumAntennas.Max = 1;
-scenarioCfg.CommunicationBehavior.Regulatory.MonitoringBand.Selection = 'Fixed';
-scenarioCfg.CommunicationBehavior.Regulatory.MonitoringBand.Fixed = 'CN_ISM_24';
+scenarioCfg.CommunicationBehavior.Regulatory.MonitoringBand.FixedBandId = 'CN_ISM_24';
 scenarioCfg.CommunicationBehavior.TemporalBehavior.PatternTypes = {'Continuous'};
 scenarioCfg.CommunicationBehavior.TemporalBehavior.PatternDistribution = 1;
 end

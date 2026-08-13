@@ -116,34 +116,45 @@ end
 
 
 function docs = localRequiredDocs(projectRoot)
-    % localRequiredDocs - Production declaration in CSRD.
-    % Inputs: see signature arguments and local validation.
-    % Outputs: see signature return values and contract fields.
-phaseDir = fullfile(projectRoot, 'docs', 'audits', 'phases');
-reportDir = fullfile(projectRoot, 'docs', 'audits', 'reports');
+    % localRequiredDocs - the release documentation set and its key markers.
+    % Inputs: projectRoot - repository root path.
+    % Outputs: docs - Nx2 cell {path, {needles...}}.
+    %
+    % Retargeted to the LIVING documentation (owner decision, 2026-08). The
+    % previous list required the docs/audits phase tree, which was
+    % deliberately removed to an archive branch (commit 9e2e5f5) -- 12 of 13
+    % required files were gone, so the gate was structurally unsatisfiable
+    % and stayed red for months, teaching everyone to ignore it. The release
+    % gate now asserts what a release actually needs: the operating docs
+    % exist, both languages of each pair are present, and each still carries
+    % the marker phrase its consumers depend on.
+docsDir = fullfile(projectRoot, 'docs');
 docs = {
     fullfile(projectRoot, 'README.md'), ...
-        {'Phase 6 Frozen', 'run_csrd_release_ci_readiness'};
-    fullfile(projectRoot, 'docs', 'audits', ...
-        '2026-04-spectrum-blueprint-construction-refactor.md'), ...
-        {'Phase 6 Frozen', 'Draft v0.6.0'};
-    fullfile(projectRoot, 'docs', 'audits', 'HANDOVER_2026-04-26.md'), ...
-        {'Phase 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 已 Frozen', ...
-         'Phase 7 downstream release materials'};
-    fullfile(phaseDir, 'phase-0-baseline.md'), {'Frozen'};
-    fullfile(phaseDir, 'phase-1-dataflow.md'), {'Frozen'};
-    fullfile(phaseDir, 'phase-2-blueprint.md'), {'Frozen'};
-    fullfile(phaseDir, 'phase-3-construction.md'), {'Frozen'};
-    fullfile(phaseDir, 'phase-4-measurement.md'), {'Frozen'};
-    fullfile(phaseDir, 'phase-5-mc-validation.md'), {'Frozen'};
-    fullfile(phaseDir, 'phase-6-release-hardening.md'), ...
-        {'Frozen', 'S8'};
-    fullfile(reportDir, 'phase-6-performance-diagnostics.md'), ...
-        {'Frozen', 'diagnostic-only-no-threshold'};
-    fullfile(reportDir, 'phase-6-ci-readiness.md'), ...
-        {'Frozen', '933.55 s'};
-    fullfile(reportDir, 'phase-6-release-freeze.md'), ...
-        {'Frozen', 'run_csrd_release_readiness'}};
+        {'ChangShuo Radio Data', 'GETTING_STARTED.md'};
+    fullfile(docsDir, 'README.md'), ...
+        {'CSRD Documentation Index'};
+    fullfile(docsDir, 'README.zh-CN.md'), ...
+        {'GETTING_STARTED'};
+    fullfile(docsDir, 'GETTING_STARTED.md'), ...
+        {'Generate Your First Dataset'};
+    fullfile(docsDir, 'GETTING_STARTED.zh-CN.md'), ...
+        {'GETTING_STARTED.md'};
+    fullfile(docsDir, 'annotation-schema.md'), ...
+        {'MeasurementContract', 'AllocatedBandwidthHz', ...
+         'ITU-R SM.328'};
+    fullfile(docsDir, 'annotation-schema.zh-CN.md'), ...
+        {'MeasurementContract', 'AllocatedBandwidthHz'};
+    fullfile(docsDir, 'configuration.md'), ...
+        {'CSRD Configuration And Runtime Plans'};
+    fullfile(docsDir, 'configuration.zh-CN.md'), ...
+        {'configuration.md'};
+    fullfile(docsDir, 'architecture', 'source-layout.md'), ...
+        {'CSRD Source Layout'};
+    fullfile(docsDir, 'architecture', 'source-layout.zh-CN.md'), ...
+        {'source-layout.md'};
+    fullfile(docsDir, 'release', 'RELEASE_NOTES_v0.5.0.md'), ...
+        {'CSRD v0.5.0 Release Notes'}};
 end
 
 

@@ -25,6 +25,9 @@ function results = run_generation_coverage(varargin)
 %   results is a struct array, one row per scenario, with fields:
 %     Region, BandId, ServiceClass, Sdr, ChannelModel, Seed, Status,
 %     ErrorId, ErrorMessage, AnnotationValid, LiveNanFields, NumSources.
+%
+%   Inputs: the name-value options above.
+%   Outputs: results - the per-scenario struct array described above.
 
 p = inputParser();
 p.FunctionName = 'run_generation_coverage';
@@ -265,6 +268,7 @@ end
 
 
 function prof = localFindProfile(profiles, model)
+    % localFindProfile - the SDR profile matching the model name, or [].
 prof = [];
 for k = 1:numel(profiles)
     if strcmp(profiles(k).Model, model); prof = profiles(k); return; end
@@ -274,6 +278,7 @@ end
 
 function rec = localResult(region, band, sdrModel, channelModel, seed, ...
         status, errId, errMsg, valid, liveNan, numSources)
+    % localResult - one coverage-cell result record for the summary table.
 serviceClass = '';
 bandId = '';
 if isstruct(band)
@@ -289,11 +294,13 @@ end
 
 
 function localRelease(runner)
+    % localRelease - release the runner only when it is locked.
 if isLocked(runner); release(runner); end
 end
 
 
 function localPrintSummary(results)
+    % localPrintSummary - print the per-status tally and the problem cells.
 n = numel(results);
 statuses = {results.Status};
 ok = sum(strcmp(statuses, 'OK'));
