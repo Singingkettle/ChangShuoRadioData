@@ -759,8 +759,8 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, 
             modulatorConfig.SymbolMapping = "Gray";
             modulatorConfig.PhaseOffset = 0;
         case 'FM'
-            % Narrowband-FM deviation scaled to the planned channel (see the
-            % buildLegacyModulatorConfig 'FM' case + calculateRequiredBandwidth).
+            % Narrowband-FM deviation scaled to the planned channel (Carson
+            % beta = 2; see the buildLegacyModulatorConfig 'FM' case).
             modulatorConfig.FrequencyDeviation = max(1e3, bandwidth / 3);
         otherwise
             if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0
@@ -842,7 +842,8 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burs
             % Δf = bandwidth/3 = 2·symbolRate (Carson modulation index beta = 2),
             % so the realized FM occupies its planned channel instead of the
             % fixed 75 kHz broadcast deviation overrunning a narrow channel ~7x.
-            % See calculateRequiredBandwidth('FM').
+            % The FM modulator derives the same Δf = TargetBandwidth/3 default
+            % when no explicit deviation is configured.
             modulatorConfig.FrequencyDeviation = max(1e3, bandwidth / 3);
         otherwise
             if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0

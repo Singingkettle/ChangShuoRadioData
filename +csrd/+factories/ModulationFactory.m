@@ -337,7 +337,22 @@ classdef ModulationFactory < matlab.System
             % with raw numeric data would fail validation
 
             try
-                inputToBlock.data = inputData;
+                % inputData is either the full message struct from the message
+                % source (data + SymbolRate = the message's NATIVE sample
+                % rate) or a bare payload array. The native rate is forwarded
+                % as MessageSampleRate: analog modulators REQUIRE it to
+                % resample the message onto their own grid (BaseModulator.
+                % prepareAnalogMessage) -- forwarding only .data is the defect
+                % that reinterpreted 44.1 kHz audio at the modulator rate and
+                % decoupled every analog family from its allocation.
+                if isstruct(inputData)
+                    inputToBlock.data = inputData.data;
+                    if isfield(inputData, 'SymbolRate')
+                        inputToBlock.MessageSampleRate = inputData.SymbolRate;
+                    end
+                else
+                    inputToBlock.data = inputData;
+                end
 
                 outputSignalStruct = step(currentModulator, inputToBlock);
                 obj.logger.debug('Frame %d, Tx %s, Seg %d: Modulation by %s successful.', ...

@@ -363,7 +363,6 @@ classdef CommunicationBehaviorSimulator < matlab.System
 
         % Configuration generation methods
         gain = calculateAntennaGain(obj, numAntennas)
-        bandwidth = calculateRequiredBandwidth(obj, modulationConfig)
 
         % Utility methods
         hasOverlap = checkFrequencyOverlap(obj, range1, range2)

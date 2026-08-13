@@ -101,6 +101,22 @@ classdef SSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
     methods (Access = protected)
 
+        function limitHz = analogMessageBandwidthLimitHz(obj)
+            % analogMessageBandwidthLimitHz - SSB transmits ONE sideband, so
+            % the message may fill the whole allocated channel.
+            % Inputs: obj - modulator with TargetBandwidth set.
+            % Outputs: limitHz - one-sided message limit (Hz).
+            limitHz = obj.TargetBandwidth;
+        end
+
+        function mode = analogMessageNormalization(~)
+            % analogMessageNormalization - SSB is linear in the message (no
+            % modulation-index semantics), so normalize to unit POWER, the
+            % baseband level the TRF's DC-offset convention assumes.
+            % Inputs: none used. Outputs: mode - 'power'.
+            mode = 'power';
+        end
+
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core SSB-AM modulation implementation
             %

@@ -7,7 +7,7 @@ classdef AllModulationFactorySmokeTest < matlab.unittest.TestCase
             addpath(projectRoot);
 
             csrd.runtime.logger.GlobalLogManager.reset();
-            cleanup = onCleanup(@() csrd.runtime.logger.GlobalLogManager.reset()); %#ok<NASGU>
+            cleanup = onCleanup(@() csrd.runtime.logger.GlobalLogManager.reset());
             csrd.runtime.logger.GlobalLogManager.initialize(struct( ...
                 'Name', 'CSRD-AllModulationFactorySmoke', ...
                 'Level', 'ERROR', ...
@@ -21,14 +21,18 @@ classdef AllModulationFactorySmokeTest < matlab.unittest.TestCase
 
             for k = 1:numel(modulationTypes)
                 typeId = modulationTypes{k};
-                payload = randi([0, 1], 4096, 1);
                 placement = struct('TargetBandwidth', localTargetBandwidth(typeId), ...
                     'CenterFrequency', 0);
                 segment = localSegmentConfig(typeId, placement.TargetBandwidth);
+                % Message-source-shaped payload: .data plus the source's
+                % native .SymbolRate (analog modulators resample from it).
+                payload = struct( ...
+                    'data', randi([0, 1], 4096, 1), ...
+                    'SymbolRate', segment.SymbolRate);
 
                 factory = csrd.factories.ModulationFactory( ...
                     'Config', cfg.Factories.Modulation);
-                factoryCleanup = onCleanup(@() localRelease(factory)); %#ok<NASGU>
+                factoryCleanup = onCleanup(@() localRelease(factory));
                 out = step(factory, payload, 1, 'Tx001', 1, segment, placement);
 
                 testCase.verifyFalse(isfield(out, 'Error'), sprintf( ...

@@ -59,6 +59,17 @@ classdef PM < csrd.blocks.physical.modulate.BaseModulator
 
     methods (Access = protected)
 
+        function limitHz = analogMessageBandwidthLimitHz(obj)
+            % analogMessageBandwidthLimitHz - Carson-style budget for PM: with
+            % the drawn PhaseDeviation capped at pi/2 (peak-normalized message,
+            % so beta <= pi/2), 2*(beta + 1)*W <= 2*(pi/2 + 1)*W ~ 5.14*W.
+            % A TargetBandwidth/6 message limit keeps the realized band at
+            % <= 0.86x the allocation for every drawable deviation.
+            % Inputs: obj - modulator with TargetBandwidth set.
+            % Outputs: limitHz - one-sided message limit (Hz).
+            limitHz = obj.TargetBandwidth / 6;
+        end
+
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core PM modulation implementation
             %

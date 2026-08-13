@@ -70,6 +70,15 @@ classdef DSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
 
     methods (Access = protected)
 
+        function mode = analogMessageNormalization(~)
+            % analogMessageNormalization - full-carrier AM has modulation-depth
+            % semantics: with |m| <= 1 (peak normalization) and carramp >= 1
+            % the envelope 1 + m/carramp never inverts, i.e. the drawn carrier
+            % amplitude means what a receiver's envelope detector expects.
+            % Inputs: none used. Outputs: mode - 'peak'.
+            mode = 'peak';
+        end
+
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core DSB-AM modulation implementation
             %
