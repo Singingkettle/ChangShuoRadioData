@@ -26,6 +26,18 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
                 if ~isempty(txsSignalSegments{txIdx})
                     currentTxInfo = TxInfos{txIdx};
 
+                    % Per-transmitter burst ramp, U(0.5, 5) microseconds. A
+                    % rectangular burst edge splatters as 1/f from a 10/T
+                    % corner and dominated the narrowband outliers; real PA
+                    % envelopes ramp over microseconds. Drawn ONCE per
+                    % transmitter (an envelope-shaping property of the
+                    % hardware, shared by its segments) and applied only
+                    % here, at TransmitOutput: ramping the modulator output
+                    % would feed the PA a time-varying envelope (fake AM/PM)
+                    % and double-ramp; the ChannelOutput window is an
+                    % observation boundary that must stay rectangular.
+                    rampSeconds = (0.5 + 4.5 * rand()) * 1e-6;
+
                     % Get transmitter scenario config (handle both cell array and struct array)
                     if iscell(obj.ScenarioConfig.Transmitters)
                         txScenarioConfig = obj.ScenarioConfig.Transmitters{txIdx};
@@ -60,7 +72,7 @@ function txsSignalSegments = processTransmitImpairments(obj, FrameId, txsSignalS
                                 segSignal, FrameId, currentTxInfo, txScenarioConfig);
                             txOut = csrd.pipeline.signal.gateToDuration( ...
                                 txOut, localSegmentDurationSec(txOut), ...
-                                'TransmitOutput');
+                                'TransmitOutput', 'RampSeconds', rampSeconds);
                             txsSignalSegments{txIdx}{segIdx} = txOut;
 
                         end
