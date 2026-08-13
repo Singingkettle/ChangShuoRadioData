@@ -429,6 +429,17 @@ csrd.test_support.freshAnnotationReader('clear', annotationPathPre);
 
 step(runner, 1, 1);
 
+% A scenario that failed generation must not silently shrink the baseline
+% sample. The runner's counts were once discarded locals; a baseline is the one
+% artefact where a quietly duplicated or missing scenario is invisible after the
+% fact, so this asserts the same Failed == 0 contract the plausibility and
+% noise-independence gates already enforce.
+runSummary = runner.LastRunSummary;
+assert(runSummary.Failed == 0, ...
+    ['Baseline sweep: a scenario FAILED generation, so the sweep would ', ...
+     'otherwise aggregate fewer scenarios than it asked for and freeze that ', ...
+     'as a baseline. Cause: %s'], runSummary.FirstFailureMessage);
+
 % Suppress the noisy `MATLAB:structOnObject` warning that fires every
 % time we look at a SimulationRunner instance to discover the resolved
 % output directory. Phase 1+ will expose this via a public accessor.
