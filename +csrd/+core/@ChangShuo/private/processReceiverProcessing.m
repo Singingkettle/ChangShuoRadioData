@@ -260,9 +260,9 @@ function design = buildDesignTruth(comp)
     if isnan(design.PlannedCenterFrequencyHz)
         design.PlannedCenterFrequencyHz = getFieldOrDefault(plannedSrc, 'PlannedCenterFrequencyHz', NaN);
     end
-    design.PlannedBandwidthHz = getFieldOrDefault(plannedSrc, 'Bandwidth', NaN);
-    if isnan(design.PlannedBandwidthHz)
-        design.PlannedBandwidthHz = getFieldOrDefault(plannedSrc, 'PlannedBandwidthHz', NaN);
+    design.AllocatedBandwidthHz = getFieldOrDefault(plannedSrc, 'Bandwidth', NaN);
+    if isnan(design.AllocatedBandwidthHz)
+        design.AllocatedBandwidthHz = getFieldOrDefault(plannedSrc, 'AllocatedBandwidthHz', NaN);
     end
     design.PlannedSampleRate = getFieldOrDefault(plannedSrc, 'SampleRate', NaN);
     if isnan(design.PlannedSampleRate)
@@ -292,7 +292,7 @@ function design = buildDesignTruth(comp)
     % an EXTERNAL reference. For a root-raised-cosine single carrier the ITU 99 %
     % OBW is a fixed multiple of the symbol rate rising with the roll-off, so
     % (Rs, beta) predicts the measurement from published theory alone. Checking
-    % the measurement against PlannedBandwidthHz instead cannot do that: the
+    % the measurement against AllocatedBandwidthHz instead cannot do that: the
     % allocation is a ceiling the planner may snap onto the receiver grid, and
     % checking it against Truth.Execution is self-referential, since both planes
     % now run one kernel and would agree even on a wrong definition.

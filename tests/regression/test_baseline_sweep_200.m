@@ -111,6 +111,8 @@ function test_baseline_sweep_200(varargin)
         'NumLowSnrExcluded', 0, ...
         'BwAbsRelDiffs', [], ...
         'BwAbsRelDiffsLowSnr', [], ...
+        'MvdRrcTheoryRatios', [], ...
+        'MvdAllocationRatios', [], ...
         'JsonNanCount', 0, ...
         'JsonInfinityCount', 0, ...
         'SanitizeManifestEntryCount', 0, ...
@@ -131,6 +133,8 @@ function test_baseline_sweep_200(varargin)
         'NumLowSnrExcluded', 0, ...
         'BwAbsRelDiffs', [], ...
         'BwAbsRelDiffsLowSnr', [], ...
+        'MvdRrcTheoryRatios', [], ...
+        'MvdAllocationRatios', [], ...
         'JsonNanCount', 0, ...
         'JsonInfinityCount', 0, ...
         'SanitizeManifestEntryCount', 0, ...
@@ -481,6 +485,8 @@ rec = struct( ...
     'NumLowSnrExcluded', 0, ...
     'BwAbsRelDiffs', [], ...
     'BwAbsRelDiffsLowSnr', [], ...
+        'MvdRrcTheoryRatios', [], ...
+        'MvdAllocationRatios', [], ...
     'JsonNanCount', 0, ...
     'JsonInfinityCount', 0, ...
     'SanitizeManifestEntryCount', 0, ...
@@ -861,6 +867,88 @@ if isfield(src, 'Status') && ischar(src.Status) ...
         && (strcmpi(src.Status, 'empty') || strcmpi(src.Status, 'no-signal'))
     rec.NumEmptySources = rec.NumEmptySources + 1;
 end
+
+% --- Measured-vs-Design metrics (published, never gated) -----------------
+% The Exec-vs-Measured gap above CANNOT see a construction defect: both
+% planes measure the same post-construction waveform with one kernel, so
+% they move together. The Design side is the independent reference. Two
+% family-conditioned views, both publish-only (a gate here would freeze
+% physics that the scenario mix legitimately varies):
+%   * measured / (kappa(beta) * Rs) for the RRC single-carrier families,
+%     where kappa is the closed-form ITU 99% ratio (ITU-R SM.853-2 Table 2;
+%     same anchors as OccupiedBandwidthAgainstTheoryTest) -- an absolute,
+%     external-theory check that catches what allocation ratios cannot;
+%   * measured / AllocatedBandwidthHz for every family -- the allocation is
+%     a ceiling, so this ratio reads "how much of its channel the emitter
+%     realized" and its P95 rising past ~1 is the construction-drift alarm
+%     that the 2026-08 audit had to build a separate probe to see.
+if isfield(truth, 'Design') && isstruct(truth.Design) && ...
+        isfinite(measuredBwHz) && measuredBwHz > 0
+    design = truth.Design;
+    allocationHz = NaN;
+    if isfield(design, 'AllocatedBandwidthHz') && ...
+            isnumeric(design.AllocatedBandwidthHz) && ...
+            isscalar(design.AllocatedBandwidthHz)
+        allocationHz = double(design.AllocatedBandwidthHz);
+    end
+    if isfinite(allocationHz) && allocationHz > 0
+        rec.MvdAllocationRatios(end + 1) = measuredBwHz / allocationHz;
+    end
+    theoryHz = localRrcTheoryObwHz(design);
+    if isfinite(theoryHz) && theoryHz > 0
+        rec.MvdRrcTheoryRatios(end + 1) = measuredBwHz / theoryHz;
+    end
+end
+end
+
+
+function theoryHz = localRrcTheoryObwHz(design)
+% localRrcTheoryObwHz - closed-form clean ITU 99% OBW from Design facts.
+% Inputs: design - Truth.Design struct (ModulationFamily,
+%         PlannedSymbolRateHz, PlannedRolloffFactor).
+% Outputs: theoryHz - kappa(beta)*Rs for the RRC single-carrier families,
+%          NaN for families without this closed form.
+%
+% For a root-raised-cosine single carrier the 99% edge solves the
+% Kepler-type equation x - sin(x) = 0.01*pi/beta with
+% OBW/Rs = (1+beta) - 2*beta*x/pi (ITU-R SM.853-2 Table 2; identical
+% anchors to tests/unit/OccupiedBandwidthAgainstTheoryTest.m and the
+% widening probe's localTheoryCleanObw).
+theoryHz = NaN;
+rrcFamilies = {'QAM', 'PSK', 'APSK', 'PAM', 'ASK', 'OQPSK', 'OOK', 'Mill88QAM'};
+family = '';
+if isfield(design, 'ModulationFamily')
+    family = char(string(design.ModulationFamily));
+end
+if ~ismember(family, rrcFamilies)
+    return;
+end
+rs = NaN; beta = NaN;
+if isfield(design, 'PlannedSymbolRateHz') && ...
+        isnumeric(design.PlannedSymbolRateHz) && ...
+        isscalar(design.PlannedSymbolRateHz)
+    rs = double(design.PlannedSymbolRateHz);
+end
+if isfield(design, 'PlannedRolloffFactor') && ...
+        isnumeric(design.PlannedRolloffFactor) && ...
+        isscalar(design.PlannedRolloffFactor)
+    beta = double(design.PlannedRolloffFactor);
+end
+if ~(isfinite(rs) && rs > 0 && isfinite(beta) && beta > 0)
+    return;
+end
+target = 0.01 * pi / beta;
+lo = 0; hi = pi;
+for it = 1:60
+    mid = (lo + hi) / 2;
+    if mid - sin(mid) < target
+        lo = mid;
+    else
+        hi = mid;
+    end
+end
+x = (lo + hi) / 2;
+theoryHz = ((1 + beta) - 2 * beta * x / pi) * rs;
 end
 
 
@@ -893,9 +981,13 @@ annBytes = annBytes(~isnan(annBytes));
 bwAll = [];
 
 bwLow = [];
+mvdTheory = [];
+mvdAlloc = [];
 for k = 1:n
     bwAll = [bwAll, rs(k).BwAbsRelDiffs]; %#ok<AGROW>
     bwLow = [bwLow, rs(k).BwAbsRelDiffsLowSnr]; %#ok<AGROW>
+    mvdTheory = [mvdTheory, rs(k).MvdRrcTheoryRatios]; %#ok<AGROW>
+    mvdAlloc = [mvdAlloc, rs(k).MvdAllocationRatios]; %#ok<AGROW>
 end
 
 totalSrc = sum([rs.NumSourcesTotal]);
@@ -931,6 +1023,17 @@ else
     metrics.ExecutionVsMeasuredBwAbsRelDiffLowSnrMax = max(bwLow);
 end
 metrics.EmptySignalSegmentRatio          = emptySrc / max(totalSrc, 1);
+
+% Measured-vs-Design (published, never gated; see localScoreSource). The
+% theory ratio is absolute -- for the RRC families the measured OBW should
+% sit at ~1.0x kappa(beta)*Rs on clean construction; the allocation ratio's
+% P95 rising past ~1 is the construction-drift alarm the Exec-vs-Measured
+% gap is structurally blind to (both its planes measure the same
+% post-construction waveform).
+metrics.MeasuredVsRrcTheoryRatioP50   = localPercentile(mvdTheory, 50);
+metrics.MeasuredVsRrcTheoryRatioP95   = localPercentile(mvdTheory, 95);
+metrics.MeasuredVsAllocationRatioP50  = localPercentile(mvdAlloc, 50);
+metrics.MeasuredVsAllocationRatioP95  = localPercentile(mvdAlloc, 95);
 
 % Phase 2 (audit C7): blueprint resample percentile across scenarios
 % whose annotations carried a numeric BlueprintResamples field.
@@ -971,6 +1074,10 @@ diag.NumLowSnrExcludedFromBwMetric = sum([rs.NumLowSnrExcluded]);
 diag.NumBwSamplesUsedLowSnr = numel(bwLow);
 diag.LowSnrFloorDb                 = 6.0;
 diag.NumBwSamplesUsed              = numel(bwAll);
+% Sample sizes for the Measured-vs-Design views (anti-cheat: an "improved"
+% ratio with a collapsed sample is not an improvement).
+diag.NumMvdRrcTheorySamples        = numel(mvdTheory);
+diag.NumMvdAllocationSamples       = numel(mvdAlloc);
 metrics.Diagnostics = diag;
 end
 

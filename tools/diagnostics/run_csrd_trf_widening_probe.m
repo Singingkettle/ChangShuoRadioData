@@ -156,7 +156,7 @@ function n = localEmitRows(fid, annotation, scenarioIdx)
 
             family = localStr(D, 'ModulationFamily');
             paMethod = localPaMethod(src);
-            plannedBw = localNum(D, 'PlannedBandwidthHz');
+            plannedBw = localNum(D, 'AllocatedBandwidthHz');
             rs = localNum(D, 'PlannedSymbolRateHz');
             beta = localNum(D, 'PlannedRolloffFactor');
             execObw = localNum(E, 'ModulatedBandwidthHz');

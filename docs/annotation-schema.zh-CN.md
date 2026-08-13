@@ -106,7 +106,7 @@ peak-relative 主瓣宽度。那与同名字段现在的量不是一回事,所�
 | 字段 | 单位 | 含义 |
 |-------|------|---------|
 | `PlannedCenterFrequencyHz` | Hz | 计划的来源中心,作为**接收机基带偏移**(与 `Execution.CenterFrequencyOffsetHz` 和 `ReceiverView.ProjectedCenterOffsetHz` 处于同一坐标系),而非绝对 RF 载波 |
-| `PlannedBandwidthHz` | Hz | 蓝图带宽:规划器分配的**额度**,即一个上限,不是对测得宽度的预测 |
+| `AllocatedBandwidthHz` | Hz | 蓝图带宽:规划器分配的**额度**,即一个上限,不是对测得宽度的预测 |
 | `PlannedSampleRate` | Hz | 计划采样率 |
 | `PlannedSymbolRateHz` | Hz | 规划器选定的符号率;无此概念的族取 `NaN` |
 | `PlannedRolloffFactor` | 标量 | 规划器选定的脉冲成形滚降;不适用处取 `NaN` |
