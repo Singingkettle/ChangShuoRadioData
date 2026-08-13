@@ -66,19 +66,19 @@ classdef AwgnNoiseFrameVariationTest < matlab.unittest.TestCase
                  'difference means noise reached the buffer the measured planes ', ...
                  'read (frames compared: 1 and 2, %d samples).'], ...
                 size(o1.Signal, 1)));
-            % ChannelNoisePowerW is deliberately NON-zero here: it is the power the
-            % saved frame will carry once the injector runs, and it is what
-            % localMeasuredReceivedSnr divides by to produce
-            % Truth.Measured.SourcePlane.SNRdB. So the invariant is not "zero", it is
-            % that the ACCOUNTING and the PLAN agree exactly. If they ever drifted
-            % apart, every SNRdB label would describe a different amount of noise
-            % than the waveform actually carries, and nothing else in the suite would
-            % notice -- the label and the buffer are produced by different code paths.
-            testCase.verifyEqual(double(o1.ChannelNoisePowerW), ...
+            % RequestedChannelNoisePowerW is deliberately NON-zero here: it is the
+            % per-link REQUESTED noise power that the frame's reference descriptor
+            % may realize (applyFrameChannelNoise draws ONE whole-frame realization
+            % from the first noise-owing component; the SNRdB labels are then
+            % measured against that realization). The invariant is that the
+            % request bookkeeping and the descriptor the injector consumes agree
+            % exactly -- if they drifted apart, the diagnostic would describe a
+            % different amount of noise than the frame could ever carry.
+            testCase.verifyEqual(double(o1.RequestedChannelNoisePowerW), ...
                 double(o1.PendingChannelNoise.PowerW), 'RelTol', 1e-12, ...
-                ['ChannelNoisePowerW (which sets the published SNRdB) must equal ', ...
+                ['RequestedChannelNoisePowerW must equal ', ...
                  'PendingChannelNoise.PowerW (which the injector realizes). A gap ', ...
-                 'here means the SNR label and the waveform disagree.']);
+                 'here means the request bookkeeping and the descriptor disagree.']);
 
             for o = {o1, o1b, o2}
                 testCase.verifyTrue(isfield(o{1}, 'PendingChannelNoise') && ...

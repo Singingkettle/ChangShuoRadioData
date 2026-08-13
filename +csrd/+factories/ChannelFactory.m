@@ -547,7 +547,12 @@ classdef ChannelFactory < matlab.System
             % noise is non-negligible. For a single antenna sum(.,2) is a no-op,
             % so SISO is unaffected.
             out.ChannelSignalPowerW = mean(abs(sum(sig, 2)) .^ 2);
-            out.ChannelNoisePowerW = targetNoiseW * numRxColumns;
+            % REQUESTED noise power for this link's target SNR. The noise the
+            % saved frame carries is the single whole-frame realization drawn
+            % from the frame's REFERENCE descriptor (applyFrameChannelNoise);
+            % this per-link value is a diagnostic of the plan, not the label's
+            % noise term.
+            out.RequestedChannelNoisePowerW = targetNoiseW * numRxColumns;
             % The injector draws on the antenna-collapsed stream, so it needs the
             % summed-scale power. Drawing one collapsed realization at
             % targetNoiseW*numColumns is statistically identical to summing

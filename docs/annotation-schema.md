@@ -207,7 +207,17 @@ executed `ChannelModel`. Empty/no-building OSM cases must expose any
 
 Both planes carry occupied bandwidth, center frequency, time occupancy,
 frequency occupancy, and `MeasurementSemantics`. `SourcePlane` also carries
-`SNRdB`.
+`SNRdB`. `FramePlane` also carries `FrameChannelNoisePowerW`: the realized
+power of the frame's SINGLE whole-frame channel-noise draw. A receiver has
+one noise floor, so the pipeline realizes ONE noise realization per frame
+(from the first noise-owing emitter's descriptor, in construction order)
+across the entire buffer — overlapping bursts share it instead of summing K
+independent realizations, and the gaps between bursts carry it too instead
+of being noise-free (a noise floor that stepped with the instantaneous
+overlap count was a directly learnable leak of the GT burst timing). Every
+`SourcePlane.SNRdB` at the receiver is measured against this same scalar,
+so emitters other than the reference get honest, emergent SNR labels rather
+than their own requested targets.
 
 Required semantics:
 

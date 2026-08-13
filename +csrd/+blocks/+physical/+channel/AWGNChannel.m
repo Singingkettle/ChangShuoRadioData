@@ -250,10 +250,11 @@ classdef AWGNChannel < matlab.System
             % sizes the noise from it, so an AWGN "channel" is now exactly what
             % it always physically was: no propagation effect plus a target SNR.
             output.ChannelDeclaredSnrDb = obj.SNRdB;
-            % Clean signal power for the measured received-SNR GT. Channel noise
-            % is filled in by the deferred injector.
+            % Clean signal power for the measured received-SNR GT. The
+            % requested channel-noise power is sized by the ChannelFactory's
+            % noise planner; the block itself owes none.
             output.ChannelSignalPowerW = signalPower;
-            output.ChannelNoisePowerW = 0;
+            output.RequestedChannelNoisePowerW = 0;
 
         end
 

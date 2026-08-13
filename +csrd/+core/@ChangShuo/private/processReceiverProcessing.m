@@ -131,10 +131,20 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
                 quantNoiseW = processedOutput.RealizedAdcQuantizationNoiseInputReferredW;
             end
 
+            % Realized whole-frame channel-noise power: ONE scalar per
+            % receiver frame (see applyFrameChannelNoise), shared by every
+            % emitter's measured SNR below.
+            frameChanNoiseW = NaN;
+            if isstruct(combinedSignal.FrameChannelNoise) && ...
+                    combinedSignal.FrameChannelNoise.Applied
+                frameChanNoiseW = combinedSignal.FrameChannelNoise.RealizedPowerW;
+            end
+
             FrameAnnotation{rxIdx}.SignalSources = [];
             for compIdx = 1:length(combinedSignal.Components)
                 comp = combinedSignal.Components{compIdx};
-                comp.MeasuredReceivedSNRdB = localMeasuredReceivedSnr(comp, thermalNoiseW, quantNoiseW);
+                comp.MeasuredReceivedSNRdB = localMeasuredReceivedSnr( ...
+                    comp, frameChanNoiseW, thermalNoiseW, quantNoiseW);
                 sourceInfo = buildSourceAnnotation(comp, comp.Signal, ...
                     rxInfo.SampleRate, observableBwHz, framePlaneCache);
                 FrameAnnotation{rxIdx}.SignalSources = [FrameAnnotation{rxIdx}.SignalSources, sourceInfo];
@@ -541,6 +551,18 @@ function fp = computeFramePlaneCache(combinedSignal, sampleRate, observableBwHz)
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
     fp = makeEmptyFramePlane();
+    % The realized whole-frame channel-noise power (one scalar per receiver
+    % frame, see applyFrameChannelNoise) is published on the FramePlane so a
+    % consumer can check the saved frame's noise floor against the SNR labels
+    % without re-estimating it from the waveform. Stamped even on NoSignal
+    % frames -- an all-gap frame still carries the frame's noise.
+    if isstruct(combinedSignal) && ...
+            isfield(combinedSignal, 'FrameChannelNoise') && ...
+            isstruct(combinedSignal.FrameChannelNoise) && ...
+            combinedSignal.FrameChannelNoise.Applied
+        fp.FrameChannelNoisePowerW = ...
+            combinedSignal.FrameChannelNoise.RealizedPowerW;
+    end
     if ~isstruct(combinedSignal) || ~isfield(combinedSignal, 'Signal') || ...
             isempty(combinedSignal.Signal)
         fp.MeasurementStatus = 'NoSignal';
@@ -614,6 +636,7 @@ function fp = makeEmptyFramePlane()
         'CenterFrequencyHz',    NaN, ...
         'TimeOccupancy',        NaN, ...
         'FrequencyOccupancy',   NaN, ...
+        'FrameChannelNoisePowerW', NaN, ...
         'MeasurementStatus',    'NoSignal', ...
         'MeasurementSemantics', 'post_rx_combined_pre_noise');
 end
@@ -740,26 +763,34 @@ function value = getFieldOrEmpty(s, fieldName, defaultValue)
     end
 end
 
-function snrDb = localMeasuredReceivedSnr(comp, thermalNoiseW, quantNoiseW)
+function snrDb = localMeasuredReceivedSnr(comp, frameChanNoiseW, thermalNoiseW, quantNoiseW)
     % localMeasuredReceivedSnr - Measured per-emitter received SNR (dB): the
     % realized per-emitter signal power over the total realized additive noise
-    % (channel noise + receiver thermal noise + ADC quantization noise). Returns
-    % NaN when the realized powers are unavailable so the caller falls back to
-    % the analytical label.
+    % (the FRAME's channel-noise realization + receiver thermal noise + ADC
+    % quantization noise). Returns NaN when the realized powers are unavailable
+    % so the caller falls back to the analytical label.
+    %
+    % frameChanNoiseW is the REALIZED power of the frame's single whole-frame
+    % channel-noise draw (applyFrameChannelNoise) -- the same scalar for every
+    % emitter at this receiver, because a receiver has one noise floor. The
+    % previous code fed each component its OWN requested ChannelNoisePowerW,
+    % which was a different quantity from what the saved frame carries whenever
+    % bursts overlapped (K summed realizations) and made the labels optimistic
+    % by ~10*log10(K) dB, correlated with the hidden overlap count.
     snrDb = NaN;
     sigW = getFieldOrDefault(comp, 'ChannelSignalPowerW', NaN);
     if ~isnumeric(sigW) || ~isscalar(sigW) || ~isfinite(sigW)
         return;
     end
-    chanNoiseW = getFieldOrDefault(comp, 'ChannelNoisePowerW', NaN);
     totalNoiseW = 0; haveNoise = false;
-    if isnumeric(chanNoiseW) && isscalar(chanNoiseW) && isfinite(chanNoiseW)
-        totalNoiseW = totalNoiseW + double(chanNoiseW); haveNoise = true;
+    if isnumeric(frameChanNoiseW) && isscalar(frameChanNoiseW) && ...
+            isfinite(frameChanNoiseW) && frameChanNoiseW > 0
+        totalNoiseW = totalNoiseW + double(frameChanNoiseW); haveNoise = true;
     end
     if isnumeric(thermalNoiseW) && isscalar(thermalNoiseW) && isfinite(thermalNoiseW)
         totalNoiseW = totalNoiseW + double(thermalNoiseW); haveNoise = true;
     end
-    if nargin >= 3 && isnumeric(quantNoiseW) && isscalar(quantNoiseW) && isfinite(quantNoiseW)
+    if nargin >= 4 && isnumeric(quantNoiseW) && isscalar(quantNoiseW) && isfinite(quantNoiseW)
         totalNoiseW = totalNoiseW + double(quantNoiseW); haveNoise = true;
     end
     if ~haveNoise || ~(totalNoiseW > 0)
@@ -790,15 +821,24 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
 
     combinedSignal = struct();
     combinedSignal.Signal = complex(zeros(frameShape.NumSamples, 1));
-    % Two accumulators. `Signal` stays NOISE-FREE and is what both measured
+    % Two buffers. `Signal` stays NOISE-FREE and is what both measured
     % planes are computed from -- the dataset's labels are only valid measured on
     % a clean waveform, because a noise floor inside the estimator's
     % peak-relative clip inflates the published occupied bandwidth up to 6x at
     % low SNR. `NoisySignal` carries the deferred channel noise and is what the
     % receiver RF chain consumes and what gets saved as the frame the model sees.
+    % The loop below accumulates ONLY clean bursts into both buffers; the
+    % channel noise is realized ONCE over the whole frame afterwards (see
+    % applyFrameChannelNoise) -- the per-component slice injection it replaces
+    % summed K independent noise realizations wherever K bursts overlapped and
+    % left the gaps between bursts noise-free, making the saved frame's noise
+    % floor a step function of the hidden overlap count.
     combinedSignal.NoisySignal = complex(zeros(frameShape.NumSamples, 1));
     combinedSignal.Components = {};
     combinedSignal.FrameShape = frameShape;
+    combinedSignal.FrameChannelNoise = struct('Applied', false, ...
+        'Reason', 'no components', 'NoisePowerW', 0, 'RealizedPowerW', 0, ...
+        'TargetSnrDb', NaN, 'ReferenceComponentIndex', NaN);
 
     if isempty(signalComponents)
         obj.logger.debug("RxID %s: No signal components, generating fixed empty frame.", string(rxInfo.ID));
@@ -838,9 +878,7 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
                 combinedSignal.Signal(idxStart:idxEnd) = ...
                     combinedSignal.Signal(idxStart:idxEnd) + compSig;
                 combinedSignal.NoisySignal(idxStart:idxEnd) = ...
-                    combinedSignal.NoisySignal(idxStart:idxEnd) + ...
-                    csrd.pipeline.signal.realizeChannelNoise( ...
-                        localPendingChannelNoise(comp), compSig);
+                    combinedSignal.NoisySignal(idxStart:idxEnd) + compSig;
             end
             comp = localUpdateComponentSampleGrid( ...
                 comp, compSig, startOffset, frameShape.NumSamples, sampleRate);
@@ -850,25 +888,14 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
             combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
         end
     end
-end
 
-function pending = localPendingChannelNoise(comp)
-    % localPendingChannelNoise - the PendingChannelNoise descriptor, or [].
-    % Inputs: comp - component struct as carried through the receiver loop.
-    % Outputs: pending - the descriptor struct planned by
-    %           ChannelFactory.planChannelNoise, or [] when the link owes none.
-    %
-    % The realization itself lives in csrd.pipeline.signal.realizeChannelNoise
-    % rather than here. It is the single point where noise enters the dataset and
-    % therefore sets the realized SNR of every saved frame, so it belongs
-    % somewhere a test can call it directly; as a local function in a private
-    % method file it was unreachable, and the most safety-critical step in the
-    % pipeline had no direct coverage.
-    pending = [];
-    if isstruct(comp) && isfield(comp, 'PendingChannelNoise') && ...
-            isstruct(comp.PendingChannelNoise)
-        pending = comp.PendingChannelNoise;
-    end
+    % ONE whole-frame channel-noise realization from the frame's reference
+    % descriptor (first component in construction order that owes noise).
+    % The selection + realization live in a public pipeline function so the
+    % K-overlap and gap-flatness contracts are directly testable.
+    [combinedSignal.NoisySignal, combinedSignal.FrameChannelNoise] = ...
+        csrd.pipeline.signal.applyFrameChannelNoise( ...
+            combinedSignal.Components, combinedSignal.NoisySignal);
 end
 
 function frameShape = localResolveFrameShape(obj, signalComponents, sampleRate)
