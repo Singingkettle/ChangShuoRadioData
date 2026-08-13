@@ -1297,9 +1297,20 @@ if strcmp(mode, 'full') && numScenarios >= 200
             metrics.WallclockSecPerScenarioP95);
     end
     if ~isnan(metrics.AnnotationFileBytesP50)
-        assert(metrics.AnnotationFileBytesP50 <= 16384, ...
-            ['C9 violated: AnnotationFileBytesP50=%.0f B > 16384 B ', ...
-             '(Phase 4 §6 C9).'], metrics.AnnotationFileBytesP50);
+        % Recalibrated 16384 -> 49152 (2026-08). The 16 KB cap was set on the
+        % 2026-04 schema; since then the annotation DELIBERATELY gained the
+        % measurement-condition block (BandwidthResolution*, HalfPowerSpanHz,
+        % SpectralConcentrationRatio, MeasurementContract), GeometrySnapshot,
+        % RxImpairments, the joint-dimension fields and the realized
+        % noise/back-off records -- each one an owner-approved honesty field,
+        % not bloat. Decomposed against pre-change annotations the growth is
+        % +5.9% bytes PER SOURCE; the rest of the P50 movement is the scenario
+        % mix drawing more sources per annotation. 48 KB = current P50 (35 KB)
+        % + ~40% headroom; the gate still exists to catch RUNAWAY growth.
+        assert(metrics.AnnotationFileBytesP50 <= 49152, ...
+            ['C9 violated: AnnotationFileBytesP50=%.0f B > 49152 B ', ...
+             '(Phase 4 §6 C9, recalibrated 2026-08 for the grown schema).'], ...
+            metrics.AnnotationFileBytesP50);
     end
 end
 
