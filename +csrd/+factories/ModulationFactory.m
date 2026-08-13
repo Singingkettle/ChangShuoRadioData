@@ -243,11 +243,31 @@ classdef ModulationFactory < matlab.System
                     class(currentModulator));
             end
 
-            % Compute and set SampleRate = SymbolRate × SamplePerSymbol
+            % Compute and set SampleRate. For the multicarrier families the
+            % rate is a property of THEIR GRID (FFTLength / DelayLength x
+            % subcarrier spacing), which the modulator itself derives during
+            % its first-call setup. The cached, already-locked modulator does
+            % NOT rerun setup on later calls, so the generic SymbolRate*SPS
+            % write here silently RELABELED its rate on every call after the
+            % first (a 30.72 MHz OFDM waveform stamped 64 MHz): the samples
+            % were unchanged but every downstream consumer stretched the
+            % spectrum by the ratio -- measured as the entire
+            % exec > 0.85*Fs capture-band-fill class (64/774 anchor rows,
+            % misattributed to PA regrowth until a TRF isolation run came
+            % back clean). Derive the same grid rate HERE, on EVERY call, so
+            % the label can never diverge from the waveform.
             if ~isempty(symbolRate) && isprop(currentModulator, 'SampleRate')
-                currentModulator.SampleRate = symbolRate * currentModulator.SamplePerSymbol;
-                obj.logger.debug('Set SampleRate = %.2f Hz (SymbolRate=%.2f × SPS=%d)', ...
-                    currentModulator.SampleRate, symbolRate, currentModulator.SamplePerSymbol);
+                gridRate = localMulticarrierGridRate(modulatorTypeID, ...
+                    segmentModulationConfig);
+                if isfinite(gridRate)
+                    currentModulator.SampleRate = gridRate;
+                    obj.logger.debug('Set SampleRate = %.2f Hz (multicarrier grid rate for %s)', ...
+                        currentModulator.SampleRate, modulatorTypeID);
+                else
+                    currentModulator.SampleRate = symbolRate * currentModulator.SamplePerSymbol;
+                    obj.logger.debug('Set SampleRate = %.2f Hz (SymbolRate=%.2f × SPS=%d)', ...
+                        currentModulator.SampleRate, symbolRate, currentModulator.SamplePerSymbol);
+                end
             end
 
             % Set ModulationOrder from the scenario plan. Factory defaults
@@ -587,6 +607,64 @@ function adaptedConfig = adaptScenarioModulatorConfig(segmentModulationConfig, m
     end
 
     adaptedConfig = ensurePulseShapeDefaults(adaptedConfig, modulatorTypeID);
+end
+
+function gridRate = localMulticarrierGridRate(modulatorTypeID, segmentModulationConfig)
+    % localMulticarrierGridRate - the multicarrier families' own sample rate.
+    % Inputs: modulatorTypeID - char; segmentModulationConfig - scenario
+    %         segment config whose ModulatorConfig carries the grid.
+    % Outputs: gridRate - Hz for OFDM/SCFDMA (FFTLength x Subcarrierspacing)
+    %          and OTFS (DelayLength x Subcarrierspacing); NaN for every
+    %          other family (the generic SymbolRate*SPS rule applies there).
+    %
+    % These formulas MUST match what the modulators derive in their own
+    % genModulatorHandle (OFDM.m / SCFDMA.m / OTFS.m): the factory stamps
+    % the rate on every call, the modulator re-derives it only on its
+    % first-call setup, and the two must agree or the cached-modulator path
+    % relabels the waveform. A multicarrier segment without its grid config
+    % fails fast -- the modulator setup could not build the grid either.
+    typeName = char(string(modulatorTypeID));
+    if ~ismember(typeName, {'OFDM', 'SCFDMA', 'OTFS'})
+        gridRate = NaN;
+        return;
+    end
+    mc = struct();
+    if isfield(segmentModulationConfig, 'ModulatorConfig') && ...
+            isstruct(segmentModulationConfig.ModulatorConfig)
+        mc = segmentModulationConfig.ModulatorConfig;
+    end
+    gridRate = NaN;
+    ok = false;
+    switch typeName
+        case 'OFDM'
+            ok = isfield(mc, 'ofdm') && isfield(mc.ofdm, 'FFTLength') && ...
+                isfield(mc.ofdm, 'Subcarrierspacing');
+            if ok
+                gridRate = double(mc.ofdm.FFTLength) * ...
+                    double(mc.ofdm.Subcarrierspacing);
+            end
+        case 'SCFDMA'
+            ok = isfield(mc, 'scfdma') && isfield(mc.scfdma, 'FFTLength') && ...
+                isfield(mc.scfdma, 'Subcarrierspacing');
+            if ok
+                gridRate = double(mc.scfdma.FFTLength) * ...
+                    double(mc.scfdma.Subcarrierspacing);
+            end
+        case 'OTFS'
+            ok = isfield(mc, 'otfs') && isfield(mc.otfs, 'DelayLength') && ...
+                isfield(mc.otfs, 'Subcarrierspacing');
+            if ok
+                gridRate = double(mc.otfs.DelayLength) * ...
+                    double(mc.otfs.Subcarrierspacing);
+            end
+    end
+    if ~ok
+        error('CSRD:Modulation:MissingMulticarrierGrid', ...
+            ['%s segment config must carry its grid ', ...
+             '(FFTLength/DelayLength + Subcarrierspacing) -- the sample ', ...
+             'rate is a property of the grid, not of SymbolRate*SPS.'], ...
+            typeName);
+    end
 end
 
 function adaptedConfig = adaptSegmentModulatorConfig(segmentModulationConfig, modulatorTypeID)
