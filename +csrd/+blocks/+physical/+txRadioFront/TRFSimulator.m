@@ -888,7 +888,20 @@ classdef TRFSimulator < matlab.System
 
             above = freqsHz > offsetsHz(end);
             if any(above)
-                levelsAtFreq(above) = levelsDbcHz(end);
+                % Above the last mask point, KEEP the last segment's slope (the
+                % interp1 'extrap' above already did that) instead of holding the
+                % level flat to Fs/2. The flat hold was a defect: it painted a
+                % white pedestal across the whole capture band, and at the top of
+                % the configured level range on a wide modulator grid that
+                % pedestal carried ~1% of total power -- exactly the ITU 99%-OBW
+                % runaway threshold. A real oscillator keeps falling past the
+                % last specified offset until its broadband floor, so the
+                % extrapolation is clamped between the last mask level (never
+                % rise above it, even for a pathological rising mask) and a
+                % physical -160 dBc/Hz far-out floor.
+                FAR_FLOOR_DBCHZ = -160;
+                levelsAtFreq(above) = min(levelsAtFreq(above), levelsDbcHz(end));
+                levelsAtFreq(above) = max(levelsAtFreq(above), FAR_FLOOR_DBCHZ);
             end
 
             % SSB phase noise L(f) relates to phase PSD by
