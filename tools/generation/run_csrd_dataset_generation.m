@@ -32,11 +32,25 @@ function summary = run_csrd_dataset_generation(varargin)
 %     'OutputRoot'    - dataset root directory (default
 %                       artifacts/datasets/run_<timestamp>; an existing root
 %                       is REFUSED rather than overwritten)
-%     'ChannelModels' - cellstr cycled across scenarios
+%     'MapType'       - 'Statistical' (default) or 'OSM'. Statistical uses
+%                       the registered fading models below; OSM drives the
+%                       RAY-TRACING channel from real building maps, and the
+%                       channel model is then a property of the map (the
+%                       ChannelModels option is ignored and says so).
+%     'ChannelModels' - cellstr cycled across scenarios, Statistical only
 %                       (default {'AWGN','Rayleigh','Rician'})
+%     'OsmSets'       - OSM only: cellstr of map-set directory names under
+%                       data/map/osm (default: every set found there). Each
+%                       scenario cycles the sets, then the files within a
+%                       set, so a long run covers set x file deterministically.
+%                       BUDGET WARNING: ray-tracing cost scales with building
+%                       density -- measured 3.8 s/scenario on open farmland
+%                       but ~570 s/scenario in an urban canyon.
 %     'CompressData'  - forwarded to Runner.Data.CompressData (default false)
 %     'Audit'         - run the strict-reader audit after generation
-%                       (default true)
+%                       (default true). For OSM runs the audit additionally
+%                       reports ChannelModel counts, RayCount, and the
+%                       zero-ray FreeSpaceAttenuation fallbacks.
 %
 %   Output:
 %     summary - struct with NumRequested, NumSucceeded, FailureMessages,
@@ -54,14 +68,52 @@ p = inputParser;
 addParameter(p, 'NumScenarios', 20, @(x) isnumeric(x) && isscalar(x) && x >= 1);
 addParameter(p, 'BaseSeed', 20260814, @(x) isnumeric(x) && isscalar(x) && isfinite(x));
 addParameter(p, 'OutputRoot', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'MapType', 'Statistical', ...
+    @(x) any(strcmpi(char(string(x)), {'Statistical', 'OSM'})));
 addParameter(p, 'ChannelModels', {'AWGN', 'Rayleigh', 'Rician'}, @iscellstr);
+addParameter(p, 'OsmSets', {}, @iscellstr);
 addParameter(p, 'CompressData', false, @(x) islogical(x) && isscalar(x));
 addParameter(p, 'Audit', true, @(x) islogical(x) && isscalar(x));
 parse(p, varargin{:});
 opt = p.Results;
+useOsm = strcmpi(char(string(opt.MapType)), 'OSM');
 
 projectRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 addpath(projectRoot);
+
+osmFiles = {};
+if useOsm
+    if ~any(strcmp('ChannelModels', p.UsingDefaults))
+        fprintf(['NOTE: MapType=OSM derives the channel from the map ', ...
+            '(ray tracing); the ChannelModels option is ignored.\n']);
+    end
+    osmSets = opt.OsmSets;
+    if isempty(osmSets)
+        d = dir(fullfile(projectRoot, 'data', 'map', 'osm'));
+        osmSets = {d([d.isdir] & ~startsWith({d.name}, '.')).name};
+    end
+    assert(~isempty(osmSets), 'CSRD:Generation:NoOsmSets', ...
+        'No OSM map sets found under data/map/osm.');
+    % Flatten to one deterministic (set, file) list: scenario k uses
+    % osmFiles{mod(k-1, end)+1}, cycling sets first, then files within a set,
+    % so a long run covers set x file without random draws.
+    maxFiles = 0;
+    perSet = cell(1, numel(osmSets));
+    for i = 1:numel(osmSets)
+        f = dir(fullfile(projectRoot, 'data', 'map', 'osm', osmSets{i}, '*.osm'));
+        assert(~isempty(f), 'CSRD:Generation:EmptyOsmSet', ...
+            'OSM set "%s" contains no .osm files.', osmSets{i});
+        perSet{i} = arrayfun(@(x) fullfile(x.folder, x.name), f, ...
+            'UniformOutput', false);
+        maxFiles = max(maxFiles, numel(perSet{i}));
+    end
+    for j = 1:maxFiles
+        for i = 1:numel(osmSets)
+            files = perSet{i};
+            osmFiles{end + 1} = files{mod(j - 1, numel(files)) + 1}; %#ok<AGROW>
+        end
+    end
+end
 
 outRoot = char(opt.OutputRoot);
 if isempty(outRoot)
@@ -94,10 +146,17 @@ for k = 1:numScenarios
     cfg.Logging.Policy = 'Standard';
     cfg.Runner.Data.OutputDirectory = scenRoot;
     cfg.Runner.Data.CompressData = opt.CompressData;
-    cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = {'Statistical'};
-    cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;
-    cfg.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel = ...
-        channelModels{mod(k - 1, numel(channelModels)) + 1};
+    if useOsm
+        cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = {'OSM'};
+        cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;
+        cfg.Factories.Scenario.PhysicalEnvironment.Map.OSM.SpecificFile = ...
+            osmFiles{mod(k - 1, numel(osmFiles)) + 1};
+    else
+        cfg.Factories.Scenario.PhysicalEnvironment.Map.Types = {'Statistical'};
+        cfg.Factories.Scenario.PhysicalEnvironment.Map.Ratio = 1;
+        cfg.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel = ...
+            channelModels{mod(k - 1, numel(channelModels)) + 1};
+    end
     cfg = csrd.test_support.buildRuntimePlanForTest(cfg);
 
     runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner, ...
@@ -151,6 +210,9 @@ function audit = localAudit(annPaths)
     % anchor (ITU-R SM.853-2 Table 2, same kernel as
     % OccupiedBandwidthAgainstTheoryTest).
     families = containers.Map('KeyType', 'char', 'ValueType', 'double');
+    channelModelCounts = containers.Map('KeyType', 'char', 'ValueType', 'double');
+    fallbackCounts = containers.Map('KeyType', 'char', 'ValueType', 'double');
+    rayCounts = [];
     snrs = []; allocRatio = []; theoryResolved = [];
     allocWide = []; ctrRelWide = []; frameNoiseCount = 0;
     nSources = 0; nFrames = 0; readerRejects = 0;
@@ -169,7 +231,30 @@ function audit = localAudit(annPaths)
             src = reader.Sources{si};
             nSources = nSources + 1;
             design = src.Truth.Design;
+            execution = src.Truth.Execution;
             measured = src.Truth.Measured.SourcePlane;
+            cm = 'missing';
+            if isfield(execution, 'ChannelModel')
+                cm = char(string(execution.ChannelModel));
+            end
+            if isKey(channelModelCounts, cm)
+                channelModelCounts(cm) = channelModelCounts(cm) + 1;
+            else
+                channelModelCounts(cm) = 1;
+            end
+            if isfield(execution, 'ChannelFallback') && ...
+                    ~isempty(execution.ChannelFallback)
+                fb = char(string(execution.ChannelFallback));
+                if isKey(fallbackCounts, fb)
+                    fallbackCounts(fb) = fallbackCounts(fb) + 1;
+                else
+                    fallbackCounts(fb) = 1;
+                end
+            end
+            if isfield(execution, 'RayCount') && ...
+                    isnumeric(execution.RayCount) && isscalar(execution.RayCount)
+                rayCounts(end + 1) = double(execution.RayCount); %#ok<AGROW>
+            end
             fam = char(string(design.ModulationFamily));
             if isKey(families, fam)
                 families(fam) = families(fam) + 1;
@@ -226,6 +311,24 @@ function audit = localAudit(annPaths)
         median(ctrRelWide), prctile(ctrRelWide, 95));
     fprintf('FrameChannelNoisePowerW: finite on %d/%d source records\n', ...
         frameNoiseCount, nSources);
+    cmk = keys(channelModelCounts);
+    fprintf('ChannelModel:');
+    for i = 1:numel(cmk)
+        fprintf(' %s=%d', cmk{i}, channelModelCounts(cmk{i}));
+    end
+    fprintf('\n');
+    if ~isempty(rayCounts)
+        fbk = keys(fallbackCounts);
+        fbTotal = 0;
+        for i = 1:numel(fbk); fbTotal = fbTotal + fallbackCounts(fbk{i}); end
+        fprintf(['RayCount: med %g [min %g, max %g]; zero-ray links %d, ', ...
+            'explicit fallbacks %d'], median(rayCounts), min(rayCounts), ...
+            max(rayCounts), nnz(rayCounts == 0), fbTotal);
+        for i = 1:numel(fbk)
+            fprintf(' (%s=%d)', fbk{i}, fallbackCounts(fbk{i}));
+        end
+        fprintf('\n');
+    end
 
     audit = struct( ...
         'ReaderRejects', readerRejects, ...
@@ -236,7 +339,10 @@ function audit = localAudit(annPaths)
         'ObwOverAllocWidebandP95', prctile(allocWide, 95), ...
         'ObwOverRrcTheoryResolvedMedian', median(theoryResolved), ...
         'ObwOverRrcTheoryResolvedP95', prctile(theoryResolved, 95), ...
-        'FrameNoiseCoverage', frameNoiseCount / max(nSources, 1));
+        'FrameNoiseCoverage', frameNoiseCount / max(nSources, 1), ...
+        'ChannelModelCounts', channelModelCounts, ...
+        'ZeroRayLinks', nnz(rayCounts == 0), ...
+        'FallbackCounts', fallbackCounts);
 end
 
 
