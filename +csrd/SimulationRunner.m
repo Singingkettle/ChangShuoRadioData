@@ -75,6 +75,28 @@ classdef SimulationRunner < matlab.System
         RuntimePlan struct
     end
 
+    properties (SetAccess = private, GetAccess = public)
+        % LastRunSummary: outcome of the most recent step(), readable by callers.
+        %
+        %   .Successful / .Failed / .Skipped - scenario counts
+        %   .FirstFailureMessage             - '' when none failed
+        %
+        %   These counts previously lived only in locals, went to the log and the
+        %   performance trace, and were then discarded -- so step() returned
+        %   normally whether a scenario had produced an annotation or not, and a
+        %   caller had no programmatic way to tell. Every gate that loops over
+        %   scenarios then lost data silently: a generation failure looked
+        %   identical to a successful run with fewer sources. That is how an
+        %   intractable-resample-ratio failure (TRFSimulator.resampleToTarget
+        %   refusing a 1902671/1179923 ratio) stayed hidden behind a stale
+        %   annotation read for as long as it did.
+        %
+        %   A caller that asks for N scenarios and gets fewer must be able to say
+        %   so, so this is a public fact rather than a log line.
+        LastRunSummary = struct('Successful', 0, 'Failed', 0, 'Skipped', 0, ...
+            'FirstFailureMessage', '')
+    end
+
     properties (Access = private)
         % logger: Logger instance for tracking simulation progress and debugging
         logger
@@ -327,6 +349,11 @@ classdef SimulationRunner < matlab.System
 
                 catch scenarioError
                     failedScenarios = failedScenarios + 1;
+                    if isempty(obj.LastRunSummary.FirstFailureMessage)
+                        obj.LastRunSummary.FirstFailureMessage = sprintf( ...
+                            'scenario %d: %s (%s)', scenarioId, ...
+                            scenarioError.message, scenarioError.identifier);
+                    end
                     scenarioTime = toc(scenarioStartTime);
 
                     % Display progress even for failed scenarios
@@ -351,6 +378,10 @@ classdef SimulationRunner < matlab.System
                 failedScenarios, skippedScenarios, simulationStartTime, true);
             csrd.runtime.map.osmSiteViewerCache('retain', false);
             csrd.runtime.map.osmSiteViewerCache('clear');
+
+            obj.LastRunSummary.Successful = successfulScenarios;
+            obj.LastRunSummary.Failed = failedScenarios;
+            obj.LastRunSummary.Skipped = skippedScenarios;
 
             obj.logCompletionStatistics(workerId, successfulScenarios, failedScenarios, ...
                 skippedScenarios, simulationStartTime);
@@ -1013,7 +1044,7 @@ classdef SimulationRunner < matlab.System
             %       }
             %   with the following mandatory Header.Runtime keys (Phase 2):
             %       LogPolicy / ToolboxLevel / ScenarioId / WorkerId /
-            %       SavedAt / SanitizeManifest /
+            %       SavedAt / SanitizeManifest / MeasurementContract /
             %       BlueprintHash / BlueprintResamples / ValidatorVersion
             %
             %   The last three keys are the Phase 2 (audit C4) blueprint
@@ -1058,6 +1089,17 @@ classdef SimulationRunner < matlab.System
             annotation.Header.Runtime.SavedAt          = char(datetime('now', ...
                 'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z''', 'TimeZone', 'UTC'));
             annotation.Header.Runtime.SanitizeManifest = sanitizeManifest;
+
+            % What the measured labels in this file MEAN: the quantity, the
+            % estimator, the point in the pipeline the buffers were taken, and a
+            % version that makes pre-fix data distinguishable. Before this existed a
+            % consumer had no way to tell an annotation whose OccupiedBandwidthHz
+            % held an ITU 99 %-power band from one whose identically named field held
+            % a peak-relative main-lobe width measured on a noisy antenna sum -- a
+            % different quantity under the same name. An ABSENT MeasurementContract
+            % is what identifies that older era.
+            annotation.Header.Runtime.MeasurementContract = ...
+                csrd.pipeline.measurement.measurementContract();
 
             % Phase 2 (audit §3.4 / C4) blueprint provenance.
             annotation.Header.Runtime = ...

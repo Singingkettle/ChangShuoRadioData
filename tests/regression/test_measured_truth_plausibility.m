@@ -53,6 +53,11 @@ function test_measured_truth_plausibility(varargin)
     sourcesChecked = 0;
     scenariosRun = 0;
     violations = {};
+    % Low-precision notes are reported, never failed on. See
+    % measuredPlausibilityViolations: a short narrow burst genuinely cannot have a
+    % finely defined bandwidth, so counting those as defects would assert a
+    % dataset-design choice as a correctness property.
+    qualityNotes = {};
 
     for k = 1:numScenarios
         try
@@ -73,18 +78,41 @@ function test_measured_truth_plausibility(varargin)
             runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner, ...
                 'FactoryConfigs', cfg.Factories, 'RuntimePlan', cfg.RuntimePlan);
             setup(runner);
-            step(runner, 1, 1);
 
+            % Resolve the output path BEFORE stepping and clear the target, so a
+            % scenario that generates nothing cannot be scored on the previous
+            % scenario's annotation. The runner writes into a session directory
+            % shared across the scenarios of one process, and frame-level failures
+            % do not raise the scenario-level skip counter -- so a stale read looks
+            % exactly like a successful one. This silently produced a wrong
+            % published number once already (see
+            % csrd.test_support.freshAnnotationReader).
             warnState = warning('off', 'MATLAB:structOnObject');
             s = struct(runner);
             warning(warnState);
             annotationPath = fullfile(s.actualOutputDirectory, 'annotations', ...
                 'scenario_000001_annotation.json');
-            if exist(annotationPath, 'file') ~= 2
-                continue;
-            end
+            csrd.test_support.freshAnnotationReader('clear', annotationPath);
 
-            annotation = jsondecode(fileread(annotationPath));
+            step(runner, 1, 1);
+
+            % A scenario that failed generation must be a LOUD failure, not a
+            % quietly smaller sample. step() returns normally either way and the
+            % counts used to live only in a log line, so a gate looping over
+            % scenarios lost data with no signal at all -- which is how an
+            % intractable-resample-ratio failure (1 scenario in 24, ratio
+            % 1902671/1179923) stayed hidden behind a stale annotation read.
+            runSummary = runner.LastRunSummary;
+            assert(runSummary.Failed == 0, ...
+                ['Plausibility gate: scenario %d FAILED generation, so this gate ', ...
+                 'would otherwise score fewer sources than it asked for and call ', ...
+                 'that a result. Cause: %s'], k, runSummary.FirstFailureMessage);
+
+            [annotation, annotationMeta] = csrd.test_support.freshAnnotationReader( ...
+                'read', annotationPath, sprintf('scenario %d', k));
+            fprintf('  s%-3d %-9s %8d bytes  %s\n', k, ...
+                cfg.Factories.Scenario.PhysicalEnvironment.Map.Statistical.ChannelModel, ...
+                annotationMeta.Bytes, annotationMeta.DatenumStr);
             frames = annotation.Frames;
             for fi = 1:numel(frames)
                 fr = frames(fi);
@@ -101,8 +129,11 @@ function test_measured_truth_plausibility(varargin)
                     if isempty(sp); continue; end
                     sourcesChecked = sourcesChecked + 1;
                     tag = sprintf('s%d/f%d/src%d', k, fi, si);
-                    violations = [violations, ...
-                        csrd.test_support.measuredPlausibilityViolations(sp, Fs, tag)]; %#ok<AGROW>
+                    [srcViolations, srcNotes] = ...
+                        csrd.test_support.measuredPlausibilityViolations( ...
+                            sp, Fs, tag, localPlausibilityContext(src, sp));
+                    violations = [violations, srcViolations]; %#ok<AGROW>
+                    qualityNotes = [qualityNotes, srcNotes]; %#ok<AGROW>
                 end
             end
             scenariosRun = scenariosRun + 1;
@@ -120,6 +151,14 @@ function test_measured_truth_plausibility(varargin)
     fprintf('  Scenarios run     : %d\n', scenariosRun);
     fprintf('  Sources checked   : %d\n', sourcesChecked);
     fprintf('  Bound violations  : %d\n', numel(violations));
+    fprintf('  Low-precision     : %d (%.1f%%, reported not failed)\n', ...
+        numel(qualityNotes), 100 * numel(qualityNotes) / max(1, sourcesChecked));
+    for v = 1:min(5, numel(qualityNotes))
+        fprintf('    ~~ %s\n', qualityNotes{v});
+    end
+    if numel(qualityNotes) > 5
+        fprintf('    ~~ ... and %d more\n', numel(qualityNotes) - 5);
+    end
 
     if ~isempty(violations)
         for v = 1:numel(violations)
@@ -152,3 +191,21 @@ end
 
 % Physical-bound checks live in csrd.test_support.measuredPlausibilityViolations
 % so this gate and the joint-dimension gate share one definition.
+
+
+function ctx = localPlausibilityContext(src, sourcePlane)
+    % localPlausibilityContext - cross-plane inputs for the plausibility bounds.
+    %   Supplies Truth.Execution.ModulatedBandwidthHz (the same estimator run on
+    %   the clean pre-channel waveform) so the measured value can be checked
+    %   against the emitter's own bandwidth, plus the measurement status so an
+    %   explicitly unresolvable source is exempt from that comparison.
+    ctx = struct('ExecutionBwHz', NaN, 'MeasurementStatus', '');
+    if isstruct(src) && isfield(src, 'Truth') && isstruct(src.Truth) ...
+            && isfield(src.Truth, 'Execution') && isstruct(src.Truth.Execution) ...
+            && isfield(src.Truth.Execution, 'ModulatedBandwidthHz')
+        ctx.ExecutionBwHz = src.Truth.Execution.ModulatedBandwidthHz;
+    end
+    if isstruct(sourcePlane) && isfield(sourcePlane, 'MeasurementStatus')
+        ctx.MeasurementStatus = sourcePlane.MeasurementStatus;
+    end
+end

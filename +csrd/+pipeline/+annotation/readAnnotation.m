@@ -22,6 +22,16 @@ localRequireFields(payload, {'Frames'}, 'annotation root');
 if p.Results.RequireRuntimeHeader
     localRequireFields(payload, {'Header'}, 'annotation root');
     localRequireFields(payload.Header, {'Runtime'}, 'annotation Header');
+    % The measurement contract states which QUANTITY the measured fields hold. Its
+    % ABSENCE is meaningful: it identifies an annotation written before the
+    % measurement moved ahead of noise injection, whose OccupiedBandwidthHz held a
+    % peak-relative main-lobe width on a noisy antenna sum -- a different quantity
+    % under the same field name. Such a file must be refused rather than silently
+    % mixed with current data, so this is a hard requirement, not a warning.
+    localRequireFields(payload.Header.Runtime, {'MeasurementContract'}, ...
+        'annotation Header.Runtime');
+    localValidateMeasurementContract(payload.Header.Runtime.MeasurementContract, ...
+        'annotation Header.Runtime.MeasurementContract');
 end
 
 frames = localFlattenStructs(payload.Frames, 'Frames');
@@ -297,9 +307,9 @@ localRequireFields(measured.FramePlane, ...
     [context '.FramePlane']);
 
 localAssertTextEquals(measured.SourcePlane.MeasurementSemantics, ...
-    'receiver_view_isolated', [context '.SourcePlane.MeasurementSemantics']);
+    'receiver_view_isolated_pre_noise', [context '.SourcePlane.MeasurementSemantics']);
 localAssertTextEquals(measured.FramePlane.MeasurementSemantics, ...
-    'post_rx_combined_pre_rfchain', ...
+    'post_rx_combined_pre_noise', ...
     [context '.FramePlane.MeasurementSemantics']);
 end
 
@@ -328,6 +338,54 @@ for k = 1:numel(forbidden)
 end
 end
 
+
+function localValidateMeasurementContract(contract, context)
+    % localValidateMeasurementContract - refuse an unreadable measured plane.
+    %   The contract exists so a consumer never has to guess which quantity a
+    %   measured field holds. That only works if the reader refuses the cases where
+    %   the answer would be a guess: a malformed contract, or a version this reader
+    %   was not written against.
+    if ~isstruct(contract) || isempty(contract)
+        error('CSRD:AnnotationV2:InvalidMeasurementContract', ...
+            '%s must be a struct.', context);
+    end
+    localRequireFields(contract, ...
+        {'ContractVersion', 'BandwidthDefinition', 'BandwidthEstimator', ...
+         'BandwidthMeasurePoint', 'NoiseFreeMeasurement', 'PerEmitterPerAntenna'}, ...
+        context);
+
+    expected = csrd.pipeline.measurement.measurementContract();
+    actualVersion = double(contract.ContractVersion);
+    if ~isscalar(actualVersion) || ~isfinite(actualVersion) || ...
+            actualVersion ~= expected.ContractVersion
+        error('CSRD:AnnotationV2:UnsupportedMeasurementContractVersion', ...
+            ['%s.ContractVersion is %s but this reader implements %d. A ', ...
+             'different version means the measured fields hold a different ', ...
+             'quantity, so reading them under the current assumptions would ', ...
+             'silently mix incomparable data.'], ...
+            context, mat2str(contract.ContractVersion), expected.ContractVersion);
+    end
+
+    % The two properties the labels' usability rests on. A file that declares
+    % either as false is internally consistent but not usable as ground truth for
+    % a power-integral bandwidth, so say so here rather than downstream.
+    if ~islogical(contract.NoiseFreeMeasurement) && ~isnumeric(contract.NoiseFreeMeasurement)
+        error('CSRD:AnnotationV2:InvalidMeasurementContract', ...
+            '%s.NoiseFreeMeasurement must be logical.', context);
+    end
+    if ~logical(contract.NoiseFreeMeasurement)
+        error('CSRD:AnnotationV2:NoisyMeasurementPlane', ...
+            ['%s declares NoiseFreeMeasurement = false. A power-integral ', ...
+             'occupied bandwidth is undefined on a noisy buffer, because noise ', ...
+             'contributes power across the whole band.'], context);
+    end
+    if ~logical(contract.PerEmitterPerAntenna)
+        error('CSRD:AnnotationV2:CombinedMeasurementPlane', ...
+            ['%s declares PerEmitterPerAntenna = false. Summing independently ', ...
+             'faded antenna copies reports the interference pattern between the ', ...
+             'copies, not a bandwidth any transmitter emitted.'], context);
+    end
+end
 
 function localRequireFields(s, fields, context)
     % localRequireFields - Production declaration in CSRD.

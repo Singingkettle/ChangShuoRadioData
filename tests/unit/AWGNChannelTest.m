@@ -10,21 +10,46 @@ classdef AWGNChannelTest < matlab.unittest.TestCase
 
     methods (Test)
 
-        function actualSnrMatchesConfigured(testCase)
+        function declaresSnrWithoutAddingNoise(testCase)
+            % AWGNChannel is propagation-neutral by construction: physically it has
+            % always meant "no multipath, plus a target SNR", and the noise is now
+            % SIZED here but REALIZED once, after both measured planes have been
+            % taken from clean buffers (csrd.pipeline.signal.realizeChannelNoise).
+            % Measuring an occupied bandwidth on a noisy buffer is not merely
+            % imprecise, it is undefined -- noise contributes power across the whole
+            % band -- so this block adding noise is exactly the defect the ordering
+            % change removed.
+            %
+            % This replaces a test that asserted the realized SNR of this block's
+            % output matched its configured target. That requirement did not
+            % disappear; it moved to the injection point, and is asserted there by
+            % RealizeChannelNoiseTest. What must hold HERE is stronger and more
+            % specific than the old assertion: the waveform is returned bit-exact,
+            % and the block reports zero noise power so no downstream accounting can
+            % double-count it.
             snrTargets = [-3, 0, 10, 20];
             for snr = snrTargets
                 ch = csrd.blocks.physical.channel.AWGNChannel( ...
                     'SNRdB', snr, 'Seed', 1234);
                 cleanup = onCleanup(@() release(ch)); %#ok<NASGU>
                 signal = (randn(50000, 1) + 1j * randn(50000, 1)) / sqrt(2);
-                noisy = ch(signal);
-                noisySig = noisy.Signal;
-                noise = noisySig - signal;
-                signalPower = mean(abs(signal) .^ 2);
-                noisePower = mean(abs(noise) .^ 2);
-                measuredSNR = 10 * log10(signalPower / noisePower);
-                testCase.verifyLessThan(abs(measuredSNR - snr), 0.5, ...
-                    sprintf('SNR target %.1f dB but measured %.2f dB', snr, measuredSNR));
+                out = ch(signal);
+
+                testCase.verifyEqual(out.Signal, signal, sprintf( ...
+                    ['AWGNChannel must pass the waveform through BIT-EXACT at ', ...
+                     'SNR %.1f dB. Any modification here happens before the ', ...
+                     'measured planes are taken and would corrupt the labels.'], snr));
+                testCase.verifyTrue(isfield(out, 'ChannelDeclaredSnrDb'), ...
+                    'AWGNChannel must declare the target SNR it stands for.');
+                testCase.verifyEqual(double(out.ChannelDeclaredSnrDb), double(snr), ...
+                    'AbsTol', 1e-12, ...
+                    'ChannelDeclaredSnrDb must carry the configured target verbatim.');
+                testCase.verifyTrue(isfield(out, 'ChannelNoisePowerW'), ...
+                    'AWGNChannel must report its noise power so it can be audited.');
+                testCase.verifyEqual(double(out.ChannelNoisePowerW), 0, sprintf( ...
+                    ['AWGNChannel must report ZERO realized noise power at SNR ', ...
+                     '%.1f dB; a nonzero value here would be counted twice once ', ...
+                     'the deferred injector runs.'], snr));
             end
         end
 

@@ -219,6 +219,14 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                         component.ChannelSignalPowerW = NaN;
                         component.ChannelNoisePowerW = NaN;
                     end
+                    % Carry the OWED channel noise forward without realizing it.
+                    % The measured planes must be taken on a noise-free waveform,
+                    % so the single deferred injector adds this in
+                    % combineSignalComponents after both measurements. Absent
+                    % descriptor == this link owes no channel noise.
+                    if isfield(channelOutput, 'PendingChannelNoise')
+                        component.PendingChannelNoise = channelOutput.PendingChannelNoise;
+                    end
                     component = csrd.pipeline.signal.gateToDuration( ...
                         component, localComponentDurationSec(segmentSignal), ...
                         'ChannelOutput');
@@ -727,6 +735,19 @@ function bwHz = measureModulatedBandwidth(segmentSignal)
     end
 
     try
+        % Same ITU-R SM.328 / RR No. 1.153 occupied-bandwidth definition as the
+        % Measured plane (99 % power, 0.5 % excluded each edge), so the two planes
+        % are comparable by DEFINITION rather than merely by sharing an estimator.
+        % Sharing the old peak-relative default is what made the C8
+        % exec-vs-measured gate self-referential: it verified that one estimator
+        % repeats itself, never that either value was the quantity its field name
+        % claims.
+        % No explicit Method: take obwActual's default so BOTH planes run the
+        % identical implementation (occupiedBandwidthCore, ITU-R SM.328 with this
+        % package's spectrum preparation). Pinning this side to bare obw() while
+        % the Measured side used the prepared kernel reintroduced exactly the
+        % asymmetry this change exists to remove -- the two planes must differ
+        % only in WHICH BUFFER they measure, never in how.
         bwHz = csrd.pipeline.measurement.obwAntennaMax( ...
             sig, double(segmentSignal.SampleRate));
     catch

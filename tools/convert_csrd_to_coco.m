@@ -95,7 +95,13 @@ coco.csrd_export = struct( ...
     'num_annotations', numel(state.annotations), ...
     'num_skipped_sources', numel(state.skippedSources), ...
     'skipped_sources', state.skippedSources, ...
+    'skip_reason_counts', localSkipReasonCounts(state.skippedSources), ...
     'field_sources', localFieldSources());
+
+% Print the breakdown. A skip that can only be found by inspecting the output JSON
+% is how a systemic measurement failure turns into a quietly undersized dataset
+% that still validates.
+localReportSkips(coco.csrd_export);
 
 if ~isempty(outputPath)
     coco = writeCocoJson(coco, outputPath);
@@ -155,7 +161,24 @@ annotation = [];
 
 rv = source.ReceiverView;
 if ~logicalScalar(rv.IsVisible)
-    state.skippedSources(end + 1) = makeSkippedSource(source, frame);
+    state.skippedSources(end + 1) = makeSkippedSource(source, frame, 'not_visible');
+    return;
+end
+
+% A source with no usable measured bandwidth is SKIPPED with a reason, not fatal.
+% The measured plane legitimately reports NoSignal for a silent buffer (an emitter
+% whose burst does not overlap this frame, a link with no propagation paths), and
+% NaN is the honest value there -- Phase 4 deliberately stopped writing a fabricated
+% number in its place. Aborting the whole conversion on one such source would mean a
+% single silent emitter destroys an entire dataset export, so the box is omitted and
+% the omission is reported.
+%
+% The reason is recorded per source and the counts are printed, because a skip that
+% is only visible by inspecting the output JSON is how a systemic measurement
+% failure becomes a quietly undersized dataset that still looks well-formed.
+skipReason = localMeasuredBandwidthSkipReason(source);
+if ~isempty(skipReason)
+    state.skippedSources(end + 1) = makeSkippedSource(source, frame, skipReason);
     return;
 end
 
@@ -197,18 +220,94 @@ end
 end
 
 
-function skipped = makeSkippedSource(source, frame)
-    % makeSkippedSource - Production declaration in CSRD.
-    % Inputs: see signature arguments and local validation.
-    % Outputs: see signature return values and contract fields.
+function counts = localSkipReasonCounts(skippedSources)
+    % localSkipReasonCounts - struct mapping each skip reason to its count.
+    % Inputs: skippedSources - struct array of skip records (possibly empty).
+    % Outputs: counts - scalar struct with one numeric field per reason seen.
+counts = struct();
+for k = 1:numel(skippedSources)
+    reason = skippedSources(k).skip_reason;
+    if isempty(reason)
+        reason = 'unspecified';
+    end
+    field = matlab.lang.makeValidName(reason);
+    if isfield(counts, field)
+        counts.(field) = counts.(field) + 1;
+    else
+        counts.(field) = 1;
+    end
+end
+end
+
+
+function localReportSkips(exportInfo)
+    % localReportSkips - print how many sources were omitted and why.
+    % Inputs: exportInfo - the csrd_export struct.
+    % Outputs: none.
+total = double(exportInfo.num_sources);
+skipped = double(exportInfo.num_skipped_sources);
+if skipped == 0
+    fprintf('COCO export: %d sources, none skipped.\n', total);
+    return;
+end
+fprintf('COCO export: %d of %d sources skipped (%.1f%%):\n', ...
+    skipped, total, 100 * skipped / max(1, total));
+reasons = fieldnames(exportInfo.skip_reason_counts);
+for k = 1:numel(reasons)
+    fprintf('  %-38s %d\n', reasons{k}, exportInfo.skip_reason_counts.(reasons{k}));
+end
+end
+
+
+function skipped = makeSkippedSource(source, frame, skipReason)
+    % makeSkippedSource - one omitted source, with WHY it was omitted.
+    % Inputs: source, frame - the annotation records; skipReason - char tag,
+    %         'not_visible' or a measured-bandwidth reason.
+    % Outputs: skipped - struct for the csrd_export.skipped_sources report.
+    %
+    % `skip_reason` is separate from `visibility_reason` on purpose: an invisible
+    % source and a source with no measurable bandwidth are different facts about the
+    % dataset, and collapsing them would hide a measurement problem inside a
+    % geometry statistic.
 skipped = struct( ...
     'frame_id', frame.FrameId, ...
     'receiver_id', char(frame.ReceiverID), ...
     'tx_id', char(source.TxID), ...
     'segment_id', source.SegmentId, ...
     'burst_id', char(source.BurstId), ...
+    'skip_reason', char(skipReason), ...
     'visibility_reason', char(source.ReceiverView.VisibilityReason));
 end
+
+
+function reason = localMeasuredBandwidthSkipReason(source)
+    % localMeasuredBandwidthSkipReason - '' when the source yields a usable box.
+    % Inputs: source - one annotation source record.
+    % Outputs: reason - char tag naming why no box can be built, '' when one can.
+    % Skip ONLY when the plane EXPLICITLY says it holds no measurement. A missing
+    % status, or a status of 'Measured' alongside a NaN bandwidth, is a
+    % contradiction rather than a legitimate absence -- the plane is claiming a
+    % measurement it did not make -- so it falls through to the fatal check below.
+    % Absence must not buy leniency: treating a missing status as "probably not
+    % measured" would turn a pipeline bug into a silently smaller dataset, which is
+    % the failure mode this whole branch has been about.
+reason = '';
+sp = source.Truth.Measured.SourcePlane;
+
+if ~isfield(sp, 'MeasurementStatus') || isempty(sp.MeasurementStatus)
+    return;
+end
+status = lower(char(string(sp.MeasurementStatus)));
+if strcmp(status, 'measured')
+    return;
+end
+
+% An explicitly non-measured plane: NoSignal for a silent buffer (an emitter whose
+% burst does not overlap this frame, a link with no propagation paths). NaN is the
+% honest value there, so omit the box and name the status.
+reason = sprintf('measurement_status_%s', status);
+end
+
 
 
 function [state, categoryId] = ensureCategory(state, categoryName)
@@ -493,11 +592,15 @@ function out = localEmptySkippedSources()
     % localEmptySkippedSources - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
     % Outputs: see signature return values and contract fields.
+% Field set and ORDER must match makeSkippedSource exactly: appending a struct
+% with a different field set raises "subscripted assignment between dissimilar
+% structures", which is how adding skip_reason first broke this.
 out = repmat(struct( ...
     'frame_id', [], ...
     'receiver_id', '', ...
     'tx_id', '', ...
     'segment_id', [], ...
     'burst_id', '', ...
+    'skip_reason', '', ...
     'visibility_reason', ''), 0, 1);
 end

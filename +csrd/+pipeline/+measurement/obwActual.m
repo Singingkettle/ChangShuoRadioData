@@ -8,48 +8,53 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 % `Truth.Execution.ModulatedBandwidthHz` (see audit §17.6 / §6 C8).
 %
 % USAGE
-%   bwHz = obwActual(signal, sampleRate)               % 99 %, peak-relative
-%   bwHz = obwActual(signal, sampleRate, percentage)   % custom %
-%   bwHz = obwActual(..., 'Method', 'peak-relative')   % default
-%   bwHz = obwActual(..., 'Method', 'matlab-obw')      % raw MATLAB obw
-%   bwHz = obwActual(..., 'PeakRelativeDb', -3)        % default -3 dB
+%   bwHz = obwActual(signal, sampleRate)               % ITU 99 % OBW (default)
+%   bwHz = obwActual(signal, sampleRate, percentage)   % custom power %
+%   bwHz = obwActual(..., 'Method', 'itu-99')          % default
+%   bwHz = obwActual(..., 'Method', 'matlab-obw')      % same definition, obw()
 %
-% METHODOLOGY
+% DEFINITION
+%   The default reports the ITU-R SM.328 / Radio Regulations No. 1.153 occupied
+%   bandwidth: the band that excludes `(100-percentage)/2` % of the mean power at
+%   each edge, i.e. 99 % of the power in band for the default percentage.
 %
-%   The default ('peak-relative') estimator was selected after the Phase
-%   4 baseline_v0 sweep (561 sources, AWGN cohort) showed that the
-%   previous noise-floor-percentile estimator could NOT make the C8
-%   ExecutionVsMeasuredBwAbsRelDiffP95 < 3 % gate physically realisable
-%   for SNR in [6, 20] dB. The reason is fundamental:
+% HISTORY -- WHY THE DEFAULT CHANGED
+%   This function previously defaulted to a peak-relative (-3 dBc) clip followed
+%   by the narrowest band holding 99 % of the SURVIVING energy, and documented
+%   that as "the standard engineering definition of occupied bandwidth ... X dB
+%   Down mode". The instrument mode is real, but it measures the x-dB-down
+%   bandwidth, which ITU-R SM.328 lists as a SEPARATE quantity; ITU-R SM.443
+%   requires x ~ 26 dB before an x-dB-down width approximates OBW. At x = 3 dB
+%   the result is the main-lobe footprint, and for a root-raised-cosine signal
+%   that footprint is ~1.0*Rs INDEPENDENT OF ROLL-OFF (measured: 0.897 / 0.901 /
+%   0.803 Rs at beta = 0.1 / 0.25 / 0.5, while the true OBW rises 1.027 -> 1.096
+%   -> 1.266 Rs). So the old default published something close to the baud rate
+%   under the name "occupied bandwidth", blind to a parameter it should track.
 %
-%     - The Execution measurement runs on the **clean** modulator output
-%       (zero AWGN), so any bin-amplitude-percentile floor estimate is
-%       dominated by FFT processing leakage and lands many tens of dB
-%       below the signal peak. The threshold therefore drops to ~-30 dBc
-%       and the 99 %-energy mass naturally extends out into the RRC /
-%       OFDM rolloff sidelobes.
-%     - The SourcePlane measurement runs on the **noisy** receiver-rate
-%       waveform. At SNR=6 dB the noise PSD sits ~6 dB below the
-%       in-band peak, so any floor*margin threshold either drowns the
-%       noise (margin too small) or chops off the legitimate rolloff
-%       (margin too large). At realistic operating SNRs the algorithm
-%       reports either Nyquist-edge bandwidths or main-lobe-only
-%       bandwidths; neither matches the clean-side number.
+%   The peak-relative form was adopted for one reason, stated in the original
+%   note below: a power-integral definition is unusable on a NOISY waveform,
+%   because noise contributes power across the whole band. That constraint was
+%   removed when the measurement moved BEFORE noise injection -- both planes now
+%   measure clean, per-emitter, per-antenna buffers, where the power integral is
+%   well posed. ECC/REC/(06)01 agrees from the metrology side: 99 % OBW
+%   measurement requires the peak at least 30 dB above the noise floor.
 %
-%   Peak-relative thresholding sidesteps both failure modes: the
-%   threshold floats with the signal peak, not with the per-source noise
-%   floor, so clean and noisy measurements of the same modulator output
-%   converge as long as the in-band SNR keeps the signal main lobe well
-%   above the chosen ratio. With the default -3 dBc threshold (= peak/2):
+%   The peak-relative path has been REMOVED rather than kept as an option. An
+%   x-dB-down width is a different quantity from occupied bandwidth, so keeping it
+%   reachable from a function named obwActual would leave a way to publish the
+%   wrong quantity under the right name. The historical numbers remain in git.
 %
-%     - Clean RRC and noisy RRC at SNR=6..20 dB report identical
-%       bandwidths.
-%     - Clean OFDM and noisy OFDM agree to <0.1 % for the same SNR
-%       range.
-%     - The reported bandwidth is the -3 dB main-lobe footprint, which
-%       is the standard engineering definition of "occupied bandwidth"
-%       on R&S FSV / Keysight 89600 spectrum analysers when the OBW
-%       cursor is configured for "X dB Down" mode (default 3 dB).
+% ORIGINAL NOTE (kept because it records why the noisy-waveform constraint
+% existed, which is what justifies the current ordering):
+%
+%   The 'peak-relative' estimator was selected after the Phase 4 baseline_v0
+%   sweep (561 sources, AWGN cohort) showed that a noise-floor-percentile
+%   estimator could NOT make the C8 ExecutionVsMeasuredBwAbsRelDiffP95 < 3 %
+%   gate physically realisable for SNR in [6, 20] dB, because the Execution
+%   measurement ran on the clean modulator output while the SourcePlane
+%   measurement ran on the noisy receiver-rate waveform. Note that the gate it
+%   was tuned against was itself self-referential: both planes called the same
+%   kernel, so the gate verified repeatability rather than correctness.
 %
 % Inputs:
 %   signal      : complex column vector (or [N x M] for multi-antenna).
@@ -59,15 +64,7 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 %   percentage  : optional scalar in (0, 100], default 99 (%)
 %
 % Optional Name-Value:
-%   'Method'         - 'peak-relative' (default) or 'matlab-obw'
-%   'PeakRelativeDb' - peak-relative threshold in dB, default -3.
-%                      Must be strictly negative. Values:
-%                        -3  : default; main-lobe -3 dB BW. SNR-invariant
-%                              for SNR >= 6 dB across RRC / OFDM / FSK.
-%                        -6  : wider footprint, includes more rolloff;
-%                              SNR-invariant for SNR >= 9 dB.
-%                        -10 : even wider, but breaks at SNR <= 9 dB
-%                              (noise crosses the threshold).
+%   'Method'         - 'itu-99' (default) | 'matlab-obw' (cross-check)
 %
 % Outputs:
 %   bwHz        : occupied bandwidth in Hz (>= 0)
@@ -78,7 +75,6 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
 %   CSRD:Measurement:InvalidSignal     - signal contains NaN/Inf
 %   CSRD:Measurement:InvalidPercentage - percentage outside (0,100]
 %   CSRD:Measurement:InvalidMethod     - unsupported Method tag
-%   CSRD:Measurement:InvalidPeakRelDb  - PeakRelativeDb >= 0
 %
 % See also: csrd.pipeline.measurement.spectrumCentroid
 %           csrd.pipeline.measurement.frequencyOccupancy
@@ -91,13 +87,10 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
     p.FunctionName = 'obwActual';
     p.CaseSensitive = false;
     p.KeepUnmatched = false;
-    addParameter(p, 'Method', 'peak-relative', ...
+    addParameter(p, 'Method', 'itu-99', ...
         @(x) ischar(x) || (isstring(x) && isscalar(x)));
-    addParameter(p, 'PeakRelativeDb', -3, ...
-        @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x < 0);
     parse(p, varargin{:});
     method = lower(char(p.Results.Method));
-    peakRelDb = double(p.Results.PeakRelativeDb);
 
     if isempty(signal)
         error('CSRD:Measurement:EmptySignal', ...
@@ -131,164 +124,26 @@ function bwHz = obwActual(signal, sampleRate, percentage, varargin)
     end
 
     switch method
+        case 'itu-99'
+            % Default. The ITU-R SM.328 / RR No. 1.153 quantity, computed on this
+            % package's prepared spectrum so the Nyquist recentre, the
+            % discarded-tail fallback and the degenerate-input contracts all hold.
+            bwHz = csrd.pipeline.measurement.occupiedBandwidthCore( ...
+                signalCol, double(sampleRate), double(percentage));
         case 'matlab-obw'
+            % Independent implementation of the same definition, kept as a
+            % cross-check on the one above. It lacks the spectrum preparation, so
+            % it is not suitable as the production path for edge-placed emitters
+            % or frame-tail bursts.
             bwHz = obw(double(signalCol), double(sampleRate), [], double(percentage));
-        case 'peak-relative'
-            bwHz = computePeakRelativeObw(signalCol, double(sampleRate), ...
-                double(percentage), peakRelDb);
         otherwise
             error('CSRD:Measurement:InvalidMethod', ...
-                'obwActual: unsupported Method "%s" (expected peak-relative | matlab-obw).', method);
+                'obwActual: unsupported Method "%s" (expected itu-99 | matlab-obw).', method);
     end
 end
 
 
-% =====================================================================
-function bwHz = computePeakRelativeObw(signalCol, sampleRate, pct, peakRelDb)
-    %COMPUTEPEAKRELATIVEOBW Peak-relative-thresholded 99 %-energy OBW.
-    % Inputs: see signature arguments and local validation.
-    % Outputs: see signature return values and contract fields.
-    %
-    %   1. Compute a smoothed two-sided PSD with pwelch (Hamming window,
-    %      8 segments with 50 % overlap; deterministic).
-    %   2. peak = max(spec); threshold = peak * 10^(peakRelDb/10).
-    %      All bins below threshold are clipped to zero before the
-    %      energy-mass search. This decouples the OBW estimate from the
-    %      per-source noise level (clean modulator output vs noisy
-    %      receiver waveform converge for SNR >= 6 dB at -3 dBc).
-    %   3. Walk a sliding-window search to find the narrowest contiguous
-    %      band whose retained-bin energy >= percentage * total mass.
-
-    N = length(signalCol);
-    if N < 8
-        % Too short for pwelch's default 8-segment split; fall back to a
-        % single-segment FFT magnitude. Keeps short-signal unit tests
-        % equivalent to the previous implementation.
-        spec = abs(fftshift(fft(double(signalCol)))).^2;
-        fAxis = ((0:N-1)' - floor(N/2)) * (sampleRate / N);
-    else
-        winLen = max(64, 2 ^ floor(log2(N / 8)));
-        if winLen >= N
-            winLen = max(8, floor(N / 2));
-        end
-        overlap = floor(winLen / 2);
-        nfft = max(256, 2 ^ nextpow2(winLen));
-        [pxx, fAxis] = pwelch(double(signalCol), hamming(winLen), ...
-            overlap, nfft, sampleRate, 'centered');
-        spec = pxx(:);
-        fAxis = fAxis(:);
-    end
-
-    % pwelch (Welch's method) discards the trailing partial segment. A
-    % short burst that sits entirely in that discarded tail yields an
-    % all-zero windowed estimate even though the signal carries energy,
-    % which would mis-measure the occupied bandwidth as zero. Fall back to
-    % a whole-signal periodogram so every sample (including a late
-    % frame-tail burst) is counted. Mirrors measureSignalSummary so the two
-    % estimators stay equivalent.
-    if (isempty(spec) || sum(spec) <= 0) && sum(abs(double(signalCol)) .^ 2) > 0
-        spec = abs(fftshift(fft(double(signalCol)))) .^ 2;
-        fAxis = ((0:N - 1)' - floor(N / 2)) * (sampleRate / N);
-    end
-
-    if isempty(spec) || sum(spec) <= 0
-        bwHz = 0;
-        return;
-    end
-
-    % Recentre a band that wraps the +/-Fs/2 Nyquist edge so the linear
-    % narrowest-contiguous-span search below does not bridge the empty middle
-    % and inflate the OBW toward Fs. The span is invariant under the circular
-    % shift, so nothing is added back (fAxis is left unchanged).
-    spec = csrd.pipeline.measurement.circularRecenterSpectrum(spec, sampleRate);
-
-    peakVal = max(spec);
-    if peakVal <= 0
-        bwHz = 0;
-        return;
-    end
-
-    % Primary estimate: peak-relative -3 dB clip then narrowest 99 %-energy band.
-    bwHz = localSpanForThreshold(spec, fAxis, sampleRate, ...
-        peakVal * 10 ^ (peakRelDb / 10), pct);
-
-    % Collapse guard (mirrors measureSignalSummary so the two estimators stay
-    % equivalent). A flat occupied band a few dB below a single localized
-    % spectral spike -- short bursts (high spectral variance) or a frequency-
-    % selective channel peak -- makes the peak-relative threshold sit ABOVE the
-    % flat band and clip it away, collapsing the width to the spike's
-    % neighbourhood. Fall back to a noise-floor-relative estimate (robust
-    % low-percentile floor + 6 dB, which keeps the whole occupied band) only
-    % when the peak-relative result is implausibly narrow. The floor percentile
-    % must stay below the minimum noise fraction: an emitter may occupy up to
-    % MaxBandwidthFractionOfSampleRate (=0.8) of the band, leaving >=20% noise
-    % bins, so a 25th-percentile floor would land INSIDE a wideband occupied
-    % band and defeat the guard. The 10th percentile stays in the noise floor
-    % for occupancies up to 90% (mirrors measureSignalSummary).
-    floorThreshold = prctile(spec, 10) * 10 ^ (6 / 10);
-    bwFloor = localSpanForThreshold(spec, fAxis, sampleRate, floorThreshold, pct);
-    if bwFloor > 0 && bwHz < 0.3 * bwFloor
-        bwHz = bwFloor;
-    end
-end
-
-
-function bwHz = localSpanForThreshold(spec, fAxis, sampleRate, threshold, pct)
-    %LOCALSPANFORTHRESHOLD Narrowest contiguous band holding pct% of the energy
-    % left after zeroing bins below `threshold`.
-    denoised = spec;
-    denoised(denoised < threshold) = 0;
-
-    totalEnergy = sum(denoised);
-    if totalEnergy <= 0
-        % All bins fell below threshold (signal indistinguishable from
-        % the receiver-band noise floor). Report 0 Hz so the caller can
-        % surface an explicit MeasurementCompleteness failure rather
-        % than silently propagating Nyquist as a measurement.
-        bwHz = 0;
-        return;
-    end
-
-    targetMass = totalEnergy * (pct / 100);
-    nBins = numel(denoised);
-
-    % Find the narrowest contiguous bin range whose cumulative energy
-    % >= targetMass. Two-pointer scan: both edges advance monotonically
-    % so the inner search is O(N).
-    cumEnergy = cumsum(denoised);
-    bestSpan = nBins;
-    lBest = 1;
-    rBest = nBins;
-    rIdx = 1;
-    for lIdx = 1:nBins
-        if rIdx < lIdx
-            rIdx = lIdx;
-        end
-        while rIdx < nBins
-            spanEnergy = cumEnergy(rIdx) - cumEnergy(lIdx) + denoised(lIdx);
-            if spanEnergy >= targetMass
-                break;
-            end
-            rIdx = rIdx + 1;
-        end
-        spanEnergy = cumEnergy(rIdx) - cumEnergy(lIdx) + denoised(lIdx);
-        if spanEnergy >= targetMass
-            span = rIdx - lIdx + 1;
-            if span < bestSpan
-                bestSpan = span;
-                lBest = lIdx;
-                rBest = rIdx;
-            end
-        end
-    end
-
-    if nBins == 1
-        % A single nonzero sample is an impulse on the sample grid. Its
-        % discrete spectrum occupies the full observable Nyquist span, and
-        % this must match measureSignalSummary's short-signal semantics.
-        bwHz = sampleRate;
-    else
-        binWidth = median(diff(fAxis));
-        bwHz = double(max(0, (fAxis(rBest) - fAxis(lBest)) + abs(binWidth)));
-    end
-end
+% The occupied-bandwidth kernel lives in
+% csrd.pipeline.measurement.occupiedBandwidthCore, shared with
+% measureSignalSummary so the Execution and Measured planes differ only in WHICH
+% buffer they measure, never in how.

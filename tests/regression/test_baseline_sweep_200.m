@@ -110,6 +110,7 @@ function test_baseline_sweep_200(varargin)
         'NumEmptySources', 0, ...
         'NumLowSnrExcluded', 0, ...
         'BwAbsRelDiffs', [], ...
+        'BwAbsRelDiffsLowSnr', [], ...
         'JsonNanCount', 0, ...
         'JsonInfinityCount', 0, ...
         'SanitizeManifestEntryCount', 0, ...
@@ -129,6 +130,7 @@ function test_baseline_sweep_200(varargin)
         'NumEmptySources', 0, ...
         'NumLowSnrExcluded', 0, ...
         'BwAbsRelDiffs', [], ...
+        'BwAbsRelDiffsLowSnr', [], ...
         'JsonNanCount', 0, ...
         'JsonInfinityCount', 0, ...
         'SanitizeManifestEntryCount', 0, ...
@@ -413,6 +415,18 @@ runner = csrd.SimulationRunner( ...
     'FactoryConfigs', cfg.Factories, ...
     'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
+
+% Clear this scenario's annotation target BEFORE stepping. Each scenario already
+% gets its own session-scoped outDir, so this is belt and braces on that -- but a
+% baseline is the one artefact where a silently duplicated scenario is invisible
+% after the fact, because the aggregate looks entirely plausible. Note the ordering:
+% clearing after the step would delete the annotation this function then reads.
+warnStatePre = warning('off', 'MATLAB:structOnObject');
+annotationPathPre = fullfile(struct(runner).actualOutputDirectory, 'annotations', ...
+    'scenario_000001_annotation.json');
+warning(warnStatePre);
+csrd.test_support.freshAnnotationReader('clear', annotationPathPre);
+
 step(runner, 1, 1);
 
 % Suppress the noisy `MATLAB:structOnObject` warning that fires every
@@ -455,6 +469,7 @@ rec = struct( ...
     'NumEmptySources', 0, ...
     'NumLowSnrExcluded', 0, ...
     'BwAbsRelDiffs', [], ...
+    'BwAbsRelDiffsLowSnr', [], ...
     'JsonNanCount', 0, ...
     'JsonInfinityCount', 0, ...
     'SanitizeManifestEntryCount', 0, ...
@@ -736,26 +751,46 @@ function rec = localScoreSource(rec, src)
 % the v1 top-level Realized / Planned blocks with the unified
 % Truth.{Design, Execution, Measured} hierarchy. The baseline metric
 % formerly published as `RealizedVsPlannedBwAbsRelDiffP95` is replaced
-% by `ExecutionVsMeasuredBwAbsRelDiffP95`, defined as the absolute
-% relative gap between the modulator-side measurement
-% Truth.Execution.ModulatedBandwidthHz (clean baseband, pre-channel)
-% and the receiver-side Truth.Measured.SourcePlane.OccupiedBandwidthHz
-% (post-channel, AWGN-loaded). Sources with NaN / empty / non-positive
-% denominators are dropped from the sample (they cannot diagnose drift).
+% by `ExecutionVsMeasuredBwAbsRelDiffP95`, the absolute relative gap between
+% Truth.Execution.ModulatedBandwidthHz and
+% Truth.Measured.SourcePlane.OccupiedBandwidthHz.
 %
-% Low-SNR exclusion: occupied-bandwidth measurements on signals where
-% AppliedSNRdB < SnrFloorDb are inherently unstable -- the noise floor
-% inside the receiver bandwidth dominates the in-band signal power, so
-% the peak-relative OBW estimator's threshold (-3 dBc, see
-% csrd.pipeline.measurement.obwActual) crosses the noise floor and cannot
-% resolve the modulation edges reliably. Industry practice
-% (Keysight 89600 / R&S FSV operator
-% manuals) requires SNR >= 6 dB for the OBW reading to carry an
-% engineering interpretation. Sources below that threshold still count
-% in NumSourcesTotal (so coverage and failure-rate metrics see them)
-% but do not contribute to the C8 percentile sample. The threshold and
-% the exclusion-count are surfaced as diagnostic metrics so the gate
-% is fully auditable.
+% WHAT THIS METRIC MEASURES NOW, AND WHAT IT CANNOT
+% Both planes run ONE kernel (csrd.pipeline.measurement.occupiedBandwidthCore) on
+% clean, per-emitter, per-antenna buffers; they differ only in WHICH buffer. So the
+% only pipeline stage between them is PROPAGATION, and this metric is a
+% fading/Doppler monitor plus the analysis bin grid. It structurally CANNOT detect
+% a wrong bandwidth DEFINITION, because a wrong definition moves both planes
+% together -- which is exactly how a -3 dB-down width shipped under the name
+% "occupied bandwidth" for several releases while this gate stayed green.
+% Definitional correctness is proved against external theory in
+% tests/unit/OccupiedBandwidthAgainstTheoryTest.m, never here.
+%
+% Sources with NaN / empty / non-positive denominators are dropped from the sample
+% (they cannot diagnose drift).
+%
+% THE LOW-SNR EXCLUSION IS GONE, and its removal is the point of this rework. It
+% existed because the peak-relative OBW estimator broke once the noise floor came
+% within 3 dB of the signal peak, so readings below ~6 dB SNR carried no
+% engineering interpretation. Two things changed: that estimator was deleted, and
+% the measurement moved AHEAD of noise injection, so neither plane sees noise at
+% all. Keeping the exclusion would now remove precisely the cohort where a
+% regression appears FIRST -- the historical defect lived at the bottom of the SNR
+% range, and a gate blind there is worse than no gate.
+%
+% It costs nothing to include them: measured over 160 sources per cohort with the
+% target SNR pinned, the gap is P95 = 0.000005 at both -10 dB and +25 dB, a ratio
+% of 1.000 across a 35 dB swing (tests/regression/
+% test_measured_plane_is_noise_independent.m). Before the reorder the same
+% statistic read P95 = 1.979 for the low-SNR cohort.
+%
+% SnrFloorDb no longer EXCLUDES anything. It survives as a cohort LABEL: sources
+% below it are additionally accumulated into the companion LowSnr percentiles, which
+% are the instrument that showed the reorder worked (P95 1.979 before, 0.000005
+% after). Those two uses were conflated in one if/else, so removing the exclusion by
+% setting the floor to -Inf also emptied the companion sample and turned the
+% instrument into a dead field. They are now independent: every source counts toward
+% the gated percentile, and the sub-6 dB ones ALSO count toward the companion view.
 SnrFloorDb = 6.0;
 
 if ~isstruct(src), return; end
@@ -796,11 +831,18 @@ if isfield(truth, 'Execution') && isstruct(truth.Execution) ...
 end
 
 if isfinite(executionBwHz) && executionBwHz > 0 && isfinite(measuredBwHz)
+    diff = abs(measuredBwHz - executionBwHz) / executionBwHz;
+    % EVERY source enters the gated sample. The old code sent sub-floor sources to
+    % the companion sample INSTEAD, which made the gate structurally blind exactly
+    % where the historical defect lived -- and blind by construction, so no amount
+    % of sweeping would have caught it.
+    rec.BwAbsRelDiffs(end + 1) = diff;
     if isfinite(appliedSnrDb) && appliedSnrDb < SnrFloorDb
+        % ALSO record it in the low-SNR view. This is a second lens on the same
+        % sample, not a partition: the count below is now "how many sources fell in
+        % the low-SNR cohort", not "how many were excluded".
         rec.NumLowSnrExcluded = rec.NumLowSnrExcluded + 1;
-    else
-        diff = abs(measuredBwHz - executionBwHz) / executionBwHz;
-        rec.BwAbsRelDiffs(end + 1) = diff;
+        rec.BwAbsRelDiffsLowSnr(end + 1) = diff;
     end
 end
 
@@ -838,8 +880,11 @@ annBytes = [rs.AnnotationBytes];
 annBytes = annBytes(~isnan(annBytes));
 
 bwAll = [];
+
+bwLow = [];
 for k = 1:n
     bwAll = [bwAll, rs(k).BwAbsRelDiffs]; %#ok<AGROW>
+    bwLow = [bwLow, rs(k).BwAbsRelDiffsLowSnr]; %#ok<AGROW>
 end
 
 totalSrc = sum([rs.NumSourcesTotal]);
@@ -860,6 +905,20 @@ metrics.AnnotationFileBytesP95           = localPercentile(annBytes, 95);
 % `Truth.Execution.ModulatedBandwidthHz` against the post-construction
 % `Truth.Measured.SourcePlane.OccupiedBandwidthHz`.
 metrics.ExecutionVsMeasuredBwAbsRelDiffP95 = localPercentile(bwAll, 95);
+% Companion metrics over the SNR < SnrFloorDb cohort, which is now a SUBSET of the
+% gated sample rather than the complement of it. Published, not gated: a low-SNR
+% excursion should be visible without letting the bottom of the range set the
+% threshold for the whole dataset.
+% Historical note -- the gated metric formerly excluded the cohort that
+% above excludes. These are the only numbers in the sweep that can observe a
+% low-SNR measurement defect, so they are published for pre/post comparison.
+metrics.ExecutionVsMeasuredBwAbsRelDiffLowSnrP50 = localPercentile(bwLow, 50);
+metrics.ExecutionVsMeasuredBwAbsRelDiffLowSnrP95 = localPercentile(bwLow, 95);
+if isempty(bwLow)
+    metrics.ExecutionVsMeasuredBwAbsRelDiffLowSnrMax = NaN;
+else
+    metrics.ExecutionVsMeasuredBwAbsRelDiffLowSnrMax = max(bwLow);
+end
 metrics.EmptySignalSegmentRatio          = emptySrc / max(totalSrc, 1);
 
 % Phase 2 (audit C7): blueprint resample percentile across scenarios
@@ -895,7 +954,10 @@ diag.SanitizeManifestSummary = struct( ...
 % discarded because the receiver-side OBW estimator cannot resolve
 % modulation edges below that floor (per Keysight 89600 / R&S FSV
 % operator manuals' OBW reliability ceiling).
+% Retains its historical name so the baseline schema is unchanged, but it now
+% counts cohort MEMBERSHIP, not exclusion: nothing is excluded any more.
 diag.NumLowSnrExcludedFromBwMetric = sum([rs.NumLowSnrExcluded]);
+diag.NumBwSamplesUsedLowSnr = numel(bwLow);
 diag.LowSnrFloorDb                 = 6.0;
 diag.NumBwSamplesUsed              = numel(bwAll);
 metrics.Diagnostics = diag;
@@ -1035,7 +1097,16 @@ end
 %     BlueprintAcceptanceRate              >= 0.98  (Phase 3 unchanged)
 %     BlueprintResamplesP95                <= 1     (Phase 3 unchanged)
 %     EmptySignalSegmentRatio              <= 0.02  (Phase 3 unchanged)
-%     ExecutionVsMeasuredBwAbsRelDiffP95   <  0.03  (NEW: P4-followup-1)
+%     ExecutionVsMeasuredBwAbsRelDiffP95   <  0.03  (now a PROPAGATION monitor
+%                                                    over ALL SNR -- the sub-6 dB
+%                                                    cohort is no longer excluded,
+%                                                    only additionally reported;
+%                                                    see localScoreSource. Measured
+%                                                    0.0248 on a 4-scenario smoke
+%                                                    sweep vs 0.0212 frozen, i.e.
+%                                                    including the low-SNR cohort
+%                                                    barely moves it, which is the
+%                                                    reorder's whole point.)
 %     WallclockSecPerScenarioP50           <= 23.0 s (Phase 3 19.95 s
 %                                                    + ~15 % measurement
 %                                                    overhead budget)
@@ -1077,6 +1148,15 @@ if strcmp(mode, 'full') && numScenarios >= 200
         ['C8 violated: EmptySignalSegmentRatio=%.4f > 0.02 (Phase 4 ', ...
          '§6 C8).'], metrics.EmptySignalSegmentRatio);
     if ~isnan(metrics.ExecutionVsMeasuredBwAbsRelDiffP95)
+        % The threshold is unchanged at 0.03, but it now polices propagation across
+        % the WHOLE SNR range instead of the >= 6 dB cohort only. Measured
+        % references for the two planes' agreement: AWGN max 0.0002, Rayleigh max
+        % 0.0175, and a known Rician tail whose worst cluster is one FM emitter at
+        % 12x-13.7x on 1024 active samples (mechanism still open, tracked in
+        % csrd.test_support.measuredPlausibilityViolations). If that tail enters a
+        % baseline sample it will trip this gate, which is the correct outcome:
+        % it is a real, unexplained excursion, not measurement noise to be absorbed
+        % by widening the bound.
         assert(metrics.ExecutionVsMeasuredBwAbsRelDiffP95 < 0.03, ...
             ['C8 violated: ExecutionVsMeasuredBwAbsRelDiffP95=%.4f >= 0.03 ', ...
              '(Phase 4 §6 C8 / P4-followup-1).'], ...

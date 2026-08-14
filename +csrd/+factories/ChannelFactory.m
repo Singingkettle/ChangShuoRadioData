@@ -205,12 +205,12 @@ classdef ChannelFactory < matlab.System
                 receivedSignalStruct = obj.mergeChannelOutput(inputSignalStruct, channelBlockOutput);
                 receivedSignalStruct.LinkDistance = linkDistance_m;
 
-                % Controlled target-SNR for channels that carry no noise of
-                % their own (RayTracing propagation, fading): inject AWGN sized
-                % to the resolved target SNR so the realized SNR is controlled
-                % for every channel model, not just AWGN. No-op in distance-based
-                % mode or when the channel already established a noise floor.
-                receivedSignalStruct = obj.applyControlledSnrNoise(receivedSignalStruct, ...
+                % Size the channel noise for the resolved target SNR but leave the
+                % waveform CLEAN: the measured-plane labels must be taken on a
+                % noise-free buffer, so the single deferred injector realizes this
+                % after both measured planes are computed (see
+                % combineSignalComponents in processReceiverProcessing).
+                receivedSignalStruct = obj.planChannelNoise(receivedSignalStruct, ...
                     appliedSNR_dB, frameId, txIdStr, rxIdStr, channelLinkSpecificInfo);
 
                 % Always preserve the analytical FSPL value so AI/ML
@@ -247,13 +247,21 @@ classdef ChannelFactory < matlab.System
                     frameId, txIdStr, rxIdStr, class(currentChannelBlock), ME_step.message);
                 obj.logger.error('Stack: %s', getReport(ME_step, 'extended', 'hyperlinks', 'off'));
 
-                % Scenario-level identifiers are still classified through
-                % the shared predicate, but Phase 5 removes the generic
-                % sentinel-output path as well: a failed channel block must
-                % not write a half-corrupted frame or partial annotation.
-                if csrd.pipeline.scenario.isScenarioSkipException(ME_step)
-                    rethrow(ME_step);
-                end
+                % Rethrow everything, unconditionally. This factory does NOT
+                % classify: a failed channel block must never write a
+                % half-corrupted frame or a partial annotation, whether the cause
+                % is scenario-level or not, so there is no decision to make here.
+                % Classification into "skip this scenario" versus "fail" happens
+                % once, in SimulationRunner.runScenario, which is the only layer
+                % that can act on the distinction.
+                %
+                % This used to read `if isScenarioSkipException(ME) rethrow; end;
+                % rethrow;` -- both branches identical, with the logging above the
+                % branch, so the predicate call could not change any behaviour. It
+                % was a decoration that read as a safety mechanism, and it made the
+                % static gate that checks for the predicate's NAME pass here while
+                % proving nothing. The gate now asserts the real requirement for
+                % this file instead: that no catch block swallows.
                 rethrow(ME_step);
             end
         end
@@ -466,48 +474,69 @@ classdef ChannelFactory < matlab.System
             appliedSNR_dB = rangeDb(1) + (rangeDb(2) - rangeDb(1)) * rand(rs);
         end
 
-        function out = applyControlledSnrNoise(obj, out, appliedSNR_dB, ...
+        function out = planChannelNoise(obj, out, appliedSNR_dB, ...
                 frameId, txIdStr, rxIdStr, channelLinkInfo)
-            % applyControlledSnrNoise - Realize the controlled target SNR for
-            %   channels that carry no noise of their own. AWGN channels already
-            %   realize the target via their SNRdB (ChannelNoisePowerW > 0) and
-            %   are left untouched; RayTracing propagation and fading channels
-            %   only attenuate/fade, so here we inject AWGN sized to
-            %   appliedSNR_dB relative to the realized signal power. No-op in
-            %   distance-based mode. The noise is deterministic per burst (local
-            %   RandStream, salted differently from the SNR draw) so it is
-            %   reproducible and does not perturb the global RNG.
+            % planChannelNoise - Size the channel noise but DO NOT add it.
+            %
+            %   The measured plane is this dataset's ground truth, and its
+            %   occupied-bandwidth label is only valid when measured on a
+            %   noise-free waveform: once the noise floor rises within the
+            %   estimator's peak-relative clip the span search bridges the whole
+            %   capture band, inflating the published label up to 6x at low SNR.
+            %   So the channel stage now leaves the waveform clean and records
+            %   HOW MUCH noise is owed; the single deferred injector realizes it
+            %   in combineSignalComponents, after both measured planes have been
+            %   taken and before the receiver RF chain.
+            %
+            %   This replaces two historical injection sites (this one for
+            %   fading/RayTracing, plus AWGNChannel realizing its own SNRdB),
+            %   which needed an `alreadyNoised` guard to arbitrate and carried
+            %   two different power-bookkeeping scales.
+            %
+            %   Noise is owed when either the controlled target-SNR mode is on
+            %   (every channel model gets the drawn target) or the channel block
+            %   declared a target of its own (the AWGN model, which is how the
+            %   distance-based mode realizes its link-budget SNR). That is
+            %   exactly the set of cases that produced noise before the reorder.
+            %
+            %   The descriptor is deterministic per burst (seed salted apart from
+            %   the SNR draw) so the realization is reproducible and never
+            %   perturbs the global RNG.
+            if ~isstruct(out) || ~isfield(out, 'Signal') || isempty(out.Signal)
+                return;
+            end
             enableDistSNR = true;
             if isfield(obj.factoryConfig, 'LinkBudget') && ...
                     isfield(obj.factoryConfig.LinkBudget, 'EnableDistanceBasedSNR')
                 enableDistSNR = obj.factoryConfig.LinkBudget.EnableDistanceBasedSNR;
             end
+            channelDeclaredSnrDb = NaN;
+            if isfield(out, 'ChannelDeclaredSnrDb') && ...
+                    isnumeric(out.ChannelDeclaredSnrDb) && ...
+                    isscalar(out.ChannelDeclaredSnrDb)
+                channelDeclaredSnrDb = double(out.ChannelDeclaredSnrDb);
+            end
             if enableDistSNR
+                targetSnrDb = channelDeclaredSnrDb;
+            else
+                targetSnrDb = double(appliedSNR_dB);
+            end
+            if ~isfinite(targetSnrDb)
                 return;
             end
-            if ~isstruct(out) || ~isfield(out, 'Signal') || isempty(out.Signal)
-                return;
-            end
-            alreadyNoised = isfield(out, 'ChannelNoisePowerW') && ...
-                isnumeric(out.ChannelNoisePowerW) && isscalar(out.ChannelNoisePowerW) && ...
-                isfinite(out.ChannelNoisePowerW) && out.ChannelNoisePowerW > 0;
-            if alreadyNoised
-                return;
-            end
+
             sig = double(out.Signal);
             signalPowerW = mean(abs(sig(:)) .^ 2);
             if ~(signalPowerW > 0)
                 return;
             end
-            % Size the per-column injected noise to the controlled target vs the
-            % per-column signal power (unchanged), so the injected WAVEFORM is
-            % identical for every antenna count.
-            targetNoiseW = signalPowerW / 10 ^ (double(appliedSNR_dB) / 10);
+            % Per-column noise power against the per-column signal power, so the
+            % owed noise is independent of antenna count (unchanged sizing).
+            targetNoiseW = signalPowerW / 10 ^ (targetSnrDb / 10);
             baseSeed = obj.deriveChannelSeed(frameId, txIdStr, rxIdStr, channelLinkInfo);
             noiseSeed = obj.frameSaltedNoiseSeed(baseSeed, frameId);
-            rs = RandStream('mt19937ar', 'Seed', noiseSeed);
-            noiseStd = sqrt(targetNoiseW / 2);
-            out.Signal = sig + noiseStd * (randn(rs, size(sig)) + 1i * randn(rs, size(sig)));
+            numRxColumns = size(sig, 2);
+
             % Record the realized signal + channel-noise power at the COLLAPSED
             % monitor-stream scale. The receiver saves sum(antennas) (see
             % localCollapseAntennaSignal), whose per-emitter signal power is
@@ -515,12 +544,18 @@ classdef ChannelFactory < matlab.System
             % thermal/ADC noise is an absolute floor referenced to that summed
             % stream. Recording per-column powers here would bias the measured
             % SNR low by ~10*log10(NumReceiveAntennas) dB whenever thermal/ADC
-            % noise is non-negligible. The injected waveform is unchanged; only
-            % the GT bookkeeping is brought to the summed-stream scale (for a
-            % single antenna sum(.,2) is a no-op, so SISO is unaffected).
-            numRxColumns = size(sig, 2);
+            % noise is non-negligible. For a single antenna sum(.,2) is a no-op,
+            % so SISO is unaffected.
             out.ChannelSignalPowerW = mean(abs(sum(sig, 2)) .^ 2);
             out.ChannelNoisePowerW = targetNoiseW * numRxColumns;
+            % The injector draws on the antenna-collapsed stream, so it needs the
+            % summed-scale power. Drawing one collapsed realization at
+            % targetNoiseW*numColumns is statistically identical to summing
+            % numColumns per-column realizations at targetNoiseW.
+            out.PendingChannelNoise = struct( ...
+                'PowerW', targetNoiseW * numRxColumns, ...
+                'Seed', noiseSeed, ...
+                'TargetSnrDb', targetSnrDb);
         end
 
         function configureStatisticalBlock(obj, currentChannelBlock, frameId, txIdStr, rxIdStr, ...

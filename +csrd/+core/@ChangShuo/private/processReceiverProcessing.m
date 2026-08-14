@@ -50,7 +50,15 @@ function [FrameData, FrameAnnotation] = processReceiverProcessing(obj, FrameId, 
             else
                 rxScenarioConfig = obj.ScenarioConfig.Receivers(rxIdx);
             end
-            processedOutput = step(obj.Factories.Receive, combinedSignal, ...
+            % The receiver RF chain consumes the NOISY combined buffer (channel
+            % noise realized), while combinedSignal.Signal stays clean for the
+            % measured planes below. Everything the receiver adds on top
+            % (thermal noise, rx DC offset, rx IQ imbalance, ADC quantisation)
+            % is therefore downstream of every measurement, as is the channel
+            % noise -- which is the ordering the measured labels depend on.
+            receiverInput = combinedSignal;
+            receiverInput.Signal = combinedSignal.NoisySignal;
+            processedOutput = step(obj.Factories.Receive, receiverInput, ...
                 FrameId, rxInfo, rxScenarioConfig);
             if isfield(processedOutput, 'Signal')
                 [processedOutput.Signal, rxFrameGating] = ...
@@ -270,6 +278,16 @@ function design = buildDesignTruth(comp)
     design.ModulationFamily  = getFieldOrEmpty(plannedSrc, 'ModulationFamily', '');
     design.ModulationOrder   = getFieldOrDefault(plannedSrc, 'ModulationOrder', NaN);
     design.ModulationSpatialMode = getFieldOrEmpty(plannedSrc, 'ModulationSpatialMode', '');
+    % Pulse-shaping parameters, published so the measured occupied bandwidth has
+    % an EXTERNAL reference. For a root-raised-cosine single carrier the ITU 99 %
+    % OBW is a fixed multiple of the symbol rate rising with the roll-off, so
+    % (Rs, beta) predicts the measurement from published theory alone. Checking
+    % the measurement against PlannedBandwidthHz instead cannot do that: the
+    % allocation is a ceiling the planner may snap onto the receiver grid, and
+    % checking it against Truth.Execution is self-referential, since both planes
+    % now run one kernel and would agree even on a wrong definition.
+    design.PlannedSymbolRateHz = getFieldOrDefault(plannedSrc, 'PlannedSymbolRateHz', NaN);
+    design.PlannedRolloffFactor = getFieldOrDefault(plannedSrc, 'PlannedRolloffFactor', NaN);
     design.MessageSource     = getFieldOrEmpty(plannedSrc, 'MessageSource', '');
     design.IsDigital         = getFieldOrDefault(plannedSrc, 'IsDigital', true);
     design.PayloadLengthBits = getFieldOrDefault(plannedSrc, 'PayloadLengthBits', NaN);
@@ -354,6 +372,44 @@ function execution = buildExecutionTruth(comp)
     validateExecutionSampleGrid(execution, comp);
 end
 
+function summary = localMeasurePerAntenna(signal, sampleRate, observableBwHz)
+    % localMeasurePerAntenna - measure one emitter per antenna, then aggregate.
+    % Inputs: signal - [samples x antennas] isolated emitter buffer (noise-free);
+    %         sampleRate, observableBwHz - receiver facts.
+    % Outputs: summary - measureSignalSummary-shaped struct whose bandwidth is the
+    %         MAX across antennas, matching the Execution plane's obwAntennaMax
+    %         rule so the two planes are directly comparable.
+    %
+    % Antennas are measured separately on purpose: they carry independently faded
+    % copies of the same emission, so a sum would report the interference pattern
+    % between them rather than the emitter's occupied bandwidth. The remaining
+    % scalars come from the widest antenna, so every published number describes
+    % one physical stream instead of a mixture.
+    if size(signal, 2) <= 1
+        summary = csrd.pipeline.measurement.measureSignalSummary( ...
+            signal, sampleRate, observableBwHz);
+        return;
+    end
+    best = [];
+    bestBw = -Inf;
+    for col = 1:size(signal, 2)
+        s = csrd.pipeline.measurement.measureSignalSummary( ...
+            signal(:, col), sampleRate, observableBwHz);
+        if isfinite(s.OccupiedBandwidthHz) && s.OccupiedBandwidthHz > bestBw
+            bestBw = s.OccupiedBandwidthHz;
+            best = s;
+        end
+    end
+    if isempty(best)
+        % No antenna produced a usable bandwidth; fall back to the first stream so
+        % the caller's existing failure handling still sees a well-formed struct.
+        summary = csrd.pipeline.measurement.measureSignalSummary( ...
+            signal(:, 1), sampleRate, observableBwHz);
+        return;
+    end
+    summary = best;
+end
+
 function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         observableBwHz, comp, framePlaneCache)
     %BUILDMEASUREDTRUTH SourcePlane (isolated) + FramePlane (cached).
@@ -375,7 +431,20 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     sourcePlane.SNRdB                = NaN;
     sourcePlane.TimeOccupancy        = NaN;
     sourcePlane.FrequencyOccupancy   = NaN;
-    sourcePlane.MeasurementSemantics = 'receiver_view_isolated';
+    sourcePlane.MeasurementSemantics = 'receiver_view_isolated_pre_noise';
+    % Measurement conditions for OccupiedBandwidthHz. See measureSignalSummary:
+    % BandwidthResolutionCells says how many analysis cells the reported width
+    % spans, which is the one number that separates a bandwidth from a resolution
+    % floor. ITU-R SM.443 puts a usable RBW at ~1-3 % of the width (>= ~33 cells).
+    sourcePlane.BandwidthResolutionHz    = NaN;
+    sourcePlane.BandwidthResolutionCells = NaN;
+    sourcePlane.ActiveSampleCount        = NaN;
+    % Shape, not just width. SpectralConcentrationRatio = 99 % span / 50 % span
+    % distinguishes a lobe-dominated reading from a floor-dominated one; a
+    % frequency-selective null on the emitter's lobe raises it to tens while the
+    % ITU 99 % number is still correct for the notched waveform.
+    sourcePlane.HalfPowerSpanHz          = NaN;
+    sourcePlane.SpectralConcentrationRatio = NaN;
 
     % Liveness is energy-based, not sample-count-based: an empty channel
     % output (e.g. a link with no propagation paths) is zero-padded to the
@@ -402,9 +471,18 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         % CSRD:Measurement:SourceCenterFrequencyFailed and
         % CSRD:Measurement:SourceEnvelopeFailed stay here so static gates keep
         % proving live measurement failures are not silently written as NaN.
+        % Measure this emitter on its OWN antenna streams, never on a sum. The
+        % per-antenna copies are independently faded, so summing them first
+        % reports the interference pattern between the copies rather than the
+        % emitter's occupied bandwidth -- a spectrum no transmitter emitted.
+        measurementSignal = isolatedSignal;
+        if isfield(comp, 'SignalPerAntenna') && ~isempty(comp.SignalPerAntenna) && ...
+                size(comp.SignalPerAntenna, 1) == size(isolatedSignal, 1)
+            measurementSignal = comp.SignalPerAntenna;
+        end
         summary = guardedMeasurement(@() ...
-            csrd.pipeline.measurement.measureSignalSummary( ...
-                isolatedSignal, sampleRate, observableBwHz), ...
+            localMeasurePerAntenna(measurementSignal, sampleRate, ...
+                observableBwHz), ...
             'CSRD:Measurement:SourceOBWFailed');
         sourcePlane.OccupiedBandwidthHz = requirePositiveMeasurement( ...
             summary.OccupiedBandwidthHz, ...
@@ -433,6 +511,20 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
         sourcePlane.FrequencyOccupancy = requireFiniteMeasurement( ...
             summary.FrequencyOccupancy, ...
             'Truth.Measured.SourcePlane.FrequencyOccupancy');
+        % Conditions travel with the value. These are not asserted finite: they
+        % describe the measurement rather than being labels themselves, so a
+        % degenerate buffer that legitimately has no resolution to report must be
+        % able to say NaN instead of failing the frame.
+        sourcePlane.BandwidthResolutionHz = ...
+            getFieldOrDefault(summary, 'BandwidthResolutionHz', NaN);
+        sourcePlane.BandwidthResolutionCells = ...
+            getFieldOrDefault(summary, 'BandwidthResolutionCells', NaN);
+        sourcePlane.ActiveSampleCount = ...
+            getFieldOrDefault(summary, 'ActiveSampleCount', NaN);
+        sourcePlane.HalfPowerSpanHz = ...
+            getFieldOrDefault(summary, 'HalfPowerSpanHz', NaN);
+        sourcePlane.SpectralConcentrationRatio = ...
+            getFieldOrDefault(summary, 'SpectralConcentrationRatio', NaN);
     end
 
     measured.SourcePlane = sourcePlane;
@@ -523,7 +615,7 @@ function fp = makeEmptyFramePlane()
         'TimeOccupancy',        NaN, ...
         'FrequencyOccupancy',   NaN, ...
         'MeasurementStatus',    'NoSignal', ...
-        'MeasurementSemantics', 'post_rx_combined_pre_rfchain');
+        'MeasurementSemantics', 'post_rx_combined_pre_noise');
 end
 
 function bwHz = computeObservableBandwidthHz(rxInfo)
@@ -698,6 +790,13 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
 
     combinedSignal = struct();
     combinedSignal.Signal = complex(zeros(frameShape.NumSamples, 1));
+    % Two accumulators. `Signal` stays NOISE-FREE and is what both measured
+    % planes are computed from -- the dataset's labels are only valid measured on
+    % a clean waveform, because a noise floor inside the estimator's
+    % peak-relative clip inflates the published occupied bandwidth up to 6x at
+    % low SNR. `NoisySignal` carries the deferred channel noise and is what the
+    % receiver RF chain consumes and what gets saved as the frame the model sees.
+    combinedSignal.NoisySignal = complex(zeros(frameShape.NumSamples, 1));
     combinedSignal.Components = {};
     combinedSignal.FrameShape = frameShape;
 
@@ -710,6 +809,13 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
         comp = signalComponents{compIdx};
         if isfield(comp, 'Signal') && ~isempty(comp.Signal)
             startOffset = localFrameStartOffset(comp, sampleRate, frameShape.NumSamples);
+            % Keep the PRE-COLLAPSE per-antenna buffer for measurement. The GT is
+            % measured per transmitter and, for MIMO, per antenna: antennas see
+            % independently faded copies, and summing them first creates deep
+            % notches that change the spectrum into something no emitter actually
+            % transmitted. The summed stream is still what the receiver records,
+            % so it stays the signal that is combined and saved.
+            compSigPerAntenna = comp.Signal;
             compSig = localCollapseAntennaSignal(comp.Signal);
             if startOffset >= frameShape.NumSamples
                 comp = localUpdateComponentSampleGrid( ...
@@ -723,18 +829,45 @@ function combinedSignal = combineSignalComponents(obj, rxSignals, rxInfo)
                 usableLen = 0;
             end
             compSig = compSig(1:usableLen, :);
+            if ~isempty(compSigPerAntenna)
+                compSigPerAntenna = compSigPerAntenna(1:min(usableLen, size(compSigPerAntenna, 1)), :);
+            end
             idxStart = startOffset + 1;
             idxEnd = startOffset + usableLen;
             if usableLen > 0
                 combinedSignal.Signal(idxStart:idxEnd) = ...
                     combinedSignal.Signal(idxStart:idxEnd) + compSig;
+                combinedSignal.NoisySignal(idxStart:idxEnd) = ...
+                    combinedSignal.NoisySignal(idxStart:idxEnd) + ...
+                    csrd.pipeline.signal.realizeChannelNoise( ...
+                        localPendingChannelNoise(comp), compSig);
             end
             comp = localUpdateComponentSampleGrid( ...
                 comp, compSig, startOffset, frameShape.NumSamples, sampleRate);
+            comp.SignalPerAntenna = compSigPerAntenna;
             combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
         else
             combinedSignal.Components{end + 1} = comp; %#ok<AGROW>
         end
+    end
+end
+
+function pending = localPendingChannelNoise(comp)
+    % localPendingChannelNoise - the PendingChannelNoise descriptor, or [].
+    % Inputs: comp - component struct as carried through the receiver loop.
+    % Outputs: pending - the descriptor struct planned by
+    %           ChannelFactory.planChannelNoise, or [] when the link owes none.
+    %
+    % The realization itself lives in csrd.pipeline.signal.realizeChannelNoise
+    % rather than here. It is the single point where noise enters the dataset and
+    % therefore sets the realized SNR of every saved frame, so it belongs
+    % somewhere a test can call it directly; as a local function in a private
+    % method file it was unreachable, and the most safety-critical step in the
+    % pipeline had no direct coverage.
+    pending = [];
+    if isstruct(comp) && isfield(comp, 'PendingChannelNoise') && ...
+            isstruct(comp.PendingChannelNoise)
+        pending = comp.PendingChannelNoise;
     end
 end
 

@@ -76,14 +76,20 @@ runner = csrd.SimulationRunner( ...
     'RuntimePlan', cfg.RuntimePlan);
 setup(runner);
 cleanupObj = onCleanup(@() localRelease(runner)); %#ok<NASGU>
-step(runner, 1, 1);
 
+% Clear the target before stepping, so the existence assertion below actually
+% proves THIS run wrote the annotation rather than finding one left by an earlier
+% scenario in the shared session directory.
 warnState = warning('off', 'MATLAB:structOnObject');
 warnGuard = onCleanup(@() warning(warnState)); %#ok<NASGU>
 s = struct(runner);
 outDir = s.actualOutputDirectory;
 annotationPath = fullfile(outDir, 'annotations', ...
     'scenario_000001_annotation.json');
+csrd.test_support.freshAnnotationReader('clear', annotationPath);
+
+step(runner, 1, 1);
+
 assert(exist(annotationPath, 'file') == 2, ...
     'Phase 12 pipeline: annotation file was not written: %s', ...
     annotationPath);

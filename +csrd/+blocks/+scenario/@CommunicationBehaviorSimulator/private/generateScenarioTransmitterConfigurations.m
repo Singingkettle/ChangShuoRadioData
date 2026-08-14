@@ -619,8 +619,9 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams, burstDu
     else
         modConfig.BitsPerSymbol = 1;  % For analog modulations
     end
-    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec);
-    
+    modConfig.ModulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, ...
+        burstDurationSec, obj.unifiedReceiverConfig.SampleRate);
+
     obj.logger.debug('Scenario: Modulation %s, Order %d, SymbolRate %.2f kHz', ...
         modConfig.Type, modConfig.Order, modConfig.SymbolRate / 1e3);
 end
@@ -688,7 +689,8 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
     else
         modConfig.BitsPerSymbol = 1;
     end
-    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec);
+    modConfig.ModulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, ...
+        burstDurationSec, obj.unifiedReceiverConfig.SampleRate);
     obj.logger.debug(['Scenario: Regulatory modulation %s, Order %d, ', ...
         'SymbolRate %.2f kHz, Band=%s'], modConfig.Type, ...
         modConfig.Order, modConfig.SymbolRate / 1e3, emitterPlan.BandId);
@@ -727,15 +729,21 @@ function [fftLength, guard, scs, cpLen] = localOfdmGridForBandwidth(bandwidth, b
     cpLen = round(fftLength / 14);                      % ~7% cyclic prefix (LTE normal CP)
 end
 
-function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec)
+function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, burstDurationSec, receiverRate)
     % buildRegulatoryModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
+    %   receiverRate - receiver sample rate (Hz); multicarrier spacings are nudged
+    %     so the modulator rate is an exact small rational of it (see
+    %     snapSpacingForTractableResample). Pass NaN/absent to skip the nudge.
     % Outputs: see signature return values and contract fields.
+    if nargin < 4; receiverRate = NaN; end
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
             [fftLength, guard, subcarrierSpacing, cpLen] = ...
                 localOfdmGridForBandwidth(bandwidth, burstDurationSec);
+            subcarrierSpacing = csrd.pipeline.signal.snapSpacingForTractableResample( ...
+                subcarrierSpacing, fftLength, receiverRate);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
@@ -761,15 +769,21 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, 
     end
 end
 
-function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec)
+function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burstDurationSec, receiverRate)
     % buildLegacyModulatorConfig - Production declaration in CSRD.
     % Inputs: see signature arguments and local validation.
+    %   receiverRate - receiver sample rate (Hz); multicarrier spacings are nudged
+    %     so the modulator rate is an exact small rational of it (see
+    %     snapSpacingForTractableResample). Pass NaN/absent to skip the nudge.
     % Outputs: see signature return values and contract fields.
+    if nargin < 4; receiverRate = NaN; end
     modulatorConfig = struct();
     switch char(string(modConfig.Type))
         case 'OFDM'
             [fftLength, guard, subcarrierSpacing, cpLen] = ...
                 localOfdmGridForBandwidth(bandwidth, burstDurationSec);
+            subcarrierSpacing = csrd.pipeline.signal.snapSpacingForTractableResample( ...
+                subcarrierSpacing, fftLength, receiverRate);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.ofdm.FFTLength = fftLength;
@@ -791,6 +805,10 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burs
             % the planned bandwidth and the symbol fits the burst.
             subcarrierSpacing = min(max(15e3, 2 / burstDurationSec), bandwidth / 12);
             delayLength = max(16, round(bandwidth / subcarrierSpacing) + 8);
+            % OTFS modulator rate is DelayLength*scs (OTFS.m: Fs = DelayLength x
+            % SubcarrierSpacing), so nudge with N = delayLength.
+            subcarrierSpacing = csrd.pipeline.signal.snapSpacingForTractableResample( ...
+                subcarrierSpacing, delayLength, receiverRate);
 
             modulatorConfig.base.mode = "qam";
             modulatorConfig.otfs.DelayLength = delayLength;
@@ -804,6 +822,8 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burs
             % 300-subcarrier grid that pinned OBW to 300*15 kHz = 4.5 MHz.
             [fftLength, guard, subcarrierSpacing, cpLen] = ...
                 localOfdmGridForBandwidth(bandwidth, burstDurationSec);
+            subcarrierSpacing = csrd.pipeline.signal.snapSpacingForTractableResample( ...
+                subcarrierSpacing, fftLength, receiverRate);
             dataSubcarriers = fftLength - 2 * guard;
 
             modulatorConfig.base.mode = "qam";

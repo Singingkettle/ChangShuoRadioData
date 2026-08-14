@@ -158,12 +158,21 @@ function annotationPath = localRunOneScenario(cfg)
     runner = csrd.SimulationRunner('RunnerConfig', cfg.Runner, ...
         'FactoryConfigs', cfg.Factories, 'RuntimePlan', cfg.RuntimePlan);
     setup(runner);
-    step(runner, 1, 1);
+
+    % Resolve the path and clear it BEFORE stepping. The runner writes into a
+    % session directory shared across a process's scenarios, and a frame-level
+    % failure does not raise the scenario-level skip counter -- so a cohort that
+    % generated nothing would otherwise be scored on the previous cohort's
+    % annotation and look like a pass. See
+    % csrd.test_support.freshAnnotationReader for the incident this prevents.
     warnState = warning('off', 'MATLAB:structOnObject');
     s = struct(runner);
     warning(warnState);
     annotationPath = fullfile(s.actualOutputDirectory, 'annotations', ...
         'scenario_000001_annotation.json');
+    csrd.test_support.freshAnnotationReader('clear', annotationPath);
+
+    step(runner, 1, 1);
 end
 
 
@@ -191,7 +200,26 @@ function [nSources, violations] = localCheckAnnotation(annotation, cohortName)
             tag = sprintf('%s/f%d/src%d', cohortName, fi, si);
             violations = [violations, ...
                 csrd.test_support.measuredPlausibilityViolations( ...
-                    src.Truth.Measured.SourcePlane, Fs, tag)]; %#ok<AGROW>
+                    src.Truth.Measured.SourcePlane, Fs, tag, ...
+                    localPlausibilityContext(src, src.Truth.Measured.SourcePlane))]; %#ok<AGROW>
         end
+    end
+end
+
+
+function ctx = localPlausibilityContext(src, sourcePlane)
+    % localPlausibilityContext - cross-plane inputs for the plausibility bounds.
+    %   Supplies Truth.Execution.ModulatedBandwidthHz (the same estimator run on
+    %   the clean pre-channel waveform) so the measured value can be checked
+    %   against the emitter's own bandwidth, plus the measurement status so an
+    %   explicitly unresolvable source is exempt from that comparison.
+    ctx = struct('ExecutionBwHz', NaN, 'MeasurementStatus', '');
+    if isstruct(src) && isfield(src, 'Truth') && isstruct(src.Truth) ...
+            && isfield(src.Truth, 'Execution') && isstruct(src.Truth.Execution) ...
+            && isfield(src.Truth.Execution, 'ModulatedBandwidthHz')
+        ctx.ExecutionBwHz = src.Truth.Execution.ModulatedBandwidthHz;
+    end
+    if isstruct(sourcePlane) && isfield(sourcePlane, 'MeasurementStatus')
+        ctx.MeasurementStatus = sourcePlane.MeasurementStatus;
     end
 end
