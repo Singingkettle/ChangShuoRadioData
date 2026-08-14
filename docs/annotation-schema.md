@@ -115,7 +115,7 @@ Legacy v1 top-level fields are forbidden: `Realized`, `Planned`, `Temporal`,
 | Field | Unit | Meaning |
 |-------|------|---------|
 | `PlannedCenterFrequencyHz` | Hz | Planned source center as a **receiver-baseband offset** (same frame as `Execution.CenterFrequencyOffsetHz` and `ReceiverView.ProjectedCenterOffsetHz`), not an absolute RF carrier |
-| `PlannedBandwidthHz` | Hz | Blueprint bandwidth: the ALLOCATION the planner assigned, i.e. a ceiling, not a prediction of the measured width |
+| `AllocatedBandwidthHz` | Hz | Blueprint bandwidth: the ALLOCATION the planner assigned, i.e. a ceiling, not a prediction of the measured width |
 | `PlannedSampleRate` | Hz | Planned sample rate |
 | `PlannedSymbolRateHz` | Hz | Symbol rate the planner chose, `NaN` for families that have none |
 | `PlannedRolloffFactor` | scalar | Pulse-shaping roll-off the planner chose, `NaN` where inapplicable |
@@ -143,11 +143,11 @@ the allocation, are what predicts a measured occupied bandwidth from published
 theory. For a root-raised-cosine single carrier the ITU 99 % OBW is a fixed
 multiple of the symbol rate that rises with the roll-off — 1.01922 / 1.10307 /
 1.26801 times `Rs` at beta = 0.1 / 0.25 / 0.5 (closed form; ITU-R SM.853-2
-Table 2). Checking a measurement against `PlannedBandwidthHz` cannot do that job:
+Table 2). Checking a measurement against `AllocatedBandwidthHz` cannot do that job:
 it is an allocation the planner may also snap onto the receiver sample grid, so
-`PlannedBandwidthHz = (1 + beta) * Rs` does not hold for narrow channels.
+`AllocatedBandwidthHz = (1 + beta) * Rs` does not hold for narrow channels.
 
-Two cautions on comparing measured widths against `PlannedBandwidthHz`:
+Two cautions on comparing measured widths against `AllocatedBandwidthHz`:
 
 - The ratio has a hard `<= 1` ceiling ONLY for strictly bandlimited families —
   RRC-shaped linear single carrier, and AM/SSB with a bandlimited message. It does
@@ -207,7 +207,17 @@ executed `ChannelModel`. Empty/no-building OSM cases must expose any
 
 Both planes carry occupied bandwidth, center frequency, time occupancy,
 frequency occupancy, and `MeasurementSemantics`. `SourcePlane` also carries
-`SNRdB`.
+`SNRdB`. `FramePlane` also carries `FrameChannelNoisePowerW`: the realized
+power of the frame's SINGLE whole-frame channel-noise draw. A receiver has
+one noise floor, so the pipeline realizes ONE noise realization per frame
+(from the first noise-owing emitter's descriptor, in construction order)
+across the entire buffer — overlapping bursts share it instead of summing K
+independent realizations, and the gaps between bursts carry it too instead
+of being noise-free (a noise floor that stepped with the instantaneous
+overlap count was a directly learnable leak of the GT burst timing). Every
+`SourcePlane.SNRdB` at the receiver is measured against this same scalar,
+so emitters other than the reference get honest, emergent SNR labels rather
+than their own requested targets.
 
 Required semantics:
 

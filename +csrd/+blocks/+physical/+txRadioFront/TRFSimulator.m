@@ -146,6 +146,12 @@ classdef TRFSimulator < matlab.System
 
     properties (Access = private)
         PhaseNoiseSampleRateHz double = NaN
+
+        % PaInputRefDbm: cached input-referred 1 dB compression point of the
+        % configured PA (dBm), measured by paInputReferenceDbm at setup. NaN
+        % when no InputBackoffDb is configured or the PA never compresses
+        % within the probe range (a linear PA needs no back-off).
+        PaInputRefDbm double = NaN
     end
 
     methods (Access = protected)
@@ -402,6 +408,18 @@ classdef TRFSimulator < matlab.System
             obj.PhaseNoise = obj.genPhaseNoise(obj.SampleRate);
             obj.PhaseNoiseSampleRateHz = obj.SampleRate;
             obj.MemoryLessNonlinearity = obj.genMemoryLessNonlinearity;
+
+            % Cache the PA's input-referred 1 dB compression point once per
+            % setup, but only when a back-off is configured -- the probe sweep
+            % costs one extra PA construction.
+            obj.PaInputRefDbm = NaN;
+            cfgNl = obj.MemoryLessNonlinearityConfig;
+            if isstruct(cfgNl) && isfield(cfgNl, 'InputBackoffDb') && ...
+                    isnumeric(cfgNl.InputBackoffDb) && ...
+                    isscalar(cfgNl.InputBackoffDb) && ...
+                    isfinite(cfgNl.InputBackoffDb) && cfgNl.InputBackoffDb > 0
+                obj.PaInputRefDbm = obj.paInputReferenceDbm();
+            end
         end
 
         function translatedSignal = frequencyTranslate(obj, inputSignal, targetFrequency, signalSampleRate)
@@ -642,6 +660,39 @@ classdef TRFSimulator < matlab.System
             phaseMeta.InputSampleRate = double(inputSampleRate);
             csrd.runtime.performance.trace('event', 'TRF.PhaseNoise', ...
                 toc(stageStart), phaseMeta);
+
+            % Step 3.5: enforce the PA input back-off. If the drive's MEAN
+            % power sits closer than the drawn InputBackoffDb to the PA's own
+            % measured 1 dB compression point (cached at setup), attenuate it
+            % down to exactly P1dB - IBO. ATTENUATE-ONLY, never boost: a drive
+            % already further from compression is left untouched. The
+            % bidirectional version of this step (scale every drive to sit
+            % exactly at P1dB - IBO) was measured to be actively harmful -- it
+            % PULLED well-behaved draws UP toward compression, e.g. QAM through
+            % the Ghorbani model got boosted past the fold-over and filled the
+            % capture band (RRC wideband OBW/theory p90 went 1.09 -> 2.03 on
+            % the widening-probe anchor). The defect this step exists for is
+            % only ever an over-driven PA: the lookup table's unit-power drive
+            % sat 17 dB PAST compression. Absolute output power is unaffected
+            % -- Step 7 renormalizes to TxPowerDb -- so this ONLY moves the
+            % operating point.
+            cfgNl = obj.MemoryLessNonlinearityConfig;
+            if isstruct(cfgNl) && isfield(cfgNl, 'InputBackoffDb') && ...
+                    isnumeric(cfgNl.InputBackoffDb) && ...
+                    isscalar(cfgNl.InputBackoffDb) && ...
+                    isfinite(cfgNl.InputBackoffDb) && ...
+                    cfgNl.InputBackoffDb > 0 && isfinite(obj.PaInputRefDbm)
+                drivePowerW = mean(abs(processedSignal(:)) .^ 2) / ...
+                    cfgNl.ReferenceImpedance;
+                if drivePowerW > eps
+                    driveDbm = 10 * log10(drivePowerW * 1000);
+                    targetDbm = obj.PaInputRefDbm - double(cfgNl.InputBackoffDb);
+                    if driveDbm > targetDbm
+                        processedSignal = processedSignal * ...
+                            10 ^ ((targetDbm - driveDbm) / 20);
+                    end
+                end
+            end
 
             % Step 4: Apply the memoryless nonlinearity (power-amplifier model).
             % A memoryless PA generates 3rd-order (and higher) spectral regrowth
@@ -888,7 +939,20 @@ classdef TRFSimulator < matlab.System
 
             above = freqsHz > offsetsHz(end);
             if any(above)
-                levelsAtFreq(above) = levelsDbcHz(end);
+                % Above the last mask point, KEEP the last segment's slope (the
+                % interp1 'extrap' above already did that) instead of holding the
+                % level flat to Fs/2. The flat hold was a defect: it painted a
+                % white pedestal across the whole capture band, and at the top of
+                % the configured level range on a wide modulator grid that
+                % pedestal carried ~1% of total power -- exactly the ITU 99%-OBW
+                % runaway threshold. A real oscillator keeps falling past the
+                % last specified offset until its broadband floor, so the
+                % extrapolation is clamped between the last mask level (never
+                % rise above it, even for a pathological rising mask) and a
+                % physical -160 dBc/Hz far-out floor.
+                FAR_FLOOR_DBCHZ = -160;
+                levelsAtFreq(above) = min(levelsAtFreq(above), levelsDbcHz(end));
+                levelsAtFreq(above) = max(levelsAtFreq(above), FAR_FLOOR_DBCHZ);
             end
 
             % SSB phase noise L(f) relates to phase PSD by
@@ -917,6 +981,29 @@ classdef TRFSimulator < matlab.System
     end
 
     methods
+
+        function refDbm = paInputReferenceDbm(obj)
+            % paInputReferenceDbm - the PA's input-referred 1 dB compression point.
+            % Inputs: obj - a TRFSimulator whose MemoryLessNonlinearityConfig is set.
+            % Outputs: refDbm - input power (dBm at ReferenceImpedance) where the
+            %          configured PA's gain has compressed 1 dB below its PEAK
+            %          value; NaN when it never compresses within the probe range
+            %          (a linear PA needs no back-off).
+            %
+            % The sweep itself lives in csrd.blocks.physical.paInputCompressionDbm
+            % -- ONE kernel shared with RRFSimulator's LNA back-off, so the two
+            % front ends can never disagree on what "compression" means. See
+            % that function for the measurement rationale (numeric, not
+            % closed-form; peak-referenced, not small-signal-referenced).
+            %
+            % The probe is a fresh instance from the same config: the production
+            % System object is locked to the frame size, and
+            % comm.MemorylessNonlinearity is stateless, so a separate sweep
+            % instance is both necessary and sufficient.
+            refDbm = csrd.blocks.physical.paInputCompressionDbm( ...
+                obj.genMemoryLessNonlinearity(), ...
+                obj.MemoryLessNonlinearityConfig.ReferenceImpedance);
+        end
 
         function obj = TRFSimulator(varargin)
             % TRFSimulator - Constructor for transmitter radio front-end simulator

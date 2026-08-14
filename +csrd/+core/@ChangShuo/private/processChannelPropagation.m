@@ -199,25 +199,29 @@ function signalsAtReceivers = processChannelPropagation(obj, FrameId, txsSignalS
                         channelOutput, txInfoForLink, rxInfoForLink);
                     component.ChannelOutputWasEmptyBeforeGating = ...
                         isfield(channelOutput, 'Signal') && isempty(channelOutput.Signal);
-                    % Realized signal/channel-noise powers for the measured
-                    % received-SNR GT. AWGN reports both (its Signal already
-                    % carries the noise); noise-free channels (MIMO/RayTracing)
-                    % report a signal power with zero channel noise, or it is
-                    % computed here from the signal-only output.
+                    % Realized signal power + REQUESTED channel-noise power for
+                    % the measured received-SNR GT. The requested value is what
+                    % this link's target asked for; the noise the saved frame
+                    % actually carries is the ONE whole-frame realization drawn
+                    % in applyFrameChannelNoise, and the SNR labels are
+                    % measured against THAT (localMeasuredReceivedSnr) -- the
+                    % per-link request is kept as a diagnostic, never as the
+                    % label's noise term.
                     if isfield(channelOutput, 'ChannelSignalPowerW')
                         component.ChannelSignalPowerW = channelOutput.ChannelSignalPowerW;
-                        if isfield(channelOutput, 'ChannelNoisePowerW')
-                            component.ChannelNoisePowerW = channelOutput.ChannelNoisePowerW;
+                        if isfield(channelOutput, 'RequestedChannelNoisePowerW')
+                            component.RequestedChannelNoisePowerW = ...
+                                channelOutput.RequestedChannelNoisePowerW;
                         else
-                            component.ChannelNoisePowerW = 0;
+                            component.RequestedChannelNoisePowerW = 0;
                         end
                     elseif isfield(channelOutput, 'Signal') && ~isempty(channelOutput.Signal)
                         component.ChannelSignalPowerW = ...
                             mean(abs(double(channelOutput.Signal(:))) .^ 2);
-                        component.ChannelNoisePowerW = 0;
+                        component.RequestedChannelNoisePowerW = 0;
                     else
                         component.ChannelSignalPowerW = NaN;
-                        component.ChannelNoisePowerW = NaN;
+                        component.RequestedChannelNoisePowerW = NaN;
                     end
                     % Carry the OWED channel noise forward without realizing it.
                     % The measured planes must be taken on a noise-free waveform,
@@ -789,8 +793,8 @@ function diagnostic = localCleanObwDiagnostic(component, segmentSignal)
                 planned, 'ModulationFamily');
             diagnostic.ModulationOrder = localStructNumber( ...
                 planned, 'ModulationOrder');
-            diagnostic.PlannedBandwidthHz = localStructNumber( ...
-                planned, 'PlannedBandwidthHz');
+            diagnostic.AllocatedBandwidthHz = localStructNumber( ...
+                planned, 'AllocatedBandwidthHz');
             diagnostic.PlannedDurationSec = localStructNumber( ...
                 planned, 'DurationSec');
         end

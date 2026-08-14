@@ -546,6 +546,8 @@ end
 
 function minInterval = calculateMinTransmissionInterval(transmissionPattern)
     % calculateMinTransmissionInterval - Shortest single on-interval (burst).
+    % Inputs: transmissionPattern - struct with .Intervals [start end] rows (s).
+    % Outputs: minInterval - shortest positive on-interval duration (s), 0 when none.
     % The transmit gating cuts the modulated signal per burst, so a multicarrier
     % symbol must fit ONE burst; this returns the tightest such constraint.
     intervals = transmissionPattern.Intervals;
@@ -587,14 +589,21 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams, burstDu
     modConfig.RolloffFactor = rolloffFactor;
     modConfig.OFDMMimoMode = modParams.OFDMMimoMode;
     
-    % Calculate symbol rate from bandwidth, then snap it to an integer
-    % submultiple of the receiver sample rate. This keeps the Tx RF chain's
-    % modulator->receiver resample ratio a small, exact rational (the
-    % regulatory path achieves the same implicitly through discrete catalog
-    % bandwidths; the legacy continuous-bandwidth path would otherwise yield
-    % an intractable rational and fail in TRFSimulator.resampleToTarget).
+    % Select order based on modulation type (from scenario config defaults).
+    % Chosen BEFORE the symbol rate: the M-ary CPM/FSK occupancy factor below
+    % depends on the tone count.
+    modConfig.Order = selectModulationOrder(selectedType, modParams);
+
+    % Calculate symbol rate from bandwidth via the FAMILY's occupancy factor,
+    % then snap it to an integer submultiple of the receiver sample rate. This
+    % keeps the Tx RF chain's modulator->receiver resample ratio a small,
+    % exact rational (the regulatory path achieves the same implicitly through
+    % discrete catalog bandwidths; the legacy continuous-bandwidth path would
+    % otherwise yield an intractable rational and fail in
+    % TRFSimulator.resampleToTarget).
     modConfig.SymbolRate = snapSymbolRateToReceiverGrid(obj, ...
-        bandwidth / (1 + rolloffFactor));
+        bandwidth / localFamilyOccupancyFactor(selectedType, ...
+            modConfig.Order, rolloffFactor));
 
     % Get samples per symbol
     if isstruct(modParams.SamplesPerSymbol)
@@ -610,9 +619,6 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams, burstDu
         modConfig.SamplesPerSymbol = max(modConfig.SamplesPerSymbol, minSps);
     end
     
-    % Select order based on modulation type (from scenario config defaults)
-    modConfig.Order = selectModulationOrder(selectedType, modParams);
-    
     % Calculate bits per symbol
     if modConfig.Order >= 2
         modConfig.BitsPerSymbol = log2(modConfig.Order);
@@ -624,6 +630,34 @@ function modConfig = generateModulationConfig(obj, bandwidth, modParams, burstDu
 
     obj.logger.debug('Scenario: Modulation %s, Order %d, SymbolRate %.2f kHz', ...
         modConfig.Type, modConfig.Order, modConfig.SymbolRate / 1e3);
+end
+
+function factor = localFamilyOccupancyFactor(modType, order, rolloffFactor)
+    % localFamilyOccupancyFactor - realized OBW as a multiple of the symbol rate.
+    % Inputs: modType - family name; order - modulation order (M);
+    %         rolloffFactor - RRC roll-off for the pulse-shaped families.
+    % Outputs: factor - divide the allocated bandwidth by this to get the
+    %          symbol rate whose realized ITU 99% OBW fills (and never
+    %          overruns) the allocation.
+    %
+    % The blanket (1+rolloff) rule this replaces is the RRC single-carrier
+    % occupancy. Applied to M-ary FSK/CPM it under-divides by the tone count:
+    % a 40 MHz GFSK allocation received Rs = 32 MHz, realized ~2.2*Rs = 70 MHz
+    % of occupied band on a 50 MHz grid, wrapped around the capture edge, and
+    % published a measured center ~25 MHz away from the planned one -- the
+    % s11/s16 capture-band-fill violators of the 24-scenario plausibility
+    % sweep. The M-ary factors mirror the measured occupancies the planner's
+    % old allocation-sizing table recorded (M=2 -> 2.2x, M=4 -> 4.5x,
+    % M=8 -> 7.9x Rs); GMSK/MSK genuinely occupy ~0.8*Rs, so dividing by
+    % (1+rolloff) left them underfilling their channel by ~35%.
+    switch char(string(modType))
+        case {'FSK', 'CPFSK', 'GFSK'}
+            factor = 1.2 * (max(double(order), 2) - 1) + 2;
+        case {'GMSK', 'MSK'}
+            factor = 0.8;
+        otherwise
+            factor = 1 + rolloffFactor;
+    end
 end
 
 function symbolRate = snapSymbolRateToReceiverGrid(obj, rawSymbolRate)
@@ -669,9 +703,11 @@ function modConfig = generateRegulatoryModulationConfig(obj, bandwidth, modParam
     % the receiver rate would yield an intractable modulator->receiver resample
     % ratio in TRFSimulator. Snap only narrow rates onto an exact receiver
     % submultiple (sub-2% bandwidth shift); wide channels keep their exact
-    % catalog bandwidth.
+    % catalog bandwidth. The symbol rate divides by the FAMILY's occupancy
+    % factor, not blanket (1+rolloff).
     modConfig.SymbolRate = snapNarrowSymbolRateToReceiverGrid(obj, ...
-        bandwidth / (1 + modParams.RolloffFactor));
+        bandwidth / localFamilyOccupancyFactor(modConfig.Type, ...
+            modConfig.Order, modParams.RolloffFactor));
     if isstruct(modParams.SamplesPerSymbol)
         spsMin = modParams.SamplesPerSymbol.Min;
         spsMax = modParams.SamplesPerSymbol.Max;
@@ -759,8 +795,8 @@ function modulatorConfig = buildRegulatoryModulatorConfig(modConfig, bandwidth, 
             modulatorConfig.SymbolMapping = "Gray";
             modulatorConfig.PhaseOffset = 0;
         case 'FM'
-            % Narrowband-FM deviation scaled to the planned channel (see the
-            % buildLegacyModulatorConfig 'FM' case + calculateRequiredBandwidth).
+            % Narrowband-FM deviation scaled to the planned channel (Carson
+            % beta = 2; see the buildLegacyModulatorConfig 'FM' case).
             modulatorConfig.FrequencyDeviation = max(1e3, bandwidth / 3);
         otherwise
             if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0
@@ -842,7 +878,8 @@ function modulatorConfig = buildLegacyModulatorConfig(modConfig, bandwidth, burs
             % Δf = bandwidth/3 = 2·symbolRate (Carson modulation index beta = 2),
             % so the realized FM occupies its planned channel instead of the
             % fixed 75 kHz broadcast deviation overrunning a narrow channel ~7x.
-            % See calculateRequiredBandwidth('FM').
+            % The FM modulator derives the same Δf = TargetBandwidth/3 default
+            % when no explicit deviation is configured.
             modulatorConfig.FrequencyDeviation = max(1e3, bandwidth / 3);
         otherwise
             if isfield(modConfig, 'RolloffFactor') && modConfig.RolloffFactor > 0

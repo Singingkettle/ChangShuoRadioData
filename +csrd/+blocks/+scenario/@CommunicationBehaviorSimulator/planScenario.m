@@ -1,5 +1,11 @@
 function [txConfigs, rxConfigs, globalLayout, entities] = planScenario(obj, entities)
 %PLANSCENARIO Freeze scenario-level communication configuration.
+% Inputs: obj - CommunicationBehaviorSimulator; entities - physical entity
+%         array from PhysicalEnvironmentSimulator (required, non-empty).
+% Outputs: txConfigs/rxConfigs - frozen per-transmitter / per-receiver
+%          scenario configurations; globalLayout - the frequency layout with
+%          FrameId reset to 0; entities - entities as (re)initialized for
+%          the scenario (cached on repeat calls).
 
 if nargin < 2 || isempty(entities)
     error('CSRD:Scenario:EmptyEntities', ...

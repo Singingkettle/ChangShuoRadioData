@@ -38,6 +38,5 @@ cfg.Regulatory.Enable = true;
 cfg.Regulatory.Region.Fixed = 'CN';
 cfg.Regulatory.ServiceTier = 'Tier1';
 cfg.Regulatory.ExcludedServiceClasses = {'Radar','Radiolocation','Radionavigation'};
-cfg.Regulatory.MonitoringBand.Selection = 'WeightedByRegion';
 cfg.Regulatory.MaxBandwidthFractionOfSampleRate = 0.8;
 end

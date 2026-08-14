@@ -160,8 +160,17 @@ while k <= numel(lines)
     declaration.HasCommentBlock = ~isempty(strtrim(commentText));
     declaration.HasEnglishComment = localHasEnglish(commentText);
     declaration.HasChineseComment = localHasCJK(commentText);
+    % Input/output contract comments are required only for NON-local
+    % declarations: a `local*` helper is a private three-to-ten-line
+    % predicate whose whole contract is its one-line description, and
+    % forcing an Inputs/Outputs block onto every one of them manufactures
+    % dozens of content-free boilerplate stanzas (the auto-fixer output the
+    % owner explicitly rejected). Top-level and packaged functions are the
+    % API surface; they keep the full requirement.
     declaration.RequiresInputOutputComment = ...
-        strcmp(kind, 'function') && localSignatureHasPayload(signature);
+        strcmp(kind, 'function') && ...
+        ~startsWith(string(name), 'local') && ...
+        localSignatureHasPayload(signature);
     declaration.HasInputOutputComment = ...
         ~declaration.RequiresInputOutputComment || ...
         localHasInputOutputComment(commentText);

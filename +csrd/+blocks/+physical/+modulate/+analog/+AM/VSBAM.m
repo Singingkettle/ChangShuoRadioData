@@ -71,6 +71,21 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
         vestigialFilterResponse
     end
 
+    methods (Access = protected)
+
+        function limitHz = analogMessageBandwidthLimitHz(obj)
+            % analogMessageBandwidthLimitHz - VSB transmits one sideband plus
+            % a vestige no wider than ~2% of the message edge, so the message
+            % may fill the whole allocated channel (unlike the DSB parent's
+            % half-channel share; the vestige's partial energy sits far below
+            % the ITU 99% edge).
+            % Inputs: obj - modulator with TargetBandwidth set.
+            % Outputs: limitHz - one-sided message limit (Hz).
+            limitHz = obj.TargetBandwidth;
+        end
+
+    end
+
     methods (Access = private)
 
         function filterResponse = vestigialFilter(obj, frequency, bandwidthParameter)
@@ -95,23 +110,32 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             %                    Type: scalar in range [0, 1]
             %
             % Filter Characteristics:
-            %   - Complete attenuation below cutoff frequency
-            %   - Linear transition through vestigial region
-            %   - Full transmission in main passband
-            %   - Complete attenuation above bandwidth limit
+            %   - Complete attenuation below the negative cutoff
+            %   - LINEAR vestigial ramp from -cutoff to +cutoff (0 -> 1)
+            %   - Full transmission from +cutoff up to the bandwidth limit
+            %   - Complete attenuation above the bandwidth limit
+            %
+            % Branch ORDER matters: the previous version tested the passband
+            % (frequency > -cutoff) before the ramp region, so the ramp branch
+            % was dead code -- only frequency == -cutoff exactly could reach
+            % it -- and the "vestigial" filter was actually a brick wall at
+            % -cutoff. The defining feature of VSB (the gradual roll-off that
+            % a real vestigial filter needs for carrier recovery) never
+            % existed in the realized spectrum.
 
-            if frequency < -obj.ModulatorConfig.cutoff
-                % Complete attenuation below negative cutoff
+            cutoffHz = obj.ModulatorConfig.cutoff;
+            if frequency < -cutoffHz
+                % Complete attenuation below the vestigial region
                 filterResponse = 0;
-            elseif frequency > -obj.ModulatorConfig.cutoff && frequency <= bandwidthParameter
-                % Complete passthrough in main passband
+            elseif frequency <= cutoffHz
+                % Linear vestigial ramp: 0 at -cutoff, 1 at +cutoff
+                filterResponse = (frequency + cutoffHz) / (2 * cutoffHz);
+            elseif frequency <= bandwidthParameter
+                % Complete passthrough in the main passband
                 filterResponse = 1;
-            elseif frequency > bandwidthParameter
-                % Complete attenuation above bandwidth limit
-                filterResponse = 0;
             else
-                % Linear transition region (vestigial portion)
-                filterResponse = (frequency + obj.ModulatorConfig.cutoff) / (2 * obj.ModulatorConfig.cutoff);
+                % Complete attenuation above the bandwidth limit
+                filterResponse = 0;
             end
 
         end
@@ -176,6 +200,24 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             % edge passed to the vestigial filter.
             msgBwHz = csrd.support.modulation.occupiedBandwidthHz( ...
                 messageSignal, obj.SampleRate);
+
+            % The vestige width follows the SAME message edge: when the config
+            % carries a drawn cutoffFraction (the default path, see
+            % genModulatorHandle) the cutoff is re-derived from the realized
+            % message every call, and the realized Hz value is written back so
+            % the exported ModulatorConfig annotates what actually happened.
+            % An explicitly configured cutoff (Hz, no fraction) is honored
+            % as-is. The previous default derived the cutoff from the same
+            % hard-coded 15 kHz audio assumption the passband edge suffered
+            % from, so a message on any other grid got a vestige that was the
+            % wrong fraction of its bandwidth (300 Hz against a 2 MHz message,
+            % or wider than a narrow message entirely).
+            if isfield(obj.ModulatorConfig, 'cutoffFraction') && ...
+                    ~isempty(obj.ModulatorConfig.cutoffFraction)
+                obj.ModulatorConfig.cutoff = ...
+                    obj.ModulatorConfig.cutoffFraction * (msgBwHz / 2);
+            end
+
             obj.vestigialFilterResponse = arrayfun( ...
                 @(freq)obj.vestigialFilter(freq, msgBwHz / 2), frequencyAxis);
 
@@ -254,10 +296,15 @@ classdef VSBAM < csrd.blocks.physical.modulate.analog.AM.DSBSCAM
             if ~isfield(obj.ModulatorConfig, 'mode')
                 % Randomly select upper or lower sideband mode
                 obj.ModulatorConfig.mode = randsample(["upper", "lower"], 1);
+            end
 
-                % Set vestigial cutoff frequency (1-2% of 15 kHz audio bandwidth)
-                % This provides adequate vestigial information for carrier recovery
-                obj.ModulatorConfig.cutoff = (rand(1) * 0.01 + 0.01) * 15e3;
+            % Vestige width: a FRACTION of the realized message edge (1-2%,
+            % the television-practice vestige share), resolved to Hz per
+            % message in baseModulator. Only drawn when no explicit cutoff
+            % (Hz) was configured -- an explicit cutoff is honored as-is.
+            if ~isfield(obj.ModulatorConfig, 'cutoff') && ...
+                    ~isfield(obj.ModulatorConfig, 'cutoffFraction')
+                obj.ModulatorConfig.cutoffFraction = rand(1) * 0.01 + 0.01;
             end
 
             % Set modulation type flags

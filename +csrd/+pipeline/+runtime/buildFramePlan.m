@@ -1,5 +1,9 @@
 function framePlan = buildFramePlan(scenarioPlan, frameId)
 %BUILDFRAMEPLAN Resolve one frame window from a frozen ScenarioPlan.
+% Inputs: scenarioPlan - frozen plan whose .Frame carries the contract;
+%         frameId - positive integer frame index.
+% Outputs: framePlan - struct with FrameId, ScenarioId, FrameNumSamples,
+%          SampleRateHz, FrameDurationSec, start/end times and Source.
 
 if nargin < 1 || ~isstruct(scenarioPlan) || ...
         ~isfield(scenarioPlan, 'Frame') || ~isstruct(scenarioPlan.Frame)
@@ -41,6 +45,7 @@ framePlan = struct( ...
 end
 
 function localRequirePositiveInteger(s, fieldName)
+    % localRequirePositiveInteger - positive-scalar check plus integer-valued check.
 localRequirePositiveScalar(s, fieldName);
 if abs(double(s.(fieldName)) - round(double(s.(fieldName)))) > 0
     error('CSRD:FramePlan:InvalidFrameContract', ...
@@ -49,6 +54,7 @@ end
 end
 
 function localRequirePositiveScalar(s, fieldName)
+    % localRequirePositiveScalar - error unless the field is a positive finite scalar.
 if ~isfield(s, fieldName) || isempty(s.(fieldName)) || ...
         ~isnumeric(s.(fieldName)) || ~isscalar(s.(fieldName)) || ...
         ~isfinite(s.(fieldName)) || s.(fieldName) <= 0
@@ -58,6 +64,7 @@ end
 end
 
 function scenarioId = localScenarioId(scenarioPlan)
+    % localScenarioId - the plan scenario id as a double, NaN when absent.
 scenarioId = NaN;
 if isfield(scenarioPlan, 'ScenarioId') && isnumeric(scenarioPlan.ScenarioId) && ...
         isscalar(scenarioPlan.ScenarioId)

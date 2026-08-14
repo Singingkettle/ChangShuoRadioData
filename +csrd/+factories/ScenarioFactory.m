@@ -942,6 +942,10 @@ classdef ScenarioFactory < matlab.System
         % tests cover the full stepImpl path end-to-end.
         function scenarioPlan = planScenario(obj, scenarioId)
             %PLANSCENARIO Build and freeze a scenario construction plan.
+            % Inputs: obj - ScenarioFactory; scenarioId - positive integer
+            %         (defaults to the runtime ScenarioId, else 1).
+            % Outputs: scenarioPlan - the frozen, validated construction plan
+            %          (entities, layout, frame contract, blueprint hash).
             obj.ensureFactoryConfigReady();
             if nargin < 2 || isempty(scenarioId)
                 runtime = localGetScenarioRuntime(obj.factoryConfig);

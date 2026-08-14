@@ -12,10 +12,14 @@ function initializeEnvironment(obj)
     % Initialize weather conditions from configuration
     obj.currentEnvironment.Weather = struct();
 
-    % Get initial weather conditions from configuration or use defaults
+    % Get initial weather conditions from configuration or use defaults.
+    % Enable=false must behave exactly like an absent Weather block, so a
+    % disabled config takes the same static defaults as no config at all.
     if isfield(obj.Config, 'Environment') && ...
             isfield(obj.Config.Environment, 'Weather') && ...
-            isfield(obj.Config.Environment.Weather, 'InitialConditions')
+            isfield(obj.Config.Environment.Weather, 'InitialConditions') && ...
+            ~isequal(getFieldOrDefault(obj.Config.Environment.Weather, ...
+                'Enable', true), false)
 
         initial = obj.Config.Environment.Weather.InitialConditions;
         obj.currentEnvironment.Weather.Temperature = getFieldOrDefault(initial, 'Temperature', 20); % Celsius

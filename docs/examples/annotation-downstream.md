@@ -30,7 +30,7 @@ Use these fields for downstream labels:
 | Downstream need | Field |
 |-----------------|-------|
 | Class name / modulation family | `Truth.Design.ModulationFamily` |
-| Planned bandwidth | `Truth.Design.PlannedBandwidthHz` |
+| Planned bandwidth | `Truth.Design.AllocatedBandwidthHz` |
 | Realized clean modulation bandwidth | `Truth.Execution.ModulatedBandwidthHz` |
 | Final occupied bandwidth label | `Truth.Measured.SourcePlane.OccupiedBandwidthHz` |
 | Receiver-window projection | `ReceiverView.ProjectedCenterOffsetHz` |

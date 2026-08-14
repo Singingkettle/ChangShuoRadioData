@@ -56,6 +56,17 @@ classdef FM < csrd.blocks.physical.modulate.BaseModulator
 
     methods (Access = protected)
 
+        function limitHz = analogMessageBandwidthLimitHz(obj)
+            % analogMessageBandwidthLimitHz - Carson's rule budget: with the
+            % planner's deviation Δf = TargetBandwidth/3 (modulation index
+            % beta = 2), a message limited to TargetBandwidth/6 realizes
+            % 2*(Δf + W) = TargetBandwidth exactly. A wider message overruns
+            % the channel no matter what the deviation is drawn as.
+            % Inputs: obj - modulator with TargetBandwidth set.
+            % Outputs: limitHz - one-sided message limit (Hz).
+            limitHz = obj.TargetBandwidth / 6;
+        end
+
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core FM modulation implementation
             % Inputs: see signature arguments and local validation.
@@ -161,14 +172,20 @@ classdef FM < csrd.blocks.physical.modulate.BaseModulator
             obj.IsDigital = false; % FM is analog modulation
             obj.NumTransmitAntennas = 1; % Single antenna transmission (analog modulation constraint)
 
-            % Configure FM parameters if not provided
+            % Configure FM parameters if not provided. The default deviation is
+            % DERIVED FROM THE ALLOCATION (Carson: Δf = TargetBandwidth/3, the
+            % same beta = 2 rule the scenario planner uses), never drawn from a
+            % free-standing 5-75 kHz range -- a 75 kHz broadcast deviation on a
+            % 12.5 kHz channel overruns it ~15x regardless of the message.
             if ~isfield(obj.ModulatorConfig, 'FrequencyDeviation')
-                % For FM modulation, frequency deviation typically ranges:
-                % - Narrowband FM: 5 kHz (mobile communications)
-                % - Wideband FM: 75 kHz (audio broadcasting standards)
-                % - Data applications: 1-100 kHz depending on requirements
-                % Using a range of 5-75 kHz to cover most practical applications
-                obj.ModulatorConfig.FrequencyDeviation = randi([5000, 75000]);
+                if ~isfinite(obj.TargetBandwidth) || obj.TargetBandwidth <= 0
+                    error('CSRD:Modulation:MissingTargetBandwidth', ...
+                        ['FM needs either an explicit ', ...
+                         'ModulatorConfig.FrequencyDeviation or a positive ', ...
+                         'TargetBandwidth to derive one from.']);
+                end
+                obj.ModulatorConfig.FrequencyDeviation = ...
+                    max(1e3, obj.TargetBandwidth / 3);
             end
 
             % Create function handle for modulation

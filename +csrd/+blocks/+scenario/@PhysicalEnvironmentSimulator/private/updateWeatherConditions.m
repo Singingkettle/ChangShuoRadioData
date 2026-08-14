@@ -11,6 +11,19 @@ function weather = updateWeatherConditions(obj, currentWeather, deltaTime)
 
     weather = currentWeather;
 
+    % Enable=false must behave exactly like an absent Weather block. The
+    % caller (updateEnvironmentalConditions) already gates on it; this
+    % early return keeps the contract even for a direct call, and matters
+    % beyond semantics -- the evolution below consumes randn() draws, so a
+    % disabled config that still ran here would shift the global RNG
+    % stream relative to a config with no Weather block at all.
+    if isfield(obj.Config, 'Environment') && ...
+            isfield(obj.Config.Environment, 'Weather') && ...
+            isequal(getFieldOrDefault(obj.Config.Environment.Weather, ...
+                'Enable', true), false)
+        return;
+    end
+
     % Get weather evolution parameters from configuration
     if isfield(obj.Config, 'Environment') && ...
             isfield(obj.Config.Environment, 'Weather') && ...

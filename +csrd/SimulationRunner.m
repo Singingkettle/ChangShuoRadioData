@@ -1378,6 +1378,9 @@ classdef SimulationRunner < matlab.System
 
         function frameEntry = normalizeReceiverSources(frameEntry)
             %NORMALIZERECEIVERSOURCES Force each receiver annotation's
+            % Inputs: frameEntry - per-receiver annotation struct array or cell.
+            % Outputs: frameEntry - same shape with every SignalSources field
+            %          coerced to a cell.
             % SignalSources to a cell so a single-source frame serializes as a
             % JSON array (not a bare object). Accepts a per-receiver struct array
             % or a cell of receiver-annotation structs.

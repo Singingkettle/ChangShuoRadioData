@@ -14,6 +14,7 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName, var
         stageName = 'unspecified';
     end
     minPositiveSamples = false;
+    rampSeconds = 0;
     if ~isempty(varargin)
         for argIdx = 1:2:numel(varargin)
             name = char(string(varargin{argIdx}));
@@ -24,6 +25,14 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName, var
             switch lower(name)
                 case 'minpositivesamples'
                     minPositiveSamples = logical(varargin{argIdx + 1});
+                case 'rampseconds'
+                    rampSeconds = double(varargin{argIdx + 1});
+                    if ~isscalar(rampSeconds) || ~isfinite(rampSeconds) || ...
+                            rampSeconds < 0
+                        error('CSRD:Signal:GatingInvalidOption', ...
+                            ['gateToDuration RampSeconds must be a finite ', ...
+                             'non-negative scalar.']);
+                    end
                 otherwise
                     error('CSRD:Signal:GatingInvalidOption', ...
                         'Unsupported gateToDuration option "%s".', name);
@@ -79,6 +88,33 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName, var
         y = x;
     end
 
+    % Optional raised-cosine burst edges (opt-in, RampSeconds > 0; the
+    % default 0 leaves the signal bit-identical). A rectangular burst edge
+    % is a step whose spectral splatter falls off only as 1/f from a 10/T
+    % corner -- for short narrowband bursts that splatter, not the
+    % modulation, set the measured occupied bandwidth. Real transmitters
+    % ramp their PA envelope over microseconds; this applies a half-Hann
+    % (raised-cosine) ramp to BOTH ENDS OF THE ACTIVE REGION only -- the
+    % zero padding beyond the burst is an observation artifact, not a
+    % transmission, and must stay exactly zero. The ramp is clamped to 10%
+    % of the active length per edge and skipped entirely below 8 active
+    % samples, so micro-bursts keep their (already floor-dominated) shape.
+    rampSamplesApplied = 0;
+    activeSamples = min(inputSamples, targetSamples);
+    if rampSeconds > 0 && activeSamples >= 8
+        rampSamplesApplied = min(round(rampSeconds * sampleRate), ...
+            floor(activeSamples / 10));
+        if rampSamplesApplied > 0
+            ramp = 0.5 * (1 - cos(pi * (0:rampSamplesApplied - 1)' / ...
+                rampSamplesApplied));
+            y(1:rampSamplesApplied, :) = ...
+                y(1:rampSamplesApplied, :) .* ramp;
+            y(activeSamples - rampSamplesApplied + 1:activeSamples, :) = ...
+                y(activeSamples - rampSamplesApplied + 1:activeSamples, :) .* ...
+                flipud(ramp);
+        end
+    end
+
     signalStruct.Signal = y;
     signalStruct.SignalSampleCount = targetSamples;
     signalStruct.SignalDurationSec = targetSamples / sampleRate;
@@ -92,7 +128,9 @@ function signalStruct = gateToDuration(signalStruct, durationSec, stageName, var
         'OutputSamples', size(y, 1), ...
         'SampleRate', sampleRate, ...
         'Action', action, ...
-        'MinimumPositiveSamplesApplied', minimumPositiveSamplesApplied);
+        'MinimumPositiveSamplesApplied', minimumPositiveSamplesApplied, ...
+        'RampSecondsRequested', rampSeconds, ...
+        'RampSamplesApplied', rampSamplesApplied);
 
     if ~isfield(signalStruct, 'SignalGating') || ...
             ~isstruct(signalStruct.SignalGating)

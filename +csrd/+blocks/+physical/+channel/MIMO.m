@@ -448,7 +448,7 @@ classdef MIMO < csrd.blocks.physical.channel.BaseChannel
             % measured SNR low against the absolute receiver thermal/ADC noise.
             % For a single receive antenna sum(.,2) is a no-op (SISO unaffected).
             outputSignal.ChannelSignalPowerW = mean(abs(sum(fadedSignal, 2)) .^ 2);
-            outputSignal.ChannelNoisePowerW = 0;
+            outputSignal.RequestedChannelNoisePowerW = 0;
 
             % Add channel configuration information
             outputSignal.PathDelays = obj.PathDelays;

@@ -106,7 +106,7 @@ peak-relative 主瓣宽度。那与同名字段现在的量不是一回事,所�
 | 字段 | 单位 | 含义 |
 |-------|------|---------|
 | `PlannedCenterFrequencyHz` | Hz | 计划的来源中心,作为**接收机基带偏移**(与 `Execution.CenterFrequencyOffsetHz` 和 `ReceiverView.ProjectedCenterOffsetHz` 处于同一坐标系),而非绝对 RF 载波 |
-| `PlannedBandwidthHz` | Hz | 蓝图带宽:规划器分配的**额度**,即一个上限,不是对测得宽度的预测 |
+| `AllocatedBandwidthHz` | Hz | 蓝图带宽:规划器分配的**额度**,即一个上限,不是对测得宽度的预测 |
 | `PlannedSampleRate` | Hz | 计划采样率 |
 | `PlannedSymbolRateHz` | Hz | 规划器选定的符号率;无此概念的族取 `NaN` |
 | `PlannedRolloffFactor` | 标量 | 规划器选定的脉冲成形滚降;不适用处取 `NaN` |
@@ -174,7 +174,14 @@ peak-relative 主瓣宽度。那与同名字段现在的量不是一回事,所�
 
 两个平面都携带占用带宽、中心频率、时间占用、
 频率占用以及 `MeasurementSemantics`。`SourcePlane` 还携带
-`SNRdB`。
+`SNRdB`。`FramePlane` 还携带 `FrameChannelNoisePowerW`:该帧**单次**
+整帧信道噪声实现的实测功率。一台接收机只有一个噪声底,所以管线对每个
+接收机帧只画一次噪声实现(取构造顺序中第一个欠噪发射机的描述符),
+覆盖整个缓冲区——重叠的突发共享它而不是叠加 K 份独立实现,突发之间的
+间隙也携带它而不是零噪声(噪声底随瞬时重叠数阶跃,曾是 GT 突发时序的
+可直接学习泄漏)。该接收机所有 `SourcePlane.SNRdB` 都对同一个标量测量,
+因此参考发射机之外的发射机得到的是诚实的涌生 SNR 标签,而非各自的
+请求目标。
 
 必需语义:
 

@@ -1,25 +1,31 @@
 {
   "SchemaVersion": "baseline-v0",
-  "GeneratedAt": "2026-04-26T07:31:20Z",
-  "GeneratedBy": "tests/regression/test_baseline_sweep_200.m@bc3abc4",
+  "GeneratedAt": "2026-08-13T18:42:40Z",
+  "GeneratedBy": "tests/regression/test_baseline_sweep_200.m@0e7254e",
   "MatlabVersion": "25.1.0.2943329 (R2025a)",
   "OS": "win64",
   "Mode": "full",
-  "SweepWallclockSec": 4799.7113154,
+  "SweepWallclockSec": 399.2228293,
+  "RunRecovery": {
+    "Resume": false,
+    "NumRecoveredScenarios": 0,
+    "AggregationWallclockSec": 399.2228293,
+    "ScenarioWallclockSecSum": 391.9797201
+  },
   "Recipe": {
     "RecipeFile": "tests/regression/baseline_recipe_v0.m",
-    "RecipeSha": "07a5957018fd901e2331c98be301552f5ad4026592ea61c5c0a458ffcbf03ed8",
-    "NumScenarios": 210,
+    "RecipeSha": "65176050d08518889eb06328d5cdffcadac3fae5b7b47d2dd41eee2b41880a64",
+    "NumScenarios": 250,
     "RngSeed": 2.0260424E+7,
     "Counts": {
-      "x2p4GHz_RT_NoBuildings_OFDM": 20,
-      "x2p4GHz_RT_WithBuildings_OFDM": 40,
-      "AMBroadcast_AWGN": 10,
-      "FMBroadcast_AWGN": 10,
-      "HighSpeed_Aero_Doppler": 10,
-      "Sub3GHz_AWGN_PSKQAM": 40,
-      "Sub3GHz_RayleighMIMO_OFDM": 40,
-      "Sub3GHz_RicianMIMO_Mixed": 40
+      "x2p4GHz_AWGN_OFDM_A": 48,
+      "x2p4GHz_AWGN_OFDM_B": 24,
+      "AMBroadcast_AWGN": 12,
+      "FMBroadcast_AWGN": 12,
+      "HighSpeed_Aero_Doppler": 12,
+      "Sub3GHz_AWGN_PSKQAM": 47,
+      "Sub3GHz_RayleighMIMO_OFDM": 47,
+      "Sub3GHz_RicianMIMO_Mixed": 48
     }
   },
   "ToolboxLevel": "minimal",
@@ -27,14 +33,21 @@
   "Metrics": {
     "BlueprintAcceptanceRate": 1,
     "ChannelFactoryFailureRate": 0,
-    "WallclockSecPerScenarioP50": 21.23075605,
-    "WallclockSecPerScenarioP95": 45.4658155,
-    "LogLinesPerScenarioP50": 923,
-    "LogLinesPerScenarioP95": 2885,
-    "AnnotationFileBytesP50": 12930,
-    "AnnotationFileBytesP95": 35244,
-    "ExecutionVsMeasuredBwAbsRelDiffP95": 0.02117070237517055,
+    "WallclockSecPerScenarioP50": 1.5224923000000001,
+    "WallclockSecPerScenarioP95": 2.6074652,
+    "LogLinesPerScenarioP50": 630,
+    "LogLinesPerScenarioP95": 1155,
+    "AnnotationFileBytesP50": 35202,
+    "AnnotationFileBytesP95": 93135,
+    "ExecutionVsMeasuredBwAbsRelDiffP95": 0.016032930094856832,
+    "ExecutionVsMeasuredBwAbsRelDiffLowSnrP50": 6.6711212859819633E-5,
+    "ExecutionVsMeasuredBwAbsRelDiffLowSnrP95": 0.018147752958302864,
+    "ExecutionVsMeasuredBwAbsRelDiffLowSnrMax": 0.23169437082597105,
     "EmptySignalSegmentRatio": 0,
+    "MeasuredVsRrcTheoryRatioP50": 1.0008679663952571,
+    "MeasuredVsRrcTheoryRatioP95": 2.1596270157253246,
+    "MeasuredVsAllocationRatioP50": 0.98640696994052757,
+    "MeasuredVsAllocationRatioP95": 2.8622754594315234,
     "BlueprintResamplesP50": 0,
     "BlueprintResamplesP95": 0,
     "BlueprintResamplesMax": 0,
@@ -46,11 +59,14 @@
       "JsonNanCount": 0,
       "JsonInfinityCount": 0,
       "SanitizeManifestSummary": {
-        "TotalEntries": 3758
+        "TotalEntries": 0
       },
-      "NumLowSnrExcludedFromBwMetric": 88,
+      "NumLowSnrExcludedFromBwMetric": 897,
+      "NumBwSamplesUsedLowSnr": 897,
       "LowSnrFloorDb": 6,
-      "NumBwSamplesUsed": 626
+      "NumBwSamplesUsed": 2067,
+      "NumMvdRrcTheorySamples": 661,
+      "NumMvdAllocationSamples": 2067
     }
   }
 }

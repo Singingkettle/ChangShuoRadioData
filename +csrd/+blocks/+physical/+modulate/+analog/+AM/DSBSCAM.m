@@ -86,6 +86,23 @@ classdef DSBSCAM < csrd.blocks.physical.modulate.BaseModulator
 
     methods (Access = protected)
 
+        function limitHz = analogMessageBandwidthLimitHz(obj)
+            % analogMessageBandwidthLimitHz - DSB transmits both sidebands, so
+            % the message may occupy half the allocated channel.
+            % Inputs: obj - modulator with TargetBandwidth set.
+            % Outputs: limitHz - one-sided message limit (Hz).
+            limitHz = obj.TargetBandwidth / 2;
+        end
+
+        function mode = analogMessageNormalization(~)
+            % analogMessageNormalization - suppressed-carrier DSB is linear in
+            % the message (no modulation-index semantics), so normalize to
+            % unit POWER: that is the baseband level the TRF's DC-offset
+            % convention assumes.
+            % Inputs: none used. Outputs: mode - 'power'.
+            mode = 'power';
+        end
+
         function [modulatedSignal, bandWidth] = baseModulator(obj, messageSignal)
             % baseModulator - Core DSB-SC AM modulation implementation
             % Inputs: see signature arguments and local validation.

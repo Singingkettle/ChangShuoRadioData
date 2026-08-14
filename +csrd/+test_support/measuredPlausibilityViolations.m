@@ -192,11 +192,41 @@ if localFiniteScalar(sourcePlane, 'OccupiedBandwidthHz')
         end
     end
 
+    % The propagation ratio is only a statement about propagation when its
+    % DENOMINATOR is a resolved width. The Execution side is measured on the
+    % same frame-length window, so when the emitter's clean band spans fewer
+    % than ~33 analysis cells (the ITU-R SM.443 RBW-at-1-3%-of-OBW guidance,
+    % i.e. the short-window OBW floor regime), both planes read a
+    % window-quantised floor and their ratio is floor arithmetic: measured
+    % floor-bound narrowband emitters on Rician read 1.6-2.0x their own
+    % equally floor-bound Execution number with NOTHING having widened.
+    % Report those as notes; a genuinely resolved denominator keeps the hard
+    % bound. (The measured-side RBW is the proxy for the Execution window's
+    % RBW -- the two windows are the same frame length.)
+    execResolved = true;
+    if localFiniteScalar(context, 'ExecutionBwHz') && ...
+            localFiniteScalar(sourcePlane, 'BandwidthResolutionHz') && ...
+            sourcePlane.BandwidthResolutionHz > 0
+        execCells = context.ExecutionBwHz / sourcePlane.BandwidthResolutionHz;
+        if execCells < 33
+            execResolved = false;
+        end
+    end
+
     if claimsMeasurement && resolvedBandwidth && ...
             localFiniteScalar(context, 'ExecutionBwHz') && context.ExecutionBwHz > 0
         execBw = context.ExecutionBwHz;
         ratio = ob / execBw;
-        if ratio > PROPAGATION_INFLATION_LIMIT
+        if ratio > PROPAGATION_INFLATION_LIMIT && ~execResolved
+            qualityNotes{end + 1} = sprintf( ...
+                ['%s OccupiedBandwidthHz=%.4g is %.3fx its ExecutionBw=%.4g, ', ...
+                 'but the Execution width spans only %.1f analysis cells ', ...
+                 '(RBW=%.4g Hz): both planes read the short-window floor and ', ...
+                 'the ratio is window arithmetic, not propagation'], ...
+                tag, ob, ratio, execBw, ...
+                execBw / sourcePlane.BandwidthResolutionHz, ...
+                localFieldOrNaN(sourcePlane, 'BandwidthResolutionHz'));
+        elseif ratio > PROPAGATION_INFLATION_LIMIT
             % Report the burst length and RBW with the ratio, because propagation
             % is the only PIPELINE stage between the planes but not the only
             % possible cause: the two planes also measure buffers of different
@@ -252,6 +282,7 @@ end
 
 
 function v = localFieldOrNaN(s, f)
+    % localFieldOrNaN - the field as a double when finite scalar, else NaN.
 v = NaN;
 if localFiniteScalar(s, f)
     v = double(s.(f));
@@ -260,6 +291,7 @@ end
 
 
 function tf = localFiniteScalar(s, f)
+    % localFiniteScalar - whether the struct carries a finite numeric scalar field.
 tf = isstruct(s) && isfield(s, f) && isnumeric(s.(f)) ...
     && isscalar(s.(f)) && isfinite(s.(f));
 end

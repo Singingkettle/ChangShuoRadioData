@@ -440,6 +440,10 @@ classdef ChannelFactory < matlab.System
         function appliedSNR_dB = resolveAppliedSnr(obj, computedSNR_dB, linkDistance_m, ...
                 frameId, txIdStr, rxIdStr, channelLinkInfo)
             % resolveAppliedSnr - The SNR to apply to the statistical channel.
+            % Inputs: computedSNR_dB - analytical link-budget SNR;
+            %         linkDistance_m - link distance (m); frameId/txIdStr/
+            %         rxIdStr/channelLinkInfo - burst identity for seeding.
+            % Outputs: appliedSNR_dB - the SNR the channel realizes.
             %   Distance-based mode (LinkBudget.EnableDistanceBasedSNR=true):
             %     the analytical link-budget SNR, unchanged.
             %   Controlled mode (false): a per-burst uniform sample from
@@ -477,6 +481,12 @@ classdef ChannelFactory < matlab.System
         function out = planChannelNoise(obj, out, appliedSNR_dB, ...
                 frameId, txIdStr, rxIdStr, channelLinkInfo)
             % planChannelNoise - Size the channel noise but DO NOT add it.
+            % Inputs: out - channel output struct (Signal etc.);
+            %         appliedSNR_dB - resolved target SNR; frameId/txIdStr/
+            %         rxIdStr/channelLinkInfo - burst identity for seeding.
+            % Outputs: out - with ChannelSignalPowerW,
+            %          RequestedChannelNoisePowerW and the PendingChannelNoise
+            %          descriptor the deferred injector realizes.
             %
             %   The measured plane is this dataset's ground truth, and its
             %   occupied-bandwidth label is only valid when measured on a
@@ -547,7 +557,12 @@ classdef ChannelFactory < matlab.System
             % noise is non-negligible. For a single antenna sum(.,2) is a no-op,
             % so SISO is unaffected.
             out.ChannelSignalPowerW = mean(abs(sum(sig, 2)) .^ 2);
-            out.ChannelNoisePowerW = targetNoiseW * numRxColumns;
+            % REQUESTED noise power for this link's target SNR. The noise the
+            % saved frame carries is the single whole-frame realization drawn
+            % from the frame's REFERENCE descriptor (applyFrameChannelNoise);
+            % this per-link value is a diagnostic of the plan, not the label's
+            % noise term.
+            out.RequestedChannelNoisePowerW = targetNoiseW * numRxColumns;
             % The injector draws on the antenna-collapsed stream, so it needs the
             % summed-scale power. Drawing one collapsed realization at
             % targetNoiseW*numColumns is statistically identical to summing
@@ -709,6 +724,8 @@ classdef ChannelFactory < matlab.System
 
         function seedValue = frameSaltedNoiseSeed(~, baseSeed, frameId)
             % frameSaltedNoiseSeed Frame-dependent additive-noise seed.
+            % Inputs: baseSeed - burst-stable channel seed; frameId - frame index.
+            % Outputs: seedValue - RandStream seed in [1, 2^31-2].
             % Salts the burst-stable base seed with frameId so the additive
             % thermal/channel-noise REALIZATION differs per observation window
             % (thermal noise is i.i.d. across frames), while fading geometry --

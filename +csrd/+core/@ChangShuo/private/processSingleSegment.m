@@ -125,7 +125,7 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         end
 
         % Phase 4 (§5 Truth.Design): the v2 annotation Design block reads
-        % `comp.Planned.{PlannedCenterFrequencyHz, PlannedBandwidthHz,
+        % `comp.Planned.{PlannedCenterFrequencyHz, AllocatedBandwidthHz,
         % PlannedSampleRate, ModulationFamily, ModulationOrder,
         % PayloadLengthBits, NumTransmitAntennas}` to publish the
         % design-time blueprint values verbatim. Project them off
@@ -133,7 +133,7 @@ function modulatedSignalSegment = processSingleSegment(obj, FrameId, currentTxSc
         % downstream `buildSourceAnnotation` does not have to reach back
         % into TxScenario or fall back on NaN sentinels (which get
         % flagged by `validateMeasurementCompleteness` / smoke tests).
-        modulatedSignalSegment.Planned.PlannedBandwidthHz = ...
+        modulatedSignalSegment.Planned.AllocatedBandwidthHz = ...
             currentSegmentScenario.Placement.TargetBandwidth;
         % PlannedCenterFrequencyHz is a receiver-baseband offset (the
         % ReceiverView projected center), NOT an absolute RF carrier: the

@@ -27,7 +27,7 @@ disp(reader.Summary)
 | 下游需求 | 字段 |
 |-----------------|-------|
 | 类别名 / 调制族 | `Truth.Design.ModulationFamily` |
-| 规划带宽 | `Truth.Design.PlannedBandwidthHz` |
+| 规划带宽 | `Truth.Design.AllocatedBandwidthHz` |
 | 实现的纯净调制带宽 | `Truth.Execution.ModulatedBandwidthHz` |
 | 最终占用带宽标签 | `Truth.Measured.SourcePlane.OccupiedBandwidthHz` |
 | 接收窗投影 | `ReceiverView.ProjectedCenterOffsetHz` |
