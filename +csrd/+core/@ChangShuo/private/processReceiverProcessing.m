@@ -455,6 +455,20 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
     % ITU 99 % number is still correct for the notched waveform.
     sourcePlane.HalfPowerSpanHz          = NaN;
     sourcePlane.SpectralConcentrationRatio = NaN;
+    % Detectability of THIS emitter in the SAVED noisy frame. The plane above
+    % is measured pre-noise per-emitter, so its OBW/center/family stay clean
+    % and confident even for a source buried far under the frame noise floor
+    % (routine under ray tracing, which applies physical path loss and does
+    % not go through the controlled-SNR realization). A source no detector
+    % could find in the delivered frame is MARKED here rather than silently
+    % carried as a confident label. The rule + floor live in one shared
+    % function so they cannot drift across the writer, the plausibility gate,
+    % and the COCO consumer; the applied threshold travels with the data.
+    [detectable, detectStatus, detectFloorDb] = ...
+        csrd.pipeline.measurement.sourceDetectability(sourcePlane.SNRdB);
+    sourcePlane.Detectable = detectable;
+    sourcePlane.DetectabilityStatus = detectStatus;
+    sourcePlane.DetectabilityThresholdDb = detectFloorDb;
 
     % Liveness is energy-based, not sample-count-based: an empty channel
     % output (e.g. a link with no propagation paths) is zero-padded to the
@@ -474,6 +488,11 @@ function measured = buildMeasuredTruth(isolatedSignal, sampleRate, ...
             getFieldOrDefault(comp, 'MeasuredReceivedSNRdB', ...
                 getFieldOrDefault(comp, 'AppliedSNRdB', NaN)), ...
             'Truth.Measured.SourcePlane.SNRdB');
+        % Re-derive detectability from the now-live SNR (the default block
+        % computed it against the placeholder NaN).
+        [sourcePlane.Detectable, sourcePlane.DetectabilityStatus, ...
+            sourcePlane.DetectabilityThresholdDb] = ...
+            csrd.pipeline.measurement.sourceDetectability(sourcePlane.SNRdB);
 
         % Phase 21: compute OBW, center frequency, envelope, and frequency
         % occupancy from one validated signal summary. Failure remains visible

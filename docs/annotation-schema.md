@@ -219,6 +219,48 @@ overlap count was a directly learnable leak of the GT burst timing). Every
 so emitters other than the reference get honest, emergent SNR labels rather
 than their own requested targets.
 
+### SNR is controlled only on the statistical channels
+
+`Execution.AppliedSNRdB` is a controlled target ([-10, 30] dB by default)
+ONLY on the statistical channels (AWGN/Rayleigh/Rician), where the channel
+factory sizes the noise to realize it. **Ray tracing does not go through that
+realization**: it applies the physical path loss of the traced (or, when no
+path is found, free-space fallback) geometry, so a ray-traced emitter's
+realized `SourcePlane.SNRdB` is geometry-emergent and UNBOUNDED BELOW — a
+shadowed NLOS or fully-blocked link legitimately arrives 100+ dB under the
+frame noise floor. `AppliedSNRdB` is still recorded for a ray-traced source
+but is NOT the realized SNR; the realized value is `SourcePlane.SNRdB`.
+
+### Detectability: is the source findable in the SAVED frame
+
+Because the measured plane is taken pre-noise per-emitter, its
+OBW/center/family stay clean and confident even for a source that, in the
+delivered noisy frame, sits far below the noise floor (routine under ray
+tracing per above). `SourcePlane` therefore carries a detectability
+determination so a consumer never trains "there is a signal here" on what is,
+in the saved frame, pure noise:
+
+| Field | Meaning |
+|-------|---------|
+| `Detectable` | logical; `SNRdB >= DetectabilityThresholdDb` |
+| `DetectabilityStatus` | `Detectable` \| `BelowNoiseFloor` \| `NoSignal` |
+| `DetectabilityThresholdDb` | the applied floor (dB), default −30 |
+
+The −30 dB floor is not a specific detector's SNR wall (that would be
+arbitrary); at −30 dB a source contributes 0.1 % of the noise power and sits
+below the single-frame SNR wall of energy and practical feature detectors, so
+it marks the sources no detector could find in one frame — the ones whose
+label is untrustworthy. The threshold travels with the data so a reader sees
+which line was applied; a consumer wanting a tighter, detector-specific gate
+re-derives from the required `SNRdB`. The COCO converter skips a
+geometry-visible but `BelowNoiseFloor` source with `skip_reason =
+below_noise_floor`, distinct from `not_visible` (geometry) and
+`measurement_status_*` (no signal to measure). These three detectability
+fields are additive — they do not change what any existing measured field
+means, so the measurement contract version is unchanged and an annotation
+written before they existed still reads (the gate/converter fall back to
+deriving detectability from `SNRdB`).
+
 Required semantics:
 
 | Field | Required value |

@@ -127,14 +127,48 @@ MIN_RESOLUTION_CELLS = 8;
 % case and far below the pathological one (~43, see below).
 MAX_SPECTRAL_CONCENTRATION = 8;
 
-% Emitters are capped at MaxBandwidthFractionOfSampleRate (0.8) of Fs; anything
-% materially above that is the estimator bridging the capture band, not a wide
-% emitter.
-maxOccupiedFraction = 0.85;
+% Emitters are capped at MaxBandwidthFractionOfSampleRate (0.8) of Fs; on the
+% statistical channels anything materially above that is the estimator bridging
+% the capture band, not a wide emitter -- so 0.85 is the default bound.
+%
+% RAY TRACING relaxes it to 0.98. The 0.8 emitter cap governs the CLEAN
+% emitter, not the measured width: a frequency-selective multipath channel
+% (a 2-ray comb, delay-spread nulls) legitimately redistributes a wideband
+% emitter's PSD toward the band edges, so a clean 40 MHz OFDM emitter on a
+% 50 MHz capture correctly measures up to ~0.99*Fs after ray tracing (verified
+% on the 100-scenario OSM stress run: 40 OFDM sources at 0.93-0.99*Fs, all
+% fully resolved cells>=500, conc~3.6 -- a correct measurement of genuine
+% multipath widening, not an estimator artifact). The only hard physical bound
+% then is Fs itself (an OBW exceeding the sampled band would be an
+% aliasing/measurement fault); 0.98 with the FFT-bin tol reaches ~1.0*Fs while
+% still catching a >Fs blow-up. Statistical fading is mild/flat and does not
+% reshape a 40 MHz emitter this way, so it keeps the stricter 0.85.
+channelModel = '';
+if isfield(context, 'ChannelModel') && ~isempty(context.ChannelModel)
+    channelModel = char(string(context.ChannelModel));
+end
+if strcmpi(channelModel, 'RayTracing')
+    maxOccupiedFraction = 0.98;
+else
+    maxOccupiedFraction = 0.85;
+end
 
 claimsMeasurement = true;
 if isfield(context, 'MeasurementStatus') && ~isempty(context.MeasurementStatus)
     claimsMeasurement = strcmpi(char(string(context.MeasurementStatus)), 'Measured');
+end
+
+% Detectability of the source in the SAVED noisy frame (see
+% csrd.pipeline.measurement.sourceDetectability). Prefer the value the writer
+% stamped on the plane; fall back to deriving it from the required SNRdB so an
+% annotation written before the field existed still gates correctly.
+if isfield(sourcePlane, 'Detectable') && ~isempty(sourcePlane.Detectable)
+    sourceDetectable = logical(sourcePlane.Detectable);
+elseif localFiniteScalar(sourcePlane, 'SNRdB')
+    sourceDetectable = csrd.pipeline.measurement.sourceDetectability( ...
+        sourcePlane.SNRdB);
+else
+    sourceDetectable = true;   % no SNR to judge by -> do not exempt
 end
 
 if localFiniteScalar(sourcePlane, 'OccupiedBandwidthHz')
@@ -274,8 +308,22 @@ end
 
 if localFiniteScalar(sourcePlane, 'SNRdB')
     sn = sourcePlane.SNRdB;
-    if sn < -100 || sn > 200
-        violations{end + 1} = sprintf('%s SNRdB=%.4g out of [-100,200]', tag, sn);
+    % The upper bound is an absurdity guard that always applies: no physical
+    % link delivers +200 dB SNR, so a value that high is a bug regardless of
+    % channel. The lower bound only applies to a DETECTABLE source. Ray
+    % tracing sets its own physical path loss and bypasses the controlled-SNR
+    % realization, so a shadowed/blocked link legitimately arrives 100+ dB
+    % under the frame noise -- that is a real geometry outcome, and the source
+    % is already MARKED not-detectable (SourcePlane.DetectabilityStatus =
+    % BelowNoiseFloor). Flagging its very-negative SNR as an absurdity too
+    % would report the same acknowledged fact twice; the deep value is the
+    % honest label of a buried emitter, not an out-of-range number.
+    if sn > 200
+        violations{end + 1} = sprintf('%s SNRdB=%.4g exceeds 200', tag, sn);
+    elseif sn < -100 && sourceDetectable
+        violations{end + 1} = sprintf( ...
+            ['%s SNRdB=%.4g < -100 while flagged Detectable; a detectable ', ...
+             'source cannot sit that far under noise'], tag, sn);
     end
 end
 end

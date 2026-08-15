@@ -165,6 +165,23 @@ if ~logicalScalar(rv.IsVisible)
     return;
 end
 
+% A source that is geometry-visible but sits below the detectability floor in
+% the saved noisy frame is SKIPPED with its own reason. This is a DIFFERENT
+% fact from not_visible (geometry) and from measurement_status (no signal to
+% measure): the emitter is present and was measured cleanly pre-noise, but in
+% the delivered frame it is buried under noise (routine under ray tracing,
+% which applies physical path loss and bypasses the controlled-SNR
+% realization). Training a detector on "there is a signal here" over what is,
+% in the saved frame, pure noise would poison the labels -- so the box is
+% omitted and the omission is named. The rule is the shared
+% csrd.pipeline.measurement.sourceDetectability floor; prefer the writer's
+% stamped flag, fall back to deriving it from the required SNRdB.
+detectSkip = localDetectabilitySkipReason(source);
+if ~isempty(detectSkip)
+    state.skippedSources(end + 1) = makeSkippedSource(source, frame, detectSkip);
+    return;
+end
+
 % A source with no usable measured bandwidth is SKIPPED with a reason, not fatal.
 % The measured plane legitimately reports NoSignal for a silent buffer (an emitter
 % whose burst does not overlap this frame, a link with no propagation paths), and
@@ -306,6 +323,32 @@ end
 % burst does not overlap this frame, a link with no propagation paths). NaN is the
 % honest value there, so omit the box and name the status.
 reason = sprintf('measurement_status_%s', status);
+end
+
+
+function reason = localDetectabilitySkipReason(source)
+    % localDetectabilitySkipReason - 'below_noise_floor' when the source is
+    % measured but buried under the frame noise; '' otherwise.
+    % Inputs: source - one annotation source record.
+    % Outputs: reason - char tag, '' when the source is detectable.
+    reason = '';
+    sp = source.Truth.Measured.SourcePlane;
+    % Only a genuinely measured plane can be "buried but present"; a NoSignal
+    % plane is handled by the measurement-status branch, not here.
+    if ~isfield(sp, 'MeasurementStatus') || ...
+            ~strcmpi(char(string(sp.MeasurementStatus)), 'Measured')
+        return;
+    end
+    detectable = true;
+    if isfield(sp, 'Detectable') && ~isempty(sp.Detectable)
+        detectable = logical(sp.Detectable);
+    elseif isfield(sp, 'SNRdB') && isnumeric(sp.SNRdB) && ...
+            isscalar(sp.SNRdB) && isfinite(sp.SNRdB)
+        detectable = csrd.pipeline.measurement.sourceDetectability(sp.SNRdB);
+    end
+    if ~detectable
+        reason = 'below_noise_floor';
+    end
 end
 
 
