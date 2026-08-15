@@ -213,11 +213,17 @@ function ctx = localPlausibilityContext(src, sourcePlane)
     %   the clean pre-channel waveform) so the measured value can be checked
     %   against the emitter's own bandwidth, plus the measurement status so an
     %   explicitly unresolvable source is exempt from that comparison.
-    ctx = struct('ExecutionBwHz', NaN, 'MeasurementStatus', '');
+    ctx = struct('ExecutionBwHz', NaN, 'MeasurementStatus', '', 'ChannelModel', '');
     if isstruct(src) && isfield(src, 'Truth') && isstruct(src.Truth) ...
-            && isfield(src.Truth, 'Execution') && isstruct(src.Truth.Execution) ...
-            && isfield(src.Truth.Execution, 'ModulatedBandwidthHz')
-        ctx.ExecutionBwHz = src.Truth.Execution.ModulatedBandwidthHz;
+            && isfield(src.Truth, 'Execution') && isstruct(src.Truth.Execution)
+        if isfield(src.Truth.Execution, 'ModulatedBandwidthHz')
+            ctx.ExecutionBwHz = src.Truth.Execution.ModulatedBandwidthHz;
+        end
+        % The channel model conditions the occupied-bandwidth bound: ray
+        % tracing legitimately fills the capture band via multipath.
+        if isfield(src.Truth.Execution, 'ChannelModel')
+            ctx.ChannelModel = src.Truth.Execution.ChannelModel;
+        end
     end
     if isstruct(sourcePlane) && isfield(sourcePlane, 'MeasurementStatus')
         ctx.MeasurementStatus = sourcePlane.MeasurementStatus;
